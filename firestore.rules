@@ -121,7 +121,7 @@ service cloud.firestore {
         allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
           && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
-          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play']
+          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode']
           && actingAs(request.resource.data.fromUid)
           && request.resource.data.fromUid != uid
           && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName
@@ -980,13 +980,85 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
     }
 
+    // ---------- Series (Community Movies seasons + episodes) ----------
+    // A series is a playlist of the owner's own movie posts: episodes = [{p: postId, s: season, e: episode}],
+    // postIds mirrors the ids (for "which series is this movie in" lookups). Only the owner (or the
+    // admin acting as 'studio' for Lone Keem Studios Originals) edits it; followers change only
+    // followerCount, by exactly one, tied to their own followers/{uid} doc.
+    match /series/{sid} {
+      function sd() { return request.resource.data; }
+      function validSeries(d) {
+        return d.keys().hasOnly(['ownerId', 'ownerName', 'ownerUsername', 'ownerColor', 'title', 'desc', 'genre', 'aiTools',
+                                 'rating', 'cover', 'seasons', 'episodes', 'postIds', 'followerCount', 'episodeCount',
+                                 'lastAddedId', 'ai', 'createdAt', 'updatedAt'])
+          && isStr(d.title, 1, 80) && isStr(d.desc, 0, 1000) && isStr(d.genre, 1, 30) && isStr(d.aiTools, 0, 100)
+          && d.rating in ['all', '13', '16', '18']
+          && (d.cover == '' || cloudinaryImageUrl(d.cover) || (d.cover is string && d.cover.matches('^https://i[.]ytimg[.]com/vi/[A-Za-z0-9_-]{6,20}/[a-z]+[.]jpg$')))
+          && d.seasons is int && d.seasons >= 1 && d.seasons <= 30
+          && d.episodes is list && d.episodes.size() <= 300
+          && d.postIds is list && d.postIds.size() == d.episodes.size()
+          && d.episodeCount == d.episodes.size()
+          && (!('ai' in d) || (d.ai is map && d.ai.keys().hasOnly(['style', 'seed', 'cast', 'look'])))
+          && d.updatedAt == request.time;
+      }
+      // The movie that was just added must be a movie post by the series owner.
+      function addedOk(d) {
+        return !('lastAddedId' in d) || d.lastAddedId == ''
+          || (resource != null && d.lastAddedId == resource.data.get('lastAddedId', ''))
+          || (d.lastAddedId in d.postIds
+              && get(/databases/$(database)/documents/posts/$(d.lastAddedId)).data.authorId == d.ownerId
+              && get(/databases/$(database)/documents/posts/$(d.lastAddedId)).data.type == 'movie');
+      }
+      allow read: if true;
+      allow create: if actingAs(sd().ownerId) && validSeries(sd())
+        && sd().followerCount == 0 && sd().createdAt == request.time && addedOk(sd())
+        && (sd().ownerId == 'studio'
+            || (sd().ownerName == get(userPath(me())).data.displayName && sd().ownerUsername == get(userPath(me())).data.username));
+      allow update: if (actingAs(resource.data.ownerId) && validSeries(sd())
+                        && sd().ownerId == resource.data.ownerId && sd().createdAt == resource.data.createdAt
+                        && sd().followerCount == resource.data.followerCount && addedOk(sd()))
+        || (signedIn() && changed().hasOnly(['followerCount'])
+            && ((sd().followerCount == resource.data.followerCount + 1
+                 && !exists(/databases/$(database)/documents/series/$(sid)/followers/$(me()))
+                 && existsAfter(/databases/$(database)/documents/series/$(sid)/followers/$(me())))
+             || (sd().followerCount == resource.data.followerCount - 1
+                 && exists(/databases/$(database)/documents/series/$(sid)/followers/$(me()))
+                 && !existsAfter(/databases/$(database)/documents/series/$(sid)/followers/$(me())))));
+      allow delete: if actingAs(resource.data.ownerId) || isAdmin();
+
+      match /followers/{fid} {
+        allow read: if signedIn() && (fid == me() || actingAs(get(/databases/$(database)/documents/series/$(sid)).data.ownerId) || isAdmin());
+        allow create: if signedIn() && fid == me()
+          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+          && request.resource.data.uid == me() && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/series/$(sid)).data.followerCount
+               == get(/databases/$(database)/documents/series/$(sid)).data.followerCount + 1;
+        allow delete: if signedIn() && (fid == me() || isAdmin()
+          || !existsAfter(/databases/$(database)/documents/series/$(sid))
+          || actingAs(get(/databases/$(database)/documents/series/$(sid)).data.ownerId));
+      }
+    }
+    match /{path=**}/followers/{fid} {
+      allow read: if signedIn() && resource.data.uid == me();
+    }
+    // Private "continue watching" progress per user and episode.
+    match /users/{uid}/watch/{postId} {
+      allow read, delete: if signedIn() && uid == me();
+      allow create, update: if signedIn() && uid == me()
+        && request.resource.data.keys().hasOnly(['sid', 't', 'dur', 'at'])
+        && isStr(request.resource.data.sid, 0, 100)
+        && request.resource.data.t is number && request.resource.data.t >= 0 && request.resource.data.t <= 100000
+        && request.resource.data.dur is number && request.resource.data.dur >= 0 && request.resource.data.dur <= 100000
+        && request.resource.data.at == request.time;
+    }
+
     // ---------- Reports (admin only can read) ----------
     match /reports/{rid} {
       allow read, delete: if isAdmin();
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'postId', 'reason', 'excerpt', 'createdAt'])
         && request.resource.data.reporterId == me()
-        && request.resource.data.targetType in ['post', 'comment', 'user', 'live', 'live chat']
+        && request.resource.data.targetType in ['post', 'comment', 'user', 'live', 'live chat', 'series', 'movie', 'song']
         && isStr(request.resource.data.targetId, 1, 200)
         && isStr(request.resource.data.postId, 0, 200)
         && isStr(request.resource.data.reason, 1, 500)

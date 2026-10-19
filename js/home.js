@@ -123,8 +123,15 @@ onAuthStateChanged(auth, async (user) => {
     try {
       const qs = await getDocs(query(collection(db, 'posts'), where('type', '==', kind), orderBy('createdAt', 'desc'), limit(12)));
       const list = qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.work && !(p.type === 'movie' && p.work.rating === '18'));
-      box.innerHTML = list.length ? list.map((p) => { const a = art(p); return `<a class="ctile ${kind}" href="app.html#/post/${esc(p.id)}"><span class="art" style="${a ? '' : `background:${grad(p.id + p.work.title)}`}">${a ? `<img src="${esc(a)}" alt="" loading="lazy" onerror="this.parentNode.style.background='linear-gradient(135deg,#5b21b6,#c026d3 70%,#f5b301)';this.remove()">` : `<span class="gt">${esc(p.work.title)}</span>`}</span><b>${esc(p.work.title)}</b><small>${esc(kind === 'song' ? (p.work.artist || p.authorName) : p.work.genre)} · @${esc(p.authorUsername)}</small><span class="ai">AI-made</span></a>`; }).join('')
-        : `<p class="muted small">No community ${kind}s yet. <a href="app.html#/new/${kind}">Be the first to share one</a>.</p>`;
+      let ser = '';
+      if (kind === 'movie') {
+        try {
+          const ss = await getDocs(query(collection(db, 'series'), orderBy('updatedAt', 'desc'), limit(8)));
+          ser = ss.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => x.episodeCount > 0 && x.rating !== '18').map((x) => `<a class="ctile movie series" href="app.html#/series/${esc(x.id)}"><span class="art" style="${x.cover ? '' : `background:${grad(x.id + x.title)}`}">${x.cover ? `<img src="${esc(x.cover)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="gt">${esc(x.title)}</span>`}</span><b>${esc(x.title)}</b><small>${x.ownerId === 'studio' ? 'Lone Keem Studios Original' : 'Series · ' + x.episodeCount + ' ep'} · @${esc(x.ownerUsername)}</small><span class="ai">Series</span></a>`).join('');
+        } catch { /* series are optional here */ }
+      }
+      box.innerHTML = ser + (list.length ? list.map((p) => { const a = art(p); return `<a class="ctile ${kind}" href="app.html#/post/${esc(p.id)}"><span class="art" style="${a ? '' : `background:${grad(p.id + p.work.title)}`}">${a ? `<img src="${esc(a)}" alt="" loading="lazy" onerror="this.parentNode.style.background='linear-gradient(135deg,#5b21b6,#c026d3 70%,#f5b301)';this.remove()">` : `<span class="gt">${esc(p.work.title)}</span>`}</span><b>${esc(p.work.title)}</b><small>${esc(kind === 'song' ? (p.work.artist || p.authorName) : p.work.genre)} · @${esc(p.authorUsername)}</small><span class="ai">AI-made</span></a>`; }).join('')
+        : ser ? '' : `<p class="muted small">No community ${kind}s yet. <a href="app.html#/new/${kind}">Be the first to share one</a>.</p>`);
     } catch { box.innerHTML = `<p class="muted small"><a href="app.html#/explore/${kind}s">Open the ${kind}s in Kemy</a></p>`; }
   }
   rows.forEach((row) => {

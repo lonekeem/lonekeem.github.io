@@ -1372,3 +1372,47 @@ body.cam-open .mini-player { display: none; }
 .rc-s:hover,.rc-s:focus-visible{border-color:#b47cf0}
 .rc-loading{display:grid;place-items:center;min-height:200px}
 .lv-emoji{border:0;background:none;font-size:20px;padding:0 6px;cursor:pointer;flex:none}
+
+/* ---------- Series & Episodes ---------- */
+.sb-series{display:inline-block;font:800 10px 'Space Grotesk',sans-serif;letter-spacing:.08em;background:#8a2be2;color:#fff;padding:3px 7px;border-radius:6px}
+.stile .sb-series{position:absolute;left:8px;top:8px}
+.worig,.wseries{margin:14px 0}.worig h3,.wseries h3{display:flex;align-items:center;gap:10px}
+.sbanner{position:relative;border-radius:20px;overflow:hidden;min-height:260px;display:flex;align-items:flex-end;margin:0 0 14px;background-size:cover;background-position:center}
+.sbanner::before{content:'';position:absolute;inset:0;background:var(--bg) center/cover no-repeat;filter:saturate(1.1)}
+.sbanner::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,3,15,.1) 0%,rgba(7,3,15,.55) 45%,#07030f 100%)}
+.sbanner-in{position:relative;z-index:1;padding:18px;width:100%}
+.sbanner h1{font:800 clamp(26px,6vw,40px)/1.05 'Space Grotesk',sans-serif;margin:8px 0 6px}
+.ssub{margin:0 0 8px;color:#d9ccf5;font-size:14px}.sby{display:flex;align-items:center;gap:8px;font-size:14px;color:#cbb6f5;margin-bottom:12px}
+.sacts{display:flex;flex-wrap:wrap;gap:8px}
+.sdesc{color:#e7defa;line-height:1.5}.sseasons{display:flex;gap:6px;overflow-x:auto;margin:14px 0 8px}.sseason-h{font:700 18px 'Space Grotesk',sans-serif;margin:16px 0 8px}
+.seps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.sep{display:flex;gap:12px;padding:8px;border-radius:14px;background:#120a22;border:1px solid rgba(180,124,240,.15);color:inherit;text-decoration:none}
+.sep:hover,.sep:focus-visible{border-color:#b47cf0}.sep.cont{border-color:#ffd166;box-shadow:0 0 0 1px rgba(255,209,102,.35)}
+.sep-th{position:relative;flex:none;width:clamp(120px,34vw,180px);aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#1b1030}
+.sep-th img{width:100%;height:100%;object-fit:cover;display:block}
+.sep-rt{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.75);color:#fff;font:700 11px Inter,sans-serif;padding:2px 5px;border-radius:5px}
+.sep-pr{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.25)}.sep-pr span{display:block;height:100%;background:#ff3d7f}
+.sep-m{display:flex;flex-direction:column;gap:3px;min-width:0}.sep-m b{font-size:15px}.sep-m small{color:#a796c9}.sep-d{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sep-cw{align-self:flex-start;font:800 10px Inter,sans-serif;letter-spacing:.05em;text-transform:uppercase;background:#ffd166;color:#1a0d00;padding:2px 6px;border-radius:5px}
+.sep-done{align-self:flex-start;font-size:11px;color:#7fe0a8}
+.sep-l{display:inline-block;font:800 12px 'Space Grotesk',sans-serif;background:rgba(138,85,220,.3);color:#e9ddff;padding:2px 7px;border-radius:6px;vertical-align:middle}
+.sepbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin:0 0 10px;border-radius:12px;background:rgba(138,85,220,.14);border:1px solid rgba(180,124,240,.25)}
+.sepbar-s{display:flex;align-items:center;gap:6px;color:#fff;text-decoration:none;min-width:0}.sepbar-s b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wplayer{position:relative}
+.snext{position:absolute;inset:0;display:grid;place-items:center;background:rgba(7,3,15,.82);z-index:3;border-radius:inherit}
+.snext-in{text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;padding:12px}.snext-in small{color:#cbb6f5}.snext-in b{font:700 20px 'Space Grotesk',sans-serif}
+.snext-ring{width:56px;height:56px;border-radius:50%;border:3px solid #ffd166;display:grid;place-items:center;font:800 22px 'Space Grotesk',sans-serif}
+.spick summary{cursor:pointer;font-weight:600}.spick-b{margin-top:8px}.spick-n{gap:10px}.spick-n .field{flex:1}
+.sman h2{margin-top:0}.sman-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(180,124,240,.12)}.sman-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sman select{flex:1;min-width:0}.sman-foot{display:flex;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap}
+.mm-ser{margin-bottom:12px}.mm-ser textarea{width:100%;margin-top:6px}
+
+/* ---------- Movie Maker: Animated mode ---------- */
+.mm-modes label span{display:flex;flex-direction:column}.mm-modes small{font-weight:400;opacity:.75;font-size:11px}
+.mm-h{font:700 16px 'Space Grotesk',sans-serif;margin:14px 0 8px}
+.mm-cast{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.mm-char{display:flex;gap:10px;padding:10px}.mm-cimg{flex:none;width:120px;height:150px;border-radius:12px;background:repeating-conic-gradient(#1b1030 0 25%,#140a24 0 50%) 0 0/16px 16px;display:grid;place-items:center;overflow:hidden}
+.mm-cprev{width:120px;height:150px;cursor:crosshair}.mm-cname{width:100%;font-weight:700}
+.mm-pup,.mm-line{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}.mm-pup select,.mm-line select{max-width:46%}.mm-px{flex:1;min-width:80px}.mm-ltext{flex:1;min-width:120px}
+.mm-row2{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
+.mm-sprev{width:100%;height:auto;display:block;border-radius:10px}

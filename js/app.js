@@ -280,7 +280,7 @@ function adminMediaCleanup(urls) {
 }
 let works = null;
 function getWorks() {
-  if (!works) works = createWorks({ db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main });
+  if (!works) works = createWorks({ db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
   return works;
 }
 const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
@@ -543,11 +543,14 @@ const routes = [
   [/^#\/feed$/, pageFeed, 'feed'],
   [/^#\/explore(?:\/(movies|songs))?$/, pageExplore, 'explore'],
   [/^#\/search(?:\?(.*))?$/, pageSearch, 'explore'],
-  [/^#\/new(?:\/(text|menu|movie|song|aimovie))?$/, pageCompose, 'new'],
+  [/^#\/new(?:\/(text|menu|movie|song|aimovie))?(?:\?(.*))?$/, pageCompose, 'new'],
+  [/^#\/series\/new$/, (t) => getWorks().series().editPage(null, t), 'explore'],
+  [/^#\/series\/([\w-]+)\/edit$/, (id, t) => getWorks().series().editPage(id, t), 'explore'],
+  [/^#\/series\/([\w-]+)$/, (id, t) => getWorks().series().page(id, t), 'explore'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
   [/^#\/me$/, pageMe, 'me'],
-  [/^#\/u\/([a-z0-9_.]{1,30})(?:\/(saved|movies|songs))?$/i, pageProfile, 'me'],
+  [/^#\/u\/([a-z0-9_.]{1,30})(?:\/(saved|movies|songs|series))?$/i, pageProfile, 'me'],
   [/^#\/(followers|following)\/([\w-]+)$/, pageFollowList, 'me'],
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
   [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
@@ -712,10 +715,12 @@ const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${ava
 // ---------------------------------------------------------------- compose (Post tab)
 // Camera / photo / library flow lives in js/create.js; the text + link form stays here.
 const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends });
-async function pageCompose(sub, token) {
+async function pageCompose(sub, qs, token) {
   if (!requireAuth()) return;
-  if (sub === 'movie' || sub === 'song') return getWorks().composePage(sub, token);
-  if (sub === 'aimovie') { const { createMovieMaker } = await import('./moviemaker.js'); return createMovieMaker({ S, main, esc, toast, friendlyError, publishMovie: (o) => getWorks().publishMovie(o) }).page(token); }
+  const pre = Object.fromEntries(new URLSearchParams(qs || ''));
+  if (pre.series) { pre.sid = pre.series; }
+  if (sub === 'movie' || sub === 'song') return getWorks().composePage(sub, token, pre);
+  if (sub === 'aimovie') { const { createMovieMaker } = await import('./moviemaker.js'); return createMovieMaker({ S, main, esc, toast, friendlyError, publishMovie: (o) => getWorks().publishMovie(o), series: getWorks().series(), pre, getPost: async (id) => { const d = await getDoc(doc(db, 'posts', id)); return d.exists() ? { id: d.id, ...d.data() } : null; } }).page(token); }
   composer.render(token, { sub, textForm: (slot) => textComposeForm(slot, sub === 'text') });
 }
 async function postAuthor(asStudio) {
@@ -896,7 +901,7 @@ async function pageProfile(username, tab, token) {
         ${!mine && S.user && uid !== STUDIO_UID ? (blocked ? `<button class="btn btn-sm btn-danger" id="unblock">Unblock</button>` : `<button class="btn btn-sm btn-danger" id="block">Block</button>`) : ''}
       </div>
     </section>
-    <nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/movies" class="${tab === 'movies' ? 'active' : ''}">Movies</a><a href="#/u/${esc(u.username)}/songs" class="${tab === 'songs' ? 'active' : ''}">Songs</a>${mine ? `<a href="#/u/${esc(u.username)}/saved" class="${tab === 'saved' ? 'active' : ''}">Saved</a>` : ''}</nav>
+    <nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/movies" class="${tab === 'movies' ? 'active' : ''}">Movies</a><a href="#/u/${esc(u.username)}/songs" class="${tab === 'songs' ? 'active' : ''}">Songs</a><a href="#/u/${esc(u.username)}/series" class="${tab === 'series' ? 'active' : ''}">Series</a>${mine ? `<a href="#/u/${esc(u.username)}/saved" class="${tab === 'saved' ? 'active' : ''}">Saved</a>` : ''}</nav>
     <div id="posts"><div class="spinner"></div></div>`;
   $('#add-bio')?.addEventListener('click', () => sessionStorage.setItem('lks-focus-bio', '1'));
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
@@ -928,6 +933,11 @@ async function pageProfile(username, tab, token) {
     const posts = (await Promise.all(sv.docs.map((d) => getDoc(doc(db, 'posts', d.id))))).filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }));
     if (stale(token)) return;
     renderGrid($('#posts'), posts, 'Nothing saved yet. Tap the bookmark on any post to save it here.');
+  } else if (tab === 'series') {
+    const ser = getWorks().series(); const list = await ser.fetchList({ owner: uid, max: 50 }).catch(() => []);
+    if (stale(token)) return;
+    $('#posts').innerHTML = '<div class="wgrid"></div>';
+    await ser.renderTiles($('#posts .wgrid'), list, `<div class="empty">No series yet.${mine ? ' <a href="#/series/new">Start a series</a>.' : ''}</div>`);
   } else if (tab === 'movies' || tab === 'songs') {
     const ps = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(100)));
     if (stale(token)) return;
@@ -1152,7 +1162,7 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
@@ -1184,7 +1194,7 @@ async function pageAdmin(token) {
     const reporter = await getProfile(r.reporterId);
     const target = r.targetType === 'user' ? await getProfile(r.targetId) : null;
     const isLive = r.targetType === 'live' || r.targetType === 'live chat';
-    const link = r.targetType === 'user' ? (target ? `#/u/${target.username}` : '') : isLive ? `#/live/${r.postId || r.targetId}` : `#/post/${r.postId || r.targetId}`;
+    const link = r.targetType === 'user' ? (target ? `#/u/${target.username}` : '') : r.targetType === 'series' ? `#/series/${r.targetId}` : isLive ? `#/live/${r.postId || r.targetId}` : `#/post/${r.postId || r.targetId}`;
     const el = document.createElement('div'); el.className = 'card pad'; el.style.marginBottom = '12px';
     el.innerHTML = `<div class="row"><span class="tag" style="text-transform:uppercase;font-size:.75rem;color:var(--blue)">${esc(r.targetType)}</span><span class="spacer"></span><span class="muted small">${esc(timeAgo(r.createdAt))}</span></div>
       <p style="margin:10px 0 4px"><b>Reason:</b> ${esc(r.reason)}</p>

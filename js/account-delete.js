@@ -53,6 +53,18 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
     await step('Deleting your stories…', () => drain(query(collection(db, 'stories'), where('authorId', '==', uid)), async (docs) => {
       for (const d of docs) { await deleteRefs(await sub(['stories', d.id, 'viewers']).catch(() => [])); await deleteDoc(d.ref); }
     }));
+    await step('Deleting your series…', () => drain(query(collection(db, 'series'), where('ownerId', '==', uid)), async (docs) => {
+      for (const d of docs) { const b = writeBatch(db); (await sub(['series', d.id, 'followers']).catch(() => [])).slice(0, BATCH - 1).forEach((r) => b.delete(r)); b.delete(d.ref); await b.commit(); }
+    }));
+    await step('Unfollowing series…', () => drain(query(collectionGroup(db, 'followers'), where('uid', '==', uid)), async (docs) => {
+      for (const d of docs) {
+        const sref = d.ref.parent.parent; if (!sref || d.ref.parent.parent.parent.id !== 'series') continue;
+        const b = writeBatch(db); b.delete(d.ref);
+        const s = await getDoc(sref).catch(() => null); if (s && s.exists()) b.update(sref, { followerCount: increment(-1) });
+        await b.commit();
+      }
+    }));
+    await step('Clearing your watch progress…', async () => deleteRefs(await sub(['users', uid, 'watch'])));
     await step('Deleting your posts…', () => drain(query(collection(db, 'posts'), where('authorId', '==', uid)), async (docs) => {
       for (const d of docs) {
         ownPosts.add(d.id);

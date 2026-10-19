@@ -2,6 +2,7 @@
 // map, so stars, comments + replies, saves, views/plays, reports, search, feeds, profiles and
 // account deletion all reuse the post system. Uploads go straight to Cloudinary (unsigned presets).
 import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
+import { createSeries } from './series.js';
 
 export const GENRES = {
   movie: ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Fantasy', 'Romance', 'Animation', 'Music', 'Documentary', 'Other'],
@@ -11,7 +12,7 @@ export const DESC = {
   movie: { heading: 'Community Movies', intro: 'Your film, your vision, made with AI. Share the short films, trailers and full-length movies you’ve created with AI tools, from sci-fi epics to five-minute comedies. Post it, collect gold stars, and get discovered by the Kemy community.', sub: 'Share an AI movie: upload up to 10 min, or link YouTube for any length.' },
   song: { heading: 'Community Songs', intro: 'Made a track with AI? Drop it here. Share your AI-created songs and beats, add your lyrics and cover art, and let the Kemy community press play, leave gold stars and find your sound.', sub: 'Share an AI song: upload audio or link YouTube, then add lyrics and cover art.' }
 };
-const RATINGS = [['all', 'All ages'], ['13', '13+'], ['16', '16+'], ['18', '18+']];
+export const RATINGS = [['all', 'All ages'], ['13', '13+'], ['16', '16+'], ['18', '18+']];
 const AUDIO_EXT = ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga'];
 const VIDEO_EXT = ['mp4', 'mov', 'webm'];
 const PLAY_SECONDS = 10;
@@ -25,8 +26,8 @@ export function ytIdFrom(url) {
   } catch { return ''; }
 }
 export const ytThumb = (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
-const fmtDur = (s) => { s = Math.max(0, Math.round(Number(s) || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
-const fmtRuntime = (s) => { s = Number(s) || 0; if (!s) return ''; if (s < 3600) return s < 60 ? `${Math.round(s)}s` : `${Math.round(s / 60)} min`; return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`; };
+export const fmtDur = (s) => { s = Math.max(0, Math.round(Number(s) || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+export const fmtRuntime = (s) => { s = Number(s) || 0; if (!s) return ''; if (s < 3600) return s < 60 ? `${Math.round(s)}s` : `${Math.round(s / 60)} min`; return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`; };
 // Deterministic purple/gold gradient for songs/movies without art.
 function hue(str) { let h = 0; for (const c of String(str)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
 export function gradientCss(seed) { const h = hue(seed); const a = 255 + (h % 50), b = (h >> 3) % 2 ? 40 + ((h >> 5) % 15) : 300 + ((h >> 5) % 30); return `linear-gradient(135deg,hsl(${a} 75% 42%),hsl(${b} 85% ${(h >> 8) % 2 ? 55 : 35}%))`; }
@@ -53,6 +54,8 @@ export function createWorks(ctx) {
   const isMine = (p) => S.user && p.authorId === S.user.uid;
   const gate18 = new Set(JSON.parse(sessionStorage.getItem('kemy-18') || '[]'));
   const confirm18 = (id) => { gate18.add(id); sessionStorage.setItem('kemy-18', JSON.stringify([...gate18])); };
+  let seriesApi = null;
+  const series = () => seriesApi || (seriesApi = createSeries({ ...ctx, upload, tile, CLOUDINARY, deliveryUrls }));
   const blurred = (p) => p.type === 'movie' && p.work.rating === '18' && !gate18.has(p.id) && !isMine(p);
 
   // ---------------------------------------------------------------- tiles + feed cards
@@ -110,7 +113,8 @@ export function createWorks(ctx) {
   });
 
   // ---------------------------------------------------------------- compose page (#/new/movie, #/new/song)
-  function composePage(kind, token) {
+  const TOO_BIG = 'This file is over the 10 min / 100 MB upload limit. Upload it to YouTube (unlisted works) and paste the link instead; YouTube links can be any length.';
+  function composePage(kind, token, pre = {}) {
     if (!requireAuth()) return;
     const D = DESC[kind], isSong = kind === 'song';
     main.innerHTML = `
@@ -120,7 +124,7 @@ export function createWorks(ctx) {
       <form class="card pad wform" id="wform" novalidate>
         <fieldset class="wsrc"><legend>Source</legend>
           <label><input type="radio" name="src" value="youtube" ${isSong ? '' : 'checked'}> <span><b>YouTube link</b><small>${isSong ? 'Any length' : 'Recommended for full-length films · any length'}</small></span></label>
-          <label><input type="radio" name="src" value="upload" ${isSong ? 'checked' : ''}> <span><b>Upload a file</b><small>${isSong ? 'MP3, M4A/AAC, WAV or OGG · up to 10 min / 100 MB' : 'MP4, MOV or WebM · up to 10 min / 100 MB'}</small></span></label>
+          <label><input type="radio" name="src" value="upload" ${isSong ? 'checked' : ''}> <span><b>${isSong ? 'Upload a file' : 'Made it in another app? Upload it here'}</b><small>${isSong ? 'MP3, M4A/AAC, WAV or OGG · up to 10 min / 100 MB' : 'From CapCut, InShot, your gallery or any editor · MP4, MOV or WebM · up to 10 min / 100 MB'}</small></span></label>
         </fieldset>
         <div class="field" data-src="youtube"><label for="w-yt">YouTube link</label><input id="w-yt" type="text" inputmode="url" placeholder="https://youtube.com/watch?v=…" autocomplete="off"></div>
         <div class="field" data-src="youtube"><label for="w-rt">Runtime (minutes)</label><input id="w-rt" type="number" min="0" max="1440" step="1" placeholder="e.g. ${isSong ? '3' : '12'}"></div>
@@ -135,12 +139,15 @@ export function createWorks(ctx) {
           <label class="check"><input type="checkbox" id="w-explicit"> <span>Explicit lyrics <span class="wb-e">E</span></span></label>` :
           `<fieldset class="wrate"><legend>Age rating</legend>${RATINGS.map(([v, l], i) => `<label><input type="radio" name="rating" value="${v}" ${i ? '' : 'checked'}> <span>${l}</span></label>`).join('')}</fieldset>`}
         <div class="field"><label for="w-ai">AI tools used <span class="muted small">(optional)</span></label><input id="w-ai" type="text" maxlength="100" placeholder="${isSong ? 'e.g. Suno, Udio' : 'e.g. Sora, Runway, Suno'}"></div>
+        ${isSong ? '' : series().pickerHtml(pre)}
         <label class="check wrights"><input type="checkbox" id="w-rights"> <span>I made this or have the rights to share it, and it follows the <a href="guidelines.html" target="_blank">Community Guidelines</a>.</span></label>
         <div class="pv-progress" hidden><span></span></div><p class="small muted" id="w-status" aria-live="polite"></p>
         <p class="form-error" id="w-err"></p>
         <button class="btn btn-block" type="submit" id="w-go">${isSong ? 'Share song' : 'Share movie'}</button>
       </form>`;
     const $ = (s) => main.querySelector(s);
+    const pickSeries = isSong ? () => null : series().wirePicker(main, pre);
+    const toYt = (msg) => { $('#w-fileinfo').innerHTML = `${esc(msg)} <button type="button" class="link-btn small" id="w-useyt">Use a YouTube link</button>`; $('#w-useyt').onclick = () => { main.querySelector('input[name=src][value=youtube]').checked = true; paintSrc(); $('#w-yt').focus(); }; };
     const counters = [['#w-title', '#w-title-n', 80], ['#w-desc', '#w-desc-n', 1000], ['#w-lyrics', '#w-lyrics-n', 5000]];
     counters.forEach(([a, b, m]) => { const i = $(a), o = $(b); if (!i) return; const f = () => (o.textContent = `${i.value.length}/${m}`); i.oninput = f; f(); });
     const src = () => main.querySelector('input[name=src]:checked').value;
@@ -151,11 +158,28 @@ export function createWorks(ctx) {
       const f = $('#w-file').files[0]; const info = $('#w-fileinfo'); fileDur = 0; if (!f) { info.textContent = ''; return; }
       const ext = (f.name.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || '';
       if (!(isSong ? AUDIO_EXT : VIDEO_EXT).includes(ext)) { info.textContent = isSong ? 'Use an MP3, M4A/AAC, WAV or OGG file.' : 'Use an MP4, MOV or WebM file.'; return; }
-      if (f.size > 100 * 1048576) { info.textContent = 'That file is over 100 MB.'; return; }
+      if (f.size > 100 * 1048576) { toYt(TOO_BIG); return; }
       info.textContent = 'Checking length…'; fileDur = await probe(f, isSong ? 'audio' : 'video');
-      info.textContent = fileDur ? `${fmtDur(fileDur)} · ${(f.size / 1048576).toFixed(1)} MB${fileDur > 600.5 ? ' · too long (max 10 min)' : ''}` : `${(f.size / 1048576).toFixed(1)} MB`;
+      info.textContent = fileDur ? `${fmtDur(fileDur)} · ${(f.size / 1048576).toFixed(1)} MB` : `${(f.size / 1048576).toFixed(1)} MB`;
+      if (fileDur > 600.5) toYt(`${fmtDur(fileDur)} · ${TOO_BIG}`);
       if (!$('#w-title').value) { $('#w-title').value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').slice(0, 80); $('#w-title').oninput(); }
     };
+    // Shared into Kemy from another app (Web Share Target, see sw.js)
+    if (pre.shared && 'caches' in window) (async () => {
+      try {
+        const c = await caches.open('kemy-share'); const metaR = await c.match('./__shared-meta'); const meta = metaR ? await metaR.json() : {};
+        const mr = await c.match('./__shared-media');
+        const link = ytIdFrom(meta.url) ? meta.url : (String(meta.text || '').match(/https?:\/\/\S+/) || [])[0] || '';
+        if (mr && !isSong) {
+          const blob = await mr.blob(); const file = new File([blob], meta.name || 'shared-video.mp4', { type: meta.type || blob.type || 'video/mp4' });
+          const dt = new DataTransfer(); dt.items.add(file); $('#w-file').files = dt.files;
+          main.querySelector('input[name=src][value=upload]').checked = true; paintSrc(); $('#w-file').onchange();
+          toast('Video received. Add a title and share it.');
+        } else if (ytIdFrom(link)) { $('#w-yt').value = link; main.querySelector('input[name=src][value=youtube]').checked = true; paintSrc(); toast('YouTube link received.'); }
+        if (meta.title && !$('#w-title').value) { $('#w-title').value = meta.title.slice(0, 80); $('#w-title').oninput(); }
+        await c.delete('./__shared-media'); await c.delete('./__shared-meta');
+      } catch { /* nothing shared */ }
+    })();
     $('#wform').onsubmit = async (ev) => {
       ev.preventDefault();
       const err = $('#w-err'); err.textContent = '';
@@ -170,8 +194,7 @@ export function createWorks(ctx) {
         file = $('#w-file').files[0]; if (!file) { err.textContent = isSong ? 'Choose an audio file.' : 'Choose a video file.'; return; }
         const ext = (file.name.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || '';
         if (!(isSong ? AUDIO_EXT : VIDEO_EXT).includes(ext)) { err.textContent = 'That file type isn’t supported.'; return; }
-        if (file.size > 100 * 1048576) { err.textContent = 'Files can be up to 100 MB.'; return; }
-        if (fileDur > 600.5) { err.textContent = 'Uploads can be up to 10 minutes. Link YouTube for longer ones.'; return; }
+        if (file.size > 100 * 1048576 || fileDur > 600.5) { err.textContent = TOO_BIG; return; }
         runtime = Math.round(fileDur * 10) / 10;
       }
       const art = $('#w-art').files[0];
@@ -205,6 +228,8 @@ export function createWorks(ctx) {
         b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
         await b.commit();
         barIn.style.transform = 'scaleX(1)';
+        const sp = pickSeries();
+        if (sp) { status.textContent = 'Adding to your series…'; try { await series().addEpisode(sp.series, ref.id, sp.season, sp.ep, work.title); } catch (e) { toast('Shared, but it couldn’t be added to the series: ' + (e.message || '')); } }
         toast(isSong ? 'Song shared!' : 'Movie shared!');
         location.hash = '#/post/' + ref.id;
       } catch (e) {
@@ -314,6 +339,7 @@ export function createWorks(ctx) {
     slot.appendChild(el);
     const q = (s) => el.querySelector(s);
     // views / plays
+    if (!isSong) series().episodeBar(p, el).catch(() => {});
     const vid = q('video');
     if (vid) { tenSeconds(vid, p); vid.addEventListener('error', () => { const o = origUrl(vid.currentSrc || vid.src); if (o && o !== vid.src) vid.src = o; }, { once: true }); }
     const wireYt = () => { const f = q('[data-a=yt]'); if (f) f.onclick = () => { f.parentElement.innerHTML = `<div class="embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(w.yt)}?autoplay=1&rel=0" title="${esc(w.title)}" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe></div>`; setTimeout(() => recordView(p.id, p.authorId), PLAY_SECONDS * 1000); }; };
@@ -387,14 +413,17 @@ export function createWorks(ctx) {
         <p class="wintro clamp" id="wintro">${esc(D.intro)}</p><button class="link-btn wmorebtn" type="button" aria-expanded="false">more</button>
         <a class="btn btn-sm wnew" href="#/new/${kind}">+ Share ${isSong ? 'a song' : 'a movie'}</a>${isSong ? '' : '<a class="btn btn-sm btn-ghost wnew wmm" href="#/new/aimovie">✨ Make an AI movie</a>'}
         <div class="wpicks" hidden><h3>★ Studio Picks</h3><div class="wrow"></div></div>
-        <div class="wchips" role="toolbar" aria-label="Genres"><button class="chip on" data-g="">All</button>${GENRES[kind].map((g) => `<button class="chip" data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div>
+        ${isSong ? '' : '<div class="worig" hidden><h3>Lone Keem Studios Originals</h3><div class="wrow"></div></div><div class="wseries" hidden><h3>📺 Series <a class="small" href="#/series/new">+ New series</a></h3><div class="wrow"></div></div>'}
+        <div class="wchips" role="toolbar" aria-label="Genres"><button class="chip on" data-g="">All</button>${isSong ? '' : '<button class="chip" data-g="__series">Series</button>'}${GENRES[kind].map((g) => `<button class="chip" data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div>
         <div class="wsort" role="tablist"><button class="on" data-s="createdAt">New</button><button data-s="viewCount">${isSong ? 'Most played' : 'Most viewed'}</button><button data-s="likeCount">Top starred</button></div>
         <div class="wgrid"><div class="spinner"></div></div>
       </section>`;
     const q = (s) => root.querySelector(s);
     wireMore(root);
     let sort = 'createdAt', genre = '', list = [];
-    const paint = () => { const v = list.filter((p) => isWork(p) && !S.blocked.has(p.authorId) && (!genre || p.work.genre === genre)); q('.wgrid').innerHTML = v.length ? v.map((p) => tile(p)).join('') : `<div class="empty">No ${isSong ? 'songs' : 'movies'} here yet. <a href="#/new/${kind}">Share the first one</a>.</div>`; wireTiles(q('.wgrid'), v); };
+    let seriesList = null;
+    const paintSeries = async () => { const box = q('.wgrid'); box.innerHTML = '<div class="spinner"></div>'; try { seriesList = seriesList || await series().fetchList({ max: 60 }); } catch { seriesList = []; } if (genre !== '__series') return; await series().renderTiles(box, seriesList, '<div class="empty">No series yet. <a href="#/series/new">Start the first one</a>.</div>'); };
+    const paint = () => { if (genre === '__series') { paintSeries(); return; } const v = list.filter((p) => isWork(p) && !S.blocked.has(p.authorId) && (!genre || p.work.genre === genre)); q('.wgrid').innerHTML = v.length ? v.map((p) => tile(p)).join('') : `<div class="empty">No ${isSong ? 'songs' : 'movies'} here yet. <a href="#/new/${kind}">Share the first one</a>.</div>`; wireTiles(q('.wgrid'), v); };
     const load = async () => {
       q('.wgrid').innerHTML = '<div class="spinner"></div>';
       try { const qs = await getDocs(query(collection(db, 'posts'), where('type', '==', kind), orderBy(sort, 'desc'), limit(60))); if (stale(token)) return; list = qs.docs.map((d) => ({ id: d.id, ...d.data() })); }
@@ -406,6 +435,11 @@ export function createWorks(ctx) {
     };
     root.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => { genre = b.dataset.g; root.querySelectorAll('[data-g]').forEach((x) => x.classList.toggle('on', x === b)); paint(); }));
     root.querySelectorAll('[data-s]').forEach((b) => (b.onclick = () => { sort = b.dataset.s; root.querySelectorAll('[data-s]').forEach((x) => x.classList.toggle('on', x === b)); load(); }));
+    if (!isSong) {
+      series().fetchList({ max: 20 }).then(async (l) => { if (stale(token) || !l.length) return; const orig = l.filter((x) => x.ownerId === 'studio'), rest = l.filter((x) => x.ownerId !== 'studio');
+        if (orig.length) { q('.worig').hidden = false; await series().renderTiles(q('.worig .wrow'), orig); }
+        if (rest.length) { q('.wseries').hidden = false; await series().renderTiles(q('.wseries .wrow'), rest); } }).catch(() => {});
+    }
     getDocs(query(collection(db, 'posts'), where('type', '==', kind), where('featured', '==', true), limit(12))).then((qs) => {
       const picks = qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter(isWork); if (!picks.length || stale(token)) return;
       q('.wpicks').hidden = false; q('.wpicks .wrow').innerHTML = picks.map((p) => tile(p)).join(''); wireTiles(q('.wpicks .wrow'), picks);
@@ -433,7 +467,7 @@ export function createWorks(ctx) {
     wireTiles(container, v);
   }
   // Post a finished movie file (used by the Kemy AI Movie Maker). Same rules as the compose form.
-  async function publishMovie({ file, title, desc = '', genre = 'Animation', aiTools = 'Kemy AI Movie Maker', rating = 'all', runtime = 0, onProgress }) {
+  async function publishMovie({ file, title, desc = '', genre = 'Animation', aiTools = 'Kemy AI Movie Maker', rating = 'all', runtime = 0, onProgress, seriesPick = null }) {
     if (!requireAuth()) throw new Error('Sign in to post.');
     if (file.size > 100 * 1048576) throw new Error('Movies can be up to 100 MB.');
     if (runtime > 600.5) throw new Error('Uploads can be up to 10 minutes.');
@@ -452,7 +486,8 @@ export function createWorks(ctx) {
     });
     b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
     await b.commit();
+    if (seriesPick) await series().addEpisode(seriesPick.series, ref.id, seriesPick.season, seriesPick.ep, work.title);
     return ref.id;
   }
-  return { isWork, card, page, explore, grid, composePage, tile, player, publishMovie };
+  return { isWork, card, page, explore, grid, composePage, tile, player, publishMovie, series };
 }
