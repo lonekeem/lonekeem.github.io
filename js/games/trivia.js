@@ -58,7 +58,7 @@ export function createTrivia(ctx) {
       <div class="tv-podium">${rows.slice(0, 3).map((r, i) => `<div class="pod p${i}">${ui.STAR()}<b>${esc(r.name)}</b><span>${r.s}</span></div>`).join('')}</div>${scoreList(players, scores)}</div>`;
     const top = rows[0]; const tie = rows.length > 1 && rows[1].s === top.s;
     const win = !tie && isMe(top);
-    ui.resultModal({ title: tie ? 'Draw at the top!' : win ? 'You win!' : `${top.name} wins`, sub: `${top.s} points`, win, buttons });
+    ui.resultModal({ title: tie ? 'Draw at the top!' : win ? 'You win!' : `${top.name} wins`, sub: `${top.s} points`, win, buttons, pts: (rows.find(isMe) || {}).s });
   }
 
   // ------------------------------------------------------------ vs computer

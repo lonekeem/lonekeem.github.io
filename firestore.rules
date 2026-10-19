@@ -1004,6 +1004,44 @@ service cloud.firestore {
       }
     }
 
+    // ---------- Scoreboards: leaderboard/{uid}_{game}, written only by that player ----------
+    // Scores only go up, by at most one game's worth per write (win 3 / draw 1; Bubble Quest stars <= 300),
+    // at most one write per doc every 10 s (3 s for Bubble Quest + Overall), with per-game bounds.
+    match /leaderboard/{docId} {
+      function lb() { return request.resource.data; }
+      function lbOld() { return resource.data; }
+      function lbBig(g) { return g == 'quest' || g == 'all'; }
+      function lbCap(g) { return lbBig(g) ? 300 : 3; }
+      function lbMaxBest(g) { return g == 'quest' ? 500 : g == 'trivia' ? 50000 : g == 'pals' ? 10000 : 1000000; }
+      function lbN(v, hi) { return v is int && v >= 0 && v <= hi; }
+      function lbUp(f, hi) { return lb()[f] >= lbOld()[f] && lb()[f] - lbOld()[f] <= hi; }
+      function lbShape() {
+        return lb().keys().hasOnly(['uid', 'game', 'name', 'uname', 'color', 'pal', 'score', 'wins', 'losses', 'draws', 'games', 'best', 'wk', 'wkScore', 'updatedAt'])
+          && lb().keys().hasAll(['uid', 'game', 'name', 'uname', 'color', 'score', 'wins', 'losses', 'draws', 'games', 'best', 'wk', 'wkScore', 'updatedAt'])
+          && lb().uid == me()
+          && lb().game in ['stardrop', 'starcards', 'pool', 'chess', 'ludo', 'trivia', 'klgrid', 'checkers', 'pals', 'quest', 'all']
+          && docId == me() + '_' + lb().game
+          && lb().name == get(userPath(me())).data.displayName && lb().uname == get(userPath(me())).data.username
+          && isStr(lb().color, 0, 20)
+          && (!('pal' in lb()) || lb().pal == null || (lb().pal is map && lb().pal.size() <= 8 && isStr(lb().pal.get('species', ''), 0, 30) && isStr(lb().pal.get('name', ''), 0, 30)))
+          && lbN(lb().score, 1000000) && lbN(lb().wins, 100000) && lbN(lb().losses, 100000) && lbN(lb().draws, 100000) && lbN(lb().games, 1000000)
+          && lbN(lb().best, lbMaxBest(lb().game))
+          && lb().wk is string && lb().wk.matches('^[0-9]{4}-W[0-9]{2}$') && lbN(lb().wkScore, 1000000) && lb().wkScore <= lb().score
+          && (lb().game != 'quest' || lb().score <= lb().games * 300)
+          && (lbBig(lb().game) || lb().score <= lb().games * 3)
+          && lb().updatedAt == request.time;
+      }
+      allow read: if true;
+      allow create: if signedIn() && lbShape()
+        && lb().score <= (lbBig(lb().game) ? 3000 : 3) && lb().games <= 1 && lb().wins <= 1 && lb().losses <= 1 && lb().draws <= 1;
+      allow update: if signedIn() && lbOld().uid == me() && lbShape() && lb().game == lbOld().game
+        && lbUp('score', lbCap(lb().game)) && lbUp('games', 1) && lbUp('wins', 1) && lbUp('losses', 1) && lbUp('draws', 1)
+        && lb().best >= lbOld().best
+        && lbOld().updatedAt + duration.value(lbBig(lb().game) ? 3 : 10, 's') < request.time
+        && (lb().wk == lbOld().wk ? lbUp('wkScore', lbCap(lb().game)) : lb().wkScore <= lbCap(lb().game));
+      allow delete: if signedIn() && resource.data.uid == me();
+    }
+
     // ---------- Game records (wins / losses / draws per game) ----------
     match /gameStats/{uid} {
       function gs() { return request.resource.data; }

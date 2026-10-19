@@ -1,5 +1,6 @@
 // Lone Keem Studios Games: hub, routing and the two-player board games (Star Drop, KL Grid,
 // Checkers) online and against the computer. Trivia and Star Cards live in trivia.js / starcards.js.
+import { recordAndShow } from '../leaderboard.js';
 import { ENGINES } from './boards.js';
 import { createNet, BOARD_TYPES, EMOTES, TURN_SECONDS, tsMs, isBot } from './net.js';
 import { sfx } from './sfx.js';
@@ -65,11 +66,14 @@ export function createGames(ctx) {
     });
     if (gid) S.unsubs.push(net.watchChat(gid, (m) => { if (m.uid !== myUid()) floatEmote(host, m.e, names(m.uid)); }));
   }
-  function resultModal({ title, sub, win, buttons }) {
+  let curType = '', curPlayers = null;
+  function resultModal({ title, sub, win, buttons, pts, spectator }) {
     openModal(`<div class="g-result ${win ? 'win' : ''}"><div class="g-result-star">${STAR()}</div><h2>${esc(title)}</h2><p>${esc(sub || '')}</p>
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
     const m = document.querySelector('.modal');
     buttons.forEach((b, i) => { if (b.onClick) { const el = m.querySelector(`[data-i="${i}"]`); if (el) el.onclick = () => { closeModal(); b.onClick(); }; } });
+    const lbBtn = document.createElement('a'); lbBtn.className = 'btn btn-ghost lb-btn'; lbBtn.href = '#/scores/' + (curType || 'all'); lbBtn.textContent = '🏆 Scoreboard'; lbBtn.dataset.close = ''; m.querySelector('.btns')?.appendChild(lbBtn);
+    if (curType && signedIn() && !spectator && (!curPlayers || curPlayers.includes(myUid())) && !/^Game cancelled/i.test(title)) recordAndShow(curType, { r: win ? 'w' : /^Draw/i.test(title) ? 'd' : 'l', pts });
     if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 25 } })); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: 20, why: 'for winning' } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
   }
   const ui = { shell, chip, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
@@ -89,6 +93,7 @@ export function createGames(ctx) {
         <a class="g-qbtn" href="#/games/pick/quick"><span>${CONTROLLER}</span>Quick match</a>
         <a class="g-qbtn" href="#/games/pick/cpu"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01M9.6 15.6h4.8"/></svg></span>Play the computer</a>
       </div>
+      <a class="g-scores" href="#/scores">🏆 <span><b>Scoreboards</b><small>Every game, every player, with their Pal</small></span></a>
       <form class="g-code" id="g-code"><label for="g-code-in" class="sr-only">Room code</label><input id="g-code-in" maxlength="6" placeholder="Have a room code?" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Join</button></form>
       <a class="g-palgames" href="#/games/pals"><span>🐾</span><div><b>Pal Games</b><small>Your Pal vs friends in real time: Pal Race, Bubble Pop Battle, Star Catch and Dance-Off</small></div><span class="g-tag">New</span></a>
       <div class="g-cards">${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}<a class="g-card" href="kemy-quest.html" data-game="kemy-quest"><img src="assets/kemy-quest/cover.svg" alt="" width="120" height="90" style="width:100%;height:auto;border-radius:14px"><div class="g-card-t"><b>Kemy's Bubble Quest</b><span class="muted small">Hop, swim and blow bubbles with Kemy the axolotl.</span><span class="g-tag">1 player</span></div></a></div>
@@ -421,7 +426,9 @@ export function createGames(ctx) {
   // ------------------------------------------------------------ router entry points
   async function page(a, b, q, token) {
     const params = qs(q);
+    curType = ''; curPlayers = null;
     if (!a) return hub(token);
+    if (b === 'cpu' || b === 'local' || params.cpu) curType = a;
     if (a === 'pick') return pick(b);
     if (a === 'kemy-quest') { location.replace('kemy-quest.html' + (b ? '#lvl=' + b : '')); return; }
     if (b === 'cpu') {
@@ -439,6 +446,7 @@ export function createGames(ctx) {
     if (stale(token)) return;
     if (!snap.exists()) { const pg = await net.fs.getDoc(net.fs.doc(db, 'palGames', gid)).catch(() => null); if (pg && pg.exists()) { location.replace('#/games/pals/' + gid); return; } main.innerHTML = `<div class="empty">No game or room called “${esc(gid)}”. <a href="#/games">Games</a></div>`; return; }
     const g = { id: snap.id, ...snap.data() };
+    curType = g.type; curPlayers = [...(g.players || []), ...(g.left || [])];
     if (BOARD_TYPES.includes(g.type)) return onlineBoard(g, token);
     if (g.type === 'trivia') return trivia.online(g, token);
     if (g.type === 'starcards') return cards.online(g, token);

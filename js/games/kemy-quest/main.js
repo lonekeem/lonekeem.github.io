@@ -202,6 +202,11 @@ export async function boot(root, opts = {}) {
       try { const c = await cloud(); const r = await c.save(L.id, ms, w.stars, nBig); const el = $('.kq-cloud', ui); if (el) el.textContent = r.saved ? (r.improved ? 'New personal best posted to the leaderboard!' : 'Stars updated on the leaderboard.') : `Your leaderboard best is ${fmt(r.best || ms)}.`; }
       catch { const el = $('.kq-cloud', ui); if (el) el.textContent = 'Could not reach the leaderboard. Progress is saved on this device.'; }
     }
+    // Kemy scoreboard: total stars (best per level) + levels cleared.
+    if (G.user && !opts.noCloud) {
+      const lv = Object.values(prog.levels || {}); const stars = lv.reduce((n, r) => n + (r.stars || 0), 0), levels = lv.filter((r) => r.done).length;
+      import('../../leaderboard.js').then((m) => m.recordAndShow('quest', { stars, levels })).catch(() => {});
+    }
   }
   async function share(L, ms, stars, nBig) {
     const url = `${location.origin}${location.pathname}#lvl=${L.id}`;

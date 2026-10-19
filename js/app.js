@@ -581,6 +581,7 @@ const routes = [
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
   [/^#\/pals(?:\/(gallery|shop))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
   [/^#\/park$/, () => park.page(), 'me'],
+  [/^#\/scores(?:\/([\w-]+))?(?:\?(.*))?$/, (g, q, t) => import('./leaderboard.js').then((m) => m.scoreboardPage(main, { game: g || 'all', tab: new URLSearchParams(q || '').get('tab') || 'all', S, stale: () => stale(t) })), 'games'],
   [/^#\/games\/pals(?:\/([\w-]+))?(?:\?(.*))?$/, (b, q) => palGames.page(b, Object.fromEntries(new URLSearchParams(q || ''))), 'games'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
@@ -936,6 +937,7 @@ async function pageProfile(username, tab, token) {
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
+        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && !blocked && !(uid === STUDIO_UID && isAdmin()) ? `<a class="btn btn-sm btn-ghost" href="#/chat/${esc(uid)}" id="msg">Message</a>` : ''}

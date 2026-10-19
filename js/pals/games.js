@@ -179,6 +179,8 @@ export function createPalGames(ctx) {
   function result(game, s, o, oname, win, draw, again) {
     openModal(`<div class="g-result ${win ? 'win' : ''}"><h2>${draw ? 'Draw!' : win ? 'Your Pal wins! 🎉' : `${esc(oname)} wins!`}</h2><p>${esc(GAME[game].name)}: you ${s} · ${esc(oname)} ${o}</p><p class="small muted">${win ? 'Your Pal got XP and Star Coins!' : 'Your Pal got a little XP for playing.'}</p>
       <div class="btns"><button class="btn" id="pg-again">Play again</button><a class="btn btn-ghost" href="#/games/pals" data-close>Pal Games</a></div></div>`);
+    document.querySelector('.modal .btns')?.insertAdjacentHTML('beforeend', '<a class="btn btn-ghost lb-btn" href="#/scores/pals" data-close>🏆 Scoreboard</a>');
+    if (S.user && S.profile) import('../leaderboard.js').then((m) => m.recordAndShow('pals', { r: draw ? 'd' : win ? 'w' : 'l', pts: s })).catch(() => {});
     document.getElementById('pg-again').onclick = () => { closeModal(); again(); };
     document.querySelector('.modal a[href="#/games/pals"]')?.addEventListener('click', () => { if (location.hash === '#/games/pals') setTimeout(() => dispatchEvent(new HashChangeEvent('hashchange')), 0); });
   }

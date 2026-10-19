@@ -84,3 +84,4 @@
 .kq-w-castle { background: linear-gradient(135deg, rgba(40,25,110,.7), rgba(120,90,220,.35)); } .kq-w-candy { background: linear-gradient(135deg, rgba(255,140,200,.4), rgba(140,220,255,.3)); }
 @media (prefers-reduced-motion: reduce) { .kq-pages { scroll-behavior: auto; } .kq-dots button { transition: none; } }
 @media (max-width: 420px) { .kq-map { padding: 12px; } .kq-levels { gap: 6px; } .kq-lvl-b { padding: 8px 10px; } .kq-whead h3 { font-size: 18px; } }
+.lb-rank { display: block; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #ffd34d; color: #241400; font: 600 14px Inter, sans-serif; text-decoration: none; text-align: center; }

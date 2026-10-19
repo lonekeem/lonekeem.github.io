@@ -1527,3 +1527,30 @@ body.kb-open .theme-fab { display: none; }
 .apple-row { display: grid; gap: 8px; } .apple-item { display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.05); border-radius: 12px; padding: 8px; }
 .apple-item img { width: 56px; height: 56px; border-radius: 8px; flex: none; } .apple-item .am { min-width: 0; flex: 1; } .apple-item b, .apple-item small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .apple-item audio { width: 100%; height: 32px; margin-top: 4px; } .apple-item a.am-open { font-size: 12px; white-space: nowrap; }
+/* Scoreboards */
+.lb-page { padding-bottom: 120px; }
+.lb-head { display: flex; justify-content: space-between; align-items: center; } .lb-head h1 { margin: 0; font-size: 1.4rem; }
+.lb-games, .lb-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 4px; scrollbar-width: none; }
+.lb-games a, .lb-tabs a { flex: none; padding: 7px 12px; border-radius: 999px; background: #241a38; color: #f3eefc; border: 1px solid rgba(255,255,255,.12); text-decoration: none; font-size: 13px; white-space: nowrap; }
+.lb-games a.on, .lb-tabs a.on { background: #fff; color: #1b1428; border-color: #fff; font-weight: 700; }
+.lb-how { color: #cfc4e6; margin: 6px 0 10px; }
+.lb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lb-row { display: grid; grid-template-columns: 40px 1fr 44px auto; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 14px; background: #1f1631; color: #f3eefc; cursor: pointer; border: 1px solid rgba(255,255,255,.08); }
+.lb-row:hover, .lb-row:focus-visible { border-color: #a855f7; outline: none; }
+.lb-row.me { border-color: #a855f7; box-shadow: inset 0 0 0 1px #a855f7; }
+.lb-rank-n { font: 800 16px 'Space Grotesk', Inter, sans-serif; text-align: center; color: #f3eefc; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.lb-medal { font-size: 18px; text-shadow: 0 0 8px rgba(255,211,77,.7); }
+.lb-row.gold { background: linear-gradient(90deg, #ffe58a, #ffd34d); color: #241400; } .lb-row.gold .lb-medal { color: #b8860b; }
+.lb-row.silver { background: linear-gradient(90deg, #f1f3f8, #cfd5e2); color: #1b1d26; } .lb-row.silver .lb-medal { color: #7b8394; }
+.lb-row.bronze { background: linear-gradient(90deg, #f7c9a0, #d9935a); color: #2a1404; } .lb-row.bronze .lb-medal { color: #8a4b1c; }
+.lb-row.gold *, .lb-row.silver *, .lb-row.bronze * { color: inherit; }
+.lb-who { min-width: 0; } .lb-who b, .lb-who small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .lb-who small { opacity: .75; }
+.lb-pal { width: 40px; height: 40px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.12); }
+.lb-score { text-align: right; } .lb-score b { display: block; font-size: 16px; } .lb-score small { display: block; opacity: .75; font-size: 11px; white-space: nowrap; }
+.lb-empty { color: #cfc4e6; padding: 14px; text-align: center; list-style: none; }
+.lb-more { margin: 10px auto; display: block; }
+.lb-me { position: sticky; bottom: calc(var(--bottom-h, 0px) + 8px + env(safe-area-inset-bottom)); margin-top: 12px; z-index: 5; padding: 6px; border-radius: 16px; background: rgba(17,12,28,.92); backdrop-filter: blur(6px); }
+.lb-rank, .lb-rank-pill a { display: block; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #ffd34d; color: #241400; font-weight: 600; text-decoration: none; text-align: center; }
+.lb-rank-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bottom-h, 0px) + 20px); z-index: 330; }
+.g-scores { display: flex; gap: 12px; align-items: center; margin: 12px 0; padding: 12px 14px; border-radius: 16px; background: linear-gradient(90deg, #ffe58a, #ffd34d); color: #241400; text-decoration: none; font-size: 24px; }
+.g-scores b, .g-scores small { display: block; color: #241400; } .g-scores b { font-size: 16px; } .g-scores small { font-size: 12px; opacity: .8; }
