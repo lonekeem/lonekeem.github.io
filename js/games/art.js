@@ -43,9 +43,15 @@ export const COVERS = {
     <g transform="rotate(8) translate(-13 -26)"><rect width="26" height="38" rx="5" fill="#f2b31b" stroke="#fff" stroke-width="1.5"/>${gstar(13, 19, 7, '#fff')}</g>
     <g transform="rotate(23) translate(-13 -24)"><rect width="26" height="38" rx="5" fill="#8a2be2" stroke="#fff" stroke-width="1.5"/>${gstar(13, 19, 7, 'url(#gc-g)')}</g></g>`)
 };
+COVERS.pool = frame(`<rect x="20" y="14" width="80" height="52" rx="8" fill="url(#gc-g)"/><rect x="25" y="19" width="70" height="42" rx="4" fill="#3d1580"/>
+    ${[[25, 19], [60, 18], [95, 19], [25, 61], [60, 62], [95, 61]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.6" fill="#05020a"/>`).join('')}
+    <circle cx="70" cy="40" r="5" fill="#f2b31b"/><circle cx="78.5" cy="35" r="5" fill="#e2558f"/><circle cx="78.5" cy="45" r="5" fill="#fff"/><path d="M73.5 45h10" stroke="#2bb5a8" stroke-width="3.4"/>
+    <circle cx="86" cy="40" r="5" fill="#0d0a14"/>${gstar(86, 40, 3, '#ffc83d')}<circle cx="40" cy="40" r="5" fill="#f7f3ff"/>
+    <path d="M34 40H8" stroke="url(#gc-p)" stroke-width="3" stroke-linecap="round"/><path d="M46 40h16" stroke="#fff" stroke-width="1" stroke-dasharray="2 2" opacity=".7"/>`);
 export const GAMES = [
   { id: 'stardrop', name: 'Star Drop', blurb: 'Drop gold and purple stars. Four in a row wins.', players: '2 players' },
   { id: 'starcards', name: 'Star Cards', blurb: 'Shed your hand first. Shout LAST STAR! at one card.', players: '2-6 players' },
+  { id: 'pool', name: 'Star Pool', blurb: 'Gold rails, purple felt. Sink your group, then call the 8.', players: '2 players' },
   { id: 'trivia', name: 'Studio Trivia', blurb: 'Fast party quiz: music, movies and more.', players: '2-8 players' },
   { id: 'klgrid', name: 'KL Grid', blurb: 'K vs L on a 3x3 grid, or go Ultimate 9x9.', players: '2 players' },
   { id: 'checkers', name: 'Checkers', blurb: 'Jump, crown and clear the purple board.', players: '2 players' }

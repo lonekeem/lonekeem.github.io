@@ -1,5 +1,6 @@
 /* Lone Keem Studios Games (js/games/*). Loaded on demand by js/games/index.js. */
-.gm-wrap { --gold: #ffc83d; --gold-2: #f2a900; --pl: #b57bff; position: relative; }
+.gm-wrap { --gold: #ffc83d; --gold-2: #f2a900; --pl: #b57bff; position: relative; touch-action: manipulation; }
+.gm-wrap button, .gm-wrap a { -webkit-tap-highlight-color: transparent; }
 .gstar { width: 1em; height: 1em; fill: var(--gold, #ffc83d); filter: drop-shadow(0 0 4px rgba(138,43,226,.7)); vertical-align: -.12em; }
 .gm-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
 .gm-bar h1 { font-size: 1.3rem; margin: 0; }
@@ -242,7 +243,7 @@
 .sc-pile:not(:disabled) .b3 { box-shadow: 0 0 0 2px #ffc83d, 0 0 18px rgba(255,200,61,.6); animation: sc-nudge 1.6s infinite; }
 .sc-pile:disabled { cursor: default; }
 @keyframes sc-nudge { 50% { transform: translate(6px, -10px); } }
-.sc-pile-n { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: .72rem; color: var(--muted); }
+.sc-pile-n { position: absolute; top: -14px; right: -14px; z-index: 2; min-width: 26px; padding: 2px 6px; border-radius: 999px; background: #2b1652; border: 1px solid rgba(181,123,255,.6); font-size: .7rem; font-weight: 700; color: #e8dbff; }
 .sc-discard { position: relative; }
 .sc-discard .sc-card { cursor: default; }
 .sc-discard .sc-card.land { animation: sc-land .38s cubic-bezier(.2,.9,.3,1.3); }
@@ -263,9 +264,10 @@
 .sc-last .gstar { fill: #8a2be2; filter: none; }
 .sc-last.armed { background: linear-gradient(135deg, #8a2be2, #5a1fb0); color: #fff; animation: none; } .sc-last.armed .gstar { fill: #ffc83d; }
 .sc-catch { border: 0; cursor: pointer; padding: 10px 16px; border-radius: 999px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #ff5c7a, #b0204a); box-shadow: 0 0 18px rgba(255,92,122,.6); animation: g-pulse .9s infinite; }
-.sc-hand { display: flex; justify-content: center; padding: 18px 8px 6px; min-height: 110px; overflow-x: auto; scrollbar-width: none; }
-.sc-hand .sc-card { --cw: 62px; margin-left: calc(-1 * clamp(4px, (var(--n) - 5) * 4.4px, 34px)); transition: transform .18s, filter .2s; }
-.sc-hand .sc-card:first-child { margin-left: 0; }
+.sc-hand { display: flex; justify-content: flex-start; padding: 18px 8px 6px; min-height: 110px; overflow-x: auto; scrollbar-width: none; }
+.sc-hand .sc-card { --cw: 62px; margin-left: calc(-1 * clamp(2px, (var(--n) * var(--cw) - 330px) / max(var(--n) - 1, 1), 48px)); transition: transform .18s, filter .2s; }
+.sc-hand .sc-card:first-child { margin-left: auto; }
+.sc-hand .sc-card:last-child { margin-right: auto; }
 .sc-hand .sc-card.can { transform: translateY(-12px); box-shadow: 0 0 0 2px #ffc83d, 0 8px 18px rgba(255,200,61,.35); }
 .sc-hand .sc-card.dim { filter: brightness(.55) saturate(.7); }
 .sc-hand .sc-card.fresh { animation: sc-fresh .5s ease-out; }
@@ -295,5 +297,38 @@
 .g-promo small { color: var(--muted); font-size: .82rem; }
 .g-promo > span:last-child { flex: 0; font-size: 1.6rem; color: var(--purple-light); }
 .icon-btn .ki-games .kf { fill: #ffc83d; }
-.g-stage { width: 100%; }
-.g-stage #g-board { width: 100%; display: grid; justify-items: center; }
+.g-stage { width: 100%; grid-template-columns: minmax(0, 1fr); }
+.g-stage #g-board { width: 100%; min-width: 0; display: flex; justify-content: center; }
+.kl-ult, .kl-sub, .kl-board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sd-board { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.ck-board { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.kl-cell, .ck-sq, .sd-col { min-width: 0; min-height: 0; }
+
+/* ---------- Star Pool */
+.pl-stage { position: relative; display: block; }
+.pl-wrap { width: 100%; display: flex; justify-content: center; }
+.pl-canvas { display: block; touch-action: none; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 24px rgba(138,43,226,.25); }
+.pl-ctrl { display: flex; align-items: center; gap: 10px; margin: 10px auto 0; max-width: 520px; }
+.pl-ctrl.off { opacity: .45; pointer-events: none; }
+.pl-spin { flex: none; width: 52px; height: 52px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #e4dcf2 60%, #b9a8d6); position: relative; cursor: pointer; touch-action: none; box-shadow: 0 0 0 2px #8a2be2; }
+.pl-spin::before, .pl-spin::after { content: ''; position: absolute; background: rgba(138,43,226,.25); }
+.pl-spin::before { left: 50%; top: 6px; bottom: 6px; width: 1px; } .pl-spin::after { top: 50%; left: 6px; right: 6px; height: 1px; }
+.pl-spin-dot { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: #e2558f; box-shadow: 0 0 6px #e2558f; transition: transform .15s; }
+.pl-pow { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.pl-pull { position: relative; height: 34px; border-radius: 17px; background: linear-gradient(90deg, #1a0b33, #2a0f4d); border: 1px solid #5a20a8; overflow: hidden; touch-action: none; cursor: grab; }
+.pl-pull-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #8a2be2, #f2b31b); }
+.pl-pull-txt { position: relative; display: block; text-align: center; line-height: 34px; font-size: .78rem; color: #e6d6ff; pointer-events: none; }
+.pl-pow input[type=range] { width: 100%; accent-color: #b57bff; }
+.pl-hint { margin: 6px 0 0; min-height: 1.2em; }
+.pl-players .g-pl { flex-wrap: nowrap; }
+.pl-grp { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: .72rem; margin-left: auto; }
+.g-pl[data-side="1"] .pl-grp { align-items: flex-end; margin-left: 0; margin-right: auto; }
+.pl-rack { display: inline-flex; gap: 2px; }
+.pl-mini { width: 9px; height: 9px; border-radius: 50%; background: var(--bc); display: inline-block; }
+.pl-mini.st { background: linear-gradient(#f7f3ff 25%, var(--bc) 25% 75%, #f7f3ff 75%); }
+.pl-mini.gone { opacity: .18; }
+.pl-players { gap: 6px; }
+.pl-players .g-pl { padding: 4px 8px; }
+.pl-players .g-pl .gp-n { max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-stage + .g-emotes { margin-top: 6px; }
+.pool-mode .g-status { margin: 4px 0; }

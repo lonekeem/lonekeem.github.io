@@ -6,6 +6,7 @@ import { sfx } from './sfx.js';
 import { CONTROLLER, STAR, COVERS, GAMES, gameName } from './art.js';
 import { createTrivia } from './trivia.js';
 import { createStarCards } from './starcards.js';
+import { createPool } from './pool.js';
 
 export { CONTROLLER };
 const CPU_KEY = 'lks-games-cpu';
@@ -72,6 +73,7 @@ export function createGames(ctx) {
   const ui = { shell, chip, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
   const trivia = createTrivia({ ...ctx, ui });
   const cards = createStarCards({ ...ctx, ui });
+  const pool = createPool({ ...ctx, ui });
 
   // ------------------------------------------------------------ hub
   async function hub(token) {
@@ -130,7 +132,7 @@ export function createGames(ctx) {
         <section class="card pad g-opt ${params.do === 'quick' ? 'hl' : ''}"><h2>${CONTROLLER} Quick match</h2><p class="muted small">We pair you with whoever’s looking right now.</p><button class="btn btn-block" id="g-quick">Find a match</button></section>
         <section class="card pad g-opt ${params.do === 'cpu' ? 'hl' : ''}"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01"/></svg> Play the computer</h2>
           ${type === 'starcards' ? `<label class="small muted g-inline-l">Computer players <select id="g-bots">${[1, 2, 3, 4, 5].map((n) => `<option ${n === 3 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}
-          <div class="g-two"><a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn" data-lvl="hard" href="#">Hard</a></div><p class="muted small">No account needed.</p></section>
+          <div class="g-two">${type === 'pool' ? '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn btn-ghost" data-lvl="medium" href="#">Medium</a><a class="btn" data-lvl="hard" href="#">Hard</a>' : '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn" data-lvl="hard" href="#">Hard</a>'}</div><p class="muted small">No account needed.</p></section>
       </div>
       <h2 class="g-h2">Top players</h2><div class="card" id="g-lb"><div class="spinner"></div></div>`, '#/games');
     const mode = () => document.querySelector('input[name=g-mode]:checked')?.value || '';
@@ -420,6 +422,7 @@ export function createGames(ctx) {
       if (BOARD_TYPES.includes(a)) return localBoard(a, params);
       if (a === 'trivia') return trivia.local(params);
       if (a === 'starcards') return cards.local(params);
+      if (a === 'pool') return pool.local(params);
     }
     return gamePage(a, params);
   }
@@ -431,6 +434,7 @@ export function createGames(ctx) {
     if (BOARD_TYPES.includes(g.type)) return onlineBoard(g, token);
     if (g.type === 'trivia') return trivia.online(g, token);
     if (g.type === 'starcards') return cards.online(g, token);
+    if (g.type === 'pool') return pool.online(g, token);
   }
   async function renderProfile(el, uid) {
     if (!el) return;

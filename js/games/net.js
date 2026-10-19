@@ -5,9 +5,11 @@ import {
   writeBatch, serverTimestamp, runTransaction, addDoc, Timestamp, deleteField
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ENGINES } from './boards.js';
+import { rack as poolRack, newState as poolState } from './pool-engine.js';
 
 export const BOARD_TYPES = ['stardrop', 'klgrid', 'checkers'];
 export const ROOM_TYPES = ['trivia', 'starcards'];
+export const TWO_P = [...BOARD_TYPES, 'pool'];
 export const EMOTES = ['GG', 'Nice!', 'Wow', 'Oops', 'Good luck', 'Rematch?', '★', 'Hmm…', 'Ha!', 'Thanks'];
 export const TURN_SECONDS = 60;
 export const HB_MS = 20000;
@@ -27,6 +29,7 @@ export function createNet({ db, S }) {
       winnerUid: '', endReason: '', rematch: '', hb: { [m.uid]: serverTimestamp() }, ...extra
     };
     if (BOARD_TYPES.includes(type)) Object.assign(g, { board: ENGINES[type].init(mode), turn: 0, moveNo: 0, last: '', turnAt: serverTimestamp() });
+    if (type === 'pool') Object.assign(g, { pos: poolRack(), ps: JSON.stringify(poolState()), shot: null, turn: 0, moveNo: 0, turnAt: serverTimestamp() });
     return g;
   }
   async function createGame(type, mode, { invitee = '', quick = false, from = '' } = {}) {
@@ -55,14 +58,14 @@ export function createNet({ db, S }) {
       const g = s.data();
       if (g.players.includes(m.uid)) return g;
       if (g.status !== 'waiting') throw new Error('That game already started. You can watch it.');
-      const max = BOARD_TYPES.includes(g.type) ? 2 : g.type === 'trivia' ? 8 : 6;
+      const max = TWO_P.includes(g.type) ? 2 : g.type === 'trivia' ? 8 : 6;
       if (g.players.length >= max) throw new Error('That room is full.');
       if (g.invitee && g.invitee !== m.uid) throw new Error('This game is for someone else.');
       const upd = {
         players: [...g.players, m.uid], names: [...g.names, m.name], unames: [...g.unames, m.uname], colors: [...g.colors, m.color],
         updatedAt: serverTimestamp()
       };
-      if (BOARD_TYPES.includes(g.type)) Object.assign(upd, { status: 'active', turnAt: serverTimestamp() });
+      if (TWO_P.includes(g.type)) Object.assign(upd, { status: 'active', turnAt: serverTimestamp() });
       tx.update(ref, upd);
       return { ...g, ...upd };
     });
