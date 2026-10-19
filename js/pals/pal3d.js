@@ -11,9 +11,9 @@ import { DANCES3D, clipFor } from './dances3d.js';
 
 const D = Math.PI / 180;
 let R = null, scene, cam, keyL, shadowPlane;
-// Graphics: 'ultra' (default on capable phones) | 'high' | 'low' (= 2D art). Ultra steps down if FPS stays under ~30.
+// Graphics: 'ultra' (opt-in) | 'high' (default) | 'low' (= 2D art). Ultra steps down if FPS stays under ~30.
 const GK = 'kemy-pal-gfx';
-export function gfxLevel() { try { const v = localStorage.getItem(GK); if (v === 'ultra' || v === 'high' || v === 'low') return v; } catch { /* */ } const n = navigator; return (n.deviceMemory && n.deviceMemory < 4) || (n.hardwareConcurrency && n.hardwareConcurrency < 4) ? 'high' : 'ultra'; }
+export function gfxLevel() { try { const v = localStorage.getItem(GK); if (v === 'ultra' || v === 'high' || v === 'low') return v; } catch { /* */ } const n = navigator; void n; return 'high'; }
 export function setGfx(v) { try { localStorage.setItem(GK, v); } catch { /* */ } if (R) { const r = v === 'ultra' ? 448 : 256; RES = r; R.setSize(r, r, false); keyL.shadow.mapSize.set(v === 'ultra' ? 1024 : 512, v === 'ultra' ? 1024 : 512); keyL.shadow.map?.dispose(); keyL.shadow.map = null; } }
 let RES = 448;
 const cache = new Map(); let lost = false;

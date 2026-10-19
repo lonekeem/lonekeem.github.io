@@ -1074,7 +1074,7 @@ async function pageSettings() {
       <h2 id="spals-h" style="font-size:1.05rem">Pals</h2>
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-dance" ${danceEnabled() ? 'checked' : ''}> <span>Pals dance to music<br><span class="muted small">When the theme song, a song or a music video plays.</span></span></label>
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-keep" ${palKeepOn() ? 'checked' : ''}> <span>Keep Pal on screen while scrolling<br><span class="muted small">A small Pal in the corner. Double-tap it to hide, triple-tap the screen to bring it back, drag to move.</span></span></label>
-      <label for="s-pal-gfx" style="margin-top:8px">Pal graphics</label><select id="s-pal-gfx" style="width:100%"><option value="ultra">Ultra (best 3D, steps down if slow)</option><option value="high">High (3D)</option><option value="low">Low (2D, saves battery)</option></select>
+      <label for="s-pal-gfx" style="margin-top:8px">Pal graphics</label><select id="s-pal-gfx" style="width:100%"><option value="ultra">Ultra (sharpest 3D, opt-in)</option><option value="high">High (3D, default)</option><option value="low">Low (2D, saves battery)</option></select>
          <p class="small" style="margin:8px 0 0"><button type="button" class="btn btn-sm btn-ghost" id="s-dance-shop">💃 Dances &amp; Dance Shop</button></p>
     </section>
     <section class="card pad" style="margin-top:16px">
