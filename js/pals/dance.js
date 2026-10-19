@@ -146,8 +146,22 @@ function sparkle(c, x, y, s, t) {
   c.closePath(); c.fill(); c.restore();
 }
 // Drop-in for drawPal: dances while music plays (st.dance = dance object forces one, e.g. a shop preview).
+// 3D Pals: lazy-load three.js only on capable devices (see js/pals/pal3d.js)
+let P3 = null;
+export const pal3dReady = () => !!P3;
+export function load3D() { return import('./pal3d.js').then((m) => { if (m.webglOK()) P3 = m; return !!P3; }).catch(() => false); }
+if (typeof window !== 'undefined') setTimeout(load3D, 600);
 export function drawDancer(c, x, y, size, pal, st = {}) {
   const b = tickBus(); const amt = st.dance ? 1 : b.amt;
+  if (P3 && !st.flat) { // 3D Pal (lazy-loaded); falls back to the 2D rig when over budget / unavailable
+    const on = amt > 0.001 && (st.dance || danceEnabled()); const beat = st.beat ?? (b.beat + (pal._off || 0));
+    const d = on ? danceFor(pal, beat, st.dance) : null;
+    const g = RM() && d && !d.gentle ? danceById('hula') || d : d;
+    if (P3.drawPal3D(c, x, y, size, pal, { ...st, dance3d: g ? g.id : null, beat, amt: on ? amt * (RM() ? 0.5 : 1) : 0 })) {
+      if (on && amt > 0.6 && !RM() && g) { const p = poseAt(g, beat); if (p.star) { const t = st.t || 0; sparkle(c, x - size * 0.5, y - size * 1.1, size * 0.09, t); sparkle(c, x + size * 0.5, y - size * 0.9, size * 0.07, t + 20); } }
+      return;
+    }
+  }
   if (amt <= 0.001 || (!st.dance && !danceEnabled())) return drawPal(c, x, y, size, pal, st);
   const gentle = RM(); const beat = st.beat ?? (b.beat + (pal._off || 0));
   const d = danceFor(pal, beat, st.dance); const p = poseAt(d, beat);

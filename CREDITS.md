@@ -26,3 +26,9 @@ All tracks below are released under **CC0 1.0** (public domain dedication, https
 ## Outside players
 
 Apple Music links play through Apple’s official embed (embed.music.apple.com); Apple search results and 30-second previews come from the public iTunes Search API. Spotify links play through Spotify’s official embed (open.spotify.com/embed). Nothing from these services is downloaded or re-hosted.
+
+## 3D Pals
+
+- **three.js r170** (`js/vendor/three-0.170.0.module.min.js`), MIT License, © 2010-2024 three.js authors. License text: `js/vendor/three-LICENSE.txt`. Self-hosted, pinned.
+- **Pal models**: built procedurally in code (`js/pals/pal3d.js`) by Lone Keem Studios. No third-party model files are used.
+- **Dance animation**: keyframed by hand from human dance reference (`js/pals/dances3d.js`), with procedural weight shift, knee bounce and follow-through. No motion-capture files, no Mixamo, and no song audio. The trend moves are simplified, Pal-adapted versions of widely known dance moves. They don't copy any full choreography.

@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="1200" height="1000"></canvas>
+<script type="module">
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { SPECIES } from '../../js/pals/art.js';
+const q = new URLSearchParams(location.search); const c = document.getElementById('c').getContext('2d');
+const list = (q.get('sp') || SPECIES.map((s) => s.id).join(',')).split(','); const mode = q.get('mode') || 'idle', dance = q.get('dance');
+window.frame = (t) => { c.fillStyle = '#2a1458'; c.fillRect(0, 0, 1200, 1000); c.font = '600 13px sans-serif';
+  list.forEach((id, i) => { const x = 100 + (i % 6) * 200, y = 170 + Math.floor(i / 6) * 200; c.fillStyle = '#ffd34d'; c.fillText(id, x - 90, y - 150);
+    window.__fb = window.__fb || 0; drawPal3D.__b = 0;
+    drawPal3D(c, x, y, 80, { species: id, level: 6, outfit: q.has('outfit') ? { head: 'crown', feet: 'sneakers', neck: 'scarf' } : undefined }, { t, mode, face: 1, dance3d: dance, beat: t / 30, amt: 1 }); }); };
+window.ready = true;
+</script>
