@@ -6,9 +6,10 @@ import { BGS, BG, drawBg } from './bgs.js';
 import { addItems, RARITY } from './catalog.js';
 import { drawDancer } from './dance.js';
 import { SPECIES } from './art.js';
+import { RARE_SPECIES } from './species.js';
 // premium items join the shop catalog (config/palShop prices) so purchases validate server-side
 addItems([...WEAR.filter((w) => w.p), ...BGS.filter((b) => b.p).map((b) => ({ ...b, kind: 'bg' })),
-  ...PATTERNS.filter((p) => p.p).map((p) => ({ ...p, kind: 'look', r: p.r || 'r' })), ...RARES.map((r) => ({ ...r, kind: 'rare' }))]);
+  ...PATTERNS.filter((p) => p.p).map((p) => ({ ...p, kind: 'look', r: p.r || 'r' })), ...RARES.map((r) => ({ ...r, kind: 'rare' })), ...RARE_SPECIES.map((sp) => ({ id: 'sp_' + sp.id, name: sp.name, kind: 'pal', p: sp.rare, r: sp.rare >= 1500 ? 'l' : 'e' }))]);
 const EMO = { cap: '🧢', beanie: '🧶', bucket: '👒', tiara: '👸', crown: '👑', tophat: '🎩', helmet: '⛑️', earband: '🐱', wizard: '🧙', santa: '🎅', flowers: '🌸', bow: '🎀', bow2: '🎀', clips: '⭐', pigtails: '💇', bun: '🍡', quiff: '💈',
   round: '👓', lens: '🕶️', heart: '💖', star: '🌟', stud: '💎', hoop: '⭕', drop: '✨', beads: '📿', chain: '⛓️', locket: '💝', medal: '🏅', scarf: '🧣', tie: '👔', bowtie: '🎀', tee: '👕', hoodie: '🧥', jersey: '🎽', sweater: '🧶', puffer: '🧥', blouse: '👚',
   shorts: '🩳', skirt: '👗', tutu: '🩰', pants: '👖', dress: '👗', gown: '👸', overalls: '👖', pjs: '🌙', suit: '🤵', kit: '⚽', uniform: '🏫', coat: '🧥', swim: '🩱', dino: '🦖', astro: '🧑‍🚀', hero: '🦸', xmas: '🎄',
@@ -71,6 +72,7 @@ export function createPalStore(ctx) {
         + `<h3 class="ps-h">Colours</h3><div class="ps-row"><label>Body <input type="color" id="ps-col-b" value="${esc((p.colors && p.colors.body) || '#ffffff')}"></label><label>Accent <input type="color" id="ps-col-a" value="${esc((p.colors && p.colors.accent) || '#ffffff')}"></label></div><p class="small">More accessories are in the Jewelry & Accessories tab.</p>`;
       if (tab === 'pals') h = `<h3 class="ps-h">Rare Pals ✨</h3><p class="small">Turn ${esc(p.name)} into a rare version. Rare looks are clearly marked and cost more Star Coins.</p>`
         + `<button class="ps-tile ${!D.variant ? 'on' : ''}" data-rv=""><span class="ps-emo">🐾</span><b>Normal</b><small>Free</small></button>` + RARES.map((r) => tile(r.id, r.name + ' ' + (SPECIES.find((s) => s.id === p.species) || {}).name, r.p, r.r, { rare_shiny: '💠', rare_glow: '🌟', rare_galaxy: '🌌', rare_gold: '🏆', rare_crystal: '💎' }[r.id], D.variant === r.id, own(r.id), 'data-rv="1"')).join('')
+        + `<h3 class="ps-h">Rare Pal species ★</h3><p class="small">${RARE_SPECIES.length} rare species. Get them in the Pal picker (Pal Box → hatch or Style → Change species).</p>` + RARE_SPECIES.map((sp) => `<div class="ps-tile" style="--rc:#ffb31a"><span class="ps-emo">★</span><b>${esc(sp.name)}</b><small>${inv['sp_' + sp.id] ? '✓ Owned' : '★ ' + sp.rare + ' · ' + (sp.rare >= 1500 ? 'Legendary' : 'Epic')}</small></div>`).join('')
         + `<h3 class="ps-h">More Pals</h3><p class="small">You can have up to 6 Pals and switch which one is on your profile. Every species can be hatched for free.</p><a class="btn btn-sm" href="#pals">🥚 Hatch or switch Pals</a>`;
       if (tab === 'dances') h = `<p>Dance moves live in the Dance Shop.</p><button class="btn" id="ps-dshop">💃 Open the Dance Shop</button>`;
       g.innerHTML = h; thumbs(g);

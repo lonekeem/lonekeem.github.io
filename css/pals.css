@@ -184,3 +184,6 @@ body.kb-open .pal-float { display: none; }
 .ps-emo{font-size:28px;line-height:1;filter:drop-shadow(0 0 0 var(--ic,transparent))}
 .ps-bgt canvas{width:96px;height:64px;border-radius:10px}
 .ps-th{width:72px;height:72px;border-radius:12px;background:radial-gradient(circle at 50% 40%,#3a1f78,#1a0c3a)}
+.pal-chip.sp.rare{border-color:#ffb31a;background:linear-gradient(160deg,#fff8e0,#ffe8a8);color:#3a2a00}
+.pal-chip.sp[hidden]{display:none}
+#pal-q{margin:4px 0 6px;padding:8px 12px;border-radius:12px}

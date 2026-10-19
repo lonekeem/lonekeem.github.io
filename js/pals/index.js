@@ -1,6 +1,6 @@
 // Kemy Pals: original virtual pets that live next to your profile.
 import { playIntro } from '../theme.js';
-import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf } from './art.js';
+import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf, shade } from './art.js';
 import { liveOverlay, popups } from './overlays.js';
 import { createShopUI } from './shop.js';
 import { createPalStore } from './store.js';
@@ -298,7 +298,11 @@ export function createPals(ctx) {
     const chips = (key, list, lab) => list.map((v) => `<button type="button" class="pal-chip ${d[key] === v ? 'on' : ''}" data-${key}="${v}">${esc(lab[v])}</button>`).join('');
     openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="pal-creator" id="pal-form"><h2>${pal ? 'Style ' + esc(pal.name) : first ? 'Meet your Pal!' : 'New Pal'}</h2>
       <div class="pal-prev"></div>
-      ${pal ? '' : `<div class="pal-l">Pick a Pal <small class="muted">(${SPECIES.length} to choose from)</small></div><div class="pal-sp" role="radiogroup" aria-label="Species"><button type="button" class="pal-chip sp mystery" data-species="mystery" title="A surprise Pal!"><span class="pal-q">?</span><b>Mystery egg</b></button>${SPECIES.map((s) => `<button type="button" class="pal-chip sp ${d.species === s.id ? 'on' : ''}" data-species="${s.id}" title="${esc(s.blurb)}"><i class="pal-th" data-th="${s.id}"></i><b>${esc(s.name)}</b><small style="color:${VIBES[s.vibe].c}">${VIBES[s.vibe].name}</small></button>`).join('')}</div>`}
+      <div class="pal-l">${pal ? 'Change species <small class="muted">(keeps name, level and look)</small>' : `Choose your Pal <small class="muted">(${SPECIES.length} species · ${SPECIES.length * 3} colour styles)</small>`}</div>
+      <input type="search" id="pal-q" placeholder="Search Pals… (cat, dino, sea…)" aria-label="Search Pals" style="width:100%">
+      <div class="pal-chips" id="pal-cats">${[['all', 'All'], ['land', '🌳 Land'], ['sea', '🌊 Sea'], ['sky', '☁️ Sky'], ['fantasy', '✨ Fantasy'], ['rare', '★ Rare']].map(([k, n], i) => `<button type="button" class="pal-chip ${i ? '' : 'on'}" data-cat="${k}">${n}</button>`).join('')}</div>
+      <div class="pal-sp" role="radiogroup" aria-label="Species">${pal ? '' : '<button type="button" class="pal-chip sp mystery" data-species="mystery" data-c="all" data-n="mystery surprise" title="A surprise Pal!"><span class="pal-q">?</span><b>Mystery egg</b></button>'}${SPECIES.map((s) => `<button type="button" class="pal-chip sp ${d.species === s.id ? 'on' : ''} ${s.rare ? 'rare' : ''}" data-species="${s.id}" data-c="${s.cat}${s.rare ? ' rare' : ''}" data-n="${esc((s.name + ' ' + s.id + ' ' + s.cat).toLowerCase())}" title="${esc(s.blurb)}"><i class="pal-th" data-th="${s.id}"></i><b>${esc(s.name)}</b><small style="color:${s.rare ? '#ffb31a' : VIBES[s.vibe].c}">${s.rare ? `★ ${s.rare} · Rare` : VIBES[s.vibe].name}</small></button>`).join('')}</div>
+      <div class="pal-l">Colour style<div class="pal-chips" id="pal-styles"></div></div>
       <label class="pal-l">Name<input id="pal-name" maxlength="20" required placeholder="Give your Pal a name" value="${esc(d.name)}"></label>
       <div class="pal-l">Body<div class="pal-sw">${BODY_PRESETS.map((c) => `<button type="button" style="--c:${c}" data-body="${c}" aria-label="Body color ${c}"></button>`).join('')}</div><input type="range" min="0" max="359" value="290" id="pal-hue" aria-label="Body hue"></div>
       <div class="pal-l">Ears, gills &amp; fins<div class="pal-sw">${ACC_PRESETS.map((c) => `<button type="button" style="--c:${c}" data-accent="${c}" aria-label="Accent color ${c}"></button>`).join('')}</div></div>
@@ -307,17 +311,28 @@ export function createPals(ctx) {
       <div class="pal-l">Outfit<div class="pal-chips">${chips('acc', ACCESSORIES, ACC_LABEL)}</div></div>
       <button class="btn" type="submit">${pal ? 'Save look' : 'Hatch!'}</button></form>`);
     const f = document.getElementById('pal-form'); const s = stage(f.querySelector('.pal-prev'), 220, 150);
-    f.querySelectorAll('[data-th]').forEach((el) => { const q = stage(el, 44, 40); drawPal(q.c, 22, 38, 34, { species: el.dataset.th, level: 1 }, { t: 30, mode: 'idle' }); });
+    // thumbnails: a few per frame (3D when available), only for visible tiles
+    const thq = [...f.querySelectorAll('[data-th]')]; const thStep = () => { if (!document.body.contains(f)) return; for (let n = 0; n < 4 && thq.length; n++) { const el = thq.shift(); if (el.closest('[hidden]')) { thq.push(el); if (thq.every((x) => x.closest('[hidden]'))) break; continue; } const q = stage(el, 44, 40); drawPal(q.c, 22, 38, 34, { species: el.dataset.th, level: 1 }, { t: 30, mode: 'idle' }); } if (thq.length) requestAnimationFrame(thStep); }; thStep();
+    let cat = 'all'; const filt = () => { const qv = f.querySelector('#pal-q').value.trim().toLowerCase(); f.querySelectorAll('.pal-sp [data-species]').forEach((b) => { b.hidden = !((cat === 'all' || b.dataset.c.split(' ').includes(cat)) && (!qv || b.dataset.n.includes(qv))); }); thStep(); };
+    f.querySelector('#pal-q').oninput = filt; f.querySelectorAll('[data-cat]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); cat = b.dataset.cat; f.querySelectorAll('[data-cat]').forEach((x) => x.classList.toggle('on', x === b)); filt(); });
+    // 3 colour styles per species (original, pastel, night) = hundreds of Pals
+    const styles = () => { const sp = SPEC[d.species]; const el = f.querySelector('#pal-styles'); if (!sp) { el.innerHTML = ''; return; } const st = [['Original', sp.body, sp.acc], ['Pastel', shade(sp.body, 0.45), shade(sp.acc, 0.35)], ['Night', shade(sp.body, -0.45), shade(sp.acc, 0.2)]];
+      el.innerHTML = st.map(([n, b, a]) => `<button type="button" class="pal-chip" data-sty="${b}|${a}" style="border-left:14px solid ${b}">${n}</button>`).join(''); };
+    styles(); let owned = {}; shop.econ() && shop.econ().inventory().then((i) => { owned = i || {}; }).catch(() => {});
     const draw = (t) => { s.c.clearRect(0, 0, 220, 150); if (d.species === 'mystery') { drawEgg(s.c, 110, 145, 120, RM() ? 0 : t); return; } drawPal(s.c, 110, 140, 120, { ...d, level: pal ? pal.level : 1 }, { t, mode: t % 300 < 90 ? 'react' : 'idle' }); }; draw.el = s.cv; loop(draw);
     f.addEventListener('click', (e) => { const b = e.target.closest('button[type=button]'); if (!b) return;
       for (const k of ['species', 'pattern', 'acc']) if (b.dataset[k]) { d[k] = b.dataset[k]; f.querySelectorAll(`[data-${k}]`).forEach((x) => x.classList.toggle('on', x === b)); if (k === 'species' && SPEC[d.species]) { d.colors.body = SPEC[d.species].body; d.colors.accent = SPEC[d.species].acc; } }
-      for (const k of ['body', 'accent', 'eye']) if (b.dataset[k]) d.colors[k] = b.dataset[k]; snd('pop'); });
+      for (const k of ['body', 'accent', 'eye']) if (b.dataset[k]) d.colors[k] = b.dataset[k];
+      if (b.dataset.sty) { const [bb, aa] = b.dataset.sty.split('|'); d.colors.body = bb; d.colors.accent = aa; }
+      if (b.dataset.species) { styles(); const sp = SPEC[d.species]; const sb = f.querySelector('[type=submit]'); sb.textContent = sp && sp.rare && !owned['sp_' + sp.id] ? `Get ${sp.name} for ★${sp.rare}` : pal ? 'Save look' : 'Hatch!'; }
+      snd('pop'); });
     f.querySelector('#pal-hue').oninput = (e) => { d.colors.body = hueHex(+e.target.value); };
     f.onsubmit = async (e) => { e.preventDefault(); d.name = f.querySelector('#pal-name').value.trim().slice(0, 20); if (!d.name) return;
-      if (d.species === 'mystery') { const r = SPECIES[Math.floor(Math.random() * SPECIES.length)]; d.species = r.id; d.colors.body = r.body; d.colors.accent = r.acc; toast(`Your mystery egg hatched into a ${r.name}!`); }
+      if (d.species === 'mystery') { const pool = SPECIES.filter((x) => !x.rare); const r = pool[Math.floor(Math.random() * pool.length)]; d.species = r.id; d.colors.body = r.body; d.colors.accent = r.acc; toast(`Your mystery egg hatched into a ${r.name}!`); }
       const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+      const rsp = SPEC[d.species]; if (rsp && rsp.rare && !owned['sp_' + rsp.id]) { try { await shop.econ().buy('sp_' + rsp.id); owned['sp_' + rsp.id] = 1; toast(`You got ${rsp.name}! ★`); } catch (er) { btn.disabled = false; toast(er.code ? friendlyError(er) : er.message || 'Not enough Star Coins yet'); return; } }
       try { const m = await myPals(); let p;
-        if (pal) { p = m.list.find((x) => x.id === pal.id); await m.store.save(p, { name: d.name, colors: d.colors, pattern: d.pattern, acc: d.acc }); }
+        if (pal) { p = m.list.find((x) => x.id === pal.id); await m.store.save(p, { name: d.name, colors: d.colors, pattern: d.pattern, acc: d.acc, species: d.species }); }
         else { p = await m.store.create(slot, d); m.list.push(p); m.list.sort((a, b) => a.id.localeCompare(b.id)); if (first || !S.profile.activePet) { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); } }
         snd('hatch'); closeModal(); toast(pal ? 'Looking good!' : `Say hi to ${p.name}! 🐾`); onDone && onDone(p);
       } catch (err) { btn.disabled = false; toast(friendlyError(err)); } };

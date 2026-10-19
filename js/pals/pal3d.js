@@ -84,6 +84,8 @@ function build(pal) {
       return new THREE.LatheGeometry(new THREE.SplineCurve(pts).getPoints(48), 56); }), mB, J.Spine); torso.scale.set(1, 1, 0.88);
     if (ex.has('belly') || sp.id === 'penguin' || sp.id === 'owl') { const b = mesh(sph(1), mat(sp.id === 'penguin' ? '#fbf6ff' : shade(B, 0.6)), J.Spine); b.scale.set(0.3, 0.36, 0.2); b.position.set(0, 0.04, 0.2); }
     if (ex.has('shell')) { const sh = mesh(sph(1), mat(A, { cc: 0.8, sheen: 0 }), J.Spine); sh.scale.set(0.5, 0.52, 0.34); sh.position.set(0, 0.12, -0.18); }
+    if (ex.has('plates')) for (let i = 0; i < 5; i++) { const k = mesh(geo('plate', () => { const g = new THREE.CylinderGeometry(0.0, 0.11, 0.18, 4); g.scale(1, 1, 0.25); return g; }), mA, J.Spine); k.position.set(0, 0.48 - i * 0.14, -0.4 + i * 0.02); k.rotation.x = -0.6 - i * 0.15; }
+    if (ex.has('fin')) { const f = mesh(cone(0.12, 0.3), mA, J.Spine); f.scale.z = 0.3; f.position.set(0, 0.42, -0.36); f.rotation.x = -0.6; }
     if (ex.has('spikes')) for (let r = 0; r < 3; r++) for (let i = 0; i < 7; i++) { const s = mesh(cone(0.075, 0.3), mA, J.Spine); const a = -1.35 + i * 0.45; const y = 0.42 - r * 0.24; const rad = 0.5 - (r === 2 ? 0.06 : 0); s.position.set(Math.sin(a) * rad, y, -Math.cos(a) * rad * 0.9); s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.sin(a) * 0.8, 0.55, -Math.cos(a)).normalize()); }
     if (ex.has('stripes') || ex.has('giraffespots')) for (let i = 0; i < 6; i++) { const s = mesh(sph(1), mA, J.Spine); s.scale.set(ex.has('stripes') ? 0.03 : 0.06, ex.has('stripes') ? 0.12 : 0.05, 0.04); const a = -1 + (i % 3) * 1; s.position.set(Math.sin(a) * 0.4, -0.05 + Math.floor(i / 3) * 0.2, Math.cos(a) * 0.33); }
     if (ex.has('wool')) for (let i = 0; i < 10; i++) { const w = mesh(sph(0.15), mat('#ffffff'), J.Spine); const a = i * 0.63; w.position.set(Math.sin(a) * 0.34, 0.02 + (i % 2) * 0.14, Math.cos(a) * 0.28); }
@@ -102,6 +104,8 @@ function build(pal) {
   if (headR) { const h = mesh(sph(1), mB, J.Head); h.scale.set(headR * 1.08, headR, headR * 0.98); h.position.y = headR * 0.82; const ch = mesh(sph(1), mB, J.Head); ch.scale.set(headR * 0.95, headR * 0.6, headR * 0.85); ch.position.set(0, headR * 0.52, headR * 0.08); }
   const hy = headR * 0.82 || 0.05, fz = headR * 0.9 || 0.6;
   const H = new THREE.Group(); H.position.y = hy - (sp.id === 'jelly' ? 0.42 : 0); J.Head.add(H); J.face = H;
+  if (ex.has('antennae') && headR) for (const q of [-1, 1]) { const st = mesh(cap(0.014, 0.26), mA, H); st.position.set(q * 0.14, headR * 1.05, 0.05); st.rotation.z = -q * 0.35; mesh(sph(0.045), mat(A, { em: A }), H).position.set(q * 0.21, headR * 1.05 + 0.15, 0.05); }
+  if (ex.has('crest') && headR) for (let i = 0; i < 4; i++) { const k = mesh(cone(0.06 - i * 0.008, 0.16), mA, H); k.position.set(0, headR * 0.95 - i * 0.1 * 0.3, -i * 0.12); k.rotation.x = -0.5 - i * 0.25; }
   if (ex.has('mane')) for (let i = 0; i < 14; i++) { const a = i * Math.PI * 2 / 14; mesh(sph(0.16), mA, H).position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.5, -0.12); }
   if (ex.has('wool')) for (let i = 0; i < 6; i++) mesh(sph(0.14), mat('#ffffff'), H).position.set(-0.25 + i * 0.1, 0.42 + (i % 2) * 0.04, 0.05);
   // eyes (glossy, with catch-lights) + blush

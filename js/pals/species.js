@@ -1,3 +1,4 @@
+import { MORE_SPECIES } from './species2.js';
 // Kemy Pals species roster. To add a species, add one entry here: pick parts from the parts
 // library in art.js (ears, snout, tail, feet, extras), colors, a vibe, three form names and a tap reaction.
 // ears: round, biground, pointy, long, floppy, big, ossicones, tuft, gills, petal, none
@@ -39,3 +40,8 @@ export const SPECIES = [
   { id: 'cloudpuff', name: 'Cloud Puff', vibe: 'moon', body: '#f2f6ff', acc: '#a8c0ff', ears: 'none', snout: 'smile', tail: 'none', feet: 'none', body2: 'cloud', extras: ['float', 'blush2'], react: 'puff', forms: ['Wisp', 'Cloud Puff', 'Storm Snuggle'], blurb: 'A fluffy cloud that rains glitter when happy.' },
   { id: 'jelly', name: 'Bubble Jelly', vibe: 'water', body: '#d9d2ff', acc: '#ff9fd6', ears: 'none', snout: 'smile', tail: 'none', feet: 'none', body2: 'jelly', extras: ['float'], react: 'bubbles', forms: ['Droplet', 'Bubble Jelly', 'Lumajelly'], blurb: 'A bubbly jelly that floats instead of walking.' }
 ];
+const CAT0 = {"kemy": "sea", "elephant": "land", "unicorn": "fantasy", "dragon": "fantasy", "starsprite": "fantasy", "cloudpuff": "fantasy", "jelly": "sea", "penguin": "sea", "seal": "sea", "otter": "sea", "turtle": "sea", "frog": "land", "owl": "sky", "duckling": "sky", "chick": "sky"};
+for (const s of SPECIES) s.cat = CAT0[s.id] || 'land';
+SPECIES.push(...MORE_SPECIES);
+export const RARE_SPECIES = SPECIES.filter((s) => s.rare);
+export const isRareSpecies = (id) => /^rx[a-z]+$/.test(id);
