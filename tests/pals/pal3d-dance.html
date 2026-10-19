@@ -1,10 +1,10 @@
 <!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="640" height="360"></canvas>
 <script type="module">
-import { drawPal3D } from '../../js/pals/pal3d.js';
-const c = document.getElementById('c').getContext('2d'); const seq = ['dab', 'griddy', 'woah', 'countshrug', 'linestep'];
-window.frame = (t) => { const id = seq[Math.floor(t / 120) % seq.length]; c.fillStyle = '#2a1458'; c.fillRect(0, 0, 640, 360);
-  drawPal3D(c, 220, 330, 150, { species: 'kitten', level: 6, outfit: { feet: 'sneakers' } }, { t, dance3d: id, beat: t / 30, amt: 1 });
-  drawPal3D(c, 470, 330, 120, { species: 'fox', level: 6 }, { t, dance3d: id, beat: t / 30 + 0.05, amt: 1 });
-  c.fillStyle = '#ffd34d'; c.font = '700 20px sans-serif'; c.fillText({ dab: 'the Dab', griddy: 'the Griddy', woah: 'the Woah', countshrug: 'Count & Shrug (New on TikTok)', linestep: 'Line Dance Step (New on TikTok)' }[id], 16, 30); };
+import { drawDancer, load3D, danceById, loadTrends } from '../../js/pals/dance.js';
+await load3D(); await loadTrends();
+const c = document.getElementById('c').getContext('2d'); const seq = (new URLSearchParams(location.search).get('seq') || 'griddy,dab,countshrug,thumbsup,funkstep,twist,woah,clappop,moonwalk,happyshimmy').split(',');
+window.frame = (t) => { const id = seq[Math.floor(t / 160) % seq.length]; const d = danceById(id); c.fillStyle = '#2a1458'; c.fillRect(0, 0, 640, 360);
+  drawDancer(c, 200, 330, 150, { species: 'kitten', level: 6, outfit: { feet: 'sneakers' } }, { t, dance: d, beat: t / 30 });
+  drawDancer(c, 460, 330, 120, { species: 'fox', level: 6 }, { t, dance: d, beat: t / 30 + 0.08, label: false }); };
 window.ready = true;
 </script>

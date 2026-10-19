@@ -254,6 +254,10 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   let P = modePose(st.mode || 'idle', t);
   if (st.dance3d) { const D3 = clipFor(st.dance3d, m.userData.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
   if (!sane(P)) P = modePose('idle', t); // never leave a broken / T-pose on screen
+  // overlap & follow-through: every joint eases toward its target (limbs a bit slower than the hips), so moves and
+  // dance changes flow into each other instead of snapping
+  const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * 0.28 : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * 0.42 : b; } P = o; }
+  m.userData.prev = P; m.userData.pt = t;
   apply(m, P, t, st.mode);
   m.rotation.y = ((st.face || 1) < 0 ? -0.28 : 0.28) + (P.ry || 0);
   scene.add(m); R.render(scene, cam); scene.remove(m);

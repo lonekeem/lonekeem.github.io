@@ -55,12 +55,15 @@ export function createDanceUI(ctx) {
           catch (er) { ev.target.disabled = false; toast(er.code ? friendlyError(er) : er.message); } };
         return; }
       if (tab === 'pick') body.innerHTML = `<div class="pal-dtile free ${sel === 'free' ? 'on' : ''}"><b>🎲 Freestyle</b><small>Mixes your moves to the beat</small><span class="pal-dbtns"><button class="btn btn-sm" data-pick="free">${sel === 'free' ? '✓ Picked' : 'Pick'}</button></span></div>
-        <h3 class="pal-sub">Moves</h3><div class="pal-dgrid">${BASIC.map(tile).join('')}</div>
-        <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${tt.map(tile).join('')}${TRENDING.map(tile).join('')}</div>
+        <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group !== 'classic').map(tile).join('')}</div>
+        <h3 class="pal-sub">✨ New on TikTok</h3><div class="pal-dgrid">${tt.map(tile).join('')}</div>
+        <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group === 'classic').map(tile).join('')}</div>
+        <h3 class="pal-sub">💜 Pal Originals</h3><div class="pal-dgrid">${BASIC.map(tile).join('')}</div>
         <p class="small muted">Pals dance whenever music plays: the theme song, songs, music videos. ${danceEnabled() ? '' : '<b>Dancing is off in Settings.</b>'}</p>`;
       else body.innerHTML = `<p class="small muted">Unlock famous moves with free Star Coins. Tap ▶ to preview first.</p>
         <h3 class="pal-sub">✨ New on TikTok</h3><div class="pal-dgrid">${tt.map(tile).join('')}</div>
-        <h3 class="pal-sub">🔥 Trending classics</h3><div class="pal-dgrid">${TRENDING.map(tile).join('')}</div>
+        <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group !== 'classic').map(tile).join('')}</div>
+        <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group === 'classic').map(tile).join('')}</div>
         ${isAdmin && isAdmin() ? '<p class="small"><button class="btn btn-sm btn-ghost" id="dc-sync">Admin: publish dance prices</button></p>' : ''}`;
       body.querySelectorAll('[data-pv]').forEach((b) => b.onclick = () => { prev = b.dataset.pv; });
       body.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { sel = b.dataset.pick; prev = null; setFav(pal, sel); render(tab); toast(sel === 'free' ? 'Freestyle on' : `${pal.name}’s favourite: ${danceById(sel).name}`); });
