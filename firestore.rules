@@ -1182,13 +1182,16 @@ service cloud.firestore {
       function hex(v) { return v is string && v.matches('^#[0-9a-fA-F]{6}$'); }
       function stat(v) { return v is int && v >= 0 && v <= 100; }
       function palValid() {
-        return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt', 'outfit', 'voice'])
+        return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt', 'outfit', 'voice', 'bg', 'variant'])
+          && (!('variant' in pd()) || pd().variant == '' || (pd().variant is string && pd().variant.matches('^rare_[a-z]{2,11}$') && exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().variant))))
+          && (!('bg' in pd()) || (pd().bg is string && (pd().bg.matches('^b_[a-z0-9_]{1,13}$')
+               || (pd().bg.matches('^bp_[a-z0-9_]{1,13}$') && exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().bg))))))
           && (!('voice' in pd()) || (pd().voice is string && pd().voice.matches('^[a-z_]{2,16}$') && (!pd().voice.matches('^vx_.*') || exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().voice)))))
           && (!('outfit' in pd()) || outfitOk(pd().outfit))
           && pd().species is string && pd().species.matches('^[a-z]{2,16}$')
           && isStr(pd().name, 1, 20)
           && pd().colors is map && pd().colors.keys().hasOnly(['body', 'accent', 'eye']) && hex(pd().colors.body) && hex(pd().colors.accent) && hex(pd().colors.eye)
-          && pd().pattern in ['none', 'spots', 'stripes', 'sparkle']
+          && (pd().pattern in ['none', 'spots', 'stripes', 'sparkle'] || (pd().pattern is string && pd().pattern.matches('^pt_[a-z]{2,13}$') && exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().pattern))))
           && pd().acc in ['none', 'bow', 'crown', 'shades', 'scarf', 'hat', 'badge']
           && pd().xp is int && pd().xp >= 0 && pd().xp <= 4900
           && pd().level == math.floor(pd().xp / 100) + 1
@@ -1198,12 +1201,15 @@ service cloud.firestore {
           && pd().at == request.time && pd().updatedAt == request.time;
       }
       function owns(o, k) {
-        return o.get(k, '') == '' || (resource != null && 'outfit' in resource.data && resource.data.outfit.get(k, '') == o.get(k, ''))
+        return o.get(k, '') == '' || (o.get(k, '') is string && o.get(k, '').matches('^f_[a-z0-9_]{1,13}$'))
+          || (resource != null && 'outfit' in resource.data && resource.data.outfit.get(k, '') == o.get(k, ''))
           || exists(/databases/$(database)/documents/users/$(uid)/inv/$(o.get(k, '')));
       }
       function outfitOk(o) {
-        return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back'])
-          && owns(o, 'head') && owns(o, 'face') && owns(o, 'neck') && owns(o, 'body') && owns(o, 'feet') && owns(o, 'back');
+        return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand'])
+          && owns(o, 'head') && owns(o, 'face') && owns(o, 'neck') && owns(o, 'body') && owns(o, 'feet') && owns(o, 'back')
+          && owns(o, 'hair') && owns(o, 'bottom') && owns(o, 'full') && owns(o, 'bag') && owns(o, 'held')
+          && owns(o, 'ears') && owns(o, 'wrist') && owns(o, 'hand');
       }
       function patPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid)/pats/$(me()); }
       allow read: if true;
@@ -1339,8 +1345,13 @@ service cloud.firestore {
     match /users/{uid}/looks/{lid} {
       allow read: if true;
       allow write: if signedIn() && uid == me() && lid.matches('^l[1-6]$')
-        && request.resource.data.keys().hasOnly(['name', 'outfit']) && isStr(request.resource.data.name, 1, 20)
-        && request.resource.data.outfit is map && request.resource.data.outfit.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back']);
+        && request.resource.data.keys().hasOnly(['name', 'outfit', 'bg', 'variant', 'pattern', 'colors', 'at']) && isStr(request.resource.data.name, 1, 20)
+        && request.resource.data.outfit is map && request.resource.data.outfit.size() <= 14
+        && request.resource.data.outfit.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand'])
+        && (!('bg' in request.resource.data) || isStr(request.resource.data.bg, 0, 16))
+        && (!('variant' in request.resource.data) || isStr(request.resource.data.variant, 0, 16))
+        && (!('pattern' in request.resource.data) || isStr(request.resource.data.pattern, 0, 16))
+        && (!('colors' in request.resource.data) || (request.resource.data.colors is map && request.resource.data.colors.size() <= 3));
       allow delete: if signedIn() && uid == me();
     }
 
