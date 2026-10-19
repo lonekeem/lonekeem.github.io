@@ -127,7 +127,9 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       for (const pet of await sub(['users', uid, 'pets']).catch(() => [])) await deleteRefs([...await sub(['users', uid, 'pets', pet.id, 'pats']).catch(() => []), ...await sub(['users', uid, 'pets', pet.id, 'playdates']).catch(() => [])], (b) => b.delete(pet));
     });
     await step('Removing your Star Coins, Pal items and Pal chat…', async () => {
-      for (const c of ['inv', 'looks', 'pal']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
+      for (const c of ['inv', 'looks']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
+      // pal/* rules match fixed doc ids only (no collection list), so delete those directly
+      await deleteRefs(['wallet', 'chat', 'settings'].map((k) => doc(db, 'users', uid, 'pal', k)));
       await deleteDoc(doc(db, 'palStats', uid)).catch(() => {});
       for (let i = 1; i <= 20; i++) await deleteDoc(doc(db, 'parkRooms', 'r' + i, 'p', uid)).catch(() => {});
     });
