@@ -152,7 +152,7 @@ export function createPool(ctx) {
         P.POCKETS.forEach((pk, i) => { const d = (pk.x - x) ** 2 + (pk.y - y) ** 2; if (d < bd) { bd = d; best = i; } });
         if (best >= 0) { V.call = best; opts.onCall && opts.onCall(best); ui.sfx.play('tap'); draw(); return; }
       }
-      if (V.placing && (c.x - x) ** 2 + (c.y - y) ** 2 < (P.R * 3.2) ** 2) dragging = 'cue'; else dragging = 'aim';
+      if (V.placing && (c.x - x) ** 2 + (c.y - y) ** 2 < (P.R * 7) ** 2) dragging = 'cue'; else dragging = 'aim';
       cv.setPointerCapture(e.pointerId); move(x, y);
     });
     const move = (x, y) => {
@@ -327,19 +327,23 @@ export function createPool(ctx) {
       if (j.winner >= 0) Object.assign(upd, { status: 'done', winnerUid: g.players[j.winner], endReason: j.winner === side ? 'win' : 'loss' });
       playing = true; lastMove = g.moveNo + 1;
       table.set(start, { canShoot: false, placing: false, callMode: false });
-      net.update(gid, upd).then(() => { if (j.winner >= 0) iEnded = true; }).catch((e) => toast(friendlyError(e)));
-      table.play(r.frames, () => { playing = false; localCall = -1; if (r.events.pocketed.length) ui.sfx.play('drop'); g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } }; sync(); if (g.status === 'done') onEnd(); });
+      syncKey = '';
+      const wp = net.update(gid, upd).then(() => { if (j.winner >= 0) iEnded = true; }, (e) => { console.warn('pool: shot rejected', e.code || e.message, g.moveNo, upd.moveNo, g.turn, side); toast(friendlyError(e)); });
+      table.play(r.frames, () => {
+        if (r.events.pocketed.length) ui.sfx.play('drop');
+        // the snapshot listener already holds the latest state (ours, or the server's if the write failed)
+        wp.finally(() => { playing = false; localCall = -1; syncKey = ''; sync(); if (g.status === 'done') onEnd(); });
+      });
     }
     function replay(prev) {
       // opponent's shot: re-simulate from the stored start, then snap to the authoritative result
       const sh = g.shot; if (!sh || !sh.from) { sync(); return; }
-      playing = true;
+      playing = true; syncKey = '';
       const r = P.simulate(P.decode(sh.from), sh);
       table.set(P.decode(sh.from), { canShoot: false, placing: false, callMode: false });
       ui.sfx.play('capture');
       table.play(r.frames, () => {
-        playing = false;
-        if (P.encode(r.balls) !== g.pos && !P.decode(g.pos)[8].on === !r.balls[8].on) console.info('pool: snapped to authoritative positions');
+        playing = false; syncKey = '';
         if (r.events.pocketed.length) ui.sfx.play('drop');
         sync(); if (g.status === 'done') onEnd();
       });
