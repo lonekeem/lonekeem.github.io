@@ -50,3 +50,69 @@
 .pal-pop-say { position: absolute; bottom: 82px; white-space: nowrap; background: #fff; color: #2a1458; font: 700 12px Inter, sans-serif; padding: 5px 10px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .pal-pop.left .pal-pop-say { left: 10px; } .pal-pop.right .pal-pop-say { right: 10px; } .pal-pop.poof .pal-pop-say { opacity: 0; transition: opacity .2s; }
 @keyframes palpeek { from { transform: translateX(var(--from)); } to { transform: none; } } @keyframes palfade { from { opacity: 0; } to { opacity: 1; } }
+/* ---- switcher, coins, quick links */
+.pal-switch { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 10px; -webkit-overflow-scrolling: touch; }
+.pal-sw-b { flex: 0 0 auto; scroll-snap-align: start; display: grid; justify-items: center; gap: 2px; padding: 6px 10px; border-radius: 14px; border: 2px solid transparent; background: rgba(178,107,255,.1); color: inherit; font: 600 12px Inter, sans-serif; cursor: pointer; min-width: 76px; }
+.pal-sw-b.on { border-color: #b26bff; background: rgba(178,107,255,.22); }
+.pal-coins { display: inline-flex; align-items: center; gap: 4px; font: 800 14px Inter, sans-serif; padding: 4px 10px; border-radius: 999px; background: linear-gradient(135deg, #fff1b8, #ffd34d); color: #5a3a00; text-decoration: none; margin-left: auto; }
+.coin { color: #c88a00; }
+.pal-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+/* ---- closet + shop */
+.pal-closet, .pal-voices { display: grid; gap: 10px; max-height: calc(100dvh - 40px); overflow-y: auto; }
+.pal-cl-prev { display: grid; place-items: center; background: radial-gradient(circle at 50% 70%, rgba(178,107,255,.18), transparent 70%); border-radius: 18px; }
+.pal-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.pal-tabs button { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 6px 12px; background: rgba(178,107,255,.12); color: inherit; font: 600 13px Inter, sans-serif; cursor: pointer; }
+.pal-tabs button[aria-selected="true"] { background: #8a55dc; color: #fff; }
+.pal-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.pal-item { display: grid; justify-items: center; gap: 2px; padding: 6px; border-radius: 12px; border: 2px solid transparent; background: rgba(255,255,255,.06); color: inherit; font: 600 11px Inter, sans-serif; cursor: pointer; }
+.pal-item.on { border-color: #b26bff; background: rgba(178,107,255,.18); }
+.pal-ic.none { display: grid; place-items: center; width: 52px; height: 52px; font-size: 20px; opacity: .5; font-style: normal; }
+.r-r { box-shadow: inset 0 -3px 0 #4aa8ff; } .r-e { box-shadow: inset 0 -3px 0 #b26bff; } .r-l { box-shadow: inset 0 -3px 0 #ffb31a, 0 0 12px rgba(255,179,26,.35); }
+.pal-looks #cl-looks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pal-shopgrid, .pal-deals { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.pal-deals { grid-auto-flow: column; grid-auto-columns: minmax(140px, 1fr); grid-template-columns: none; overflow-x: auto; }
+.pal-shopitem { display: grid; justify-items: center; text-align: center; gap: 3px; padding: 10px 8px; border-radius: 14px; background: rgba(178,107,255,.08); font-size: 13px; }
+.pal-shopitem small { font-size: 11px; } .pal-shopitem s { opacity: .6; }
+.pal-owned { font: 700 11px Inter, sans-serif; color: #2e9a5a; }
+.pal-sub { font-size: 16px; margin: 14px 0 8px; }
+.pal-earn { margin: 6px 0; padding-left: 18px; }
+/* ---- talk */
+.pal-talk { display: grid; gap: 8px; max-height: calc(100dvh - 40px); overflow-y: auto; }
+.pal-talk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pal-talk-stage { position: relative; display: grid; place-items: center; min-height: 170px; background: radial-gradient(circle at 50% 80%, rgba(178,107,255,.2), transparent 70%); border-radius: 18px; padding-top: 34px; }
+.pal-bubble { position: absolute; top: 4px; left: 8px; right: 8px; background: #fff; color: #2a1458; font: 600 14px Inter, sans-serif; padding: 8px 12px; border-radius: 16px; box-shadow: 0 4px 14px rgba(0,0,0,.18); opacity: 0; transition: opacity .2s; text-align: center; }
+.pal-bubble.on { opacity: 1; }
+.pal-talk-log { max-height: 150px; overflow-y: auto; display: grid; gap: 4px; font-size: 13px; }
+.tk-u { justify-self: end; background: #8a55dc; color: #fff; padding: 5px 10px; border-radius: 12px 12px 2px 12px; max-width: 80%; }
+.tk-p { justify-self: start; background: rgba(178,107,255,.14); padding: 5px 10px; border-radius: 12px 12px 12px 2px; max-width: 80%; }
+.pal-talk-form { display: flex; gap: 6px; } .pal-talk-form input { flex: 1; min-width: 0; }
+#tk-mic.on { background: #ff6fae; color: #fff; }
+.pal-ai-note { margin: 0; } .linkish { background: none; border: 0; color: #b26bff; text-decoration: underline; cursor: pointer; font: inherit; padding: 0; }
+.pal-talk-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal-vlist { display: grid; gap: 6px; }
+.pal-v { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 12px; background: rgba(178,107,255,.07); flex-wrap: wrap; }
+.pal-v.on { outline: 2px solid #b26bff; } .pal-v b { flex: 1; min-width: 90px; } .pal-v small { font-size: 11px; opacity: .75; } .vpre { color: #ffb31a; opacity: 1 !important; }
+.vfav { background: none; border: 0; color: #ffb31a; font-size: 18px; cursor: pointer; }
+/* ---- Pal Games */
+.g-palgames { display: flex; align-items: center; gap: 12px; padding: 14px; margin: 10px 0 14px; border-radius: 18px; text-decoration: none; color: #fff; background: linear-gradient(135deg, #8a55dc, #ff6fae); }
+.g-palgames > span:first-child { font-size: 30px; } .g-palgames small { display: block; opacity: .9; } .g-palgames div { flex: 1; }
+.pg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
+.pg-card { display: grid; gap: 4px; text-align: left; padding: 12px; border-radius: 16px; border: 2px solid transparent; background: rgba(178,107,255,.1); color: inherit; cursor: pointer; font: inherit; }
+.pg-card.on { border-color: #b26bff; background: rgba(178,107,255,.22); } .pg-ic { font-size: 28px; } .pg-card small { opacity: .8; }
+.pg-modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; } .pg-friend { display: flex; gap: 6px; } .pg-friend input { flex: 1; min-width: 0; }
+.pg-play { max-width: 420px; margin: 0 auto; } .pg-top { display: flex; align-items: center; gap: 8px; padding: 8px 4px; flex-wrap: wrap; }
+.pg-host { display: grid; place-items: center; } .pg-cv { width: 100%; max-width: 400px; aspect-ratio: 3 / 4; border-radius: 18px; touch-action: none; user-select: none; }
+.pg-count { font: 900 72px Inter, sans-serif; color: #b26bff; padding: 80px 0; } .pg-wait { display: grid; gap: 8px; justify-items: center; padding: 30px 10px; text-align: center; } .pg-wait input { width: 100%; }
+.pg-w { margin-left: auto; font-size: 12px; opacity: .8; }
+/* ---- Pal Park */
+.park { max-width: 960px; margin: 0 auto; } .park-top { display: flex; align-items: center; gap: 10px; padding: 6px 4px; flex-wrap: wrap; } .park-zone { font: 700 13px Inter, sans-serif; color: #b26bff; } .park-top a { margin-left: auto; }
+.park-view { position: relative; border-radius: 18px; overflow: hidden; touch-action: none; user-select: none; background: #c8efa8; }
+#park-cv { display: block; outline: none; }
+.park-joy { position: absolute; left: 14px; bottom: 14px; width: 110px; height: 110px; border-radius: 50%; background: rgba(40,18,84,.25); border: 2px solid rgba(255,255,255,.5); touch-action: none; }
+.park-joy i { position: absolute; left: 35px; top: 35px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.park-btns { position: absolute; right: 12px; bottom: 14px; display: grid; gap: 8px; } .park-btns .btn { width: 48px; height: 48px; border-radius: 50%; font-size: 20px; padding: 0; }
+.park-panel { position: absolute; left: 10px; right: 70px; bottom: 136px; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-radius: 14px; background: rgba(255,255,255,.95); color: #2a1458; max-height: 45%; overflow-y: auto; }
+.pk-e { font-size: 24px; background: none; border: 0; cursor: pointer; } .pk-f { display: flex; gap: 6px; width: 100%; } .pk-f input { flex: 1; min-width: 0; }
+.park-found { position: absolute; left: 10px; top: 10px; font: 800 13px Inter, sans-serif; color: #fff; background: rgba(40,18,84,.55); padding: 4px 10px; border-radius: 999px; }
+.park-card { display: grid; gap: 8px; } .park-card textarea, .park-card select { width: 100%; }
+@media (min-width: 900px) { .park-joy { display: none; } }

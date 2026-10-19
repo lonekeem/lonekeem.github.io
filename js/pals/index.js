@@ -1,6 +1,12 @@
 // Kemy Pals: original virtual pets that live next to your profile.
 import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf } from './art.js';
 import { liveOverlay, popups } from './overlays.js';
+import { createShopUI } from './shop.js';
+import { openTalk } from './talk.js';
+import { doc as fdoc, getDoc as fget, setDoc as fset, serverTimestamp as fts } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { roomOf } from './economy.js';
+import { DECOR } from './wear.js';
+import { ITEM } from './catalog.js';
 import { createStore, liveStats, moodOf, patPal, readPet, firstPet, formName, isNight, xpToLevel, MAX_PALS, tsMs, listPals, getActivePal, playdate, newPlaydates } from './core.js';
 
 export const PALS_COPY = "Meet your Kemy Pal 🐾 Hatch your own cute companion from dozens of Pals like a baby elephant, puppy, panda, baby dragon and more, give it a name, colors and outfits, and watch it hang out next to your profile. Give it bubbly showers, feed it snacks, brush it, tuck it into bed and play catch, and watch it glow up as you level. Collect up to 6 Pals, and let your friends give yours a pat.";
@@ -34,6 +40,7 @@ export function createPals(ctx) {
   if (!document.getElementById('pals-css')) { const l = document.createElement('link'); l.id = 'pals-css'; l.rel = 'stylesheet'; l.href = 'css/pals.css?v=1'; document.head.appendChild(l); }
   let mine = null; // { uid, list, store }
   const pop = popups({ S, db });
+  const shop = createShopUI(ctx);
   const debug = () => localStorage.getItem('kemy-pals-debug') === '1';
   async function myPals(force) {
     if (!S.user || !S.profile) return null;
@@ -55,6 +62,7 @@ export function createPals(ctx) {
   async function commit(p, patch, host) {
     const before = stageOf(p.level || 1), lvBefore = p.level || 1;
     try { await mine.store.save(p, patch); } catch (e) { toast(friendlyError(e)); return; }
+    if (host && patch.xpGain > 0 && patch.xpGain < 60) shop.earn('care', 5, 'for caring');
     if (stageOf(p.level) > before) glowUp(p); else if (p.level > lvBefore) toast(`${p.name} reached level ${p.level}!`);
     host && host();
   }
@@ -66,6 +74,19 @@ export function createPals(ctx) {
       const show = t < 70 ? frm : p; drawPal(c, 130, 180, 130, show, { t, mode: t > 90 ? 'happy' : 'idle' });
       c.fillStyle = `rgba(255,255,255,${flash})`; c.fillRect(0, 0, 260, 200); if (t === 72) fx.add(130, 110, 'star', 24); fx.draw(c); };
     f.el = s.cv; loop(f);
+  }
+  // ---------------------------------------------------------------- Talk to your Pal
+  async function talk(p, isMine, ownerName, ownerUid) {
+    let visitorChat = false; if (!isMine) { try { const s = await fget(fdoc(db, 'users', ownerUid, 'pal', 'settings')); visitorChat = s.exists() && !!s.data().visitorChat; } catch {} if (visitorChat && !requireAuth()) return; }
+    let inv = {}; if (isMine) { try { inv = await shop.econ().inventory(); } catch {} }
+    const m = isMine ? await myPals() : null; const mp = m ? m.list.find((x) => x.id === p.id) || p : p;
+    openTalk(ctx, mp, { owner: ownerName || (S.profile && S.profile.username) || 'friend', mine: isMine, visitorChat: !isMine && visitorChat,
+      ownsVoice: (id) => !!inv[id], saveVoice: (id) => m.store.save(mp, { voice: id }),
+      onHappy: () => { const st = liveStats(mp); st.happy = Math.min(100, st.happy + 2); commit(mp, { stats: st, xpGain: 2 }); shop.earn('chat', 2); } });
+  }
+  async function visitorSetting(el) {
+    let on = false; try { const s = await fget(fdoc(db, 'users', S.user.uid, 'pal', 'settings')); on = s.exists() && !!s.data().visitorChat; } catch {}
+    el.checked = on; el.onchange = async () => { try { await fset(fdoc(db, 'users', S.user.uid, 'pal', 'settings'), { visitorChat: el.checked, updatedAt: fts() }); toast(el.checked ? 'Visitors can chat with your Pal' : 'Visitors see friendly preset lines'); } catch (e) { toast(friendlyError(e)); } };
   }
   // ---------------------------------------------------------------- profile strip
   async function renderProfile(el, uid, u, isMine) {
@@ -80,15 +101,16 @@ export function createPals(ctx) {
     const sp = SPEC[act.species] || SPECIES[0];
     el.innerHTML = `<div class="pal-strip" aria-label="${esc(u.displayName)}'s Pals"><div class="pal-cv"></div>
       <div class="pal-tag"><b>${esc(act.name)}</b><small>${esc(formName(act))} · Lv ${act.level || 1} · <span class="pal-vibe" style="--v:${VIBES[sp.vibe].c}">${VIBES[sp.vibe].name}</span></small><small class="pal-pats">🐾 <b>${act.pats || 0}</b> pats</small></div>
-      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
+      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Talk</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Say hi</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
     const host = el.querySelector('.pal-cv'); const W = Math.max(160, Math.min(host.clientWidth || 300, 560)), H = 104; const s = stage(host, W, H);
     const fx = particles();
     const actors = shown.map((p, i) => ({ p, x: W * (0.5 - i * 0.22) + (i ? 0 : 10), tx: 0, face: i % 2 ? 1 : -1, mode: 'idle', until: i * 60, react: 0, mood: moodOf(liveStats(p)), size: i ? 52 : 66 }));
-    let guest = null, play = null, curT = 0;
+    let guest = null, play = null, curT = 0, room = []; roomOf(db, uid).then((r) => { room = r.filter((id) => ITEM[id]); });
     const f = (t) => { curT = t;
       const c = s.c; c.clearRect(0, 0, W, H); const night = isNight(); const h = new Date().getHours();
       c.fillStyle = night ? 'rgba(40,30,110,.35)' : h < 10 ? 'rgba(255,210,150,.18)' : h > 17 ? 'rgba(255,150,190,.16)' : 'rgba(170,140,255,.10)'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill();
       c.fillStyle = 'rgba(120,220,160,.35)'; c.beginPath(); c.ellipse(W / 2, H - 6, W * 0.48, 7, 0, 0, 7); c.fill();
+      room.forEach((id, i) => { const it = ITEM[id]; const x = [22, W - 26, W * 0.72][i]; c.save(); c.lineWidth = 0.9; try { DECOR[it.st](c, it.col, x, H - 9, 1.5); } catch {} c.restore(); });
       if (night) { c.fillStyle = '#fff3b0'; c.beginPath(); c.arc(W - 22, 18, 7, 0, 7); c.fill(); c.fillStyle = 'rgba(40,30,110,1)'; c.beginPath(); c.arc(W - 19, 16, 6, 0, 7); c.fill(); }
       const all = guest ? [...actors, guest] : actors;
       for (const A of all) {
@@ -123,7 +145,7 @@ export function createPals(ctx) {
     s.cv.addEventListener('pointerup', (e) => { if (isMine && !longT) return; clearTimeout(longT); longT = null;
       const r = s.cv.getBoundingClientRect(); const A = hit((e.clientX - r.left) * W / r.width); if (!A) return;
       A.react = 90; fx.add(A.x, 30, 'heart', 6); fx.add(A.x, 30, 'star', 5); snd('happy'); if (!isMine && A !== guest) doPat(A.p); });
-    el.querySelectorAll('[data-pa]').forEach((b) => b.onclick = () => { const k = b.dataset.pa; if (k === 'care') openSheet(act); if (k === 'pat') { actors[0].react = 90; fx.add(actors[0].x, 30, 'star', 10); snd('pat'); doPat(act); } if (k === 'bring') bring(b); });
+    el.querySelectorAll('[data-pa]').forEach((b) => b.onclick = () => { const k = b.dataset.pa; if (k === 'care') openSheet(act); if (k === 'talk') talk(act, isMine, u.username, uid); if (k === 'pat') { actors[0].react = 90; fx.add(actors[0].x, 30, 'star', 10); snd('pat'); doPat(act); } if (k === 'bring') bring(b); });
     async function doPat(p) {
       if (!S.user || !S.profile) { toast('Sign in to pat Pals'); return; }
       try { const ok = await patPal(db, uid, p.id, S.user.uid); if (ok) { p.pats = (p.pats || 0) + 1; if (p === act) el.querySelector('.pal-pats b').textContent = p.pats; toast(`You patted ${p.name}! 🐾`); notify(uid, 'pal_pat', { text: `@${S.profile.username} patted ${p.name}` }); } else toast(`${p.name} already got your pat today. Come back tomorrow!`); }
@@ -299,7 +321,7 @@ export function createPals(ctx) {
     s.cv.onclick = crack; document.getElementById('pal-crack').onclick = crack;
   }
   function onRoute(hash) {
-    if (!S.user || !S.profile || S.profile.welcomed === false) return; trackStreak();
+    if (!S.user || !S.profile || S.profile.welcomed === false) return; trackStreak(); shop.daily();
     const k = 'kemy-pals-intro-' + S.user.uid; if (localStorage.getItem(k) || /login|signup|onboard|settings|live/.test(hash || '')) return;
     if (document.querySelector('#modal-root .modal')) return;
     localStorage.setItem(k, '1'); myPals().then((m) => { if (m && !m.list.length) intro(false); }).catch(() => {});
@@ -307,22 +329,30 @@ export function createPals(ctx) {
   // ---------------------------------------------------------------- Pal Box page
   async function page(main, token, stale, sub) {
     if (sub === 'gallery') return gallery(main);
+    if (sub === 'shop') return shop.shopPage(main, { myPals, activeOf, commit });
     if (!requireAuth()) return; const m = await myPals(true); if (stale && stale(token)) return;
     const n = slots(m); const act = activeOf(m); const firstEmpty = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].find((id) => !m.list.some((p) => p.id === id));
-    main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Box</h1><span class="muted small">${m.list.length}/${MAX_PALS} Pals · ${n} unlocked · <a href="#/pals/gallery">Pal Gallery (${collected().size}/${SPECIES.length})</a></span></div>
+    main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Box</h1><span class="muted small">${m.list.length}/${MAX_PALS} Pals · ${n} unlocked · <a href="#/pals/gallery">Pal Gallery (${collected().size}/${SPECIES.length})</a></span><a class="pal-coins" href="#/pals/shop" title="Star Coins: open the Pal Shop" id="pal-coins">${shop.coinTxt('…')}</a></div>
+      ${m.list.length > 1 ? `<div class="pal-l">Who’s on your profile? <small class="muted">Swipe and tap to switch</small></div><div class="pal-switch" role="radiogroup" aria-label="Active Pal">${m.list.map((p) => `<button role="radio" aria-checked="${act && act.id === p.id}" class="pal-sw-b ${act && act.id === p.id ? 'on' : ''}" data-act="${p.id}"><i data-swc="${p.id}"></i><b>${esc(p.name)}</b></button>`).join('')}</div>` : ''}
+      <div class="pal-quick"><a class="btn btn-sm" href="#/pals/shop">🛍️ Pal Shop</a><a class="btn btn-sm btn-ghost" href="#/games/pals">🎮 Pal Games</a><a class="btn btn-sm btn-ghost" href="#/park">🌳 Pal Park</a></div>
       <p class="muted small">${esc(PALS_SHORT)} New eggs unlock as your Pals level up and with daily visit streaks.</p>
       <div class="pal-grid">${['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => { const p = m.list.find((x) => x.id === id);
         if (p) return `<div class="pal-card ${act && act.id === id ? 'active' : ''}" data-id="${id}"><div class="pal-thumb"></div><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv ${p.level}</small>
-          <div class="pal-card-b"><button class="btn btn-sm" data-c="care">Care</button><button class="btn btn-sm btn-ghost" data-c="style">Style</button>${act && act.id === id ? '<span class="pal-on">On profile</span>' : '<button class="btn btn-sm btn-ghost" data-c="show">Show on profile</button>'}</div></div>`;
+          <div class="pal-card-b"><button class="btn btn-sm" data-c="care">Care</button><button class="btn btn-sm btn-ghost" data-c="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-c="closet">Closet</button><button class="btn btn-sm btn-ghost" data-c="style">Colors</button>${act && act.id === id ? '<span class="pal-on">On profile</span>' : '<button class="btn btn-sm btn-ghost" data-c="show">Show on profile</button>'}</div></div>`;
         return id === firstEmpty && m.list.length < n ? `<button class="pal-card egg" data-hatch="${id}"><div class="pal-thumb"></div><b>Egg ready!</b><small>Tap to hatch</small></button>` : `<div class="pal-card locked"><div class="pal-lock">🔒</div><small>Level up your Pals to unlock</small></div>`; }).join('')}</div>
+      <label class="check small pal-popset"><input type="checkbox" id="pal-vchat"> Let visitors chat with my Pal (AI)</label>
       <label class="check small pal-popset"><input type="checkbox" id="pal-pops" ${pop.enabled() ? 'checked' : ''}> Pal pop-ups while I scroll videos</label>
       ${debug() ? '<p class="small muted">Test mode is on (debug XP button in the care sheet). <button class="btn btn-sm btn-ghost" id="pal-poptest">Test pop-up</button></p>' : ''}</section>`;
+    shop.econ().wallet().then((w) => { const el = main.querySelector('#pal-coins'); if (el) el.innerHTML = shop.coinTxt(w.coins); }).catch(() => {});
+    main.querySelectorAll('[data-swc]').forEach((el) => { const p = m.list.find((x) => x.id === el.dataset.swc); const q = stage(el, 56, 50); drawPal(q.c, 28, 47, 40, p, { t: 20, mode: 'idle' }); });
+    main.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => { const p = m.list.find((x) => x.id === b.dataset.act); if (act && p.id === act.id) return; try { await m.store.setActive(p.id); S.profile.activePet = p.id; snd('pop'); toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } });
+    visitorSetting(main.querySelector('#pal-vchat'));
     main.querySelector('#pal-pops').onchange = (e) => { pop.set(e.target.checked); toast(e.target.checked ? 'Pal pop-ups on' : 'Pal pop-ups off'); };
     const pt = main.querySelector('#pal-poptest'); if (pt) pt.onclick = () => pop.show(true);
     main.querySelectorAll('.pal-card[data-id]').forEach((card) => { const p = m.list.find((x) => x.id === card.dataset.id); const s = stage(card.querySelector('.pal-thumb'), 110, 90);
       const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawPal(s.c, 55, 84, 74, p, { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
       card.querySelectorAll('[data-c]').forEach((b) => b.onclick = async () => { const c = b.dataset.c;
-        if (c === 'care') openSheet(p); if (c === 'style') creator({ pal: p, onDone: () => page(main) });
+        if (c === 'talk') talk(p, true, S.profile.username, S.user.uid); if (c === 'care') openSheet(p); if (c === 'closet') shop.closet(p, async (outfit) => { await m.store.save(p, { outfit }); page(main); }); if (c === 'style') creator({ pal: p, onDone: () => page(main) });
         if (c === 'show') { try { await m.store.setActive(p.id); S.profile.activePet = p.id; toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } } }); });
     main.querySelectorAll('[data-hatch]').forEach((b) => { const s = stage(b.querySelector('.pal-thumb'), 110, 90); const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawEgg(s.c, 55, 86, 76, RM() ? 0 : t); }; f.el = s.cv; loop(f); b.onclick = () => creator({ slot: b.dataset.hatch, onDone: () => page(main) }); });
   }
@@ -338,7 +368,8 @@ export function createPals(ctx) {
       <a class="btn btn-sm btn-ghost" href="#/pals">← Pal Box</a></section>`;
     main.querySelectorAll('[data-g]').forEach((el) => { const sp = el.dataset.g; const q = stage(el, 96, 84); let lv = 1; const fn = (t) => { if (t % 180 === 0) lv = lv === 1 ? 5 : lv === 5 ? 12 : 1; q.c.clearRect(0, 0, 96, 84); drawPal(q.c, 48, 80, 64, { species: sp, level: lv }, { t, mode: t % 180 > 130 ? 'react' : 'idle' }); if (!got.has(sp)) { q.c.globalCompositeOperation = 'source-atop'; q.c.fillStyle = 'rgba(40,20,80,.55)'; q.c.fillRect(0, 0, 96, 84); q.c.globalCompositeOperation = 'source-over'; } }; fn.el = q.cv; if (RM()) fn(1); else loop(fn); });
   }
+  addEventListener('kemy:coins', (e) => { const d = e.detail || {}; if (S.user && d.src) shop.earn(d.src, d.n || 1, d.why); });
   // XP from activity elsewhere in the app: dispatchEvent(new CustomEvent('kemy:xp', { detail: { n } }))
   addEventListener('kemy:xp', async (e) => { try { const m = await myPals(); if (!m) return; const p = activeOf(m); if (!p) return; await commit(p, { xpGain: Math.min(60, (e.detail && e.detail.n) || 10) }); } catch {} });
-  return { renderProfile, onRoute, page, intro, openSheet, gallery, liveOverlay: (root, o) => liveOverlay({ S, db, toast }, root, o), popups: pop };
+  return { renderProfile, onRoute, page, intro, openSheet, gallery, shop, myPals, activeOf, commit, liveOverlay: (root, o) => liveOverlay({ S, db, toast }, root, o), popups: pop };
 }

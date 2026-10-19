@@ -1016,7 +1016,9 @@ service cloud.firestore {
       function hex(v) { return v is string && v.matches('^#[0-9a-fA-F]{6}$'); }
       function stat(v) { return v is int && v >= 0 && v <= 100; }
       function palValid() {
-        return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt'])
+        return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt', 'outfit', 'voice'])
+          && (!('voice' in pd()) || (pd().voice is string && pd().voice.matches('^[a-z_]{2,16}$') && (!pd().voice.matches('^vx_.*') || exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().voice)))))
+          && (!('outfit' in pd()) || outfitOk(pd().outfit))
           && pd().species is string && pd().species.matches('^[a-z]{2,16}$')
           && isStr(pd().name, 1, 20)
           && pd().colors is map && pd().colors.keys().hasOnly(['body', 'accent', 'eye']) && hex(pd().colors.body) && hex(pd().colors.accent) && hex(pd().colors.eye)
@@ -1028,6 +1030,14 @@ service cloud.firestore {
           && pd().stats is map && pd().stats.keys().hasOnly(['happy', 'hunger', 'energy', 'clean'])
           && stat(pd().stats.happy) && stat(pd().stats.hunger) && stat(pd().stats.energy) && stat(pd().stats.clean)
           && pd().at == request.time && pd().updatedAt == request.time;
+      }
+      function owns(o, k) {
+        return o.get(k, '') == '' || (resource != null && 'outfit' in resource.data && resource.data.outfit.get(k, '') == o.get(k, ''))
+          || exists(/databases/$(database)/documents/users/$(uid)/inv/$(o.get(k, '')));
+      }
+      function outfitOk(o) {
+        return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back'])
+          && owns(o, 'head') && owns(o, 'face') && owns(o, 'neck') && owns(o, 'body') && owns(o, 'feet') && owns(o, 'back');
       }
       function patPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid)/pats/$(me()); }
       allow read: if true;
@@ -1065,6 +1075,181 @@ service cloud.firestore {
           && (resource == null || resource.data.at + duration.value(20, 'h') < request.time);
         allow delete: if signedIn() && (vid == me() || uid == me());
       }
+    }
+
+    // ================= Kemy Pals economy: Star Coins, inventory, outfits (Spark-friendly, no functions)
+    // Price catalog: only the admin writes it. Every purchase is checked against it.
+    match /config/palShop {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /users/{uid}/pal/wallet {
+      function w() { return request.resource.data; }
+      function ow() { return resource.data; }
+      function dayNow() { return int(request.time.toMillis() / 86400000); }
+      // Star Coin sources: max per write and max per day
+      function emax() { return { 'daily': 50, 'care': 5, 'win': 25, 'quest': 10, 'stars': 5, 'park': 10, 'chat': 2 }; }
+      function ecap() { return { 'daily': 50, 'care': 60, 'win': 150, 'quest': 60, 'stars': 50, 'park': 100, 'chat': 20 }; }
+      function invPath(i) { return /databases/$(database)/documents/users/$(uid)/inv/$(i); }
+      function shop() { return get(/databases/$(database)/documents/config/palShop).data; }
+      function walletShape() {
+        return w().keys().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'lastBuy', 'paid', 'buyAt', 'room', 'updatedAt'])
+          && w().coins is int && w().coins >= 0 && w().total is int && w().day is int && w().earned is map
+          && w().room is list && w().room.size() <= 3 && w().updatedAt == request.time;
+      }
+      function amt() { return w().coins - ow().coins; }
+      function earnOk() {
+        return w().src in emax() && amt() > 0 && amt() <= emax()[w().src]
+          && w().total == ow().total + amt() && w().day == dayNow() && w().last == request.time
+          && ow().last + duration.value(1, 's') < request.time
+          && ((ow().day == dayNow() && w().earned.diff(ow().earned).affectedKeys().hasOnly([w().src])
+               && w().earned[w().src] == ow().earned.get(w().src, 0) + amt())
+              || (ow().day != dayNow() && w().earned.keys().hasOnly([w().src]) && w().earned[w().src] == amt()))
+          && w().earned[w().src] <= ecap()[w().src];
+      }
+      function buyOk() {
+        return w().paid == ow().coins - w().coins && w().paid > 0 && w().buyAt == request.time
+          && w().lastBuy in shop().prices
+          && (w().paid == shop().prices[w().lastBuy] || w().paid == shop().deals[dayNow() % shop().deals.size()].get(w().lastBuy, -1))
+          && getAfter(invPath(w().lastBuy)).data.at == request.time;
+      }
+      function roomOk() {
+        return (w().room.size() < 1 || exists(invPath(w().room[0]))) && (w().room.size() < 2 || exists(invPath(w().room[1])))
+          && (w().room.size() < 3 || exists(invPath(w().room[2])));
+      }
+      allow read: if true;
+      allow create: if signedIn() && uid == me() && walletShape() && w().coins == 0 && w().total == 0 && w().day == dayNow()
+        && w().earned.size() == 0 && w().room.size() == 0 && w().last == request.time && w().paid == 0 && w().lastBuy == '';
+      allow update: if signedIn() && uid == me() && walletShape() && (
+        (changed().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'updatedAt']) && earnOk())
+        || (changed().hasOnly(['coins', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && buyOk())
+        || (changed().hasOnly(['room', 'updatedAt']) && roomOk()));
+      allow delete: if signedIn() && uid == me();
+    }
+    // Talk to your Pal: short chat memory (last messages + a few facts), owner-only
+    match /users/{uid}/pal/chat {
+      allow read, delete: if signedIn() && uid == me();
+      allow create, update: if signedIn() && uid == me()
+        && request.resource.data.keys().hasOnly(['msgs', 'facts', 'updatedAt'])
+        && request.resource.data.msgs is list && request.resource.data.msgs.size() <= 12
+        && request.resource.data.facts is list && request.resource.data.facts.size() <= 6
+        && request.resource.data.updatedAt == request.time;
+    }
+    // owner's Pal settings that visitors may read (e.g. 'let visitors chat with my Pal')
+    match /users/{uid}/pal/settings {
+      allow read: if true;
+      allow write: if signedIn() && uid == me() && request.resource.data.keys().hasOnly(['visitorChat', 'updatedAt'])
+        && request.resource.data.visitorChat is bool && request.resource.data.updatedAt == request.time;
+      allow delete: if signedIn() && uid == me();
+    }
+    match /users/{uid}/inv/{item} {
+      function v() { return request.resource.data; }
+      function walletPath() { return /databases/$(database)/documents/users/$(uid)/pal/wallet; }
+      function oldN() { return resource == null ? 0 : resource.data.n; }
+      function kind() { return get(/databases/$(database)/documents/config/palShop).data.kinds[item]; }
+      function bought() { return getAfter(walletPath()).data.buyAt == request.time && getAfter(walletPath()).data.lastBuy == item; }
+      function achOk() {
+        return oldN() == 0 && v().n == 1 && (
+          (item == 'ach_glow' && v().proof is string && v().proof.matches('^p[1-6]$')
+             && get(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof)).data.level >= 12)
+          || (item == 'ach_coins' && get(walletPath()).data.total >= 1000)
+          || (item == 'ach_family' && v().proof is list && v().proof.size() == 3 && v().proof[0] != v().proof[1] && v().proof[1] != v().proof[2] && v().proof[0] != v().proof[2]
+             && exists(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof[0]))
+             && exists(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof[1]))
+             && exists(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof[2])))
+          || (item == 'ach_champ' && get(/databases/$(database)/documents/palStats/$(uid)).data.wins >= 5));
+      }
+      allow read: if true;
+      allow create, update: if signedIn() && uid == me() && item.matches('^[a-z_]{2,16}$')
+        && v().keys().hasOnly(['n', 'at', 'proof']) && v().n is int && v().at == request.time && (
+          // bought: +1 together with the wallet purchase (wearables, decor and toys are one each)
+          (v().n == oldN() + 1 && bought() && (kind() == 'snack' || v().n == 1))
+          // used up a snack or toy
+          || (resource != null && v().n == oldN() - 1 && v().n >= 0)
+          // achievement reward, checked against real progress
+          || (item.matches('^ach_[a-z]+$') && achOk()));
+      allow delete: if signedIn() && uid == me();
+    }
+    match /users/{uid}/looks/{lid} {
+      allow read: if true;
+      allow write: if signedIn() && uid == me() && lid.matches('^l[1-6]$')
+        && request.resource.data.keys().hasOnly(['name', 'outfit']) && isStr(request.resource.data.name, 1, 20)
+        && request.resource.data.outfit is map && request.resource.data.outfit.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back']);
+      allow delete: if signedIn() && uid == me();
+    }
+
+    // ================= Pal Games (real-time Pal vs Pal mini-games)
+    match /palGames/{gid} {
+      function g() { return request.resource.data; }
+      function og() { return resource.data; }
+      allow read: if true;
+      allow create: if signedIn() && g().keys().hasOnly(['game', 'status', 'players', 'names', 'unames', 'pals', 'host', 'invitee', 'quick', 'seed', 'startAt', 'createdAt', 'updatedAt'])
+        && g().game in ['race', 'bubbles', 'stars', 'dance'] && g().status == 'waiting' && g().host == me()
+        && g().players == [me()] && g().names is list && g().names.size() == 1 && g().unames is list && g().unames.size() == 1
+        && g().pals is list && g().pals.size() == 1 && isStr(g().invitee, 0, 128) && g().quick is bool && g().seed is int
+        && g().createdAt == request.time && g().updatedAt == request.time;
+      allow update: if signedIn() && (
+        // join: second seat, starts the countdown
+        (og().status == 'waiting' && !(me() in og().players) && og().invitee in ['', me()] && og().players.size() == 1
+          && changed().hasOnly(['players', 'names', 'unames', 'pals', 'status', 'startAt', 'updatedAt'])
+          && g().players == og().players.concat([me()]) && g().names.size() == 2 && g().unames.size() == 2 && g().pals.size() == 2
+          && g().status == 'active' && g().startAt is timestamp && g().startAt > request.time && g().startAt < request.time + duration.value(10, 's')
+          && g().updatedAt == request.time)
+        // finish / cancel
+        || (me() in og().players && changed().hasOnly(['status', 'updatedAt']) && g().status == 'done'));
+      allow delete: if isAdmin();
+      // each player's live progress (throttled ~2/s) and final score
+      match /live/{uid} {
+        allow read: if true;
+        allow create, update: if signedIn() && uid == me() && me() in get(/databases/$(database)/documents/palGames/$(gid)).data.players
+          && request.resource.data.keys().hasOnly(['p', 's', 'fin', 'at']) && request.resource.data.p is int && request.resource.data.p >= 0 && request.resource.data.p <= 1000
+          && request.resource.data.s is int && request.resource.data.s >= 0 && request.resource.data.s <= 999 && request.resource.data.fin is bool
+          && request.resource.data.at == request.time
+          && (resource == null || (!resource.data.fin && resource.data.at + duration.value(300, 'ms') < request.time && request.resource.data.s >= resource.data.s));
+        allow delete: if false;
+      }
+      match /rec/{uid} {
+        allow read: if true;
+        allow create: if signedIn() && uid == me() && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
+          && getAfter(/databases/$(database)/documents/palStats/$(uid)).data.last == gid;
+      }
+    }
+    // Pal Games leaderboard: wins only count for finished human matches where your score beat theirs.
+    match /palStats/{uid} {
+      function ps() { return request.resource.data; }
+      function pg() { return get(/databases/$(database)/documents/palGames/$(ps().last)).data; }
+      function other() { return pg().players[0] == uid ? pg().players[1] : pg().players[0]; }
+      function lv(u) { return get(/databases/$(database)/documents/palGames/$(ps().last)/live/$(u)).data; }
+      function fresh() {
+        return !exists(/databases/$(database)/documents/palGames/$(ps().last)/rec/$(uid))
+          && existsAfter(/databases/$(database)/documents/palGames/$(ps().last)/rec/$(uid));
+      }
+      function base() {
+        return signedIn() && uid == me() && ps().keys().hasOnly(['wins', 'games', 'last', 'name', 'uname', 'color', 'updatedAt'])
+          && isStr(ps().last, 1, 40) && pg().players.size() == 2 && uid in pg().players && lv(uid).fin && lv(other()).fin && fresh()
+          && ps().updatedAt == request.time && ps().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
+          && ps().uname == get(/databases/$(database)/documents/users/$(uid)).data.username && isStr(ps().color, 0, 20);
+      }
+      function won() { return lv(uid).s > lv(other()).s; }
+      allow read: if true;
+      allow create: if base() && ps().games == 1 && ps().wins == (won() ? 1 : 0);
+      allow update: if base() && ps().games == resource.data.games + 1 && ps().wins == resource.data.wins + (won() ? 1 : 0);
+      allow delete: if isAdmin() || (signedIn() && uid == me());
+    }
+
+    // ================= Pal Park presence: rooms of ~20, ~4 writes/s while moving, stale docs removable by anyone
+    match /parkRooms/{room}/p/{uid} {
+      function pp() { return request.resource.data; }
+      allow read: if signedIn();
+      allow create, update: if signedIn() && uid == me() && room.matches('^r[0-9]{1,2}$')
+        && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at'])
+        && pp().x is int && pp().x >= 0 && pp().x <= 4000 && pp().y is int && pp().y >= 0 && pp().y <= 4000
+        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && isStr(pp().tgt, 0, 128)
+        && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
+        && pp().uname == get(/databases/$(database)/documents/users/$(uid)).data.username
+        && pp().pal is map && pp().at == request.time
+        && (resource == null || resource.data.at + duration.value(200, 'ms') < request.time);
+      allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(2, 'm'));
     }
   }
 }

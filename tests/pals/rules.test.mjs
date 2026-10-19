@@ -1,0 +1,77 @@
+// Firestore rules tests for the Pals economy, Pal Games stats and Pal Park presence.
+// Run: firebase emulators:exec --only firestore "node tests/pals/rules.test.mjs"
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { doc, setDoc, updateDoc, getDoc, deleteDoc, writeBatch, serverTimestamp, Timestamp, increment } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+import { shopDoc, DEALS, dayNo } from '../../js/pals/catalog.js';
+const env = await initializeTestEnvironment({ projectId: 'demo-pals', firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+let pass = 0, fail = 0; const ok = async (name, p) => { try { await p; pass++; console.log('PASS', name); } catch (e) { fail++; console.log('FAIL', name, e.message.slice(0, 200)); } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+await env.withSecurityRulesDisabled(async (c) => { const d = c.firestore();
+  await setDoc(doc(d, 'config/palShop'), shopDoc());
+  for (const u of ['alice', 'bob']) await setDoc(doc(d, 'users', u), { displayName: u, username: u });
+  await setDoc(doc(d, 'users/alice/pets/p1'), { species: 'axolotl', name: 'Bloop', colors: { body: '#f7cdee', accent: '#8a55dc', eye: '#24133f' }, pattern: 'none', acc: 'none', xp: 0, level: 1, pats: 0, stats: { happy: 80, hunger: 80, energy: 80, clean: 80 }, at: Timestamp.now(), createdAt: Timestamp.now(), updatedAt: Timestamp.fromMillis(Date.now() - 5000) });
+});
+const A = env.authenticatedContext('alice').firestore(), B = env.authenticatedContext('bob').firestore();
+const W = doc(A, 'users/alice/pal/wallet');
+const base = { coins: 0, total: 0, day: dayNo(), earned: {}, src: '', last: serverTimestamp(), lastBuy: '', paid: 0, buyAt: serverTimestamp(), room: [], updatedAt: serverTimestamp() };
+await ok('create empty wallet', setDoc(W, base));
+await ok('cannot create a wallet with coins for someone else', assertFails(setDoc(doc(B, 'users/alice/pal/wallet'), base)));
+await sleep(1100);
+const earn = (src, n, cur) => updateDoc(W, { coins: cur.coins + n, total: cur.total + n, day: dayNo(), earned: { ...cur.earned, [src]: (cur.earned[src] || 0) + n }, src, last: serverTimestamp(), updatedAt: serverTimestamp() });
+let cur = { coins: 0, total: 0, earned: {} };
+await ok('daily bonus +50', assertSucceeds(earn('daily', 50, cur))); cur = { coins: 50, total: 50, earned: { daily: 50 } };
+await sleep(1100);
+await ok('second daily bonus same day refused', assertFails(earn('daily', 50, cur)));
+await ok('care +6 (over per-write max) refused', assertFails(earn('care', 6, cur)));
+await ok('unknown source refused', assertFails(earn('cheat', 5, cur)));
+await ok('care +5 ok', assertSucceeds(earn('care', 5, cur))); cur = { coins: 55, total: 55, earned: { daily: 50, care: 5 } };
+await ok('earning again within 1s refused', assertFails(earn('care', 5, cur)));
+await ok('cannot just set coins', assertFails(updateDoc(W, { coins: 99999, updatedAt: serverTimestamp() })));
+// purchases
+const buy = (item, paid, curCoins, n = 1) => { const b = writeBatch(A); b.update(W, { coins: curCoins - paid, lastBuy: item, paid, buyAt: serverTimestamp(), updatedAt: serverTimestamp() }); b.set(doc(A, 'users/alice/inv', item), { n, at: serverTimestamp() }); return b.commit(); };
+await ok('buy a berry at catalog price (10)', assertSucceeds(buy('berry', 10, 55))); let coins = 45;
+await ok('buy at a made-up low price refused', assertFails(buy('beanie', 1, coins)));
+await ok('buy more than you can afford refused (no negative balance)', assertFails(buy('tophat', 150, coins)));
+await ok('inventory add without paying refused', assertFails(setDoc(doc(A, 'users/alice/inv/cape'), { n: 1, at: serverTimestamp() })));
+await ok('second berry stacks (snack)', assertSucceeds(buy('berry', 10, coins, 2))); coins = 35;
+const deal = DEALS[dayNo() % DEALS.length]; const [did, dp] = Object.entries(deal).find(([k, p]) => p <= coins) || [];
+if (did) await ok(`today's deal ${did} at ${dp}`, assertSucceeds(buy(did, dp, coins))); if (did) coins -= dp;
+await ok('use a berry (n-1)', assertSucceeds(updateDoc(doc(A, 'users/alice/inv/berry'), { n: 1, at: serverTimestamp() })));
+await ok('achievement crown refused without a level 12 Pal', assertFails(setDoc(doc(A, 'users/alice/inv/ach_glow'), { n: 1, at: serverTimestamp(), proof: 'p1' })));
+await ok('coins achievement refused below 1000 earned', assertFails(setDoc(doc(A, 'users/alice/inv/ach_coins'), { n: 1, at: serverTimestamp() })));
+// outfits
+await ok('wear an unowned hat refused', assertFails(updateDoc(doc(A, 'users/alice/pets/p1'), { outfit: { head: 'goldcrown' }, xp: 0, level: 1, stats: { happy: 80, hunger: 80, energy: 80, clean: 80 }, at: serverTimestamp(), updatedAt: serverTimestamp() })));
+await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), 'users/alice/inv/beanie'), { n: 1, at: Timestamp.now() }));
+await ok('wear an owned beanie', assertSucceeds(updateDoc(doc(A, 'users/alice/pets/p1'), { outfit: { head: 'beanie', body: '' }, pattern: 'stripes', xp: 0, level: 1, stats: { happy: 80, hunger: 80, energy: 80, clean: 80 }, at: serverTimestamp(), updatedAt: serverTimestamp() })));
+await ok('room decor must be owned', assertFails(updateDoc(W, { room: ['castle'], updatedAt: serverTimestamp() })));
+await ok('save a look', assertSucceeds(setDoc(doc(A, 'users/alice/looks/l1'), { name: 'Cozy', outfit: { head: 'beanie' } })));
+// Pal Games stats
+await env.withSecurityRulesDisabled(async (c) => { const d = c.firestore();
+  await setDoc(doc(d, 'palGames/g1'), { game: 'stars', status: 'done', players: ['alice', 'bob'] });
+  await setDoc(doc(d, 'palGames/g1/live/alice'), { p: 1000, s: 30, fin: true, at: Timestamp.now() }); await setDoc(doc(d, 'palGames/g1/live/bob'), { p: 1000, s: 20, fin: true, at: Timestamp.now() }); });
+const stat = (db, uid, wins) => { const b = writeBatch(db); b.set(doc(db, 'palStats', uid), { wins, games: 1, last: 'g1', name: uid, uname: uid, color: '', updatedAt: serverTimestamp() }); b.set(doc(db, 'palGames/g1/rec', uid), { at: serverTimestamp() }); return b.commit(); };
+await ok('loser cannot claim a win', assertFails(stat(B, 'bob', 1)));
+await ok('loser records a game', assertSucceeds(stat(B, 'bob', 0)));
+await ok('winner records a win', assertSucceeds(stat(A, 'alice', 1)));
+await ok('same game cannot be counted twice', assertFails(updateDoc(doc(A, 'palStats/alice'), { wins: 2, games: 2, last: 'g1', name: 'alice', uname: 'alice', color: '', updatedAt: serverTimestamp() })));
+await ok('cannot write into a game you are not in', assertFails(setDoc(doc(env.authenticatedContext('eve').firestore(), 'palGames/g1/live/eve'), { p: 1, s: 1, fin: false, at: serverTimestamp() })));
+// Park
+const P = (db) => doc(db, 'parkRooms/r1/p/alice');
+const pres = { x: 100, y: 200, d: 1, e: '', eAt: 0, say: '', sayAt: 0, tgt: '', name: 'alice', uname: 'alice', color: '#8a2be2', pal: { species: 'axolotl' }, at: serverTimestamp() };
+await ok('join the park', assertSucceeds(setDoc(P(A), pres)));
+await ok('position spam faster than 4/s refused', assertFails(setDoc(P(A), { ...pres, x: 120 })));
+await sleep(250); await ok('throttled move ok', assertSucceeds(setDoc(P(A), { ...pres, x: 130 })));
+await ok('bob cannot move alice', assertFails(setDoc(P(B), { ...pres, x: 1 })));
+await ok('fresh presence cannot be deleted by others', assertFails(deleteDoc(P(B))));
+await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), 'parkRooms/r1/p/ghost'), { ...pres, name: 'ghost', at: Timestamp.fromMillis(Date.now() - 600000) }));
+await ok('stale presence can be cleaned up by anyone', assertSucceeds(deleteDoc(doc(B, 'parkRooms/r1/p/ghost'))));
+await ok('owner saves Pal chat memory', assertSucceeds(setDoc(doc(A, 'users/alice/pal/chat'), { msgs: [{ r: 'u', t: 'hi', p: 'p1' }], facts: ['i like pizza'], updatedAt: serverTimestamp() })));
+await ok('others cannot read your Pal chat', assertFails(getDoc(doc(B, 'users/alice/pal/chat'))));
+await ok('owner toggles visitor chat', assertSucceeds(setDoc(doc(A, 'users/alice/pal/settings'), { visitorChat: true, updatedAt: serverTimestamp() })));
+await ok('visitors can read the visitor-chat setting', assertSucceeds(getDoc(doc(B, 'users/alice/pal/settings'))));
+await sleep(1100);
+await ok('locked voice refused', assertFails(updateDoc(doc(A, 'users/alice/pets/p1'), { voice: 'vx_royal', xp: 0, level: 1, stats: { happy: 80, hunger: 80, energy: 80, clean: 80 }, at: serverTimestamp(), updatedAt: serverTimestamp() })));
+await ok('free voice ok', assertSucceeds(updateDoc(doc(A, 'users/alice/pets/p1'), { voice: 'squeaky', xp: 0, level: 1, stats: { happy: 80, hunger: 80, energy: 80, clean: 80 }, at: serverTimestamp(), updatedAt: serverTimestamp() })));
+await ok('only the admin writes the price catalog', assertFails(setDoc(doc(A, 'config/palShop'), { prices: { goldcrown: 1 } })));
+console.log(fail ? `${fail} FAILED, ${pass} passed` : `ALL ${pass} PASSED`); await env.cleanup(); process.exit(fail ? 1 : 0);
