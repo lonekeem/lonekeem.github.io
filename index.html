@@ -48,6 +48,10 @@
         }
 
         .btn:hover { background-color: #5d1a99; }
+        /* Music Videos */
+        .video-card { border: 1px solid #8a2be2; border-radius: 8px; padding: 15px; margin: 15px auto; max-width: 420px; text-align: center; }
+        .video-card h3 { margin-top: 0; color: #8a2be2; }
+        .video-card video { width: 100%; border-radius: 6px; background: #000; }
     </style>
 </head>
 <body>
@@ -64,6 +68,16 @@
         <div class="media-item">
             <span>[Movie Title 2]</span>
             <a href="[Link URL]" class="btn">Watch Now</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Music Videos</h2>
+        <div class="video-card">
+            <h3>Stand Up Strong</h3>
+            <video controls playsinline preload="metadata" poster="videos/stand-up-strong.jpg">
+                <source src="videos/stand-up-strong.mp4" type="video/mp4">
+            </video>
         </div>
     </div>
 
