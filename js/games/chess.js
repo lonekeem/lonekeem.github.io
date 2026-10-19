@@ -176,7 +176,7 @@ export function createChess(ctx) {
       if (timed()) { const c = [...g.clk]; c[me] = Math.max(0, Math.round(c[me] - (Date.now() - turnSeen) - 500)); upd.clk = c; }
       if (o.over) Object.assign(upd, o.winner === 'draw' ? { status: 'done', winnerUid: 'draw', endReason: 'draw' } : { status: 'done', winnerUid: ui.myUid(), endReason: 'win' });
       sel = -1; ui.sfx.play(m.c ? 'capture' : 'place');
-      try { await net.update(gid, upd); if (o.over) iEnded = true; } catch (e) { toast(friendlyError(e)); }
+      if (o.over) iEnded = true; try { await net.update(gid, upd); } catch (e) { iEnded = false; toast(friendlyError(e)); }
     }
     function actions() {
       const box = $('#g-actions'); if (!box) return;

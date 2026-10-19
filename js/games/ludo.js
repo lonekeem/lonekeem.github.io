@@ -165,7 +165,7 @@ export function createLudo(ctx) {
       let ns; try { ns = L.step(st, die, token); } catch { submittedK = k - 1; return; }
       const upd = { lv: toLv(ns), moveNo: (g.moveNo || 0) + 1, turnAt: net.fs.serverTimestamp() };
       if (ns.winner >= 0) Object.assign(upd, { status: 'done', winnerUid: g.players[ns.winner], endReason: 'win' });
-      try { await net.update(gid, upd); if (ns.winner >= 0) iEnded = true; } catch (e) { submittedK = k - 1; toast(friendlyError(e)); }
+      if (ns.winner >= 0) iEnded = true; try { await net.update(gid, upd); } catch (e) { iEnded = false; submittedK = k - 1; toast(friendlyError(e)); }
     }
     // drive the roll / move cycle from the latest snapshot
     async function step() {
@@ -287,7 +287,7 @@ export function createLudo(ctx) {
       if (g.status === 'done' && !ended) {
         ended = true; if (stopHb) { stopHb(); stopHb = null; }
         const mine = member() || (g.left || []).includes(me());
-        if (mine) setTimeout(() => net.recordResult(g, iEnded), iEnded ? 0 : 2500);
+        if (mine) setTimeout(() => net.recordResult(g, iEnded || (member() && (g.left || []).length > 0)), iEnded ? 0 : 2500);
         const win = g.winnerUid === me();
         const wi = g.players.indexOf(g.winnerUid);
         ui.resultModal({ title: win ? 'You win!' : `${wi >= 0 ? g.names[wi] : 'Someone'} wins`, sub: 'All four tokens home.', win, buttons: [{ label: 'New room', onClick: () => $('#lu-again')?.click() }, { label: 'Back to games', href: '#/games' }] });
