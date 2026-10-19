@@ -884,5 +884,22 @@ service cloud.firestore {
         && isStr(request.resource.data.excerpt, 0, 300)
         && request.resource.data.createdAt == request.time;
     }
+      // Kemy's Bubble Quest: one best-score doc per user per level (fastest time leaderboard).
+    match /kqLevels/{lvl}/scores/{uid} {
+      function kq() { return request.resource.data; }
+      function kqValid() {
+        return signedIn() && uid == me() && lvl.matches('^[1-3]-[1-2]$')
+          && kq().keys().hasOnly(['uid', 'level', 'name', 'uname', 'time', 'stars', 'big', 'updatedAt'])
+          && kq().uid == uid && kq().level == lvl && isStr(kq().name, 1, 40) && isStr(kq().uname, 0, 30)
+          && kq().time is int && kq().time >= 10000 && kq().time <= 3600000
+          && kq().stars is int && kq().stars >= 0 && kq().stars <= 80
+          && kq().big is int && kq().big >= 0 && kq().big <= 3
+          && kq().updatedAt == request.time;
+      }
+      allow read: if true;
+      allow create: if kqValid();
+      allow update: if kqValid() && kq().time <= resource.data.time && kq().stars >= resource.data.stars && kq().big >= resource.data.big;
+      allow delete: if signedIn() && uid == me();
+    }
   }
 }

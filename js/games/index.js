@@ -86,7 +86,7 @@ export function createGames(ctx) {
         <a class="g-qbtn" href="#/games/pick/cpu"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01M9.6 15.6h4.8"/></svg></span>Play the computer</a>
       </div>
       <form class="g-code" id="g-code"><label for="g-code-in" class="sr-only">Room code</label><input id="g-code-in" maxlength="6" placeholder="Have a room code?" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Join</button></form>
-      <div class="g-cards">${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}</div>
+      <div class="g-cards">${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}<a class="g-card" href="kemy-quest.html" data-game="kemy-quest"><img src="assets/kemy-quest/cover.svg" alt="" width="120" height="90" style="width:100%;height:auto;border-radius:14px"><div class="g-card-t"><b>Kemy's Bubble Quest</b><span class="muted small">Hop, swim and blow bubbles with Kemy the axolotl.</span><span class="g-tag">1 player</span></div></a></div>
       <h2 class="g-h2">Your record</h2>
       <div class="card g-record" id="g-record">${signedIn() ? '<div class="spinner"></div>' : '<p class="muted small" style="margin:0">Your vs-computer record is saved on this device. <a href="#/login?next=%23%2Fgames">Sign in</a> to play online and get on the leaderboard.</p>'}</div>
       <h2 class="g-h2">Top players</h2>
@@ -418,6 +418,7 @@ export function createGames(ctx) {
     const params = qs(q);
     if (!a) return hub(token);
     if (a === 'pick') return pick(b);
+    if (a === 'kemy-quest') { location.replace('kemy-quest.html' + (b ? '#lvl=' + b : '')); return; }
     if (b === 'cpu') {
       if (BOARD_TYPES.includes(a)) return localBoard(a, params);
       if (a === 'trivia') return trivia.local(params);

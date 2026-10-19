@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90" role="img" aria-label="Kemy's Bubble Quest">
+<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd9f1"/><stop offset=".6" stop-color="#b48bff"/><stop offset="1" stop-color="#6a45d6"/></linearGradient>
+<linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde6f7"/><stop offset="1" stop-color="#e9b6ef"/></linearGradient>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b47cf0"/><stop offset="1" stop-color="#6c3fd1"/></linearGradient>
+<radialGradient id="glow"><stop offset="0" stop-color="#b26bff" stop-opacity=".8"/><stop offset="1" stop-color="#b26bff" stop-opacity="0"/></radialGradient></defs>
+<rect width="120" height="90" rx="14" fill="url(#s)"/>
+<rect y="64" width="120" height="26" fill="#6e96ff" opacity=".45"/><ellipse cx="22" cy="68" rx="14" ry="4" fill="#7fdc9d" stroke="#2f7c55"/><ellipse cx="98" cy="72" rx="13" ry="4" fill="#7fdc9d" stroke="#2f7c55"/>
+<circle cx="96" cy="20" r="12" fill="url(#glow)"/><path d="M96 12l2.4 5 5.5.6-4.1 3.7 1.2 5.4L96 24l-5 2.7 1.2-5.4-4.1-3.7 5.5-.6z" fill="#ffd34d" stroke="#c77d12"/>
+<circle cx="20" cy="26" r="6" fill="#fff" opacity=".25" stroke="#fff"/><circle cx="30" cy="40" r="3.5" fill="#fff" opacity=".2" stroke="#fff"/>
+<g transform="translate(60 72) scale(2.3)" stroke="#7d4fc0" stroke-width=".9" stroke-linejoin="round">
+<path d="M-5-9q-8-3-13 1q5 4 13 6z" fill="#f6a6d6"/>
+<ellipse cx="0" cy="-5.5" rx="6.5" ry="5" fill="url(#b)"/>
+<g fill="url(#g)"><path d="M-7.5-15c-2-3-5-3-7.6-1.6c1.4 1.6 0 3 0 3c2.6 1.6 5.6 1.6 7.6-1.4z"/><path d="M-7.5-12.4c-3-1.5-6-.5-7.8 1.5c1.8.8 1.2 2.5 1.2 2.5c3 .4 5.6-1 6.6-4z"/><path d="M-7.5-17.6c-1-3.4-3.6-4.6-6.4-4.2c.8 2-.6 3-.6 3c2 2.4 5 2.6 7 1.2z"/>
+<path d="M7.5-15c2-3 5-3 7.6-1.6c-1.4 1.6 0 3 0 3c-2.6 1.6-5.6 1.6-7.6-1.4z"/><path d="M7.5-12.4c3-1.5 6-.5 7.8 1.5c-1.8.8-1.2 2.5-1.2 2.5c-3 .4-5.6-1-6.6-4z"/><path d="M7.5-17.6c1-3.4 3.6-4.6 6.4-4.2c-.8 2 .6 3 .6 3c-2 2.4-5 2.6-7 1.2z"/></g>
+<ellipse cx="0" cy="-13.5" rx="9.2" ry="7.6" fill="url(#b)"/>
+<g stroke="none"><ellipse cx="-5.5" cy="-11" rx="1.9" ry="1.1" fill="#ff9fc8"/><ellipse cx="5.5" cy="-11" rx="1.9" ry="1.1" fill="#ff9fc8"/>
+<ellipse cx="-3.4" cy="-13.6" rx="2" ry="2.3" fill="#24133f"/><ellipse cx="3.4" cy="-13.6" rx="2" ry="2.3" fill="#24133f"/><circle cx="-2.8" cy="-14.5" r=".75" fill="#fff"/><circle cx="4" cy="-14.5" r=".75" fill="#fff"/></g>
+<path d="M-1.8-10.6q.9 1.2 1.8.2q.9 1 1.8-.2" fill="none" stroke="#24133f" stroke-width=".8" stroke-linecap="round"/></g>
+</svg>
