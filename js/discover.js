@@ -12,7 +12,7 @@ export async function loadDiscover() {
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     const videos = (d.videos || []).filter((v) => /^[\w-]{11}$/.test(v.id)).map((v) => ({
-      id: 'yt-' + v.id, external: true, kind: 'youtube', ytId: v.id, short: !!v.short,
+      id: 'yt-' + v.id, external: true, kind: 'youtube', ytId: v.id, short: !!v.short, own: !!v.own,
       linkUrl: v.short ? `https://www.youtube.com/shorts/${v.id}` : `https://www.youtube.com/watch?v=${v.id}`,
       text: v.title, source: v.channel, channelId: v.channelId, cat: v.cat, published: v.published, views: v.views || 0,
       sourceUrl: `https://www.youtube.com/channel/${v.channelId}`

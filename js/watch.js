@@ -88,20 +88,28 @@ export function createWatch(ctx) {
     const funnyVids = disc.videos.filter((v) => v.cat === 'funny'), newsVids = disc.videos.filter((v) => v.cat === 'news');
     if (tab === 'following') return followingPosts(own);
     if (tab === 'trending') return rankTrending(own);
+    if (tab === 'funny') return pinOwn(mixIn(rankForYou(own.filter((p) => catOf(p) === tab), prefs, opts), rankForYou(funnyVids.filter((v) => !v.own), prefs, opts), 2), disc.videos, 0, 2);
     if (tab === 'funny' || tab === 'dance' || tab === 'music') return mixIn(rankForYou(own.filter((p) => catOf(p) === tab), prefs, opts), rankForYou(disc.videos.filter((v) => v.cat === tab), prefs, opts), 2);
     if (tab === 'news') {
       const vids = rankForYou(newsVids, prefs, opts), heads = disc.news.slice(), outside = [];
       while (vids.length || heads.length) { if (heads.length) outside.push(heads.shift()); if (vids.length) outside.push(vids.shift()); }
       return mixIn(rankForYou(own.filter((p) => catOf(p) === 'news'), prefs, opts), outside, 1);
     }
-    return mixIn(rankForYou(own, prefs, opts), rankForYou([...funnyVids, ...disc.videos.filter((v) => v.cat === 'music' || v.cat === 'dance')], prefs, opts).slice(0, 16), 4);
+    return pinOwn(mixIn(rankForYou(own, prefs, opts), rankForYou([...funnyVids.filter((v) => !v.own), ...disc.videos.filter((v) => v.cat === 'music' || v.cat === 'dance')], prefs, opts).slice(0, 16), 4), disc.videos, 1, 3);
+  }
+  // Lone Keem Studios Originals (the studio's own YouTube channel): pinned near the top, newest first.
+  function pinOwn(list, all, first, gap) {
+    const mine = all.filter((v) => v.own).sort((a, b) => String(b.published).localeCompare(String(a.published)));
+    const out = list.filter((p) => !p.own);
+    mine.forEach((v, k) => out.splice(Math.min(out.length, first + k * gap), 0, v));
+    return out;
   }
 
   // Outside items: a YouTube video (tap Watch to load the youtube-nocookie player) or a news headline card.
   function externalSlideHtml(p, i) {
     const yt = p.kind === 'youtube';
     const poster = yt ? `https://i.ytimg.com/vi/${encodeURIComponent(p.ytId)}/hqdefault.jpg` : (p.image || '');
-    const label = yt ? (p.short ? 'YouTube Shorts' : 'From YouTube') : 'News';
+    const label = yt ? (p.own ? 'Lone Keem Studios Originals' : p.short ? 'YouTube Shorts' : 'From YouTube') : 'News';
     const media = yt
       ? `<div class="vcard">
            <img class="vthumb" src="${esc(poster)}" alt="" loading="lazy" referrerpolicy="no-referrer">
@@ -124,6 +132,7 @@ export function createWatch(ctx) {
         <div class="vmeta">
           <div class="vcreator"><span class="vext-badge">${yt ? '▶ ' + label : '📰 News'}</span>
             ${p.sourceUrl ? `<a class="vname" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(p.source)}</a>` : `<span class="vname">${esc(p.source)}</span>`}</div>
+          ${yt && p.own ? `<p class="vsub vown-credit">${p.short ? 'YouTube Shorts' : 'YouTube'} · views count on the channel</p>` : ''}
           ${yt ? `<p class="vcaption">${esc(p.text)}</p>` : ''}
           <p class="vsub">${esc(ago(p.published))} ago${catChip(p)} · ${yt ? 'Shown with YouTube’s player' : 'Opens the original story'}</p>
         </div>

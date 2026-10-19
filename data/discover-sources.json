@@ -4,6 +4,17 @@
   "maxAgeDays": 45,
   "youtube": [
     {
+      "name": "Lone Keem",
+      "channelId": "UCw1sr9mis9XT35wKLnYR3fQ",
+      "handle": "@Unrulywrld_comedy",
+      "cat": "funny",
+      "own": true,
+      "featured": true,
+      "max": 50,
+      "maxShorts": 50,
+      "_note": "Lone Keem Studios' own channel: shown as Lone Keem Studios Originals, pinned near the top of Funny and For You."
+    },
+    {
       "name": "Just For Laughs Gags",
       "channelId": "UCpsSadsgX_Qk9i6i_bJoUwQ",
       "cat": "funny"
@@ -192,5 +203,9 @@
     "parental advisory",
     "diss track"
   ],
-  "maxShortsPerChannel": 5
+  "maxShortsPerChannel": 5,
+  "ownSoftWords": [
+    "criminal",
+    "crime"
+  ]
 }

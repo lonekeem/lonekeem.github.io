@@ -17,6 +17,18 @@ const unent = (s) => String(s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1'
 const tag = (xml, t) => { const m = xml.match(new RegExp(`<${t}(?:\\s[^>]*)?>([\\s\\S]*?)</${t}>`, 'i')); return m ? m[1] : ''; };
 const attr = (xml, t, a) => { const m = xml.match(new RegExp(`<${t}\\s[^>]*${a}="([^"]+)"`, 'i')); return m ? m[1] : ''; };
 const safe = (...t) => !blockRe.test(t.join(' '));
+// The studio's own channel ("own": true): only hard block words drop a video; soft hits are kept and logged.
+const soft = new Set((cfg.ownSoftWords || []).map((w) => w.toLowerCase()));
+const hardWords = words.filter((w) => !soft.has(w));
+const hardRe = hardWords.length ? new RegExp('(^|[^a-z])(' + hardWords.map(esc).join('|') + ')([^a-z]|$)', 'i') : /$^/;
+function okFor(ch, title, desc) {
+  if (!ch.own) return safe(title, desc);
+  const t = title + ' ' + desc;
+  if (hardRe.test(t)) { console.log(`  OWN DROPPED (hard word "${t.match(hardRe)[2]}"): ${title}`); return false; }
+  if (blockRe.test(t)) console.log(`  own kept despite soft word "${t.match(blockRe)[2]}": ${title}`);
+  return true;
+}
+const ageOk = (ch, pub) => ch.own || now - pub < maxAge;
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s);
 async function get(url) {
   const r = await fetch(url, { headers: { 'user-agent': 'KemyDiscover/1.0 (+https://lonekeem.github.io/)' } });
@@ -33,13 +45,13 @@ for (const ch of cfg.youtube || []) {
       const desc = unent(tag(e, 'media:description')), views = +attr(e, 'media:statistics', 'views') || 0;
       const link = attr(e, 'link', 'href');
       return { id, title, pub, desc, views, short: /\/shorts\//.test(link) };
-    }).filter((v) => /^[\w-]{11}$/.test(v.id) && v.pub && now - v.pub < maxAge);
+    }).filter((v) => /^[\w-]{11}$/.test(v.id) && v.pub && ageOk(ch, v.pub));
     let n = 0;
     for (const v of entries) {
       if (n >= (ch.max || cfg.maxPerChannel || 6)) break;
-      if (!safe(v.title, v.desc.slice(0, 300))) { skipped++; continue; }
+      if (!okFor(ch, v.title, v.desc.slice(0, 300))) { skipped++; continue; }
       if (seen.has(v.id)) continue; seen.add(v.id);
-      out.videos.push({ id: v.id, title: clip(v.title, 140), channel: ch.name, channelId: ch.channelId, cat: ch.cat, published: new Date(v.pub).toISOString(), views: v.views, short: v.short });
+      out.videos.push({ id: v.id, title: clip(v.title, 140), channel: ch.name, channelId: ch.channelId, cat: ch.cat, published: new Date(v.pub).toISOString(), views: v.views, short: v.short, ...(ch.own ? { own: true } : {}) });
       n++;
     }
     console.log(`youtube ${ch.name}: ${n}`);
@@ -53,10 +65,10 @@ for (const ch of cfg.youtube || []) {
       if (n >= (ch.maxShorts || cfg.maxShortsPerChannel || 5)) break;
       const id = tag(e, 'yt:videoId'), title = unent(tag(e, 'title')), pub = Date.parse(tag(e, 'published'));
       const desc = unent(tag(e, 'media:description')), views = +attr(e, 'media:statistics', 'views') || 0;
-      if (!/^[\w-]{11}$/.test(id) || !pub || now - pub > maxAge || seen.has(id)) continue;
-      if (!safe(title, desc.slice(0, 300))) { skipped++; continue; }
+      if (!/^[\w-]{11}$/.test(id) || !pub || !ageOk(ch, pub) || seen.has(id)) continue;
+      if (!okFor(ch, title, desc.slice(0, 300))) { skipped++; continue; }
       seen.add(id);
-      out.videos.push({ id, title: clip(title, 140), channel: ch.name, channelId: ch.channelId, cat: ch.cat, published: new Date(pub).toISOString(), views, short: true, shorts: true });
+      out.videos.push({ id, title: clip(title, 140), channel: ch.name, channelId: ch.channelId, cat: ch.cat, published: new Date(pub).toISOString(), views, short: true, shorts: true, ...(ch.own ? { own: true } : {}) });
       n++; shortsN++;
     }
     console.log(`shorts ${ch.name}: ${n}`);
@@ -86,7 +98,7 @@ for (const f of cfg.news || []) {
 {
   const keep = [];
   for (const v of out.videos) {
-    try { const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + v.id)}`); if (r.ok) keep.push(v); else skipped++; }
+    try { const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + v.id)}`); if (r.ok) keep.push(v); else { skipped++; console.log(`  embedding disabled (${r.status}), skipped: ${v.channel} ${v.id}`); } }
     catch { keep.push(v); }
   }
   console.log(`embeddable: ${keep.length}/${out.videos.length}`); out.videos = keep;
