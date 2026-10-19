@@ -160,6 +160,8 @@ export function createLudo(ctx) {
       net.update(gid, { [`rv.${me()}`]: chain[chain.length - 2 - k], [`rk.${me()}`]: k }).catch((e) => { sentK = k - 1; toast(friendlyError(e)); });
     }
     const allRevealed = (k) => humans().every((u) => (g.rk || {})[u] === k);
+    // the die depends on who is seated (a player who leaves is replaced by a bot), so cache it per roll AND per seating
+    const dk = (k) => k + '|' + g.players.join(',');
     async function submit(st, die, token) {
       const k = st.k; if (submittedK >= k) return; submittedK = k;
       let ns; try { ns = L.step(st, die, token); } catch { submittedK = k - 1; return; }
@@ -175,8 +177,9 @@ export function createLudo(ctx) {
       if (R === me() && isBot(g.players[st.turn]) && (rk[me()] ?? -1) < k) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) reveal(k); }, 700); }
       if (R !== me() && rk[R] === k && (rk[me()] ?? -1) < k) reveal(k);
       if (!allRevealed(k)) return;
-      if (dieK[k] == null) { dieK[k] = await rollFor(g, k); if (!g.lv || g.lv.k !== k) return; ui.sfx.play('tap'); }
-      const die = dieK[k];
+      const key = dk(k);
+      if (dieK[key] == null) { const d = await rollFor(g, k); if (!g.lv || g.lv.k !== k || dk(k) !== key) return; dieK[key] = d; dieK[k] = d; ui.sfx.play('tap'); }
+      const die = dieK[key];
       if (mover() !== me()) return;
       const moves = L.legal(st, die);
       if (isBot(g.players[st.turn])) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) submit(st, die, L.aiPick(st, die, 'hard')); }, 750); }
@@ -250,7 +253,7 @@ export function createLudo(ctx) {
       if (!g.lv) { const b = $('#lu-body'); if (b) b.innerHTML = '<div class="spinner"></div>'; return; }
       const st = fromLv(g.lv), seat = mySeat(), k = st.k, rk = g.rk || {};
       const myTurn = seat >= 0 && st.turn === seat && g.status === 'active';
-      const revealedAll = allRevealed(k), die = dieK[k];
+      const revealedAll = allRevealed(k), die = dieK[dk(k)];
       const canRoll = myTurn && (rk[me()] ?? -1) < k && sentK < k;
       const rolling = g.status === 'active' && !revealedAll && (rk[roller()] === k);
       const movable = myTurn && revealedAll && die != null && submittedK < k ? L.legal(st, die) : [];
