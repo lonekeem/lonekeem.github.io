@@ -98,6 +98,7 @@ export function createWorks(ctx) {
       return last;
     })();
   }
+  const origUrl = (u) => { const m = String(u || '').match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/video\/upload\/)(?:[^/]*_[^/]*\/)+(v\d+\/.+)$/); return m ? m[1] + m[2] : ''; };
   const audioUrl = (r) => `${cloudBase()}video/upload/ac_mp3,br_192k/${r.version ? 'v' + r.version + '/' : ''}${r.public_id}.mp3`;
   const squareUrl = (r) => `${cloudBase()}image/upload/c_fill,g_auto,h_800,w_800/f_auto,q_auto/${r.version ? 'v' + r.version + '/' : ''}${r.public_id}`;
   const probe = (file, kind) => new Promise((resolve) => {
@@ -216,6 +217,8 @@ export function createWorks(ctx) {
   // ---------------------------------------------------------------- persistent mini player (songs)
   const player = (() => {
     const audio = new Audio(); audio.preload = 'metadata'; audio.crossOrigin = 'anonymous';
+    // A brand-new upload's transcoded copy can take a minute to exist on Cloudinary; fall back to the original file meanwhile.
+    audio.addEventListener('error', () => { const o = origUrl(audio.src); if (o && o !== audio.src) { const t = audio.currentTime; audio.src = o; audio.currentTime = t; audio.play().catch(() => {}); } });
     let queue = [], idx = -1, cur = null, played = 0, last = null, counted = false, ac = null, an = null;
     const bar = document.createElement('div'); bar.className = 'mini-player'; bar.hidden = true;
     bar.innerHTML = `<a class="mp-art" href="#/"></a><a class="mp-meta" href="#/"><b></b><small></small></a>
@@ -312,7 +315,7 @@ export function createWorks(ctx) {
     const q = (s) => el.querySelector(s);
     // views / plays
     const vid = q('video');
-    if (vid) tenSeconds(vid, p);
+    if (vid) { tenSeconds(vid, p); vid.addEventListener('error', () => { const o = origUrl(vid.currentSrc || vid.src); if (o && o !== vid.src) vid.src = o; }, { once: true }); }
     const wireYt = () => { const f = q('[data-a=yt]'); if (f) f.onclick = () => { f.parentElement.innerHTML = `<div class="embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(w.yt)}?autoplay=1&rel=0" title="${esc(w.title)}" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe></div>`; setTimeout(() => recordView(p.id, p.authorId), PLAY_SECONDS * 1000); }; };
     wireYt();
     q('[data-a="18"]')?.addEventListener('click', () => { confirm18(p.id); slot.innerHTML = ''; page(p, slot, more); });

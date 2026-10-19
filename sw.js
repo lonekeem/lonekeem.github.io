@@ -1,4 +1,4 @@
-const CACHE = 'lks-v26';
+const CACHE = 'lks-v27';
 const CORE = [
   './', 'index.html', 'app.html', 'terms.html', 'privacy.html', 'guidelines.html',
   'css/app.css', 'kemy-logo.png', 'favicon-32.png', 'js/app.js', 'js/home.js', 'js/firebase-init.js', 'js/watch.js',
