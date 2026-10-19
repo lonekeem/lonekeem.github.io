@@ -668,8 +668,37 @@ service cloud.firestore {
     // the host's client runs the round (it is the referee); members write only their own intents,
     // answers and heartbeats. Results are written by participants with consistency checks.
     function gBoardType(t) { return t in ['stardrop', 'klgrid', 'checkers']; }
-    function gTwoP(t) { return gBoardType(t) || t == 'pool'; }
-    function gMax(t) { return gTwoP(t) ? 2 : t == 'trivia' ? 8 : 6; }
+    function gTwoP(t) { return gBoardType(t) || t == 'pool' || t == 'chess'; }
+    function gMax(t) { return gTwoP(t) ? 2 : t == 'trivia' ? 8 : t == 'ludo' ? 4 : 6; }
+    // Chess: clocks in ms; the mover's clock may only go down by at least the real elapsed time.
+    function gClockOk(o, n) {
+      return o.clk.size() == 0 ? n.clk == o.clk
+        : (n.clk is list && n.clk.size() == 2 && n.clk[o.turn] is int && n.clk[o.turn] >= 0
+           && n.clk[o.turn] <= o.clk[o.turn] - (request.time.toMillis() - o.turnAt.toMillis()) + 3000
+           && n.clk[1 - o.turn] == o.clk[1 - o.turn]);
+    }
+    function gTurnUp(o) {
+      return o.type == 'chess' && o.clk.size() == 2
+        ? request.time.toMillis() > o.turnAt.toMillis() + o.clk[o.turn] + 2000
+        : request.time > o.turnAt + duration.value(65, 's');
+    }
+    // Ludo: commit-reveal dice. rv[uid] holds each human's latest hash-chain link, rk[uid] its
+    // roll index; die = 1 + first hex digit 0-5 of sha256(reveals in seat order + roll index).
+    function gIsBot(u) { return u.matches('^cpu[0-9]$'); }
+    function gLRv(d, i) { return i < d.players.size() && !gIsBot(d.players[i]) ? d.rv[d.players[i]] : ''; }
+    function gLRk(d, i) { return i >= d.players.size() || gIsBot(d.players[i]) || d.rk[d.players[i]] == d.lv.k; }
+    function gLIn(d, i) { return i >= d.players.size() || gIsBot(d.players[i]) || d.players[i] in d.rv; }
+    function gLReady(d) { return gLIn(d, 0) && gLIn(d, 1) && gLIn(d, 2) && gLIn(d, 3); }
+    function gLDieOk(d, die) {
+      return die is int && die >= 1 && die <= 6
+        && hashing.sha256((gLRv(d, 0) + gLRv(d, 1) + gLRv(d, 2) + gLRv(d, 3) + string(d.lv.k)).toUtf8()).toHexString().lower()
+             .matches('^[6-9a-f]*' + string(die - 1) + '.*');
+    }
+    function gLStart(d) {
+      return d.players.size() >= 2 && gLReady(d) && d.lv.k == 0 && d.lv.turn == 0 && d.lv.n == d.players.size()
+        && d.lv.p.matches('^(--)+$') && d.lv.p.size() == d.players.size() * 8 && d.moveNo == 0;
+    }
+    function gLSame(o, n, x, j) { return j >= o.players.size() || n.players[j] == o.players[j] || (o.players[j] == x && n.players[j] == 'cpu' + string(j)); }
     function gCount(s, re) { return s.replace(re, '').size(); }
     function gProfile() { return get(userPath(me())).data; }
     function gBoardOk(t, ob, nb, turn) {
@@ -719,8 +748,8 @@ service cloud.firestore {
         && nd().keys().hasOnly(['type', 'mode', 'status', 'players', 'names', 'unames', 'colors', 'host', 'invitee', 'quick',
                                 'createdAt', 'updatedAt', 'winnerUid', 'endReason', 'rematch', 'hb', 'board', 'turn', 'moveNo',
                                 'last', 'turnAt', 'round', 'qs', 'roundAt', 'roundLen', 'scores', 'pv', 'seedHash', 'seeds', 'intent', 'call', 'from',
-                                'pos', 'ps', 'shot'])
-        && nd().type in ['stardrop', 'klgrid', 'checkers', 'trivia', 'starcards', 'pool']
+                                'pos', 'ps', 'shot', 'cx', 'ml', 'clk', 'lv', 'rv', 'rk', 'left'])
+        && nd().type in ['stardrop', 'klgrid', 'checkers', 'trivia', 'starcards', 'pool', 'chess', 'ludo']
         && isStr(nd().mode, 0, 20)
         && nd().status == 'waiting' && nd().host == me() && nd().players[0] == me() && validNames(nd())
         && nd().names[0] == gProfile().displayName && nd().unames[0] == gProfile().username
@@ -729,10 +758,65 @@ service cloud.firestore {
         && (!gBoardType(nd().type) || (nd().players.size() == 1 && nd().board.matches('^[.]{9}$|^[.]{42}$|^[.]{81}$|^b{12}[.]{8}a{12}$')
                                         && nd().turn == 0 && nd().moveNo == 0))
         && (nd().type != 'pool' || (nd().players.size() == 1 && nd().pos is string && nd().pos.matches('^[0-9]{128}$')
-                                    && nd().turn == 0 && nd().moveNo == 0 && isStr(nd().ps, 2, 400)));
+                                    && nd().turn == 0 && nd().moveNo == 0 && isStr(nd().ps, 2, 400)))
+        && (nd().type != 'chess' || (nd().players.size() == 1 && nd().board == 'rnbqkbnrpppppppp' + '................................' + 'PPPPPPPPRNBQKBNR'
+                                     && nd().cx == 'w KQkq - 0 1' && nd().ml == '' && nd().turn == 0 && nd().moveNo == 0
+                                     && nd().clk == (nd().mode == '5' ? [300000, 300000] : nd().mode == '10' ? [600000, 600000] : [])))
+        && (nd().type != 'ludo' || (nd().mode in ['2', '3', '4'] && nd().lv == null && nd().rv == {} && nd().rk == {} && nd().left == [] && nd().moveNo == 0));
       allow update: if signedIn() && (
         // heartbeat
         (member() && hbOnly())
+        // Chess move: only the side to move; shape checks on the board (one king each, the mover
+        // keeps all pieces, the other side loses at most one), clock can't go up.
+        || (od().type == 'chess' && member() && od().status == 'active' && od().players[od().turn] == me()
+            && changed().hasOnly(['board', 'cx', 'ml', 'clk', 'last', 'turn', 'moveNo', 'turnAt', 'updatedAt', 'status', 'winnerUid', 'endReason'])
+            && nd().moveNo == od().moveNo + 1 && nd().turn == 1 - od().turn && nd().turnAt == request.time
+            && nd().board is string && nd().board.matches('^[.PNBRQKpnbrqk]{64}$') && nd().board != od().board
+            && gCount(nd().board, '[^K]') == 1 && gCount(nd().board, '[^k]') == 1
+            && gCount(nd().board, od().turn == 0 ? '[^PNBRQK]' : '[^pnbrqk]') == gCount(od().board, od().turn == 0 ? '[^PNBRQK]' : '[^pnbrqk]')
+            && gCount(nd().board, od().turn == 0 ? '[^pnbrqk]' : '[^PNBRQK]') <= gCount(od().board, od().turn == 0 ? '[^pnbrqk]' : '[^PNBRQK]')
+            && gCount(nd().board, od().turn == 0 ? '[^pnbrqk]' : '[^PNBRQK]') >= gCount(od().board, od().turn == 0 ? '[^pnbrqk]' : '[^PNBRQK]') - 1
+            && nd().cx.matches('^' + (nd().turn == 0 ? 'w' : 'b') + ' (-|[KQkq]{1,4}) (-|[0-9]{1,2}) [0-9]{1,3} [0-9]{1,4}$')
+            && nd().last.matches('^[0-9]{1,2}-[0-9]{1,2}(-[1-4])?$')
+            && isStr(nd().ml, 3, 8000) && nd().ml.size() > od().ml.size()
+            && gClockOk(od(), nd())
+            && ((nd().status == 'active' && nd().winnerUid == '')
+                || (nd().status == 'done' && ((nd().winnerUid == me() && nd().endReason == 'win') || (nd().winnerUid == 'draw' && nd().endReason == 'draw')))))
+        // Ludo: commit to a hash chain before the game starts
+        || (od().type == 'ludo' && member() && od().status == 'waiting' && changed().hasOnly(['rv', 'rk', 'updatedAt'])
+            && !(me() in od().rv) && nd().rv.diff(od().rv).affectedKeys().hasOnly([me()]) && nd().rk.diff(od().rk).affectedKeys().hasOnly([me()])
+            && nd().rv[me()] is string && nd().rv[me()].matches('^[0-9a-f]{64}$') && nd().rk[me()] == -1)
+        // Ludo: reveal the next link for the current roll (must hash to the previous link)
+        || (od().type == 'ludo' && member() && od().status == 'active' && changed().hasOnly(['rv', 'rk', 'updatedAt'])
+            && nd().rv.diff(od().rv).affectedKeys().hasOnly([me()]) && nd().rk.diff(od().rk).affectedKeys().hasOnly([me()])
+            && nd().rk[me()] == od().rk[me()] + 1 && nd().rk[me()] == od().lv.k
+            && nd().rv[me()] is string && nd().rv[me()].size() == 64
+            && hashing.sha256(nd().rv[me()].toUtf8()).toHexString().lower() == od().rv[me()])
+        // Ludo: the player to move (or the host for a computer seat) applies the fair roll
+        || (od().type == 'ludo' && member() && od().status == 'active'
+            && (od().players[od().lv.turn] == me() || (gIsBot(od().players[od().lv.turn]) && od().host == me()))
+            && changed().hasOnly(['lv', 'moveNo', 'turnAt', 'updatedAt', 'status', 'winnerUid', 'endReason'])
+            && nd().moveNo == od().moveNo + 1 && nd().turnAt == request.time
+            && nd().lv.k == od().lv.k + 1 && nd().lv.n == od().lv.n
+            && nd().lv.turn is int && nd().lv.turn >= 0 && nd().lv.turn < od().players.size()
+            && nd().lv.p is string && nd().lv.p.size() == od().lv.p.size() && nd().lv.p.matches('^([0-5][0-9]|--)+$')
+            && gLRk(od(), 0) && gLRk(od(), 1) && gLRk(od(), 2) && gLRk(od(), 3)
+            && gLDieOk(od(), nd().lv.die)
+            && ((nd().status == 'active' && nd().winnerUid == '' && nd().lv.winner == -1)
+                || (nd().status == 'done' && nd().endReason == 'win' && nd().lv.winner == od().lv.turn && nd().winnerUid == od().players[od().lv.turn])))
+        // Ludo: leave (yourself) or replace a player who blocks the game for a full turn with a computer player
+        || (od().type == 'ludo' && member() && od().status == 'active'
+            && changed().hasOnly(['players', 'names', 'unames', 'colors', 'left', 'turnAt', 'updatedAt'])
+            && nd().turnAt == request.time && validNames(nd()) && nd().players.size() == od().players.size()
+            && nd().left.size() == od().left.size() + 1 && nd().left == od().left.concat([nd().left[nd().left.size() - 1]])
+            && nd().left[nd().left.size() - 1] in od().players && !(nd().left[nd().left.size() - 1] in nd().players)
+            && !gIsBot(nd().left[nd().left.size() - 1])
+            && gLSame(od(), nd(), nd().left[nd().left.size() - 1], 0) && gLSame(od(), nd(), nd().left[nd().left.size() - 1], 1)
+            && gLSame(od(), nd(), nd().left[nd().left.size() - 1], 2) && gLSame(od(), nd(), nd().left[nd().left.size() - 1], 3)
+            && (nd().left[nd().left.size() - 1] == me()
+                || (request.time > od().turnAt + duration.value(60, 's')
+                    && (nd().left[nd().left.size() - 1] == od().players[od().lv.turn] || od().rk[nd().left[nd().left.size() - 1]] < od().lv.k))
+                || (nd().left[nd().left.size() - 1] in od().hb && od().hb[nd().left[nd().left.size() - 1]] < request.time - duration.value(45, 's'))))
         // join a waiting game / room
         || (!member() && od().status == 'waiting' && od().invitee in ['', me()]
             && changed().hasOnly(['players', 'names', 'unames', 'colors', 'status', 'turnAt', 'updatedAt'])
@@ -752,7 +836,7 @@ service cloud.firestore {
         // Star Pool shot: the shooter writes the shot and the resulting positions (both clients
         // simulate the same deterministic physics). Balls can only leave the table, never come back,
         // except on the break (an 8 dropped on the break is re-spotted).
-        || (member() && od().type == 'pool' && od().status == 'active' && od().players[od().turn] == me()
+        || (od().type == 'pool' && member() && od().status == 'active' && od().players[od().turn] == me()
             && changed().hasOnly(['pos', 'ps', 'shot', 'turn', 'moveNo', 'turnAt', 'updatedAt', 'status', 'winnerUid', 'endReason'])
             && nd().moveNo == od().moveNo + 1 && nd().turn in [0, 1] && nd().turnAt == request.time
             && nd().pos is string && nd().pos.matches('^([0-9]{8}|-{8}){16}$') && nd().pos.matches('^[0-9]{8}.*')
@@ -767,7 +851,7 @@ service cloud.firestore {
             && changed().hasOnly(['status', 'winnerUid', 'endReason', 'updatedAt'])
             && ((nd().endReason == 'forfeit' && nd().winnerUid == otherP())
                 || (nd().endReason == 'timeout' && nd().winnerUid == me() && od().players[od().turn] != me()
-                    && (request.time > od().turnAt + duration.value(65, 's')
+                    && (gTurnUp(od())
                         || (otherP() in od().hb && od().hb[otherP()] < request.time - duration.value(45, 's'))))))
         // cancel a waiting board game nobody joined
         || (member() && od().host == me() && od().status == 'waiting' && nd().status == 'done'
@@ -782,6 +866,8 @@ service cloud.firestore {
             && nd().status in ['waiting', 'active', 'done']
             && (nd().status != 'done' || nd().winnerUid in nd().players || nd().winnerUid == 'draw')
             && !changed().hasAny(['type', 'createdAt', 'from'])
+            && (od().type != 'ludo' || (od().status == 'waiting' && !changed().hasAny(['rv', 'rk', 'left'])
+                                        && (nd().status == 'waiting' || (nd().status == 'active' && gLStart(nd())))))
             && (od().type != 'starcards' || !('pv' in nd()) || gCountsOk(od(), nd().pv)))
         // host migration when the host's heartbeat is stale
         || (member() && !gTwoP(od().type) && od().status != 'done' && changed().hasOnly(['host', 'hb'])
@@ -834,7 +920,8 @@ service cloud.firestore {
       // Result receipts: one per player per game, so a result is counted once.
       match /rec/{uid} {
         allow read: if true;
-        allow create: if signedIn() && me() in getAfter(gPath()).data.players && uid in getAfter(gPath()).data.players
+        allow create: if signedIn() && (me() in getAfter(gPath()).data.players || me() in getAfter(gPath()).data.get('left', []))
+          && (uid in getAfter(gPath()).data.players || uid in getAfter(gPath()).data.get('left', []))
           && getAfter(gPath()).data.status == 'done'
           && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
           && getAfter(/databases/$(database)/documents/gameStats/$(uid)).data.last == gid;
@@ -852,7 +939,7 @@ service cloud.firestore {
       }
       function gOk() {
         return signedIn() && isStr(gs().last, 1, 40) && gG().status == 'done'
-          && uid in gG().players && me() in gG().players && gFresh()
+          && (uid in gG().players || uid in gG().get('left', [])) && (me() in gG().players || me() in gG().get('left', [])) && gFresh()
           && gs().updatedAt == request.time
           && gs().name == get(userPath(uid)).data.displayName && gs().uname == get(userPath(uid)).data.username
           && isStr(gs().color, 0, 20);

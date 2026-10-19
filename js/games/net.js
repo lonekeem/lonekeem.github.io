@@ -6,10 +6,12 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ENGINES } from './boards.js';
 import { rack as poolRack, newState as poolState } from './pool-engine.js';
+import { START as CHESS_START, START_CX as CHESS_CX } from './chess-engine.js';
 
 export const BOARD_TYPES = ['stardrop', 'klgrid', 'checkers'];
-export const ROOM_TYPES = ['trivia', 'starcards'];
-export const TWO_P = [...BOARD_TYPES, 'pool'];
+export const ROOM_TYPES = ['trivia', 'starcards', 'ludo'];
+export const TWO_P = [...BOARD_TYPES, 'pool', 'chess'];
+export const CHESS_CLOCK = { 5: 300000, 10: 600000 };
 export const EMOTES = ['GG', 'Nice!', 'Wow', 'Oops', 'Good luck', 'Rematch?', '★', 'Hmm…', 'Ha!', 'Thanks'];
 export const TURN_SECONDS = 60;
 export const HB_MS = 20000;
@@ -30,6 +32,7 @@ export function createNet({ db, S }) {
     };
     if (BOARD_TYPES.includes(type)) Object.assign(g, { board: ENGINES[type].init(mode), turn: 0, moveNo: 0, last: '', turnAt: serverTimestamp() });
     if (type === 'pool') Object.assign(g, { pos: poolRack(), ps: JSON.stringify(poolState()), shot: null, turn: 0, moveNo: 0, turnAt: serverTimestamp() });
+    if (type === 'chess') Object.assign(g, { board: CHESS_START, cx: CHESS_CX, ml: '', last: '', clk: CHESS_CLOCK[mode] ? [CHESS_CLOCK[mode], CHESS_CLOCK[mode]] : [], turn: 0, moveNo: 0, turnAt: serverTimestamp() });
     return g;
   }
   async function createGame(type, mode, { invitee = '', quick = false, from = '' } = {}) {
@@ -39,6 +42,7 @@ export function createNet({ db, S }) {
         const g = baseGame(type, mode, { invitee, quick, from });
         if (type === 'trivia') Object.assign(g, { round: -1, qs: [], roundLen: 15, scores: {} });
         if (type === 'starcards') Object.assign(g, { intent: {}, call: {}, seedHash: '', seeds: [] });
+        if (type === 'ludo') Object.assign(g, { lv: null, rv: {}, rk: {}, left: [], moveNo: 0 });
         try {
           await runTransaction(db, async (tx) => { const s = await tx.get(ref); if (s.exists()) throw new Error('taken'); tx.set(ref, g); });
           return code;
@@ -58,7 +62,7 @@ export function createNet({ db, S }) {
       const g = s.data();
       if (g.players.includes(m.uid)) return g;
       if (g.status !== 'waiting') throw new Error('That game already started. You can watch it.');
-      const max = TWO_P.includes(g.type) ? 2 : g.type === 'trivia' ? 8 : 6;
+      const max = TWO_P.includes(g.type) ? 2 : g.type === 'trivia' ? 8 : g.type === 'ludo' ? Math.max(2, Math.min(4, +g.mode || 4)) : 6;
       if (g.players.length >= max) throw new Error('That room is full.');
       if (g.invitee && g.invitee !== m.uid) throw new Error('This game is for someone else.');
       const upd = {
@@ -73,7 +77,7 @@ export function createNet({ db, S }) {
   // Quick match: one queue slot per game (and mode). If someone fresh is waiting, take their
   // game; otherwise open a game and wait in the slot.
   async function quickMatch(type, mode) {
-    const qid = mode && mode !== 'classic' && BOARD_TYPES.includes(type) ? `${type}-${mode}` : type;
+    const qid = mode && mode !== 'classic' && (BOARD_TYPES.includes(type) || type === 'chess' || type === 'ludo') ? `${type}-${mode}` : type;
     const qref = doc(db, 'gameQueue', qid);
     const snap = await getDoc(qref).catch(() => null);
     const q = snap && snap.exists() ? snap.data() : null;
@@ -93,7 +97,7 @@ export function createNet({ db, S }) {
     return gid;
   }
   async function leaveQueue(type, mode, gid) {
-    const qid = mode && mode !== 'classic' && BOARD_TYPES.includes(type) ? `${type}-${mode}` : type;
+    const qid = mode && mode !== 'classic' && (BOARD_TYPES.includes(type) || type === 'chess' || type === 'ludo') ? `${type}-${mode}` : type;
     try {
       const qref = doc(db, 'gameQueue', qid);
       const s = await getDoc(qref);
@@ -118,8 +122,10 @@ export function createNet({ db, S }) {
   // Records the finished game for every human player that hasn't been recorded yet.
   // `all` = write everyone's record (the client that ended the game); otherwise only our own.
   async function recordResult(g, all = false) {
-    if (!S.user || g.status !== 'done' || !g.players.includes(S.user.uid) || !g.winnerUid) return;
-    const humans = g.players.filter((u) => !isBot(u) && (all || u === S.user.uid));
+    if (!S.user || g.status !== 'done' || !g.winnerUid) return;
+    const left = g.left || [];
+    if (!g.players.includes(S.user.uid) && !left.includes(S.user.uid)) return;
+    const humans = [...g.players, ...left].filter((u, i, a) => !isBot(u) && a.indexOf(u) === i && (all || u === S.user.uid));
     const todo = [];
     for (const uid of humans) {
       const rec = await getDoc(doc(db, 'games', g.id, 'rec', uid)).catch(() => null);
@@ -128,12 +134,13 @@ export function createNet({ db, S }) {
     for (let i = 0; i < todo.length; i += 3) {
       const b = writeBatch(db);
       for (const uid of todo.slice(i, i + 3)) {
-        const idx = g.players.indexOf(uid);
+        let idx = g.players.indexOf(uid), prof = null;
+        if (idx < 0) { const u = await getDoc(doc(db, 'users', uid)).catch(() => null); prof = u && u.exists() ? u.data() : null; if (!prof) continue; }
         const key = `${g.type}_${g.winnerUid === uid ? 'w' : g.winnerUid === 'draw' ? 'd' : 'l'}`;
         const st = await getDoc(doc(db, 'gameStats', uid)).catch(() => null);
         const cur = st && st.exists() ? Number(st.data()[key]) || 0 : 0;
         b.set(doc(db, 'gameStats', uid), {
-          [key]: cur + 1, last: g.id, updatedAt: serverTimestamp(), name: g.names[idx], uname: g.unames[idx], color: g.colors[idx] || ''
+          [key]: cur + 1, last: g.id, updatedAt: serverTimestamp(), name: prof ? prof.displayName : g.names[idx], uname: prof ? prof.username : g.unames[idx], color: (prof ? prof.color : g.colors[idx]) || ''
         }, { merge: true });
         b.set(doc(db, 'games', g.id, 'rec', uid), { at: serverTimestamp() });
       }

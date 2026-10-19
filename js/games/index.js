@@ -7,6 +7,8 @@ import { CONTROLLER, STAR, COVERS, GAMES, gameName } from './art.js';
 import { createTrivia } from './trivia.js';
 import { createStarCards } from './starcards.js';
 import { createPool } from './pool.js';
+import { createChess } from './chess.js';
+import { createLudo } from './ludo.js';
 
 export { CONTROLLER };
 const CPU_KEY = 'lks-games-cpu';
@@ -74,6 +76,8 @@ export function createGames(ctx) {
   const trivia = createTrivia({ ...ctx, ui });
   const cards = createStarCards({ ...ctx, ui });
   const pool = createPool({ ...ctx, ui });
+  const chess = createChess({ ...ctx, ui });
+  const ludo = createLudo({ ...ctx, ui });
 
   // ------------------------------------------------------------ hub
   async function hub(token) {
@@ -120,8 +124,8 @@ export function createGames(ctx) {
   async function gamePage(type, params) {
     const g = GAMES.find((x) => x.id === type);
     if (!g) { main.innerHTML = '<div class="empty">Game not found. <a href="#/games">Games</a></div>'; return; }
-    const room = type === 'trivia' || type === 'starcards';
-    const modes = type === 'klgrid' ? [['classic', 'Classic 3x3'], ['ultimate', 'Ultimate 9x9']] : type === 'starcards' ? [['500', 'Play to 500'], ['round', 'Single round']] : null;
+    const room = type === 'trivia' || type === 'starcards' || type === 'ludo';
+    const modes = type === 'klgrid' ? [['classic', 'Classic 3x3'], ['ultimate', 'Ultimate 9x9']] : type === 'starcards' ? [['500', 'Play to 500'], ['round', 'Single round']] : type === 'chess' ? [['', '60s a move'], ['5', '5 min clock'], ['10', '10 min clock']] : type === 'ludo' ? [['4', '4 seats'], ['3', '3 seats'], ['2', '2 seats']] : null;
     shell(esc(g.name), `
       <div class="g-detail">${COVERS[type]}<p class="muted">${esc(g.blurb)} <span class="g-tag">${esc(g.players)}</span></p></div>
       ${modes ? `<div class="g-seg" role="radiogroup" aria-label="Mode">${modes.map(([v, l], i) => `<label><input type="radio" name="g-mode" value="${v}" ${i ? '' : 'checked'}><span>${l}</span></label>`).join('')}</div>` : ''}
@@ -132,7 +136,7 @@ export function createGames(ctx) {
         <section class="card pad g-opt ${params.do === 'quick' ? 'hl' : ''}"><h2>${CONTROLLER} Quick match</h2><p class="muted small">We pair you with whoever’s looking right now.</p><button class="btn btn-block" id="g-quick">Find a match</button></section>
         <section class="card pad g-opt ${params.do === 'cpu' ? 'hl' : ''}"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01"/></svg> Play the computer</h2>
           ${type === 'starcards' ? `<label class="small muted g-inline-l">Computer players <select id="g-bots">${[1, 2, 3, 4, 5].map((n) => `<option ${n === 3 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}
-          <div class="g-two">${type === 'pool' ? '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn btn-ghost" data-lvl="medium" href="#">Medium</a><a class="btn" data-lvl="hard" href="#">Hard</a>' : '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn" data-lvl="hard" href="#">Hard</a>'}</div><p class="muted small">No account needed.</p></section>
+          <div class="g-two">${['pool', 'chess', 'ludo'].includes(type) ? '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn btn-ghost" data-lvl="medium" href="#">Medium</a><a class="btn" data-lvl="hard" href="#">Hard</a>' : '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn" data-lvl="hard" href="#">Hard</a>'}</div><p class="muted small">No account needed.</p></section>
       </div>
       <h2 class="g-h2">Top players</h2><div class="card" id="g-lb"><div class="spinner"></div></div>`, '#/games');
     const mode = () => document.querySelector('input[name=g-mode]:checked')?.value || '';
@@ -424,6 +428,8 @@ export function createGames(ctx) {
       if (a === 'trivia') return trivia.local(params);
       if (a === 'starcards') return cards.local(params);
       if (a === 'pool') return pool.local(params);
+      if (a === 'chess') return chess.local(params);
+      if (a === 'ludo') return ludo.local(params);
     }
     return gamePage(a, params);
   }
@@ -436,6 +442,8 @@ export function createGames(ctx) {
     if (g.type === 'trivia') return trivia.online(g, token);
     if (g.type === 'starcards') return cards.online(g, token);
     if (g.type === 'pool') return pool.online(g, token);
+    if (g.type === 'chess') return chess.online(g, token);
+    if (g.type === 'ludo') return ludo.online(g, token);
   }
   async function renderProfile(el, uid) {
     if (!el) return;

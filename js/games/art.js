@@ -48,10 +48,22 @@ COVERS.pool = frame(`<rect x="20" y="14" width="80" height="52" rx="8" fill="url
     <circle cx="70" cy="40" r="5" fill="#f2b31b"/><circle cx="78.5" cy="35" r="5" fill="#e2558f"/><circle cx="78.5" cy="45" r="5" fill="#fff"/><path d="M73.5 45h10" stroke="#2bb5a8" stroke-width="3.4"/>
     <circle cx="86" cy="40" r="5" fill="#0d0a14"/>${gstar(86, 40, 3, '#ffc83d')}<circle cx="40" cy="40" r="5" fill="#f7f3ff"/>
     <path d="M34 40H8" stroke="url(#gc-p)" stroke-width="3" stroke-linecap="round"/><path d="M46 40h16" stroke="#fff" stroke-width="1" stroke-dasharray="2 2" opacity=".7"/>`);
+COVERS.chess = frame(`${(() => { let s = ''; for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) s += `<rect x="${33 + c * 9}" y="${22 + r * 9}" width="9" height="9" fill="${(r + c) % 2 ? '#5a1fa6' : '#2a0f4d'}"/>`; return s; })()}
+    <rect x="33" y="22" width="54" height="36" fill="none" stroke="url(#gc-p)" stroke-width="1.5" rx="2"/>
+    <path d="M52 50c0-6 1.8-8.4 5-11-2.3.2-4.2 1.2-5.8 2.8l-2-1.9c.3-4 2.9-8.1 6.5-10.5l-.6-3.5 3.2 1.9c5.8 0 10 4.8 10 12.1V50z" fill="url(#gc-g)" stroke="#fff3c4" stroke-width=".8"/>
+    <path d="M73 31l1.2 2.5 2.7.3-2 1.9.5 2.7-2.4-1.3-2.4 1.3.5-2.7-2-1.9 2.7-.3z" fill="#c9a6ff"/><path d="M73 40c3.6 0 6.5 2 7.6 5.2l1.7-1c1 1.7.6 4.3-1.1 6.5L80 53H66l-1.2-2.3c-1.7-2.2-2.1-4.8-1.1-6.5l1.7 1c1.1-3.2 4-5.2 7.6-5.2z" fill="#3b1670" stroke="#c9a6ff" stroke-width="1"/>`);
+COVERS.ludo = frame(`<g transform="translate(36 16)">
+    <rect width="20" height="20" rx="5" fill="#8a2be2"/><rect x="28" width="20" height="20" rx="5" fill="#f2b31b"/><rect x="28" y="28" width="20" height="20" rx="5" fill="#2bb5a8"/><rect y="28" width="20" height="20" rx="5" fill="#e2558f"/>
+    <rect x="20" y="0" width="8" height="48" fill="#1a0b33"/><rect x="0" y="20" width="48" height="8" fill="#1a0b33"/>
+    <polygon points="20,20 28,20 24,24" fill="#f2b31b"/><polygon points="28,20 28,28 24,24" fill="#2bb5a8"/><polygon points="28,28 20,28 24,24" fill="#e2558f"/><polygon points="20,28 20,20 24,24" fill="#8a2be2"/>
+    <circle cx="10" cy="10" r="4.5" fill="#fff"/><circle cx="38" cy="38" r="4.5" fill="#fff"/></g>
+    <g transform="translate(90 52) rotate(14)"><rect x="-9" y="-9" width="18" height="18" rx="4.5" fill="#fff3c4" stroke="url(#gc-g)" stroke-width="1.5"/><circle cx="-4" cy="-4" r="1.8" fill="#2a0f4d"/><circle cx="4" cy="4" r="1.8" fill="#2a0f4d"/><circle cx="0" cy="0" r="1.8" fill="#2a0f4d"/></g>`);
 export const GAMES = [
   { id: 'stardrop', name: 'Star Drop', blurb: 'Drop gold and purple stars. Four in a row wins.', players: '2 players' },
   { id: 'starcards', name: 'Star Cards', blurb: 'Shed your hand first. Shout LAST STAR! at one card.', players: '2-6 players' },
   { id: 'pool', name: 'Star Pool', blurb: 'Gold rails, purple felt. Sink your group, then call the 8.', players: '2 players' },
+  { id: 'chess', name: 'Chess', blurb: 'Gold vs purple. Full rules, optional clocks.', players: '2 players' },
+  { id: 'ludo', name: 'Ludo', blurb: 'Roll fair dice, race four tokens home.', players: '2-4 players' },
   { id: 'trivia', name: 'Studio Trivia', blurb: 'Fast party quiz: music, movies and more.', players: '2-8 players' },
   { id: 'klgrid', name: 'KL Grid', blurb: 'K vs L on a 3x3 grid, or go Ultimate 9x9.', players: '2 players' },
   { id: 'checkers', name: 'Checkers', blurb: 'Jump, crown and clear the purple board.', players: '2 players' }
