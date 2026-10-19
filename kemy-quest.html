@@ -3,12 +3,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-<title>Kemy's Bubble Quest | Kemy Games</title>
-<meta name="description" content="Kemy's Bubble Quest: a free, cute side-scrolling platformer starring Kemy the purple axolotl. Hop, swim and blow bubbles across 8 worlds and 40+ levels: Lily Pond, Crystal Caves, Neon Reef, Sunny Meadow, Cloud Kingdom, Frosty Peaks, Volcano Glow and Starlight Castle.">
+<title>Kemy's Bubble Quest | Free Platformer Game | Kemy by Lone Keem Studios</title>
+<meta name="description" content="Play Kemy's Bubble Quest free: a cute platformer from Kemy by Lone Keem Studios. Hop, swim and blow bubbles with Kemy the axolotl across 8 worlds and 40+ levels.">
 <link rel="canonical" href="https://lonekeem.github.io/kemy-quest.html">
-<meta property="og:title" content="Kemy's Bubble Quest">
-<meta property="og:description" content="Hop, swim and blow bubbles with Kemy the axolotl. Free in your browser.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:site_name" content="Kemy by Lone Keem Studios">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lonekeem.github.io/kemy-quest.html">
+<meta property="og:title" content="Kemy's Bubble Quest: free platformer game">
+<meta property="og:description" content="Hop, swim and blow bubbles with Kemy the axolotl across 8 worlds. Free in your browser, from Kemy by Lone Keem Studios.">
 <meta property="og:image" content="https://lonekeem.github.io/assets/kemy-quest/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Kemy the purple axolotl on a lily pond next to the words Kemy's Bubble Quest">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Kemy's Bubble Quest: free platformer game">
+<meta name="twitter:description" content="Hop, swim and blow bubbles with Kemy the axolotl across 8 worlds. Free in your browser.">
+<meta name="twitter:image" content="https://lonekeem.github.io/assets/kemy-quest/og.png">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "VideoGame",
+ "@id": "https://lonekeem.github.io/kemy-quest.html#game",
+ "name": "Kemy's Bubble Quest",
+ "url": "https://lonekeem.github.io/kemy-quest.html",
+ "image": "https://lonekeem.github.io/assets/kemy-quest/og.png",
+ "description": "Kemy's Bubble Quest by Lone Keem Studios: a free, cute side-scrolling platformer starring Kemy the purple axolotl. Hop, swim and blow bubbles across 8 worlds and 40+ levels: Lily Pond, Crystal Caves, Neon Reef, Sunny Meadow, Cloud Kingdom, Frosty Peaks, Volcano Glow and Starlight Castle.",
+ "genre": [
+  "Platformer",
+  "Casual"
+ ],
+ "playMode": "SinglePlayer",
+ "numberOfPlayers": "1",
+ "gamePlatform": [
+  "Web browser",
+  "Android"
+ ],
+ "applicationCategory": "Game",
+ "operatingSystem": "Web browser, Android",
+ "isAccessibleForFree": true,
+ "offers": {
+  "@type": "Offer",
+  "price": "0",
+  "priceCurrency": "USD"
+ },
+ "character": {
+  "@type": "Person",
+  "name": "Kemy the axolotl"
+ },
+ "publisher": {
+  "@type": "Organization",
+  "@id": "https://lonekeem.github.io/#organization",
+  "name": "Lone Keem Studios",
+  "url": "https://lonekeem.github.io/",
+  "logo": "https://lonekeem.github.io/logo.png"
+ },
+ "isPartOf": {
+  "@id": "https://lonekeem.github.io/kemy/#app"
+ }
+}
+</script>
 <meta name="theme-color" content="#2a1458">
 <link rel="icon" href="assets/kemy-quest/cover.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
@@ -18,7 +72,12 @@
 </head>
 <body class="kq-body">
 <a class="kq-back" href="app.html#/games" aria-label="Back to Kemy games">← Games</a>
-<main id="kq" class="kq-root"><noscript>Kemy's Bubble Quest needs JavaScript.</noscript></main>
+<main id="kq" class="kq-root"><section class="kq-static" style="max-width:640px;margin:60px auto;padding:0 20px;line-height:1.6;color:#fff">
+<h1>Kemy's Bubble Quest</h1>
+<p>A free side-scrolling platformer from <a href="kemy/" style="color:#e2d0ff">Kemy by Lone Keem Studios</a>. Help Kemy the purple axolotl hop, swim and blow bubbles through 8 worlds and more than 40 levels: Lily Pond, Crystal Caves, Neon Reef, Sunny Meadow, Cloud Kingdom, Frosty Peaks, Volcano Glow and Starlight Castle, plus a secret bonus world. Collect stars, beat 8 original bosses and unlock new paths on the world map. Play with touch controls, a keyboard or a controller.</p>
+<p>Loading the game… <noscript>The game needs JavaScript. Please turn it on.</noscript></p>
+<p><a href="app.html#/games" style="color:#e2d0ff">More free games in Kemy</a>: Star Pool, Chess, Ludo, Checkers and more.</p>
+</section></main>
 <script type="module">
 import { boot } from './js/games/kemy-quest/main.js?v=2';
 boot(document.getElementById('kq')).catch((e) => { console.error(e); document.getElementById('kq').textContent = 'Could not start the game. Please reload.'; });

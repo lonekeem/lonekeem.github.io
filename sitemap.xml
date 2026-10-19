@@ -7,6 +7,7 @@
     <lastmod>2026-10-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <image:image><image:loc>https://lonekeem.github.io/kemy-og.jpg</image:loc></image:image>
     <image:image><image:loc>https://lonekeem.github.io/og-image.jpg</image:loc></image:image>
     <video:video>
       <video:thumbnail_loc>https://lonekeem.github.io/videos/stand-up-strong.jpg</video:thumbnail_loc>
@@ -18,6 +19,8 @@
       <video:family_friendly>yes</video:family_friendly>
     </video:video>
   </url>
+  <url><loc>https://lonekeem.github.io/kemy/</loc><lastmod>2026-10-19</lastmod><changefreq>weekly</changefreq><priority>0.9</priority><image:image><image:loc>https://lonekeem.github.io/kemy-og.jpg</image:loc></image:image></url>
+  <url><loc>https://lonekeem.github.io/kemy-quest.html</loc><lastmod>2026-10-19</lastmod><changefreq>monthly</changefreq><priority>0.7</priority><image:image><image:loc>https://lonekeem.github.io/assets/kemy-quest/og.png</image:loc></image:image></url>
   <url><loc>https://lonekeem.github.io/app.html</loc><lastmod>2026-10-19</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
   <url><loc>https://lonekeem.github.io/guidelines.html</loc><lastmod>2026-10-19</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://lonekeem.github.io/terms.html</loc><lastmod>2026-10-19</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
