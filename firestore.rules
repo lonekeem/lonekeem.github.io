@@ -132,7 +132,7 @@ service cloud.firestore {
     // Cloudinary cloud name for photo/video posts. PLACEHOLDER until the real account exists:
     // this is the ONLY line to change (scripts/set-cloud-name.sh <cloud_name> updates it and
     // js/media-config.js together). Media URLs must start with https://res.cloudinary.com/<cloud>/.
-    function cloudinaryCloud() { return 'REPLACE_WITH_CLOUD_NAME'; }
+    function cloudinaryCloud() { return 'zfmeldgm'; }
     function cloudinaryImageUrl(u) {
       return u is string && u.size() <= 500
         && u.matches('^https://res[.]cloudinary[.]com/' + cloudinaryCloud() + '/image/upload/[^?#]+$');

@@ -13,7 +13,7 @@
 // The browser only needs the cloud name + unsigned preset name.
 // ---------------------------------------------------------------------------
 export const CLOUDINARY = {
-  cloudName: 'REPLACE_WITH_CLOUD_NAME', // <-- PLACEHOLDER: set to the real cloud name
+  cloudName: 'zfmeldgm', // Cloudinary cloud name (public)
   uploadPreset: 'lks_user_uploads',    // unsigned preset (see scripts/cloudinary-setup.mjs)
   folder: 'lks/user-uploads',          // enforced by the preset; informational here
   // Separate unsigned presets so avatars and stories land in their own folders
