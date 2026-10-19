@@ -9,6 +9,9 @@ import { fmtCount } from './views.js';
 import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
 import { FX_DEFAULT } from './fx/looks.js';
+import { emojiPicker, insertAtCursor } from './richcomments.js';
+// Emoji in live chat (all live layouts share the .lv-form markup).
+if (typeof document !== 'undefined' && !window.__lvEmoji) { window.__lvEmoji = 1; document.addEventListener('click', (e) => { const b = e.target.closest('.lv-emoji'); if (!b) return; const inp = b.parentNode.querySelector('input'); emojiPicker((em) => { insertAtCursor(inp, em); }); }); }
 
 export const LIVE_CAP = 12;
 export const LIVE_STALE_MS = 60000;      // no heartbeat for 60 s = ended (no Cloud Functions on Spark)
@@ -411,7 +414,7 @@ export function createLive(ctx) {
       <div class="lv-bottom">
         <div class="lv-fx" id="lv-fx" hidden></div>
         <div class="lv-chat" aria-live="polite" aria-label="Live chat"></div>
-        <form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
+        <form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><button type="button" class="lv-emoji" aria-label="Emoji">😊</button><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
         <div class="lv-tools">
           <button class="lv-tool" id="lv-flip" aria-label="Flip camera">${IC.flip}</button>
           <button class="lv-tool" id="lv-mic" aria-label="Mute microphone" aria-pressed="false">${IC.mic}</button>
@@ -611,7 +614,7 @@ export function createLive(ctx) {
       <div class="lv-stars" aria-hidden="true"></div>
       <div class="lv-bottom">
         <div class="lv-chat" aria-live="polite" aria-label="Live chat"></div>
-        ${signedIn ? `<div class="lv-row"><form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
+        ${signedIn ? `<div class="lv-row"><form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><button type="button" class="lv-emoji" aria-label="Emoji">😊</button><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
           <button class="lv-starbtn" id="lv-starbtn" aria-label="Send a star (or tap the video)">${STAR}<span class="lv-starbadge" id="lv-starsn" aria-label="Total stars">0</span></button></div>` : ''}
       </div></div>`;
     const root = $('#lv'), v = $('#lv-video');
@@ -757,7 +760,7 @@ export function createLive(ctx) {
       <div class="lv-bottom">
         ${host ? `<p class="lv-hostnote small">Closing this screen doesn’t end your live. Tap <b>End</b> when your YouTube stream is over.</p>` : ''}
         ${chatOn ? '<div class="lv-chat" aria-live="polite" aria-label="Live chat"></div>' : ''}
-        ${canChat ? `<div class="lv-row"><form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
+        ${canChat ? `<div class="lv-row"><form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><button type="button" class="lv-emoji" aria-label="Emoji">😊</button><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
           <button class="lv-starbtn" id="lv-starbtn" aria-label="Send a star (or tap the video)">${STAR}<span class="lv-starbadge" id="lv-starsn" aria-label="Total stars">0</span></button></div>`
           : !chatOn ? `<a class="btn btn-sm btn-ghost lv-ytchat" href="${ytUrl}" target="_blank" rel="noopener">Chat on YouTube</a>`
           : `<p class="lv-hostnote small"><a href="#/login?next=${encodeURIComponent('#/live/' + id)}">Log in</a> to chat and send stars.</p>`}

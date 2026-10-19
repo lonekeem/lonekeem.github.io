@@ -1331,3 +1331,44 @@ body.cam-open .mini-player { display: none; }
 .mm select { width: 100%; background: #07050c; border: 1px solid var(--border); border-radius: 12px; padding: 11px 12px; font-size: 16px; color: inherit; }
 .mm .mm-head input[type=text] { background: transparent; border: 0; border-bottom: 2px solid rgba(160,110,255,.4); border-radius: 0; padding: 4px 0; font: 700 1.3rem "Space Grotesk", Inter, sans-serif; }
 .mm-fields textarea { min-height: 64px; }
+
+/* ---------- Rich comments: emoji / GIF / photo / Pal stickers ---------- */
+.rc-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+.rc-btn{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:32px;padding:0 8px;border-radius:10px;border:1px solid rgba(180,124,240,.28);background:rgba(138,85,220,.12);color:#e9ddff;font:700 13px Inter,system-ui;cursor:pointer}
+.rc-btn:hover,.rc-btn:focus-visible{background:rgba(138,85,220,.28)}
+.rc-gifbtn{font-family:'Space Grotesk',Inter,sans-serif;letter-spacing:.04em;font-size:12px}
+.rc-att{flex-basis:100%;display:flex;align-items:center;gap:10px}
+.rc-prev{position:relative;display:inline-block}
+.rc-prev img,.rc-prev canvas{max-height:90px;max-width:140px;border-radius:10px;display:block;background:#140a24}
+.rc-rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:#2a1a45;color:#fff;font-size:11px;cursor:pointer}
+.rc-up{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#cbb6f5}
+.rc-attrib{font-size:11px;color:#a796c9;margin:6px 0 0;text-align:right}
+.rc-media{display:block;margin:6px 0 2px;position:relative;width:max-content;max-width:100%}
+.rc-media img{display:block;max-width:min(260px,100%);height:auto;max-height:240px;border-radius:12px;background:#140a24;object-fit:cover}
+.rc-gif-tag{position:absolute;left:6px;bottom:6px;font:800 9px 'Space Grotesk',sans-serif;letter-spacing:.06em;background:rgba(0,0,0,.6);color:#fff;padding:2px 5px;border-radius:5px}
+.rc-m-sticker canvas,.rc-sticker{width:96px;height:96px;display:block}
+.rc-sheet-bg{position:fixed;inset:0;z-index:1200;background:rgba(5,0,15,.6);display:flex;align-items:flex-end;justify-content:center}
+.rc-sheet{width:min(520px,100%);max-height:72vh;display:flex;flex-direction:column;background:#120a22;border:1px solid rgba(180,124,240,.25);border-radius:18px 18px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.5);padding-bottom:env(safe-area-inset-bottom)}
+@media (min-width:700px){.rc-sheet-bg{align-items:center}.rc-sheet{border-radius:18px}}
+.rc-sheet-h{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 6px;font-family:'Space Grotesk',sans-serif}
+.rc-sheet-b{padding:4px 12px 12px;overflow:auto;display:flex;flex-direction:column;gap:8px;min-height:200px}
+.rc-ebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rc-esearch,.rc-gsearch{flex:1;min-width:150px;height:38px;border-radius:10px;border:1px solid rgba(180,124,240,.3);background:#1b1030;color:#fff;padding:0 12px;font:14px Inter,system-ui}
+.rc-tones{display:flex;gap:2px}
+.rc-tones button{border:0;background:none;font-size:18px;padding:3px;border-radius:8px;cursor:pointer;opacity:.6}
+.rc-tones button[aria-checked=true]{opacity:1;background:rgba(138,85,220,.35)}
+.rc-ecats{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid rgba(180,124,240,.18);padding-bottom:4px}
+.rc-ecats button{border:0;background:none;font-size:20px;padding:4px 7px;border-radius:8px;cursor:pointer;opacity:.6}
+.rc-ecats button[aria-selected=true]{opacity:1;background:rgba(138,85,220,.3)}
+.rc-egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:2px;overflow-y:auto;max-height:42vh}
+.rc-e{border:0;background:none;font-size:26px;height:42px;border-radius:8px;cursor:pointer;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+.rc-e:hover,.rc-e:focus-visible{background:rgba(138,85,220,.3)}
+.rc-ggrid{columns:2 140px;column-gap:6px;overflow-y:auto;max-height:52vh}
+.rc-g{display:block;width:100%;border:0;padding:0;margin:0 0 6px;background:#1b1030;border-radius:8px;overflow:hidden;cursor:pointer;break-inside:avoid}
+.rc-g img{display:block;width:100%;height:auto}
+.rc-pals{display:flex;gap:6px;flex-wrap:wrap}
+.rc-sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.rc-s{display:flex;flex-direction:column;align-items:center;border:1px solid rgba(180,124,240,.2);background:#1b1030;border-radius:14px;padding:6px;color:#e9ddff;cursor:pointer}
+.rc-s:hover,.rc-s:focus-visible{border-color:#b47cf0}
+.rc-loading{display:grid;place-items:center;min-height:200px}
+.lv-emoji{border:0;background:none;font-size:20px;padding:0 6px;cursor:pointer;flex:none}

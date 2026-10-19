@@ -103,7 +103,8 @@
         <ul>
             <li><b>Account info:</b> your email address and password (or your Google sign-in), handled by Google Firebase Authentication. We never see your password.</li>
             <li><b>Profile info:</b> your display name, @username (and your account ID), bio, pronouns, website, avatar color and avatar photo. These are public.</li>
-            <li><b>Activity:</b> your posts, captions, hashtags, comments, gold stars (likes), follows, and the views and plays you add to posts. These are public or shown as counts.</li>
+            <li><b>Activity:</b> your posts, captions, hashtags, comments (which can include emoji, a photo stored on Cloudinary, a GIF from GIPHY or a sticker of your Pal), gold stars (likes), follows, and the views and plays you add to posts. These are public or shown as counts.</li>
+            <li><b>GIFs:</b> GIF search and GIFs in comments load straight from GIPHY, so GIPHY receives your search words, IP address and browser details under <a href="https://support.giphy.com/hc/en-us/articles/360032872931" target="_blank" rel="noopener">GIPHY's privacy policy</a>.</li>
             <li><b>Photos and videos:</b> photo and video posts, stories, snaps and your avatar photo, uploaded to our media host, Cloudinary.</li>
             <li><b>Community Movies and Songs:</b> movie files, audio files, posters and cover art you upload are stored with Cloudinary. Titles, descriptions, lyrics, genres, ratings, “AI tools used” and YouTube links are stored in Cloud Firestore and are public.</li>
             <li><b>Games:</b> game records, scores, wins, leaderboards and online match moves are stored in Cloud Firestore. <b>Kemy’s Bubble Quest</b> keeps your best times on your device, and in Firestore (for the leaderboard) when you’re signed in.</li>

@@ -828,7 +828,7 @@ async function pagePost(postId, token) {
       <h2 id="c-title" style="font-size:1.1rem">Comments</h2>
       <div id="comments"><div class="spinner"></div></div>
       ${S.user && S.profile
-        ? `<form class="comment-form" id="comment-form"><label for="comment-text" class="sr-only">Add a comment</label><input id="comment-text" type="text" maxlength="500" placeholder="Add a comment…" autocomplete="off" required><button class="btn btn-sm" type="submit">Send</button></form><p class="form-error" id="comment-err"></p>`
+        ? `<form class="comment-form" id="comment-form"><label for="comment-text" class="sr-only">Add a comment</label><input id="comment-text" type="text" maxlength="500" placeholder="Add a comment…" autocomplete="off"><button class="btn btn-sm" type="submit">Send</button></form><p class="form-error" id="comment-err"></p>`
         : `<p class="muted small" style="margin-top:12px"><a href="#/login?next=${encodeURIComponent('#/post/' + postId)}">Log in</a> or <a href="#/signup">create an account</a> to comment.</p>`}
     </section>`;
   if (isWork(p)) getWorks().page(p, $('#post-slot'), []); else $('#post-slot').appendChild(postCard(p, { detail: true }));

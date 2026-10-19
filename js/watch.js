@@ -436,7 +436,7 @@ export function createWatch(ctx) {
             <button class="icon-btn" data-close-sheet aria-label="Close comments">${IC.close}</button></header>
           <div class="vsheet-list" id="vsheet-list"><div class="spinner"></div></div>
           ${signedIn
-            ? `<form class="comment-form vsheet-form" id="vsheet-form"><label for="vsheet-text" class="sr-only">Add a comment</label><input id="vsheet-text" type="text" maxlength="500" placeholder="Add a comment…" autocomplete="off" required><button class="btn btn-sm" type="submit">Send</button></form><p class="form-error" id="vsheet-err"></p>`
+            ? `<form class="comment-form vsheet-form" id="vsheet-form"><label for="vsheet-text" class="sr-only">Add a comment</label><input id="vsheet-text" type="text" maxlength="500" placeholder="Add a comment…" autocomplete="off"><button class="btn btn-sm" type="submit">Send</button></form><p class="form-error" id="vsheet-err"></p>`
             : `<div class="vsheet-signin"><p class="small">Sign in to join the conversation.</p><a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/watch/' + p.id)}">Log in</a><a class="btn btn-sm btn-ghost" href="#/signup">Sign up</a></div>`}
         </section>`;
       requestAnimationFrame(() => sheetRoot.classList.add('open'));

@@ -1,9 +1,13 @@
 // Comment threads: replies (one level, like most apps) and stars on comments.
 // Shared by the post page and the video comment sheet.
 import {
-  doc, getDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, writeBatch, serverTimestamp, increment
+  doc, getDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, writeBatch, serverTimestamp, increment, deleteField
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { fmtCount } from './views.js';
+import { attachComposer, mediaHtml, hydrateStickers } from './richcomments.js';
+
+const MEDIA_LABEL = { gif: 'sent a GIF', photo: 'sent a photo', sticker: 'sent a Pal sticker' };
+export const commentLabel = (c) => (c && c.text) || (c && c.media && MEDIA_LABEL[c.media.kind]) || '';
 
 const STAR = '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>';
 export const commentsQuery = (db, postId) => query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(500));
@@ -13,10 +17,12 @@ export function createComments(ctx) {
   const { db, S, esc, avatar, badge, timeAgo, linkify, toast, friendlyError, isAdmin, reportDialog, notify } = ctx;
   const likedCache = new Map(); // "postId/cid" -> bool
 
-  async function addComment(p, text, reply) {
+  async function addComment(p, text, reply, media) {
     const ref = doc(collection(db, 'posts', p.id, 'comments'));
     const b = writeBatch(db);
     const base = { authorId: S.user.uid, authorName: S.profile.displayName, authorUsername: S.profile.username, authorColor: S.profile.color, text: text.slice(0, 500), createdAt: serverTimestamp(), likeCount: 0 };
+    if (media) base.media = media;
+    text = text || MEDIA_LABEL[media && media.kind] || '';
     if (reply) {
       b.set(ref, { ...base, parentId: reply.parentId });
       b.update(doc(db, 'posts', p.id, 'comments', reply.parentId), { replyCount: increment(1), lastReplyId: ref.id });
@@ -35,7 +41,7 @@ export function createComments(ctx) {
     const b = writeBatch(db);
     const ref = doc(db, 'posts', postId, 'comments', c.id);
     if (!c.parentId && (hasReplies ?? (c.replyCount || 0) > 0)) {
-      b.update(ref, { deleted: true, text: '', authorName: '', authorUsername: '', authorColor: '' });
+      b.update(ref, { deleted: true, text: '', authorName: '', authorUsername: '', authorColor: '', media: deleteField() });
     } else {
       b.delete(ref);
       if (c.parentId) {
@@ -62,7 +68,7 @@ export function createComments(ctx) {
     b.update(doc(db, 'posts', postId, 'comments', c.id), { likeCount: increment(on ? 1 : -1) });
     await b.commit();
     likedCache.set(postId + '/' + c.id, on);
-    if (on) notify(c.authorId, 'comment_like', { postId, text: c.text });
+    if (on) notify(c.authorId, 'comment_like', { postId, text: commentLabel(c) });
   }
 
   // Mounts a live thread into `box`. Returns an unsubscribe function.
@@ -98,7 +104,7 @@ export function createComments(ctx) {
       const n = Math.max(0, c.likeCount || 0);
       el.innerHTML = `${avatar({ uid: c.authorId, displayName: c.authorName, username: c.authorUsername, color: c.authorColor }, 'sm')}
         <div class="body"><div><a class="cname" href="#/u/${esc(c.authorUsername)}">${esc(c.authorName)}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
-        <div class="text">${linkify(esc(c.text))}</div>
+        ${c.text ? `<div class="text">${linkify(esc(c.text))}</div>` : ''}${mediaHtml(c)}
         <div class="cacts small">${me() && S.profile ? '<button type="button" class="link-btn small" data-c="reply">Reply</button>' : ''}${me() && !mine ? '<button type="button" class="link-btn small" data-c="report">Report</button>' : ''}${canDelete ? '<button type="button" class="link-btn small cdel-btn" data-c="del">Delete</button>' : ''}</div></div>
         <button type="button" class="cstar ${liked ? 'on' : ''}" data-c="star" aria-pressed="${liked}" aria-label="${liked ? 'Remove your star' : 'Give this comment a star'}">${STAR}<span class="cn">${n ? fmtCount(n) : ''}</span></button>`;
       return el;
@@ -135,6 +141,7 @@ export function createComments(ctx) {
         }
         box.appendChild(wrap);
       }
+      hydrateStickers(box, db);
       // Which of these have I starred? (one read per starred comment, cached)
       if (me()) {
         const todo = vis.filter((c) => !c.deleted && (c.likeCount || 0) > 0 && !likedCache.has(p.id + '/' + c.id));
@@ -152,7 +159,7 @@ export function createComments(ctx) {
         const parentId = c.parentId || c.id; expanded.add(parentId);
         setReply({ parentId, handle: c.authorUsername, uid: c.authorId, mention: !!c.parentId });
       }
-      if (a === 'report') reportDialog('comment', c.id, p.id, c.text);
+      if (a === 'report') reportDialog('comment', c.id, p.id, commentLabel(c) + (c.media && c.media.url ? ' ' + c.media.url : ''));
       if (a === 'del') {
         const hasReplies = !c.parentId && last.some((x) => x.parentId === c.id);
         if (!confirm(hasReplies ? 'Delete this comment? Its replies stay, under “Comment deleted”.' : 'Delete this comment?')) return;
@@ -173,22 +180,24 @@ export function createComments(ctx) {
     };
     const unsub = onSnapshot(commentsQuery(db, p.id), (qs) => render(qs.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (e) => { box.innerHTML = `<p class="muted small">${esc(friendlyError(e))}</p>`; });
+    const rc = form ? attachComposer({ form, input, S, db, toast }) : null;
     if (form) form.onsubmit = async (ev) => {
       ev.preventDefault();
-      const text = input.value.trim(); if (!text) return;
+      if (rc && rc.busy) { toast('Wait for the photo to finish uploading.'); return; }
+      const text = input.value.trim(); const media = rc && rc.media; if (!text && !media) return;
       if (err) err.textContent = '';
       const btn = form.querySelector('button[type=submit], button:not([type])'); if (btn) btn.disabled = true;
       try {
         const r = reply && last.some((x) => x.id === reply.parentId && !x.deleted) ? reply : null;
         if (reply && !r) throw Object.assign(new Error('That comment was deleted.'), { code: 'gone' });
-        await addComment(p, text, r);
-        input.value = ''; setReply(null);
+        await addComment(p, text, r, media);
+        input.value = ''; rc && rc.clear(); setReply(null);
       } catch (e2) {
         if (err) err.textContent = e2.code === 'permission-denied' ? 'Please wait a few seconds between comments.' : e2.code === 'gone' ? 'That comment was deleted, so you can’t reply to it.' : friendlyError(e2);
       }
       if (btn) btn.disabled = false;
     };
-    return () => { unsub(); chip && chip.remove(); };
+    return () => { unsub(); chip && chip.remove(); if (rc) { rc.bar.remove(); form.__rc = null; } };
   }
   return { mount, addComment, deleteComment, starComment, tidyParent };
 }

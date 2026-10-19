@@ -21,7 +21,16 @@ export const CLOUDINARY = {
   avatarPreset: 'lks_avatars',         // folder lks/avatars, jpg/png/webp only
   storyPreset: 'lks_stories',          // folder lks/stories, same formats/eager as posts
   snapPreset: 'lks_snaps',             // folder lks/snaps, view-once snaps sent to friends
-  songPreset: 'lks_songs'              // folder lks/songs, audio (resource_type video), eager mp3
+  songPreset: 'lks_songs',             // folder lks/songs, audio (resource_type video), eager mp3
+  commentPreset: 'lks_comment_media'   // folder lks/comment-media, photos in comments (jpg/png/webp/gif, 10 MB)
+};
+
+// GIFs in comments. GIPHY's API key is a public, client-side key by design (the "SDK/API key"
+// from developers.giphy.com, free). Leave it empty and the GIF button stays hidden.
+export const GIFS = {
+  provider: 'giphy',
+  key: '',            // paste the free GIPHY API key here
+  rating: 'pg'        // stricter than pg-13
 };
 
 // Client-side limits (Cloudinary free plan caps: images 10 MB, videos 100 MB).

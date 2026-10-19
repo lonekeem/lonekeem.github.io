@@ -6,7 +6,7 @@ import {
   EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, deleteUser, signOut
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
-  doc, getDoc, getDocs, collection, collectionGroup, query, where, limit, writeBatch, increment, deleteDoc
+  doc, getDoc, getDocs, collection, collectionGroup, query, where, limit, writeBatch, increment, deleteDoc, deleteField
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 const PAGE = 300;          // docs fetched per query page
@@ -84,7 +84,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
         const replies = c.parentId ? 0 : (await getDocs(query(collection(db, 'posts', postRef.id, 'comments'), where('parentId', '==', d.id), limit(1)))).size;
         if (replies) {
           // Others replied: leave a blank "Comment deleted" so their replies keep their place.
-          b.update(d.ref, { deleted: true, text: '', authorName: '', authorUsername: '', authorColor: '' });
+          b.update(d.ref, { deleted: true, text: '', authorName: '', authorUsername: '', authorColor: '', media: deleteField() });
         } else {
           b.delete(d.ref);
           likes.slice(0, BATCH - 5).forEach((r) => b.delete(r));

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Creates (or updates) the UNSIGNED Cloudinary upload presets used by the app:
-//   lks_user_uploads (posts), lks_stories (24h stories), lks_snaps (view-once snaps), lks_songs (community songs), lks_avatars (profile pictures).
+//   lks_user_uploads (posts), lks_stories (24h stories), lks_snaps (view-once snaps), lks_songs (community songs), lks_avatars (profile pictures), lks_comment_media (comment photos).
 // Run on the box only. Credentials come from the environment and are never written anywhere:
 //   CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=... node scripts/cloudinary-setup.mjs <cloud_name> [--dry-run]
 // The preset:
@@ -42,7 +42,10 @@ const PRESETS = [
     eager: 'ac_mp3,br_192k/mp3', eager_async: 'true', tags: 'lks_song' },
   // Avatars: the app already crops + resizes to a 512px JPEG; images only, small files.
   { name: 'lks_avatars', ...base, folder: 'lks/avatars', allowed_formats: 'jpg,jpeg,png,webp',
-    eager: 'c_fill,h_512,w_512/f_auto,q_auto', eager_async: 'true', tags: 'lks_avatar' }
+    eager: 'c_fill,h_512,w_512/f_auto,q_auto', eager_async: 'true', tags: 'lks_avatar' },
+  // Photos in comments: images only (the app shrinks them to 1600px first), 10 MB cap.
+  { name: 'lks_comment_media', ...base, folder: 'lks/comment-media', allowed_formats: 'jpg,jpeg,png,webp,gif',
+    resource_type: 'image', eager: 'c_limit,h_1200,w_1200/f_auto,q_auto', eager_async: 'true', tags: 'lks_comment' }
 ];
 const api = `https://api.cloudinary.com/v1_1/${cloud}/upload_presets`;
 const auth = 'Basic ' + Buffer.from(`${key}:${secret}`).toString('base64');

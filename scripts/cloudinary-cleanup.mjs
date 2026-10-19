@@ -55,6 +55,19 @@ for (const col of ['posts', 'users']) {
   } while (token);
   console.log(`Read ${n} ${col}`);
 }
+// comment photos live in posts/*/comments (a collection-group query; comments are public)
+{
+  let last = null, n = 0;
+  for (;;) {
+    const q = { structuredQuery: { from: [{ collectionId: 'comments', allDescendants: true }], select: { fields: [{ fieldPath: 'media' }] }, orderBy: [{ field: { fieldPath: '__name__' } }], limit: 500, ...(last ? { startAt: { values: [{ referenceValue: last }], before: false } } : {}) } };
+    const r = await fetch(`${FS}:runQuery?key=${WEB_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(q) });
+    const j = await r.json(); if (!r.ok) throw new Error(`Firestore comments ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
+    const docs = j.filter((x) => x.document).map((x) => x.document);
+    for (const d of docs) { n++; Object.values(d.fields || {}).forEach(walk); }
+    if (docs.length < 500) break; last = docs[docs.length - 1].name;
+  }
+  console.log(`Read ${n} comments`);
+}
 console.log(`${used.size} media files are in use.`);
 
 // 2. list Cloudinary files and pick orphans
@@ -68,7 +81,7 @@ for (const type of ['image', 'video']) {
       let orphan = false;
       if (id.startsWith('lks/stories/')) orphan = age > storyAge;          // stories expire after 24h
       else if (id.startsWith('lks/snaps/')) orphan = age > snapAge;        // view-once snaps
-      else if (/^lks\/(user-uploads|songs|avatars)\//.test(id)) orphan = age > minAge && !used.has(id);
+      else if (/^lks\/(user-uploads|songs|avatars|comment-media)\//.test(id)) orphan = age > minAge && !used.has(id);
       if (orphan) { orphans[type].push(id); bytes += r.bytes || 0; console.log(`  orphan ${type} ${id} ${(r.bytes / 1048576).toFixed(1)}MB ${r.created_at}`); }
     }
     cursor = j.next_cursor || '';

@@ -15,7 +15,7 @@ bash -c 'set -a; source ~/.config/lks/cloudinary.env; set +a; node scripts/cloud
 ```
 
 Rules for orphans:
-- `lks/user-uploads`, `lks/songs` and `lks/avatars`: orphaned when no post or profile references them and they're older than `--min-age-hours` (24 by default).
+- `lks/user-uploads`, `lks/songs`, `lks/avatars` and `lks/comment-media`: orphaned when no post, profile or comment references them and they're older than `--min-age-hours` (24 by default). Comment photos of deleted comments and deleted accounts are cleaned up this way.
 - `lks/stories`: deleted after `--story-days` (3 by default). Stories expire after 24 hours.
 - `lks/snaps`: deleted after `--snap-days` (7 by default).
 
