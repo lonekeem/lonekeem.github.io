@@ -897,3 +897,80 @@ body.live-mode .app-main { max-width: none; padding: 0; min-height: 0; }
 .reply-chip .link-btn { min-height: 32px; }
 .vsheet .reply-chip { margin: 6px 12px 0; }
 .reply-chip[hidden] { display: none; }
+
+/* ---------- Go Live: mode choice + YouTube big lives ---------- */
+.lv-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 10px; }
+.lv-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 10px 12px; text-align: left;
+  border-radius: 14px; border: 1px solid rgba(255,255,255,.18); background: rgba(10,4,22,.55); color: #fff; cursor: pointer; font: inherit; }
+.lv-mode b { font-size: .9rem; }
+.lv-mode span { font-size: .72rem; color: rgba(255,255,255,.7); line-height: 1.25; }
+.lv-mode.on { border-color: #b57bff; background: linear-gradient(135deg, rgba(138,43,226,.45), rgba(80,20,140,.35)); box-shadow: 0 0 0 1px rgba(181,123,255,.5), 0 6px 20px rgba(138,43,226,.35); }
+.lv-mode:focus-visible { outline: 2px solid #b57bff; outline-offset: 2px; }
+.lv-setup.yt-mode { background: radial-gradient(120% 80% at 50% 0%, #3a1170 0%, #12051f 55%, #000 100%); }
+.lv-setup.yt-mode .lv-video { display: none; }
+.lv-setup-panel input#lv-yt { width: 100%; }
+.lv-help { margin: 8px 0 4px; font-size: .82rem; color: rgba(255,255,255,.85); }
+.lv-help summary { cursor: pointer; font-weight: 600; color: #d9b8ff; min-height: 32px; display: flex; align-items: center; }
+.lv-help ol { margin: 6px 0; padding-left: 18px; line-height: 1.45; }
+.lv-help li { margin-bottom: 4px; }
+.lv-help a { color: #d9b8ff; }
+.lv-ytlive { background: #000; }
+.lv-ytbox { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+.lv-ytbox iframe, .lv-ytbox #lv-ytplayer { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.lv-ytposter { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(.5); transform: scale(1.1); }
+.lv-ytbox .spinner { position: relative; z-index: 1; }
+.lv-ytlive .lv-shade { pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, transparent 18%, transparent 62%, rgba(0,0,0,.75) 100%); }
+.lv-ytlive .lv-bottom, .lv-ytlive .lv-top { pointer-events: none; }
+.lv-ytlive .lv-bottom > *, .lv-ytlive .lv-top > * { pointer-events: auto; }
+.lv-ytlive .lv-chat { pointer-events: none; }
+.lv-ytnote { position: absolute; left: 12px; right: 12px; top: 74px; z-index: 6; padding: 10px 14px; border-radius: 14px; font-size: .85rem;
+  background: rgba(18,6,34,.88); border: 1px solid rgba(181,123,255,.45); color: #fff; }
+.lv-ytnote a { color: #d9b8ff; font-weight: 600; }
+.lv-hostnote { margin: 0 0 6px; padding: 6px 10px; border-radius: 10px; background: rgba(10,4,22,.6); color: rgba(255,255,255,.8); width: fit-content; max-width: 100%; }
+.lv-hostnote a { color: #d9b8ff; }
+.lv-ytchat { width: fit-content; }
+
+/* ---------- Tap to star: burst at the tap point ---------- */
+.post-media, .vslide { position: relative; }
+.post-media, .post-media video, .post-media img, .vslide, .vslide video, .lv, .lv-taplayer { touch-action: manipulation; }
+.tapburst { position: absolute; z-index: 20; width: 0; height: 0; pointer-events: none; }
+.tapburst .tb-star { position: absolute; left: calc(var(--ts) / -2); top: calc(var(--ts) / -2); width: var(--ts); height: var(--ts);
+  fill: #ffc83d; stroke: #fff3c4; stroke-width: .5;
+  filter: drop-shadow(0 0 8px rgba(138,43,226,.95)) drop-shadow(0 0 22px rgba(181,123,255,.8));
+  animation: tb-star .9s cubic-bezier(.2,1.4,.4,1) forwards; }
+.tapburst .tb-halo { position: absolute; left: calc(var(--ts) / -2); top: calc(var(--ts) / -2); width: var(--ts); height: var(--ts); border-radius: 50%;
+  border: 3px solid rgba(181,123,255,.85); box-shadow: 0 0 18px rgba(138,43,226,.8), inset 0 0 12px rgba(138,43,226,.6);
+  animation: tb-halo .7s ease-out forwards; }
+.tapburst .tb-spark { position: absolute; left: calc(var(--ss) / -2); top: calc(var(--ss) / -2); width: var(--ss); height: var(--ss);
+  fill: #ffd700; filter: drop-shadow(0 0 4px rgba(181,123,255,.95)); opacity: 0;
+  animation: tb-spark .75s ease-out var(--sd) forwards; }
+@keyframes tb-star {
+  0% { transform: scale(0) rotate(calc(var(--tr) - 70deg)); opacity: 0; }
+  35% { transform: scale(1.18) rotate(var(--tr)); opacity: 1; }
+  60% { transform: scale(.96) rotate(var(--tr)); opacity: 1; }
+  100% { transform: translateY(-46px) scale(.75) rotate(var(--tr)); opacity: 0; }
+}
+@keyframes tb-halo { 0% { transform: scale(.25); opacity: .95; } 100% { transform: scale(1.9); opacity: 0; border-width: 1px; } }
+@keyframes tb-spark {
+  0% { transform: translate(0, 0) scale(.3) rotate(0); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate(var(--sx), var(--sy)) scale(1) rotate(90deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tapburst .tb-star { animation-duration: .6s; } .tapburst .tb-spark, .tapburst .tb-halo { display: none; }
+}
+/* Live: stars float up from where you tapped */
+.lstar.at { bottom: auto; left: var(--x); top: var(--y); margin-left: calc(var(--sz, 28px) / -2); margin-top: calc(var(--sz, 28px) / -2); animation: lstar-at 2.2s cubic-bezier(.2,.7,.4,1) forwards; z-index: 7; pointer-events: none; }
+@keyframes lstar-at {
+  0% { transform: scale(.2) rotate(0); opacity: 0; }
+  12% { transform: scale(1.25) rotate(var(--rot)); opacity: 1; }
+  100% { transform: translate(var(--dx), -42vh) scale(.8) rotate(var(--rot)); opacity: 0; }
+}
+.lv-taplayer { position: absolute; inset: 0; z-index: 1; background: transparent; cursor: pointer; }
+.lv-tapplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; display: flex; align-items: center; gap: 8px;
+  padding: 12px 18px; border-radius: 999px; border: 0; color: #fff; font: 600 1rem Inter, sans-serif; background: linear-gradient(120deg, #b57bff, #8a2be2); box-shadow: 0 8px 30px rgba(138,43,226,.5); }
+.lv-starpill { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 999px; background: rgba(10,4,22,.55); color: #fff; font-size: .8rem; font-weight: 700; }
+.lv-starpill svg { width: 15px; height: 15px; fill: #ffc83d; filter: drop-shadow(0 0 3px rgba(138,43,226,.9)); }
+.lv-starbtn { position: relative; }
+.lv-starbadge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
+  background: linear-gradient(120deg, #b57bff, #8a2be2); color: #fff; font: 700 .68rem/1 Inter, sans-serif; box-shadow: 0 0 0 2px rgba(10,4,22,.9); pointer-events: none; }

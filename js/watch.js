@@ -7,6 +7,7 @@
 // autoplay or swipe well).
 // All stars (likes) / comments / saves / follows go through the shared actions in app.js.
 
+import { burstStar, onDoubleTap } from './tapstar.js';
 import { ICONS } from './icons.js';
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
@@ -234,9 +235,22 @@ export function createWatch(ctx) {
         const vr = v.videoWidth / v.videoHeight, sr = sl.clientWidth / sl.clientHeight;
         sl.classList.toggle('fit-cover', Math.abs(vr - sr) / sr < 0.2);
       });
-      v.addEventListener('click', () => {
-        if (v.paused) { v.muted = muted; v.play().catch(() => {}); sl.classList.remove('paused'); }
-        else { v.pause(); sl.classList.add('paused'); }
+    });
+    // Tap = play/pause (after a short wait so a double-tap doesn't flicker); double-tap = star.
+    slides.forEach((sl) => {
+      const v = sl.querySelector('video');
+      if (!v && !sl.querySelector('.vimage')) return;
+      onDoubleTap(sl, {
+        ignore: (e) => !!e.target.closest('button, a, input, textarea, iframe, [data-a], .vrail, .vmeta, .vembed, .vcard'),
+        single: v ? () => {
+          if (v.paused) { v.muted = muted; v.play().catch(() => {}); sl.classList.remove('paused'); }
+          else { v.pause(); sl.classList.add('paused'); }
+        } : null,
+        double: (e) => {
+          const btn = sl.querySelector('[data-a=like]'); if (!btn) return;
+          if (S.user && S.profile) burstStar(sl, e.clientX, e.clientY);
+          if (!btn.classList.contains('on') && !btn.disabled) btn.click();   // signed out: shows the sign-in prompt
+        }
       });
     });
 

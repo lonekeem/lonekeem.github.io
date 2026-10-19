@@ -439,7 +439,16 @@ service cloud.firestore {
     function validNewLive(d) {
       let u = get(userPath(d.hostId)).data;
       return d.keys().hasOnly(['hostId', 'hostName', 'hostUsername', 'hostColor', 'title', 'status', 'startedAt',
-                               'heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount'])
+                               'heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount',
+                               'type', 'youtubeId', 'chatOn'])
+        // In-app (peer-to-peer) lives by default; "big lives" embed the host's own YouTube Live.
+        // Anyone can start either for their own account (the create rule checks actingAs, so
+        // only the admin can host as the studio).
+        && (!('type' in d) || d.type in ['webrtc', 'youtube'])
+        && (d.get('type', 'webrtc') == 'youtube'
+            ? (d.youtubeId is string && d.youtubeId.matches('^[A-Za-z0-9_-]{11}$')
+               && d.chatOn is bool)
+            : (!('youtubeId' in d) && !('chatOn' in d)))
         && d.keys().hasAll(['hostId', 'hostName', 'hostUsername', 'hostColor', 'title', 'status', 'startedAt',
                             'heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount'])
         && d.hostName == u.displayName
@@ -452,15 +461,16 @@ service cloud.firestore {
         && d.viewerCount == 0 && d.peakViewers == 0 && d.totalViewers == 0 && d.starCount == 0
         && getAfter(userPath(d.hostId)).data.lastPostAt == request.time;
     }
+    function maxViewers(o) { return o.get('type', 'webrtc') == 'youtube' ? 10000000 : 50; }
     function hostLiveUpdate() {
       let n = request.resource.data;
       let o = resource.data;
       return actingAs(o.hostId) && o.status == 'live'
         && changed().hasOnly(['heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount', 'status', 'endedAt', 'endedBy'])
         && n.heartbeatAt == request.time
-        && n.viewerCount is int && n.viewerCount >= 0 && n.viewerCount <= 50
-        && n.peakViewers is int && n.peakViewers >= o.peakViewers && n.peakViewers <= 50
-        && n.totalViewers is int && n.totalViewers >= o.totalViewers && n.totalViewers <= 100000
+        && n.viewerCount is int && n.viewerCount >= 0 && n.viewerCount <= maxViewers(o)
+        && n.peakViewers is int && n.peakViewers >= o.peakViewers && n.peakViewers <= maxViewers(o)
+        && n.totalViewers is int && n.totalViewers >= o.totalViewers && n.totalViewers <= 10000000
         && n.starCount is int && n.starCount >= o.starCount && n.starCount <= 10000000
         && ((n.status == 'live' && !('endedAt' in n) && !('endedBy' in n))
             || (n.status == 'ended' && n.endedAt == request.time && n.endedBy == 'host'));
@@ -517,6 +527,7 @@ service cloud.firestore {
       match /chat/{c} {
         allow read: if true;
         allow create: if signedIn() && liveOn() && !blockedBy(live().hostId)
+          && live().get('chatOn', true) == true
           && request.resource.data.keys().hasOnly(['authorId', 'name', 'username', 'color', 'type', 'text', 'count', 'createdAt'])
           && request.resource.data.authorId == me()
           && request.resource.data.name == get(userPath(me())).data.displayName

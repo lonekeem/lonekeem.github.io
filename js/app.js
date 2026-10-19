@@ -22,6 +22,7 @@ import { ICONS } from './icons.js';
 import { createLive } from './live.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
+import { burstStar, onDoubleTap } from './tapstar.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -297,6 +298,15 @@ function postCard(p, { detail = false } = {}) {
   const pv = $('.post-media video', el);
   if (pv) trackVideo(pv, p.id, p.authorId); else trackVisible(el, p.id, p.authorId);
 
+  // Double-tap the photo/video to give a star (never removes one).
+  const media = $('.post-media', el);
+  if (media && !media.querySelector('iframe')) onDoubleTap(media, {
+    double: (e) => {
+      if (!S.user || !S.profile) { requireAuth(); return; }
+      burstStar(media, e.clientX, e.clientY);
+      if (!likeBtn.classList.contains('on') && !likeBtn.disabled) likeBtn.onclick();
+    }
+  });
   likeBtn.onclick = async () => {
     if (!requireAuth()) return;
     const on = !likeBtn.classList.contains('on');
@@ -532,7 +542,7 @@ const stories = createStories({
 });
 const live = createLive({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal,
-  fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp }
+  fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
 });
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),

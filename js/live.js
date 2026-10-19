@@ -22,12 +22,31 @@ const IC = {
   muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="m16 9 5 6M21 9l-5 6"/></svg>'
 };
 export const liveBadge = (small = false) => `<span class="live-badge ${small ? 'sm' : ''}"><span class="lb-star" aria-hidden="true">${STAR}</span>LIVE</span>`;
-export const isFresh = (l) => !!l && l.status === 'live' && (l.heartbeatAt?.toMillis?.() || 0) > Date.now() - LIVE_STALE_MS;
+// YouTube "big lives" stream from YouTube, so the host may not keep this app open: they count as
+// live for up to 3 h after the host's app last checked in, and never longer than 12 h.
+const YT_STALE_MS = 3 * 3600e3, YT_MAX_MS = 12 * 3600e3;
+export const isFresh = (l) => !!l && l.status === 'live' && (l.type === 'youtube'
+  ? (l.heartbeatAt?.toMillis?.() || 0) > Date.now() - YT_STALE_MS && (l.startedAt?.toMillis?.() || 0) > Date.now() - YT_MAX_MS
+  : (l.heartbeatAt?.toMillis?.() || 0) > Date.now() - LIVE_STALE_MS);
+// youtube.com/live/ID, watch?v=ID, youtu.be/ID, /embed/ID, /shorts/ID, or a bare 11-character ID.
+export function parseYouTubeId(input) {
+  const s = String(input || '').trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  let u; try { u = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s); } catch { return null; }
+  const host = u.hostname.replace(/^(www\.|m\.|music\.)/, '');
+  let id = null;
+  if (host === 'youtu.be') id = u.pathname.split('/')[1];
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    id = u.searchParams.get('v');
+    if (!id) { const m = u.pathname.match(/^\/(?:live|embed|shorts|v)\/([^/?#]+)/); if (m) id = m[1]; }
+  }
+  return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+}
 const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
 
 export function createLive(ctx) {
   const { S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal } = ctx;
-  const { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp } = ctx.fs;
+  const { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer } = ctx.fs;
   const liveRef = (id) => doc(db, 'lives', id);
   const sub = (id, c, d) => doc(db, 'lives', id, c, d);
   const me = () => S.user?.uid;
@@ -104,7 +123,19 @@ export function createLive(ctx) {
   }
 
   // ------------------------------------------------------------ shared overlay pieces
-  function floatStars(root, n = 1) {
+  // Float stars up the side, or from a tap point (x, y in client coordinates).
+  function floatStars(root, n = 1, x = null, y = null) {
+    if (x != null) {
+      const r = root.getBoundingClientRect();
+      const s = document.createElement('span');
+      s.className = 'lstar at'; s.innerHTML = STAR;
+      s.style.setProperty('--x', (x - r.left) + 'px'); s.style.setProperty('--y', (y - r.top) + 'px');
+      s.style.setProperty('--dx', (Math.random() * 60 - 30).toFixed(0) + 'px');
+      s.style.setProperty('--rot', (Math.random() * 50 - 25).toFixed(0) + 'deg');
+      s.style.setProperty('--sz', (30 + Math.random() * 12).toFixed(0) + 'px');
+      root.appendChild(s); setTimeout(() => s.remove(), 2300);
+      return;
+    }
     const box = root.querySelector('.lv-stars'); if (!box) return;
     n = Math.min(n, 8);
     for (let i = 0; i < n; i++) {
@@ -118,6 +149,30 @@ export function createLive(ctx) {
       }, i * 140);
     }
   }
+  // Stars you send: shown instantly, written in batches (one write per ~1.1 s, up to 20 stars
+  // each) so even fast tapping stays well inside the free Firestore quota.
+  function starSender(root, id) {
+    let pending = 0, t = 0, sent = 0;
+    const flush = async () => {
+      t = 0; if (pending <= 0) return;
+      const n = Math.min(20, pending); pending -= n;
+      try { await sendStars(id, n); sent += n; } catch { /* live ended or too fast: dropped */ }
+      if (pending > 0 && !t) t = setTimeout(flush, 1100);
+    };
+    return {
+      add(x = null, y = null) { floatStars(root, 1, x, y); pending++; if (!t) t = setTimeout(flush, 1100); },
+      flushNow() { clearTimeout(t); t = 0; if (pending > 0) sendStars(id, Math.min(20, pending)).catch(() => {}); pending = 0; },
+      get pending() { return pending; }, get sent() { return sent; }
+    };
+  }
+  // Running star total for viewers: the live doc's count, or what we've seen since joining.
+  function starTotal(root, base) {
+    let seen = 0, doc = base || 0;
+    const paint = () => { const el = root.querySelector('#lv-starsn'); if (el) el.textContent = fmtCount(Math.max(doc, (base || 0) + seen)); };
+    paint();
+    return { add(n) { seen += n; paint(); }, doc(n) { doc = Math.max(doc, n || 0); paint(); }, get value() { return Math.max(doc, (base || 0) + seen); } };
+  }
+  const tapIgnore = (e) => !!e.target.closest('button, a, input, textarea, form, label, .lv-top, .lv-row, .lv-ytnote, .lv-chat, .lv-hostnote, .lv-wait-in .btn');
   function chatLine(c) {
     return `<div class="lv-msg">${avatar({ uid: c.authorId, displayName: c.name, username: c.username, color: c.color }, 'xs', false)}<p><b>${esc(c.name)}</b> ${esc(c.text)}</p></div>`;
   }
@@ -176,7 +231,14 @@ export function createLive(ctx) {
   }
   async function cleanupSubs(id) {
     for (const c of ['conns', 'answers', 'viewers', 'chat']) {
-      try { const s = await getDocs(query(collection(db, 'lives', id, c), limit(300))); await Promise.all(s.docs.map((d) => deleteDoc(d.ref).catch(() => {}))); } catch {}
+      for (let i = 0; i < 40; i++) {
+        try {
+          const s = await getDocs(query(collection(db, 'lives', id, c), limit(300)));
+          if (s.empty) break;
+          await Promise.all(s.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+          if (s.size < 300) break;
+        } catch { break; }
+      }
     }
   }
 
@@ -192,15 +254,38 @@ export function createLive(ctx) {
       <button class="lv-x" id="lv-x" aria-label="Close">${IC.close}</button>
       <div class="lv-setup-panel">
         <h1>${ICONS.live} Go Live</h1>
-        <p class="small">Your followers see you in their feed right away. Up to ${LIVE_CAP} people can watch at once. Nothing is recorded.</p>
+        <div class="lv-modes" role="radiogroup" aria-label="Type of live">
+          <button type="button" class="lv-mode on" role="radio" aria-checked="true" data-mode="app"><b>Live in the app</b><span>Free · up to ${LIVE_CAP} viewers</span></button>
+          <button type="button" class="lv-mode" role="radio" aria-checked="false" data-mode="yt"><b>Big live with YouTube</b><span>Unlimited viewers · needs your own YouTube channel</span></button>
+        </div>
         <label class="sr-only" for="lv-title">Title</label>
         <input id="lv-title" maxlength="80" placeholder="Add a title (optional)" autocomplete="off">
         ${isAdmin() ? `<label class="check small"><input type="checkbox" id="lv-studio"> Go live as Lone Keem Studios</label>` : ''}
-        <p class="form-error" id="lv-err" role="alert"></p>
-        <div class="lv-setup-btns"><button class="btn btn-ghost" id="lv-flip0">${IC.flip}Flip</button><button class="btn lv-start" id="lv-start" disabled>${ICONS.live}Go Live</button></div>
+        <div id="lv-app-pane">
+          <p class="small">Your camera, straight from this app. Your followers see you in their feed right away. Nothing is recorded.</p>
+          <p class="form-error" id="lv-err" role="alert"></p>
+          <div class="lv-setup-btns"><button class="btn btn-ghost" id="lv-flip0">${IC.flip}Flip</button><button class="btn lv-start" id="lv-start" disabled>${ICONS.live}Go Live</button></div>
+        </div>
+        <div id="lv-yt-pane" hidden>
+          <p class="small">Stream on YouTube, and it plays right here in the app with your in-app chat and stars. Viewers don’t need YouTube.</p>
+          <label class="sr-only" for="lv-yt">YouTube Live link</label>
+          <input id="lv-yt" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="Paste your YouTube Live link" autocomplete="off">
+          <label class="check small"><input type="checkbox" id="lv-ytchat" checked> In-app chat and stars</label>
+          <details class="lv-help"><summary>How do I start a YouTube Live?</summary>
+            <ol>
+              <li>Open the <b>YouTube</b> app, tap <b>Create (+)</b>, then <b>Go live</b>. The first time, YouTube asks you to verify your channel and can take up to 24 hours to turn live streaming on.</li>
+              <li>Going live from a <b>phone</b> needs at least 50 subscribers. From a <b>computer</b> (webcam at youtube.com, or streaming software like OBS) there’s no subscriber minimum.</li>
+              <li>Set it to <b>Public</b> or <b>Unlisted</b>, and put <b>https://lonekeem.github.io/</b> in your stream description.</li>
+              <li>Tap <b>Share</b>, copy the link, and paste it above.</li>
+            </ol>
+            <p>Only stream your own channel, and follow the <a href="guidelines.html" target="_blank" rel="noopener">Community Guidelines</a>.</p>
+          </details>
+          <p class="form-error" id="lv-yterr" role="alert"></p>
+          <div class="lv-setup-btns"><button class="btn lv-start" id="lv-yt-start">${ICONS.live}Start big live</button></div>
+        </div>
       </div></div>`;
     const v = $('#lv-video');
-    let facing = 'user', stream = null;
+    let facing = 'user', stream = null, mode = 'app', camTry = 0;
     const getCam = async () => {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 24, max: 30 } },
@@ -208,21 +293,33 @@ export function createLive(ctx) {
       });
       return s;
     };
-    const stop = () => stream && stream.getTracks().forEach((t) => t.stop());
+    const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; v.srcObject = null; };
     S.unsubs.push(() => { if (!hostSession) { stop(); document.body.classList.remove('live-mode'); } });
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
-    try {
-      if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) throw Object.assign(new Error('unsupported'), { name: 'Unsupported' });
-      stream = await getCam();
-      if (stale(token)) { stop(); return; }
-      v.srcObject = stream; v.play().catch(() => {});
-      $('#lv-start').disabled = false;
-    } catch (e) {
-      $('#lv-err').textContent = e.name === 'NotAllowedError' ? 'Camera or microphone access is blocked. Allow it in your browser settings, then try again.'
-        : e.name === 'Unsupported' ? 'This browser can’t go live. Try the latest Chrome, Safari or Firefox.'
-        : 'Couldn’t start your camera. Make sure no other app is using it.';
-      return;
+    async function startCam() {
+      const my = ++camTry;
+      $('#lv-err').textContent = ''; $('#lv-start').disabled = true;
+      try {
+        if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) throw Object.assign(new Error('unsupported'), { name: 'Unsupported' });
+        const s = await getCam();
+        if (stale(token) || my !== camTry || mode !== 'app') { s.getTracks().forEach((t) => t.stop()); return; }
+        stream = s; v.srcObject = stream; v.play().catch(() => {});
+        $('#lv-start').disabled = false;
+      } catch (e) {
+        if (my !== camTry) return;
+        $('#lv-err').textContent = e.name === 'NotAllowedError' ? 'Camera or microphone access is blocked. Allow it in your browser settings, then try again.'
+          : e.name === 'Unsupported' ? 'This browser can’t go live in the app. Try the latest Chrome, Safari or Firefox, or use a big live with YouTube.'
+          : 'Couldn’t start your camera. Make sure no other app is using it.';
+      }
     }
+    const setMode = (m) => {
+      mode = m;
+      $('#lv').querySelectorAll('.lv-mode').forEach((b) => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+      $('#lv-app-pane').hidden = m !== 'app'; $('#lv-yt-pane').hidden = m !== 'yt';
+      $('#lv').classList.toggle('yt-mode', m === 'yt');
+      if (m === 'yt') { camTry++; stop(); setTimeout(() => $('#lv-yt')?.focus(), 30); } else startCam();
+    };
+    $('#lv').querySelectorAll('.lv-mode').forEach((b) => (b.onclick = () => b.dataset.mode !== mode && setMode(b.dataset.mode)));
     $('#lv-flip0').onclick = async () => {
       facing = facing === 'user' ? 'environment' : 'user';
       try { const s = await getCam(); stop(); stream = s; v.srcObject = s; v.classList.toggle('mirror', facing === 'user'); }
@@ -242,8 +339,24 @@ export function createLive(ctx) {
         $('#lv-err').textContent = e.code === 'permission-denied' ? 'Please wait a few seconds and try again (you just posted or went live).' : friendlyError(e);
       }
     };
+    $('#lv-yt').addEventListener('input', () => { $('#lv-yterr').textContent = ''; });
+    $('#lv-yt-start').onclick = async () => {
+      const err = $('#lv-yterr'); err.textContent = '';
+      const yt = parseYouTubeId($('#lv-yt').value);
+      if (!yt) { err.textContent = 'That doesn’t look like a YouTube link. Paste the link from Share on your YouTube Live (like youtube.com/live/…, youtu.be/… or watch?v=…).'; return; }
+      const btn = $('#lv-yt-start'); btn.disabled = true;
+      try {
+        const id = await createLive($('#lv-title').value.trim().slice(0, 80), !!$('#lv-studio')?.checked, { youtubeId: yt, chatOn: !!$('#lv-ytchat').checked });
+        if (stale(token)) return;
+        location.replace('#/live/' + id);
+      } catch (e) {
+        btn.disabled = false;
+        err.textContent = e.code === 'permission-denied' ? 'Please wait a few seconds and try again (you just posted or went live).' : friendlyError(e);
+      }
+    };
+    startCam();
   }
-  async function createLive(title, asStudio) {
+  async function createLive(title, asStudio, yt = null) {
     const hostId = asStudio ? STUDIO_UID : me();
     const host = asStudio ? await getProfile(STUDIO_UID) : S.profile;
     // End any of this host's old lives that were left hanging (tab closed, crash).
@@ -255,7 +368,8 @@ export function createLive(ctx) {
     const ref = doc(collection(db, 'lives'));
     const b = writeBatch(db);
     b.set(ref, { hostId, hostName: host.displayName, hostUsername: host.username, hostColor: host.color, title, status: 'live',
-      startedAt: serverTimestamp(), heartbeatAt: serverTimestamp(), viewerCount: 0, peakViewers: 0, totalViewers: 0, starCount: 0 });
+      startedAt: serverTimestamp(), heartbeatAt: serverTimestamp(), viewerCount: 0, peakViewers: 0, totalViewers: 0, starCount: 0,
+      ...(yt ? { type: 'youtube', youtubeId: yt.youtubeId, chatOn: yt.chatOn } : {}) });
     b.update(doc(db, 'users', hostId), { lastPostAt: serverTimestamp() });
     await b.commit();
     return ref.id;
@@ -357,7 +471,7 @@ export function createLive(ctx) {
         else addPeer(uid);           // added, or re-joined (modified)
       });
     }, (e) => console.warn('viewers', e));
-    const unsubChat = watchChat(id, root, (n, initial) => { if (!initial) { stars += n; floatStars(root, n); paint(); soon(); } });
+    const unsubChat = watchChat(id, root, (n, initial) => { if (!initial) { stars += n; paint(); soon(); } });
     const unsubLive = onSnapshot(liveRef(id), (d) => {
       const l = d.data();
       if (l && l.status === 'ended' && l.endedBy === 'admin' && !ended) {
@@ -431,6 +545,7 @@ export function createLive(ctx) {
     const l = { id, ...snap.data() };
     if (!isFresh(l)) { endedView(l); return; }
     if (S.blocked.has(l.hostId)) { main.innerHTML = '<div class="empty">You blocked this account.</div>'; return; }
+    if (l.type === 'youtube') return pageYouTube(l, token);
     document.body.classList.add('live-mode');
     const signedIn = !!(S.user && S.profile);
     const mine = signedIn && l.hostId === me();
@@ -453,17 +568,19 @@ export function createLive(ctx) {
       <div class="lv-bottom">
         <div class="lv-chat" aria-live="polite" aria-label="Live chat"></div>
         ${signedIn ? `<div class="lv-row"><form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
-          <button class="lv-starbtn" id="lv-starbtn" aria-label="Send a star">${STAR}</button></div>` : ''}
+          <button class="lv-starbtn" id="lv-starbtn" aria-label="Send a star (or tap the video)">${STAR}<span class="lv-starbadge" id="lv-starsn" aria-label="Total stars">0</span></button></div>` : ''}
       </div></div>`;
     const root = $('#lv'), v = $('#lv-video');
-    let pc = null, left = false, connected = false, pending = 0, flushT = 0, connT = 0;
+    let pc = null, left = false, connected = false, connT = 0, starsOut = null;
     const unsubs = [];
     const waitMsg = (html, spinner = false) => { const w = $('#lv-wait'); if (!w) return; w.hidden = false; w.querySelector('#lv-wait-msg').innerHTML = html; const sp = w.querySelector('.spinner'); if (sp) sp.hidden = !spinner; };
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
-    unsubs.push(watchChat(id, root));
+    const totals = starTotal(root, l.starCount || 0);
+    unsubs.push(watchChat(id, root, (n, initial) => { if (!initial) totals.add(n); }));
     unsubs.push(onSnapshot(liveRef(id), (d) => {
       const x = d.data(); if (!x) return;
       root.querySelector('#lv-count span').textContent = fmtCount(x.viewerCount || 0);
+      totals.doc(x.starCount);
       if (x.status === 'ended') ended(x);
     }, () => {}));
     const staleT = setInterval(async () => { try { const d = await getDoc(liveRef(id)); if (!isFresh(d.data())) ended(d.data() || l); } catch {} }, 15000);
@@ -473,9 +590,9 @@ export function createLive(ctx) {
     }
     async function leave() {
       if (left) return; left = true;
-      clearInterval(staleT); clearTimeout(flushT); clearTimeout(connT);
+      clearInterval(staleT); clearTimeout(connT);
       unsubs.forEach((u) => u());
-      if (pending > 0 && signedIn) sendStars(id, Math.min(20, pending)).catch(() => {});
+      starsOut && starsOut.flushNow();
       try { pc && pc.close(); } catch {}
       if (signedIn) { deleteDoc(sub(id, 'viewers', me())).catch(() => {}); deleteDoc(sub(id, 'answers', me())).catch(() => {}); }
       document.body.classList.remove('live-mode');
@@ -494,14 +611,10 @@ export function createLive(ctx) {
     $('#lv-unmute').onclick = () => { v.muted = false; v.play().catch(() => {}); $('#lv-unmute').hidden = true; };
     if (!signedIn) return;
     if (mine) { waitMsg('You’re hosting this live in another tab or on another device.'); return; }
-    // Stars: show instantly, send in small batches (max ~1 write per second).
-    $('#lv-starbtn').onclick = () => {
-      floatStars(root, 1); pending++;
-      if (!flushT) flushT = setTimeout(async () => {
-        const n = Math.min(20, pending); pending -= n; flushT = 0;
-        try { await sendStars(id, n); } catch { /* live ended or too fast: drop */ }
-      }, 1300);
-    };
+    // Stars: the button, or tap anywhere on the video (each tap floats a star from that spot).
+    starsOut = starSender(root, id);
+    $('#lv-starbtn').onclick = () => starsOut.add();
+    root.addEventListener('click', (e) => { if (tapIgnore(e) || !$('#lv-wait')?.hidden) return; starsOut.add(e.clientX, e.clientY); });
     wireChatForm(root, id);
     // Join: clear any old signaling docs, then ask the host for a connection.
     try {
@@ -545,7 +658,178 @@ export function createLive(ctx) {
       waitMsg(`<b>Couldn’t connect to this live</b><br>Some networks (like some work, school or mobile networks) block direct video connections, and we don’t use a relay server. Try Wi‑Fi or another network.<br><button class="btn btn-sm" id="lv-retry" style="margin-top:12px">Try again</button>`);
       const r = $('#lv-retry'); if (r) r.onclick = () => location.reload();
     }
-    window.__lksLive = { role: 'viewer', id, get connected() { return connected; }, get pc() { return pc; } };
+    window.__lksLive = { role: 'viewer', id, get starsSent() { return starsOut ? starsOut.sent : 0; }, get starTotal() { return totals.value; }, get connected() { return connected; }, get pc() { return pc; } };
+  }
+  // ------------------------------------------------------------ YouTube "big live"
+  // The video comes from YouTube's own embed player (any number of viewers); chat, stars and the
+  // in-app viewer count run through Firestore. To stay inside the free Firestore quota, viewers
+  // poll the live doc once a minute instead of listening, and nobody writes a heartbeat except the
+  // host's screen (once a minute, only while open).
+  let ytApi = null;
+  function loadYouTubeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+    if (ytApi) return ytApi;
+    ytApi = new Promise((resolve, reject) => {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { prev && prev(); resolve(window.YT); };
+      const sc = document.createElement('script'); sc.src = 'https://www.youtube.com/iframe_api'; sc.async = true;
+      sc.onerror = () => { ytApi = null; reject(new Error('YouTube player failed to load')); };
+      document.head.appendChild(sc);
+      setTimeout(() => reject(new Error('timeout')), 10000);
+    });
+    return ytApi;
+  }
+  async function pageYouTube(l, token) {
+    const id = l.id, yt = l.youtubeId;
+    document.body.classList.add('live-mode');
+    const signedIn = !!(S.user && S.profile);
+    const host = signedIn && (l.hostId === me() || (l.hostId === STUDIO_UID && isAdmin()));
+    const chatOn = l.chatOn !== false;
+    const canChat = signedIn && chatOn;
+    const following = S.following.has(l.hostId);
+    const ytUrl = 'https://www.youtube.com/watch?v=' + encodeURIComponent(yt);
+    main.innerHTML = `<div class="lv lv-view lv-ytlive" id="lv">
+      <div class="lv-ytbox" id="lv-ytbox"><img class="lv-ytposter" alt="" src="https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg"><div class="spinner"></div></div>
+      <div class="lv-taplayer" id="lv-taplayer" hidden aria-hidden="true"></div>
+      <button class="lv-tapplay" id="lv-tapplay" hidden>${ICONS.live}<span>Tap to play</span></button>
+      <div class="lv-shade"></div>
+      <header class="lv-top">
+        <a class="lv-who" href="#/u/${esc(l.hostUsername)}">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'sm', false)}<div><b>${esc(l.hostName)}${badge(l.hostId)}</b><span class="small">${l.title ? esc(l.title) : '@' + esc(l.hostUsername)}</span></div></a>
+        ${signedIn && !host && !following ? `<button class="lv-follow" id="lv-follow" aria-label="Follow ${esc(l.hostName)}">Follow</button>` : ''}
+        ${liveBadge()}
+        <span class="lv-count" id="lv-count" aria-live="polite" title="Signed-in viewers in the app">${IC.people}<span>${fmtCount(l.viewerCount || 0)}</span></span>
+        ${host ? `<button class="lv-end" id="lv-end">End</button>` : ''}
+        <button class="lv-x" id="lv-x" aria-label="Leave live">${IC.close}</button>
+      </header>
+      <div class="lv-ytnote" id="lv-ytnote" hidden></div>
+      ${isAdmin() && !host ? `<button class="lv-admin-end" id="lv-admin-end">End live (guidelines)</button>` : ''}
+      <button class="lv-unmute" id="lv-unmute" hidden>${IC.muted}<span>Tap for sound</span></button>
+      <div class="lv-stars" aria-hidden="true"></div>
+      <div class="lv-bottom">
+        ${host ? `<p class="lv-hostnote small">Closing this screen doesn’t end your live. Tap <b>End</b> when your YouTube stream is over.</p>` : ''}
+        ${chatOn ? '<div class="lv-chat" aria-live="polite" aria-label="Live chat"></div>' : ''}
+        ${canChat ? `<div class="lv-row"><form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
+          <button class="lv-starbtn" id="lv-starbtn" aria-label="Send a star (or tap the video)">${STAR}<span class="lv-starbadge" id="lv-starsn" aria-label="Total stars">0</span></button></div>`
+          : !chatOn ? `<a class="btn btn-sm btn-ghost lv-ytchat" href="${ytUrl}" target="_blank" rel="noopener">Chat on YouTube</a>`
+          : `<p class="lv-hostnote small"><a href="#/login?next=${encodeURIComponent('#/live/' + id)}">Log in</a> to chat and send stars.</p>`}
+      </div></div>`;
+    const root = $('#lv');
+    let left = false, player = null, playing = false, starsOut = null, stars = l.starCount || 0;
+    let peak = l.peakViewers || 0, total = l.totalViewers || 0, lastCount = l.viewerCount || 0;
+    const unsubs = []; const timers = [];
+    const note = (html) => { const n = $('#lv-ytnote'); if (!n) return; n.hidden = !html; n.innerHTML = html || ''; };
+    $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
+    const totals = starTotal(root, l.starCount || 0);
+    if (chatOn) unsubs.push(watchChat(id, root, (n, initial) => { if (!initial) { stars += n; totals.add(n); } }));
+    // Player (lazy: the API script only loads when a YouTube live is opened).
+    (async () => {
+      const box = $('#lv-ytbox');
+      const fallback = () => {
+        if (left || !box) return;
+        box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(yt)}?autoplay=1&playsinline=1&rel=0" title="${esc(l.title || l.hostName + ' live')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+      };
+      try {
+        const YT = await loadYouTubeApi();
+        if (left || stale(token)) return;
+        const el = document.createElement('div'); el.id = 'lv-ytplayer'; box.appendChild(el);
+        player = new YT.Player(el, {
+          host: 'https://www.youtube-nocookie.com', videoId: yt, width: '100%', height: '100%',
+          playerVars: { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1 },
+          events: {
+            onReady: (e) => {
+              box.querySelector('.spinner')?.remove();
+              $('#lv-taplayer').hidden = false;
+              try { e.target.playVideo(); } catch {}
+              // Browsers block autoplay with sound: fall back to muted + a "Tap for sound" button.
+              setTimeout(() => { if (!left && !playing && player) { try { player.mute(); player.playVideo(); $('#lv-unmute').hidden = false; } catch {} } }, 1500);
+            },
+            onStateChange: (e) => {
+              if (e.data === 1) { playing = true; note(''); box.querySelector('.lv-ytposter')?.remove(); $('#lv-tapplay').hidden = true; }
+              if (e.data === 2) { playing = false; $('#lv-tapplay').hidden = false; }
+              if (e.data === 0) note(`<b>The YouTube stream has ended.</b> ${host ? 'Tap End to close the live in the app.' : ''}`);
+            },
+            onError: (e) => {
+              const msg = e.data === 101 || e.data === 150 ? 'This stream can’t be played here. It may not exist, be private, or have embedding turned off on YouTube.'
+                : e.data === 100 ? 'This stream is private, removed, or hasn’t been published yet.'
+                : 'This stream can’t be played right now.';
+              note(`<b>${msg}</b> <a href="${ytUrl}" target="_blank" rel="noopener">Watch on YouTube</a>`);
+            }
+          }
+        });
+      } catch { fallback(); }
+      // Not started yet / offline: YouTube shows its own "waiting" screen; add a gentle hint.
+      timers.push(setTimeout(() => { if (!playing && !left && $('#lv-ytnote')?.hidden) note(`Waiting for the stream to start… If nothing plays, the live may not have started on YouTube yet. <a href="${ytUrl}" target="_blank" rel="noopener">Open on YouTube</a>`); }, 15000));
+    })();
+    $('#lv-unmute').onclick = () => { try { player.unMute(); player.playVideo(); } catch {} $('#lv-unmute').hidden = true; };
+    $('#lv-tapplay').onclick = () => { try { player.playVideo(); } catch {} $('#lv-tapplay').hidden = true; };
+    // The tap layer sits over the YouTube player: taps send stars (the host's taps play/pause).
+    $('#lv-taplayer').addEventListener('click', (e) => {
+      if (!player) return;
+      if (!playing || host) { try { playing && host ? player.pauseVideo() : player.playVideo(); } catch {} return; }
+      if (starsOut) starsOut.add(e.clientX, e.clientY);
+      else if (!signedIn) toast('Log in to send stars');
+    });
+    // Live doc: poll once a minute (cheap for thousands of viewers).
+    const poll = async () => {
+      try {
+        const d = await getDoc(liveRef(id)); const x = d.data();
+        if (!x) return ended(l);
+        root.querySelector('#lv-count span').textContent = fmtCount(host ? Math.max(lastCount, x.viewerCount || 0) : x.viewerCount || 0);
+        totals.doc(x.starCount);
+        if (!isFresh(x)) ended({ ...l, ...x });
+      } catch {}
+    };
+    if (!host) timers.push(setInterval(poll, 60000));
+    // Host screen: count viewers (one aggregate read) and check in once a minute.
+    const hostWrite = async (end = false) => {
+      let n = lastCount;
+      try { n = (await getCountFromServer(collection(db, 'lives', id, 'viewers'))).data().count; } catch {}
+      lastCount = end ? 0 : n; peak = Math.max(peak, n); total = Math.max(total, peak);
+      root.querySelector('#lv-count span').textContent = fmtCount(n);
+      await updateDoc(liveRef(id), { heartbeatAt: serverTimestamp(), viewerCount: end ? 0 : n, peakViewers: peak, totalViewers: total, starCount: Math.max(stars, l.starCount || 0),
+        ...(end ? { status: 'ended', endedAt: serverTimestamp(), endedBy: 'host' } : {}) });
+    };
+    if (host) {
+      hostWrite().catch(() => {});
+      timers.push(setInterval(() => hostWrite().then(poll).catch(() => {}), 60000));
+      $('#lv-end').onclick = async () => {
+        if (!confirm('End your live in the app? (Remember to end the stream on YouTube too.)')) return;
+        try { await hostWrite(true); } catch (e) { toast(friendlyError(e)); return; }
+        const fin = { ...l, status: 'ended', viewerCount: 0, peakViewers: peak, totalViewers: total, starCount: Math.max(stars, l.starCount || 0) };
+        leave(); cleanupSubs(id); endedView(fin);
+      };
+    }
+    function ended(x) { if (left) return; leave(); endedView({ ...l, ...x, id }); }
+    function leave() {
+      if (left) return; left = true;
+      timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
+      unsubs.forEach((u) => u());
+      starsOut && starsOut.flushNow();
+      try { player && player.destroy(); } catch {}
+      if (signedIn && !host) deleteDoc(sub(id, 'viewers', me())).catch(() => {});
+      document.body.classList.remove('live-mode');
+    }
+    S.unsubs.push(leave);
+    window.addEventListener('pagehide', leave, { once: true });
+    $('#lv-follow')?.addEventListener('click', async (e) => {
+      const b = e.currentTarget; const on = !S.following.has(l.hostId); b.disabled = true;
+      try { await followUser(l.hostId, on); b.textContent = on ? 'Following' : 'Follow'; b.classList.toggle('on', on); if (on) setTimeout(() => b.remove(), 1500); } catch (err) { toast(friendlyError(err)); }
+      b.disabled = false;
+    });
+    $('#lv-admin-end')?.addEventListener('click', async () => {
+      if (!confirm('End this live for breaking the community guidelines?')) return;
+      try { await updateDoc(liveRef(id), { status: 'ended', endedAt: serverTimestamp(), endedBy: 'admin' }); toast('Live ended'); ended({ status: 'ended', endedBy: 'admin' }); } catch (e) { toast(friendlyError(e)); }
+    });
+    if (canChat) {
+      starsOut = starSender(root, id);
+      $('#lv-starbtn').onclick = () => starsOut.add();
+      wireChatForm(root, id);
+    }
+    // Presence for the in-app viewer count: one doc per signed-in viewer (no cap), removed on leave.
+    if (signedIn && !host) {
+      setDoc(sub(id, 'viewers', me()), { name: S.profile.displayName, username: S.profile.username, color: S.profile.color, joinedAt: serverTimestamp() }).catch(() => {});
+    }
+    window.__lksLive = { role: host ? 'host' : 'viewer', type: 'youtube', id, get starsSent() { return starsOut ? starsOut.sent : 0; }, get starTotal() { return totals.value; }, get playing() { return playing; }, get note() { return $('#lv-ytnote')?.textContent || ''; }, get player() { return player; } };
   }
   function endedView(l) {
     document.body.classList.remove('live-mode');
