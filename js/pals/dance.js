@@ -140,18 +140,6 @@ export function danceFor(pal, beat, forced) {
 }
 
 // arms: little rounded nubs at the shoulders, in the Pal's body colour
-function arms(c, pal, pose, amt, st) {
-  const sp = SPEC[pal.species] || SPECIES[0]; const B = (pal.colors && pal.colors.body) || sp.body;
-  const stage = stageOf(pal.level || 1); const g = [0.84, 1, 1.12][stage] * [1, 1.08, 1.22][stage];
-  const shY = -12 * g, shX = 8 * g, len = 6.5 * g;
-  c.lineCap = 'round';
-  for (const side of [-1, 1]) {
-    let a = (side < 0 ? pose.aL : pose.aR); a = lerp(25, a, amt) * Math.PI / 180;
-    const x0 = side * shX, x1 = x0 + side * Math.sin(a) * len, y1 = shY + Math.cos(a) * len;
-    c.strokeStyle = 'rgba(40,20,70,.55)'; c.lineWidth = 4.4 * g; c.beginPath(); c.moveTo(x0, shY); c.lineTo(x1, y1); c.stroke();
-    c.strokeStyle = B; c.lineWidth = 3 * g; c.beginPath(); c.moveTo(x0, shY); c.lineTo(x1, y1); c.stroke();
-  }
-}
 function sparkle(c, x, y, s, t) {
   c.save(); c.translate(x, y); c.rotate(t * 0.05); c.fillStyle = '#ffd34d'; c.beginPath();
   for (let i = 0; i < 10; i++) { const r = i % 2 ? s * 0.42 : s; const a = (i / 10) * Math.PI * 2 - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
@@ -170,8 +158,10 @@ export function drawDancer(c, x, y, size, pal, st = {}) {
   const sx = lerp(1, p.sx, gentle ? 0 : amt), sy = lerp(1, p.sy, A);
   c.transform(1, 0, p.k * A, 1, 0, 0); c.scale(sx || 0.01, sy);
   const face = (p.f && amt > 0.5 ? p.f : (st.face || 1));
-  drawPal(c, 0, 0, size, pal, { ...st, t: st.t, face, mode: amt > 0.5 ? (p.m || 'idle') : st.mode });
-  c.scale(k, k); arms(c, pal, p, amt, st);
+  // the dance drives the Pal's own rig (shoulders/elbows, hips/knees) instead of an overlay
+  const aL = lerp(14, p.aL ?? 14, amt), aR = lerp(14, p.aR ?? 14, amt), bend = Math.max(0, p.y || 0) * 9 * A;
+  const rig = { aL: face < 0 ? aR : aL, aR: face < 0 ? aL : aR, eL: p.eL ?? 16, eR: p.eR ?? 16, kL: 4 + bend + (p.kL || 0) * A, kR: 4 + bend + (p.kR || 0) * A, hL: bend * 0.5 + (p.hL || 0) * A, hR: bend * 0.5 + (p.hR || 0) * A };
+  drawPal(c, 0, 0, size, pal, { ...st, t: st.t, face, mode: amt > 0.5 ? (p.m || 'idle') : st.mode, rig });
   c.restore();
   if (!gentle && amt > 0.6) {
     if (p.star) { const t = st.t || 0; sparkle(c, x - size * 0.42, y - size * 0.9, size * 0.09, t); sparkle(c, x + size * 0.45, y - size * 0.75, size * 0.07, t + 20); }

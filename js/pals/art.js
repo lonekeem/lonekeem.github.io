@@ -71,6 +71,11 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   c.fillStyle = 'rgba(30,10,60,.18)'; ell(c, 0, 0, 11 * grow * (floaty ? 0.7 : 1), 2.4); c.fill();
   c.translate(0, bob); if (spin) { c.translate(0, -10); c.rotate(spin * face); c.translate(0, 10); }
   c.rotate(tilt); c.scale(face * sx * grow, sy * grow);
+  // ---------------- rig: joints for arms (shoulder/elbow/hand) and legs (hip/knee/foot)
+  const hasLegs = kind === 'blob' && sp.feet !== 'none' && !floaty, legH = hasLegs ? 3.4 : 0;
+  const armKind = kind !== 'blob' ? '' : ex.has('wings') ? 'wing' : ex.has('flippers') ? 'flipper' : 'paw';
+  const RG = rigPose(st.mode === 'react' ? 'happy' : st.mode || 'idle', t, st.rig, leg);
+  c.translate(0, -legH);
   c.lineWidth = 1; c.lineJoin = 'round'; c.lineCap = 'round'; const line = shade(A === '#ffffff' ? B : A, -0.4); c.strokeStyle = line;
   const light = shade(B, 0.5), dark = shade(B, -0.12);
   const P = (fn) => { c.save(); fn(); c.restore(); };
@@ -92,17 +97,17 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   });
   if (ex.has('batwings')) for (const s of [-1, 1]) P(() => { c.translate(s * 4, -10); c.rotate(s * (0.3 + wing * 0.5)); c.beginPath(); c.moveTo(0, 0); c.lineTo(s * (9 + stage * 2), -8); c.lineTo(s * (8 + stage * 2), -2); c.lineTo(s * 10, 1); c.lineTo(s * 5, 2); c.closePath(); fillS(A); });
   if (ex.has('fairywings')) for (const s of [-1, 1]) P(() => { c.translate(s * 5, -14); c.rotate(s * (0.4 + Math.sin(t * 0.5) * 0.3)); c.globalAlpha = 0.7; ell(c, s * 6, -3, 6, 3.5, -0.4 * s); fillS('#e8f4ff'); ell(c, s * 5, 3, 4, 2.4, 0.3 * s); fillS('#ffe8fb'); });
-  if (ex.has('wings')) for (const s of [-1, 1]) P(() => { c.translate(s * 6.5 * bodyG, -8); c.rotate(s * (0.3 + wing)); ell(c, s * 1.5, 0, 2.6 + stage * 0.5, 4.5 + stage * 0.6); fillS(shade(B, -0.08)); });
-  if (ex.has('flippers')) for (const s of [-1, 1]) P(() => { c.translate(s * 6.5, -7); c.rotate(s * (0.5 + wing)); ell(c, s * 1.5, 1, 2, 5); fillS(B); });
+  if (ex.has('wings')) for (const s of [-1, 1]) P(() => { c.translate(s * 6.5 * bodyG, -8); c.rotate(s * (0.3 + wing + ((s < 0 ? RG.sL : RG.sR) - 15) / 110)); ell(c, s * 1.5, 0, 2.6 + stage * 0.5, 4.5 + stage * 0.6); fillS(shade(B, -0.08)); });
+  if (ex.has('flippers')) for (const s of [-1, 1]) P(() => { c.translate(s * 6.5, -7); c.rotate(s * (0.5 + wing + ((s < 0 ? RG.sL : RG.sR) - 15) / 90)); ell(c, s * 1.5, 1, 2, 5); fillS(B); });
   if (ex.has('shell')) P(() => { ell(c, -1, -8, 11 * bodyG, 8); fillS(A); c.strokeStyle = shade(A, -0.25); for (const [a, b] of [[-5, -10], [2, -11], [-1, -5]]) { ell(c, a, b, 2.6, 2); c.stroke(); } c.fillStyle = '#7fe08a'; for (let i = 0; i <= stage; i++) { ell(c, -4 + i * 4, -16, 2, 3, 0.4 * (i - 1)); c.fill(); } });
   if (ex.has('spikes')) P(() => { c.fillStyle = A; c.beginPath(); for (let i = 0; i <= 12; i++) { const a = Math.PI * 0.95 + i * (Math.PI * 1.05 / 12); const r = i % 2 ? 11 : 15 + stage; c.lineTo(Math.cos(a) * r - 2, -12 + Math.sin(a) * r); } c.closePath(); c.fill(); c.stroke(); });
   const WG = () => ({ bodyG, hy, t, stage, kind, top: (sp.ears === 'long' || sp.ears === 'big' ? hy - 7.6 : hy - 7), ey: hy - 0.5, eyeL: -3.6, eyeR: 3.6 });
   drawWear(c, 'back', pal.outfit, WG());
   // ---------------- feet + body
   const feet = sp.feet;
-  if (feet === 'paws') { ell(c, -3 + leg * 1.5, -1.5, 2.4, 1.8); fillS(dark); ell(c, 3.5 - leg * 1.5, -1.5, 2.4, 1.8); fillS(dark); }
-  if (feet === 'webbed') { c.fillStyle = '#ffa53a'; c.strokeStyle = '#a8600f'; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 3 + leg * s, -1.5); c.lineTo(s * 3 - 2.5 + leg * s, 0.4); c.lineTo(s * 3 + 2.5 + leg * s, 0.4); c.closePath(); c.fill(); c.stroke(); } c.strokeStyle = line; }
-  if (feet === 'flippers') { for (const s of [-1, 1]) { ell(c, s * 5, -0.8, 3.4, 1.3, s * 0.3); fillS(dark); } }
+  const feetPos = hasLegs ? drawLegs(c, RG, { B, dark, line, light, feet, bodyG, legH, sp }) : null;
+  if (feetPos) drawWear(c, 'feet', pal.outfit, { ...WG(), feet: feetPos });
+  if (!hasLegs && feet === 'flippers') { for (const s of [-1, 1]) { ell(c, s * 5, -0.8, 3.4, 1.3, s * 0.3); fillS(dark); } }
   if (kind === 'blob') {
     ell(c, 0, -5.5 * bodyG, 6.8 * bodyG, 5.2 * bodyG); const g = c.createLinearGradient(0, -11, 0, 0); g.addColorStop(0, light); g.addColorStop(1, B); fillS(g);
     if (ex.has('belly')) { c.fillStyle = sp.id === 'penguin' || sp.id === 'owl' ? '#fbf6ff' : shade(B, 0.55); ell(c, 0.5, -4.6 * bodyG, 4 * bodyG, 3.6 * bodyG); c.fill(); }
@@ -112,7 +117,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (kind === 'cloud') { c.fillStyle = B; for (const [a, b, r] of [[-7, -8, 6], [7, -8, 6], [0, -5, 7], [-4, -14, 6], [5, -14, 6]]) { ell(c, a, b, r, r * 0.9); c.fill(); c.stroke(); } for (const [a, b, r] of [[-7, -8, 5.2], [7, -8, 5.2], [0, -5, 6.2], [-4, -14, 5.2], [5, -14, 5.2]]) { ell(c, a, b, r, r * 0.9); c.fill(); } if (mode === 'happy' || R === 'puff') { c.fillStyle = '#ffd34d'; for (let i = 0; i < 4; i++) { star(c, -6 + i * 4, 2 + ((t * 0.5 + i * 5) % 10), 1.2); c.fill(); } } }
   if (kind === 'jelly') { c.strokeStyle = A; c.lineWidth = 1.6; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(i * 2.6, -6); c.quadraticCurveTo(i * 2.6 + Math.sin(t * 0.1 + i) * 2, -1, i * 2.6, 3 + stage * 2); c.stroke(); } c.lineWidth = 1; c.strokeStyle = line; }
   if (kind === 'star') { star(c, 0, -12, 13 + stage, 7 + stage * 0.5); const g = c.createLinearGradient(0, -25, 0, 0); g.addColorStop(0, '#fffbe0'); g.addColorStop(1, B); fillS(g); }
-  drawWear(c, 'body', pal.outfit, WG());
+  drawWear(c, 'body', pal.outfit, { ...WG(), feet: feetPos });
   // ---------------- ears (behind head)
   const ears = sp.ears;
   const earPair = (fn) => { for (const s of [-1, 1]) P(() => fn(s)); };
@@ -181,8 +186,61 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (a === 'scarf') { c.fillStyle = '#ff7a8a'; c.strokeStyle = '#a3304a'; c.beginPath(); c.roundRect(-6.5, hy + 4.9, 13, 3, 1.5); c.fill(); c.stroke(); c.beginPath(); c.roundRect(2, hy + 6.5, 3, 6, 1.2); c.fill(); c.stroke(); }
   if (a === 'hat') { c.fillStyle = '#6b4fd6'; c.strokeStyle = '#2a1458'; ell(c, 0, top + 0.5, 7, 1.6); c.fill(); c.stroke(); c.beginPath(); c.roundRect(-4, top - 6, 8, 6.5, 1.5); c.fill(); c.stroke(); c.fillStyle = '#ffd34d'; c.fillRect(-4, top - 1.5, 8, 1.4); }
   if (a === 'badge') { c.fillStyle = '#8a2be2'; c.strokeStyle = '#ffd34d'; ell(c, 3, -6, 2.8, 2.8); c.fill(); c.stroke(); c.fillStyle = '#fff'; c.font = 'bold 2.6px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('KL', 3, -5.9); }
+  if (armKind === 'paw') P(() => drawArms(c, RG, { B, dark, line, light, bodyG, sp, ex }));
   drawWear(c, 'head', pal.outfit, { ...WG(), top, ey, eyeL, eyeR, fx });
   if (stage === 2 && a !== 'crown' && a !== 'hat' && !(pal.outfit && pal.outfit.head)) { c.fillStyle = '#ffd34d'; star(c, -5, top - 1, 1.6 + Math.sin(t * 0.08) * 0.3); c.fill(); }
   c.restore();
   if (mode === 'sleep') { c.save(); c.fillStyle = '#c9b8ff'; c.font = `bold ${7 * k}px sans-serif`; for (let i = 0; i < 3; i++) { const p = ((t * 0.01 + i / 3) % 1); c.globalAlpha = 1 - p; c.fillText('z', x + (8 + p * 10) * k, y - (26 + p * 14) * k); } c.restore(); }
+}
+
+// ---------------------------------------------------------------- rig
+// Joint angles in degrees. Arms: s = shoulder (0 down, 90 out, 180 up), e = elbow bend (+ folds the hand in).
+// Legs: h = hip swing (+ forward), k = knee bend. st.rig = { aL, aR, eL, eR } overrides (dances).
+export function rigPose(mode, t, o, leg = 0) {
+  const r = { sL: 14, sR: 14, eL: 18, eR: 18, hL: 0, hR: 0, kL: 4, kR: 4 };
+  const w = Math.sin(t * 0.06);
+  if (mode === 'idle') { r.sL = 13 + w * 3; r.sR = 13 - w * 3; r.eL = r.eR = 20 + w * 4; }
+  else if (mode === 'walk') { const p = Math.sin(t * 0.35); r.hL = p * 26; r.hR = -p * 26; r.kL = Math.max(0, -p) * 40 + 4; r.kR = Math.max(0, p) * 40 + 4; r.sL = 16 - p * 14; r.sR = 16 + p * 14; r.eL = r.eR = 32; }
+  else if (mode === 'wave') { r.sL = 14; r.eL = 20; r.sR = 105; r.eR = -(62 + Math.sin(t * 0.45) * 28); }
+  else if (mode === 'hop' || mode === 'jump') { const a = Math.abs(Math.sin(t * 0.18)); r.sL = r.sR = 40 + a * 110; r.eL = r.eR = 20; r.hL = r.hR = a * 22; r.kL = r.kR = 10 + a * 55; }
+  else if (mode === 'happy') { const a = Math.sin(t * 0.4); r.sL = 130 + a * 22; r.sR = 130 - a * 22; r.eL = r.eR = 15; r.kL = r.kR = 8; }
+  else if (mode === 'sleep') { r.sL = r.sR = 22; r.eL = r.eR = 105; }
+  else if (mode === 'eat') { r.sL = 18; r.sR = 38; r.eR = 118 + Math.sin(t * 0.5) * 8; }
+  else if (mode === 'shake') { const a = Math.sin(t * 1.3); r.sL = 30 + a * 15; r.sR = 30 - a * 15; }
+  if (o) { if (o.aL != null) { r.sL = o.aL; r.eL = o.eL ?? 14; } if (o.aR != null) { r.sR = o.aR; r.eR = o.eR ?? 14; } if (o.hL != null) r.hL = o.hL; if (o.hR != null) r.hR = o.hR; if (o.kL != null) r.kL = o.kL; if (o.kR != null) r.kR = o.kR; }
+  return r;
+}
+const D2R = Math.PI / 180;
+function limb(c, x0, y0, x1, y1, x2, y2, w, col, line) {
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = line; c.lineWidth = w + 1.1; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+  c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+}
+function drawArms(c, R, { B, line, light, bodyG, sp, ex }) {
+  const shY = -6.9 * bodyG, shX = 5.5 * bodyG, L1 = 3.3 * bodyG, L2 = 3.1 * bodyG;
+  for (const s of [-1, 1]) {
+    const a = (s < 0 ? R.sL : R.sR) * D2R, e = (s < 0 ? R.eL : R.eR) * D2R, a2 = a - e;
+    const x0 = s * shX, y0 = shY, x1 = x0 + s * Math.sin(a) * L1, y1 = y0 + Math.cos(a) * L1, x2 = x1 + s * Math.sin(a2) * L2, y2 = y1 + Math.cos(a2) * L2;
+    limb(c, x0, y0, x1, y1, x2, y2, 2.5 * bodyG, B, line);
+    // hand / paw with little fingers (frogs get round finger tips)
+    c.fillStyle = B; c.strokeStyle = line; c.lineWidth = 0.8; ell(c, x2, y2, 1.55 * bodyG, 1.45 * bodyG); c.fill(); c.stroke();
+    const dx = s * Math.sin(a2), dy = Math.cos(a2);
+    if (sp.id === 'frog') { c.fillStyle = light; for (const q of [-0.6, 0, 0.6]) { ell(c, x2 + (dx * Math.cos(q) - dy * Math.sin(q) * s) * 1.7, y2 + (dy * Math.cos(q) + dx * Math.sin(q) * s) * 1.7, 0.55, 0.55); c.fill(); } }
+    else { c.strokeStyle = line; c.lineWidth = 0.45; for (const q of [-0.45, 0, 0.45]) { const ux = dx * Math.cos(q) - dy * Math.sin(q), uy = dy * Math.cos(q) + dx * Math.sin(q); c.beginPath(); c.moveTo(x2 + ux * 0.7, y2 + uy * 0.7); c.lineTo(x2 + ux * 1.45, y2 + uy * 1.45); c.stroke(); } }
+  }
+  c.lineWidth = 1; c.strokeStyle = line;
+}
+function drawLegs(c, R, { B, dark, line, light, feet, bodyG, legH }) {
+  const hipY = -1.6, hipX = 3.1 * bodyG, L = (legH - hipY) / 2 + 0.15, out = [];
+  for (const s of [-1, 1]) {
+    const h = (s < 0 ? R.hL : R.hR) * D2R, k = (s < 0 ? R.kL : R.kR) * D2R;
+    const x0 = s * hipX, y0 = hipY, x1 = x0 + Math.sin(h) * L, y1 = y0 + Math.cos(h) * L, x2 = x1 + Math.sin(h - k) * L, y2 = Math.min(legH, y1 + Math.cos(h - k) * L);
+    limb(c, x0, y0, x1, y1, x2, y2, 2.9 * bodyG, B, line);
+    c.lineWidth = 0.9; c.strokeStyle = line;
+    if (feet === 'webbed') { c.fillStyle = '#ffa53a'; c.strokeStyle = '#a8600f'; c.beginPath(); c.moveTo(x2 - 0.6, y2 - 0.6); c.lineTo(x2 - 1.4, y2 + 0.5); c.lineTo(x2 + 3.4, y2 + 0.5); c.closePath(); c.fill(); c.stroke(); }
+    else if (feet === 'flippers') { c.fillStyle = dark; ell(c, x2 + 1, y2, 3.2, 1.2, 0.15); c.fill(); c.stroke(); }
+    else { c.fillStyle = dark; ell(c, x2 + 0.7, y2 - 0.3, 2.3, 1.35); c.fill(); c.stroke(); c.fillStyle = light; for (const q of [-1, 0, 1]) { ell(c, x2 + 1.9 + q * 0.15, y2 - 0.35 + q * 0.75, 0.42, 0.42); c.fill(); } ell(c, x2 + 0.3, y2 - 0.25, 0.8, 0.6); c.fill(); }
+    out.push({ x: x2 + 0.4, y: y2 + 0.2, r: 0 });
+  }
+  c.lineWidth = 1; c.strokeStyle = line; return out;
 }

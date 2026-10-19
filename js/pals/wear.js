@@ -9,11 +9,13 @@ const fs = (c, f, s) => { c.fillStyle = f; c.strokeStyle = s || shade(f, -0.45);
 // outfit = { head, face, neck, body, feet, back } of item ids; layer = which pass drawPal is in
 export function drawWear(c, layer, outfit, g) {
   if (!outfit) return;
-  const slots = layer === 'back' ? ['back'] : layer === 'body' ? ['feet', 'body'] : ['neck', 'face', 'head'];
+  const slots = layer === 'back' ? ['back'] : layer === 'feet' ? ['feet'] : layer === 'body' ? (g.feet ? ['body'] : ['feet', 'body']) : ['neck', 'face', 'head'];
   for (const s of slots) { const it = ITEM[outfit[s]]; if (it && it.slot === s) { c.save(); c.lineWidth = 0.8; try { STYLE[it.st] && STYLE[it.st](c, it.col, g); } catch {} c.restore(); } }
 }
 const by = (g) => -5.5 * g.bodyG, bw = (g) => 6.9 * g.bodyG, bh = (g) => 5.3 * g.bodyG;
 function bodyClip(c, g) { ell(c, 0, by(g), bw(g), bh(g)); c.clip(); }
+// shoes sit on the rigged feet (g.feet = [{x,y,r}] from drawPal), or the classic spots
+function onFeet(c, g, fn) { for (const f of (g && g.feet) || [{ x: -3.3, y: 0, r: 0 }, { x: 3.3, y: 0, r: 0 }]) { c.save(); c.translate(f.x, f.y); c.rotate(f.r || 0); fn(); c.restore(); } }
 const STYLE = {
   // ---- back
   cape(c, col, g) { const sw = Math.sin(g.t * 0.08) * 1.2; c.beginPath(); c.moveTo(-5, g.hy + 7); c.quadraticCurveTo(-11 - sw, by(g), -9 - sw, 0); c.lineTo(9 + sw, 0); c.quadraticCurveTo(11 + sw, by(g), 5, g.hy + 7); c.closePath(); fs(c, col); if (col === '#2a1a6a') { c.fillStyle = '#fff'; for (const [x, y] of [[-5, -4], [4, -7], [6, -2], [-2, -9]]) { starP(c, x, y, 0.9); c.fill(); } } },
@@ -21,9 +23,9 @@ const STYLE = {
   wings(c, col, g) { c.globalAlpha = 0.8; for (const s of [-1, 1]) { ell(c, s * 9, by(g) - 4 + Math.sin(g.t * 0.3) * 0.6, 6, 3.5, -0.5 * s); fs(c, col, '#9ac8f0'); ell(c, s * 8, by(g) + 1, 4, 2.4, 0.4 * s); fs(c, '#ffe8fb', '#e0a8d8'); } },
   balloon(c, col, g) { c.strokeStyle = '#7a6a9a'; c.beginPath(); c.moveTo(-6, by(g)); c.quadraticCurveTo(-10, g.hy, -12, g.hy - 14 + Math.sin(g.t * 0.05)); c.stroke(); starP(c, -12, g.hy - 18 + Math.sin(g.t * 0.05), 4.5); fs(c, col); },
   // ---- feet
-  sneakers(c, col) { for (const s of [-1, 1]) { c.beginPath(); c.roundRect(s * 3.3 - 2.8, -2.6, 5.6, 2.8, 1.3); fs(c, col); c.fillStyle = '#fff'; c.fillRect(s * 3.3 - 2.8, -0.6, 5.6, 0.8); } },
-  boots(c, col) { for (const s of [-1, 1]) { c.beginPath(); c.roundRect(s * 3.3 - 2.4, -4.2, 4.8, 4.4, 1.2); fs(c, col); } },
-  slippers(c, col) { for (const s of [-1, 1]) { ell(c, s * 3.3, -1.2, 3, 1.7); fs(c, col, '#d8a8c8'); ell(c, s * 3.3 - 1, -3, 0.7, 1.6); fs(c, col, '#d8a8c8'); ell(c, s * 3.3 + 1, -3, 0.7, 1.6); fs(c, col, '#d8a8c8'); } },
+  sneakers(c, col, g) { onFeet(c, g, () => { c.beginPath(); c.roundRect(-2.6, -2.4, 5.4, 2.6, 1.3); fs(c, col); c.fillStyle = '#fff'; c.fillRect(-2.6, -0.6, 5.4, 0.8); }); },
+  boots(c, col, g) { onFeet(c, g, () => { c.beginPath(); c.roundRect(-2.3, -4, 4.8, 4.2, 1.2); fs(c, col); }); },
+  slippers(c, col, g) { onFeet(c, g, () => { ell(c, 0.2, -1.1, 3, 1.6); fs(c, col, '#d8a8c8'); ell(c, -0.8, -2.8, 0.7, 1.5); fs(c, col, '#d8a8c8'); ell(c, 1.2, -2.8, 0.7, 1.5); fs(c, col, '#d8a8c8'); }); },
   // ---- body
   tee(c, col, g) { c.save(); bodyClip(c, g); c.fillStyle = col; c.fillRect(-12, by(g) - bh(g), 24, bh(g) * 1.35); c.restore(); ell(c, 0, by(g), bw(g), bh(g)); c.strokeStyle = shade(col, -0.45); c.stroke(); },
   hoodie(c, col, g) { STYLE.tee(c, col, g); c.fillStyle = shade(col, -0.15); c.beginPath(); c.roundRect(-3, by(g) + 0.5, 6, 2.6, 1); c.fill(); c.strokeStyle = '#fff'; c.beginPath(); c.moveTo(-1.2, by(g) - bh(g) + 1); c.lineTo(-1.2, by(g) - 1); c.moveTo(1.2, by(g) - bh(g) + 1); c.lineTo(1.2, by(g) - 1); c.stroke(); },

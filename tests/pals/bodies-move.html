@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="480" height="240"></canvas>
+<script type="module">
+import { drawPal } from '../../js/pals/art.js';
+import { drawDancer, danceById } from '../../js/pals/dance.js';
+const c = document.getElementById('c').getContext('2d');
+window.frame = (t) => { c.fillStyle = '#2a1458'; c.fillRect(0, 0, 480, 240); c.fillStyle = '#3d2275'; c.fillRect(0, 200, 480, 40);
+  const w = t < 60; const x = w ? 120 : 120 + ((t - 60) * 2.2) % 300; const ph = t < 60 ? 'wave' : t < 150 ? 'walk' : 'hop';
+  drawPal(c, x, 205, 130, { species: 'puppy', level: 6, outfit: { feet: 'sneakers' } }, { t, mode: ph, face: 1 });
+  drawDancer(c, 400, 205, 110, { species: 'kitten', level: 6 }, { t, dance: danceById('hopclap') || undefined, beat: t / 30 });
+  c.fillStyle = '#ffd34d'; c.font = '600 16px sans-serif'; c.fillText(ph === 'wave' ? 'wave' : ph, 12, 22); c.fillText('dance (rig)', 360, 22); };
+window.done = true;
+</script>

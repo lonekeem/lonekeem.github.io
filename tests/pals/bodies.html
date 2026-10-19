@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="1000" height="3000"></canvas>
+<script type="module">
+import { drawPal, SPECIES } from '../../js/pals/art.js';
+const q = new URLSearchParams(location.search); const c = document.getElementById('c').getContext('2d');
+const modes = ['idle', 'walk', 'wave', 'hop', 'happy'];
+const draw = (t) => { c.clearRect(0, 0, 1000, 3000); c.font = '600 14px sans-serif';
+  SPECIES.forEach((sp, i) => { const y = 10 + i * 100; c.fillStyle = 'rgba(255,255,255,.06)'; c.fillRect(0, y, 1000, 96); c.fillStyle = '#ffd34d'; c.fillText(sp.name, 8, y + 18);
+    modes.forEach((m, j) => drawPal(c, 220 + j * 170, y + 90, 80, { species: sp.id, level: 5 }, { t: q.has('anim') ? t : 23 + j * 7, mode: m, face: 1 })); }); };
+if (q.has('anim')) { let t = 0; const f = () => { t++; draw(t); requestAnimationFrame(f); }; f(); } else draw(0);
+window.done = true;
+</script>
