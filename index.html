@@ -124,7 +124,7 @@
  ]
 }
     </script>
-    <meta name="lks-version" content="social-2026-10-19-root">
+    <meta name="lks-version" content="social-2026-10-19-views">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -316,9 +316,15 @@
         .soc:hover { background: rgba(255,255,255,.06); color: var(--text); }
         .soc svg { width: 22px; height: 22px; }
         .soc.save { margin-left: auto; }
-        .soc.like.on { color: #ff5ca8; }
+        .soc.like:not(.on) svg { color: #ffc83d; filter: drop-shadow(0 0 3px rgba(138,43,226,.55)); }
+        .soc.like.on { color: var(--text); }
+        .soc.like.on svg { color: #ffc83d; fill: #ffc83d; filter: drop-shadow(0 0 4px rgba(138,43,226,.95)) drop-shadow(0 0 9px rgba(181,123,255,.7)); }
+        .soc.views svg path:last-child { fill: #ffc83d; }
         .soc.save.on { color: var(--blue); }
         .soc.on svg { fill: currentColor; }
+        .soc.views { cursor: default; font-size: .92rem; }
+        .soc.views:hover { background: none; color: var(--muted); }
+        .soc.views svg { width: 20px; height: 20px; }
         .community-cta { margin-top: 28px; text-align: center; color: var(--muted); }
         .foot-links { display: flex; gap: 6px 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px !important; }
         .foot-links a { color: var(--muted); }
@@ -434,7 +440,7 @@
                         </div>
                     </article>
                 </div>
-                <p class="community-cta"><a href="app.html#/watch">Watch the full-screen feed</a> · Like, comment and save your favorites. <a href="app.html#/signup">Join the community</a> to follow the studio and share what you create.</p>
+                <p class="community-cta"><a href="app.html#/watch">Watch the full-screen feed</a> · Give stars, comment and save your favorites. <a href="app.html#/signup">Join the community</a> to follow the studio and share what you create.</p>
             </div>
         </section>
 

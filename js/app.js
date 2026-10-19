@@ -7,6 +7,7 @@ import { createStories } from './stories.js';
 import { createAvatarEditor } from './avatar-editor.js';
 import { createSearch, SEARCH_ICON } from './search.js';
 import { searchFields, userSearchFields, linkify } from './search-index.js';
+import { viewsHtml, trackVideo, trackVisible, fmtCount, EYE } from './views.js';
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   sendPasswordResetEmail, sendEmailVerification, updateProfile, GoogleAuthProvider,
@@ -14,7 +15,8 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy,
-  limit, onSnapshot, writeBatch, serverTimestamp, increment, getCountFromServer, Timestamp
+  limit, onSnapshot, writeBatch, serverTimestamp, increment, getCountFromServer, Timestamp,
+  getAggregateFromServer, sum
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 // ---------------------------------------------------------------- state
@@ -111,7 +113,7 @@ function requireAuth() {
   return true;
 }
 const ICON = {
-  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.8 3.6 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.4 0 5.6 3.3 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg>',
+  heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
   comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>',
   save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h12a1 1 0 0 1 1 1v16l-7-4.5-7 4.5v-16a1 1 0 0 1 1-1z"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
@@ -285,15 +287,19 @@ function postCard(p, { detail = false } = {}) {
     ${p.text ? `<p class="post-text">${linkify(esc(p.text))}</p>` : ''}
     ${mediaHtml(p)}
     <div class="actions">
-      <button class="act like" data-a="like" aria-pressed="false" aria-label="Like">${ICON.heart}<span class="n">${Number(p.likeCount) || 0}</span></button>
+      <button class="act like" data-a="like" aria-pressed="false" aria-label="Give a star">${ICON.heart}<span class="n">${Number(p.likeCount) || 0}</span></button>
       <a class="act" href="#/post/${esc(p.id)}" aria-label="Comments">${ICON.comment}<span>${Number(p.commentCount) || 0}</span></a>
       <button class="act saved" data-a="save" aria-pressed="false" aria-label="Save to favorites">${ICON.save}</button>
+      ${viewsHtml(p.viewCount, p.id, 'act views')}
     </div>`;
   const likeBtn = $('[data-a=like]', el), saveBtn = $('[data-a=save]', el);
-  const setLike = (on) => { likeBtn.classList.toggle('on', on); likeBtn.setAttribute('aria-pressed', on); };
+  const setLike = (on) => { likeBtn.classList.toggle('on', on); likeBtn.setAttribute('aria-pressed', on); likeBtn.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); };
   const setSave = (on) => { saveBtn.classList.toggle('on', on); saveBtn.setAttribute('aria-pressed', on); saveBtn.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to favorites'); };
   setSave(S.saved.has(p.id));
   isLiked(p.id).then(setLike).catch(() => {});
+  // Views: videos after a few seconds of playback, everything else after ~2 s on screen.
+  const pv = $('.post-media video', el);
+  if (pv) trackVideo(pv, p.id, p.authorId); else trackVisible(el, p.id, p.authorId);
 
   likeBtn.onclick = async () => {
     if (!requireAuth()) return;
@@ -510,6 +516,7 @@ const watch = createWatch({
   isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId,
   blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, commentsQuery: watchCommentsQuery,
   openStory: () => { if (requireAuth()) composer.openStory(); },
+  views: { viewsHtml, trackVideo, trackVisible },
   fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot }
 });
 async function pageWatch(postId, token) { return watch.render(postId, token); }
@@ -532,7 +539,7 @@ async function pageFeed(token) {
       <section class="card pad center stack">
         <img class="auth-logo" src="logo.png" alt="" width="64" height="64">
         <h1 class="page-title" style="margin:0">Join the community</h1>
-        <p class="muted" style="margin:6px 0 0">Follow the studio for new movies and music, like and comment on drops, save favorites, share your own creations, and message other fans.</p>
+        <p class="muted" style="margin:6px 0 0">Follow the studio for new movies and music, star and comment on drops, save favorites, share your own creations, and message other fans.</p>
         <div class="row" style="justify-content:center;flex-wrap:wrap"><a class="btn" href="#/signup">Create account</a><a class="btn btn-ghost" href="#/login">Log in</a></div>
       </section>
       <div id="stories" class="stories-slot"></div>
@@ -751,10 +758,13 @@ async function pageProfile(username, tab, token) {
   if (!u) { main.innerHTML = '<div class="empty">This profile is not available.</div>'; return; }
   const mine = !!(S.user && uid === S.user.uid);
   const blocked = S.blocked.has(uid);
-  const [fers, fing, pc] = await Promise.all([
+  const [fers, fing, pc, tot] = await Promise.all([
     getCountFromServer(query(collection(db, 'follows'), where('followee', '==', uid))),
     getCountFromServer(query(collection(db, 'follows'), where('follower', '==', uid))),
-    getCountFromServer(query(collection(db, 'posts'), where('authorId', '==', uid)))
+    getCountFromServer(query(collection(db, 'posts'), where('authorId', '==', uid))),
+    // Total stars (likeCount) + views across all of their posts (server-side sums, one cheap aggregate read).
+    getAggregateFromServer(query(collection(db, 'posts'), where('authorId', '==', uid)), { likes: sum('likeCount'), views: sum('viewCount') })
+      .then((a) => a.data()).catch(() => ({ likes: 0, views: 0 }))
   ]);
   if (stale(token)) return;
   const isFollowing = S.following.has(uid);
@@ -769,6 +779,10 @@ async function pageProfile(username, tab, token) {
             <span><b>${pc.data().count}</b> posts</span>
             <a href="#/followers/${esc(uid)}"><b id="fers">${fers.data().count}</b> followers</a>
             <a href="#/following/${esc(uid)}"><b>${fing.data().count}</b> following</a>
+          </div>
+          <div class="stats small stats-2">
+            <span id="plikes" title="${Number(tot.likes) || 0} stars">${ICON.heart}<b>${fmtCount(tot.likes)}</b> stars</span>
+            <span id="pviews" title="${Number(tot.views) || 0} views">${EYE}<b>${fmtCount(tot.views)}</b> views</span>
           </div>
         </div>
       </div>
@@ -834,7 +848,7 @@ function gridTile(p) {
     : `<span class="gtext">${esc((p.text || p.linkUrl || '').slice(0, 120))}</span>`;
   return `<a class="gtile k-${kind}" href="${href}" aria-label="${esc(label)}">${inner}
     <span class="gicon">${kind === 'image' ? GRID_IC.photo : kind === 'text' ? GRID_IC.text : GRID_IC.play}</span>
-    <span class="glikes">${ICON.heart}${Number(p.likeCount) || 0}</span></a>`;
+    ${viewsHtml(p.viewCount, p.id, 'gviews')}</a>`;
 }
 function renderGrid(container, posts, emptyMsg) {
   const visible = posts.filter((p) => !S.blocked.has(p.authorId));
@@ -1005,7 +1019,7 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'liked your post', comment: 'commented on your post', message: 'sent you a message' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', message: 'sent you a message' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}

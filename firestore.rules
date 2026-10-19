@@ -221,7 +221,20 @@ service cloud.firestore {
           && (actingAs(resource.data.authorId) || isAdmin())
           && validPostSearch(request.resource.data);
       }
-      allow update: if signedIn() && (likeChange() || commentChange() || searchChange());
+      // Views: exactly +1 on viewCount and nothing else. Signed-in viewers must create their own
+      // views/{uid} doc in the same batch (so it counts once per account); signed-out visitors can
+      // only add 1 at a time (once per device, enforced in the app).
+      function viewDocAdded() {
+        let viewP = /databases/$(database)/documents/posts/$(postId)/views/$(request.auth.uid);
+        return !exists(viewP) && existsAfter(viewP);
+      }
+      function viewChange() {
+        return changed().hasOnly(['viewCount'])
+          && request.resource.data.viewCount is int
+          && request.resource.data.viewCount == resource.data.get('viewCount', 0) + 1
+          && (!signedIn() || viewDocAdded());
+      }
+      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange()));
       allow delete: if signedIn() && (resource.data.authorId == me() || isAdmin());
 
       match /likes/{likerId} {
@@ -232,6 +245,14 @@ service cloud.firestore {
           && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount + 1;
         allow delete: if signedIn() && likerId == me()
           && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount - 1;
+      }
+
+      match /views/{viewerId} {
+        allow read: if signedIn() && viewerId == me();
+        allow create: if signedIn() && viewerId == me()
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time
+          && getAfter(postPath()).data.get('viewCount', 0) == get(postPath()).data.get('viewCount', 0) + 1;
       }
 
       match /comments/{cid} {

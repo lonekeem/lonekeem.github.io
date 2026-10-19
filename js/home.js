@@ -1,6 +1,7 @@
-// Homepage add-ons: header account button + like / comment / save bar on studio videos.
+// Homepage add-ons: header account button + star (like) / comment / save bar on studio videos.
 import { auth, db } from './firebase-init.js';
 import { safePhotoURL } from './media-config.js';
+import { viewsHtml, setCounters, trackVideo, trackVisible } from './views.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
   doc, getDoc, onSnapshot, writeBatch, setDoc, deleteDoc, serverTimestamp, increment
@@ -23,7 +24,7 @@ function renderAccount() {
   }
 }
 
-const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.8 3.6 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.4 0 5.6 3.3 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg>';
+const HEART = '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>';
 const BUBBLE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>';
 const MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h12a1 1 0 0 1 1 1v16l-7-4.5-7 4.5v-16a1 1 0 0 1 1-1z"/></svg>';
 
@@ -33,21 +34,26 @@ document.querySelectorAll('[data-post-id]').forEach((card) => {
   const bar = document.createElement('div');
   bar.className = 'social-bar';
   bar.innerHTML = `
-    <button class="soc like" aria-pressed="false" aria-label="Like">${HEART}<span class="n">0</span></button>
+    <button class="soc like" aria-pressed="false" aria-label="Give a star">${HEART}<span class="n">0</span></button>
     <a class="soc" href="app.html#/post/${esc(postId)}" aria-label="Comments">${BUBBLE}<span class="c">0</span></a>
+    ${viewsHtml(0, postId, 'soc views')}
     <button class="soc save" aria-pressed="false" aria-label="Save to favorites">${MARK}</button>`;
   card.querySelector('.info').appendChild(bar);
   const like = bar.querySelector('.like'), save = bar.querySelector('.save');
   const state = { liked: false, saved: false, count: 0 };
   const paint = () => {
-    like.classList.toggle('on', state.liked); like.setAttribute('aria-pressed', state.liked);
+    like.classList.toggle('on', state.liked); like.setAttribute('aria-pressed', state.liked); like.setAttribute('aria-label', state.liked ? 'Remove your star' : 'Give a star');
     save.classList.toggle('on', state.saved); save.setAttribute('aria-pressed', state.saved);
   };
   onSnapshot(doc(db, 'posts', postId), (d) => {
     if (!d.exists()) return;
     bar.querySelector('.n').textContent = d.data().likeCount || 0;
     bar.querySelector('.c').textContent = d.data().commentCount || 0;
+    setCounters(postId, d.data().viewCount || 0, card);
   }, () => {});
+  // Views: the card's video counts after a few seconds of playback (audio cards the same; others on screen).
+  const media = card.querySelector('video, audio');
+  if (media) trackVideo(media, postId, 'studio'); else trackVisible(card, postId, 'studio');
   const needAccount = () => {
     if (!me) { location.href = 'app.html#/login?next=' + encodeURIComponent('#/post/' + postId); return true; }
     if (!profile) { location.href = 'app.html#/onboard'; return true; }

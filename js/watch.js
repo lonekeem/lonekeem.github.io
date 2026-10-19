@@ -5,10 +5,10 @@
 // (mediaType 'image', shown as full-screen image slides), plus any post with a YouTube or
 // TikTok link (shown as a poster card with a Watch button, because third-party embeds can't
 // autoplay or swipe well).
-// All likes / comments / saves / follows go through the shared actions in app.js.
+// All stars (likes) / comments / saves / follows go through the shared actions in app.js.
 
 const IC = {
-  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.8 3.6 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.4 0 5.6 3.3 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg>',
+  heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
   comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>',
   save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h12a1 1 0 0 1 1 1v16l-7-4.5-7 4.5v-16a1 1 0 0 1 1-1z"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.5 21 11l-7 6.5V14c-5 0-8.5 1.5-11 5.5 1-5.5 4-10 11-11z"/></svg>',
@@ -22,7 +22,7 @@ const IC = {
 export function createWatch(ctx) {
   const { S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, isAdmin, stale,
     isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, commentsQuery,
-    blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, openStory } = ctx;
+    blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, openStory, views } = ctx;
   const { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot } = ctx.fs;
   let muted = true; // stays the same while scrolling between videos
   let session = null;
@@ -85,10 +85,10 @@ export function createWatch(ctx) {
             ${mine ? '' : `<button class="vfollow ${following ? 'on' : ''}" data-a="follow" data-uid="${esc(p.authorId)}" aria-pressed="${following}">${following ? 'Following' : 'Follow'}</button>`}
           </div>
           ${p.text ? `<p class="vcaption" data-a="more">${linkify(esc(p.text))}</p>` : ''}
-          <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))}</p>
+          <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))} · ${views.viewsHtml(p.viewCount, p.id, 'vviews')}</p>
         </div>
         <div class="vrail">
-          <button class="vact like" data-a="like" aria-pressed="false" aria-label="Like">${IC.heart}<span class="n">${fmt(p.likeCount)}</span></button>
+          <button class="vact like" data-a="like" aria-pressed="false" aria-label="Give a star">${IC.heart}<span class="n">${fmt(p.likeCount)}</span></button>
           <button class="vact" data-a="comment" aria-label="Comments">${IC.comment}<span class="c">${fmt(p.commentCount)}</span></button>
           <button class="vact save" data-a="save" aria-pressed="${S.saved.has(p.id)}" aria-label="Save">${IC.save}<span>${S.saved.has(p.id) ? 'Saved' : 'Save'}</span></button>
           <button class="vact" data-a="share" aria-label="Share">${IC.share}<span>Share</span></button>
@@ -123,7 +123,7 @@ export function createWatch(ctx) {
       <button class="icon-btn close" data-close aria-label="Close">✕</button>
       <img class="logo" src="logo.png" alt="Lone Keem Studios KL logo" width="72" height="72">
       <h2 id="signin-title">Sign in to ${esc(what)}</h2>
-      <p>Watching is free for everyone. Create a free account to like, comment, save favorites and follow creators.</p>
+      <p>Watching is free for everyone. Create a free account to give stars, comment, save favorites and follow creators.</p>
       <div class="btns">
         <a class="btn" href="#/signup" data-close>Create account</a>
         <a class="btn btn-ghost" href="#/login?next=${next}" data-close>Log in</a>
@@ -239,6 +239,13 @@ export function createWatch(ctx) {
       });
     });
 
+    // Views: videos count after a few seconds of real playback; photos / link cards after ~2 s on screen.
+    slides.forEach((sl) => {
+      const p = byId.get(sl.dataset.id); if (!p) return;
+      const v = sl.querySelector('video');
+      if (v) views.trackVideo(v, p.id, p.authorId); else views.trackVisible(sl, p.id, p.authorId);
+    });
+
     // Photos: cover the screen when the shape is close to the screen's, otherwise letterbox.
     slides.forEach((sl) => {
       const img = sl.querySelector('.vimage'); if (!img) return;
@@ -264,7 +271,7 @@ export function createWatch(ctx) {
 
     // Likes: show the current user's state.
     posts.forEach((p, i) => isLiked(p.id).then((on) => paintLike(slides[i], on)).catch(() => {}));
-    function paintLike(sl, on) { const b = sl.querySelector('[data-a=like]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Unlike' : 'Like'); }
+    function paintLike(sl, on) { const b = sl.querySelector('[data-a=like]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); }
     function paintSave(sl, on) { const b = sl.querySelector('[data-a=save]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = on ? 'Saved' : 'Save'; }
     function paintFollow(uid, on) {
       feed.querySelectorAll(`[data-a=follow][data-uid="${CSS.escape(uid)}"]`).forEach((b) => {
@@ -287,7 +294,7 @@ export function createWatch(ctx) {
       if (a === 'watch') return openEmbed(p, sl);
       if (a === 'menu') return openMenu(p, sl);
       if (a === 'like') {
-        if (needAuth(p.id, 'like videos')) return;
+        if (needAuth(p.id, 'give stars')) return;
         const on = !btn.classList.contains('on'); const n = btn.querySelector('.n');
         const cur = Number(p.likeCount) || 0;
         paintLike(sl, on); p.likeCount = Math.max(0, cur + (on ? 1 : -1)); n.textContent = fmt(p.likeCount); btn.disabled = true;
