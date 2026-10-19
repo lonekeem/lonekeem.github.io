@@ -2,7 +2,9 @@
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { createWatch } from './watch.js';
 import { createComposer } from './create.js';
-import { deliveryUrls, LIMITS } from './media-config.js';
+import { deliveryUrls, LIMITS, safePhotoURL } from './media-config.js';
+import { createStories } from './stories.js';
+import { createAvatarEditor } from './avatar-editor.js';
 import { createSearch, SEARCH_ICON } from './search.js';
 import { searchFields, userSearchFields, linkify } from './search-index.js';
 import {
@@ -12,7 +14,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy,
-  limit, onSnapshot, writeBatch, serverTimestamp, increment, getCountFromServer
+  limit, onSnapshot, writeBatch, serverTimestamp, increment, getCountFromServer, Timestamp
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 // ---------------------------------------------------------------- state
@@ -35,16 +37,41 @@ function initials(name) {
   const parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
   return ((parts[0]?.[0] || '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
 }
+// Avatars: profile photo (users/{uid}.photoURL, Cloudinary only) or the coloured initials.
+// Posts/comments don't copy the photo, so avatars rendered without one are filled in from the
+// cached profile by hydrateAvatars() (a MutationObserver), which keeps photos current everywhere.
 function avatar(p, size = '', link = true) {
-  const uid = p.uid || p.authorId || p.id;
+  const uid = p.uid || p.authorId || p.id || '';
   const name = p.displayName || p.authorName || '';
   const color = /^#[0-9a-f]{3,8}$/i.test(p.color || p.authorColor || '') ? (p.color || p.authorColor) : '#8a2be2';
   const uname = p.username || p.authorUsername || '';
-  const cls = `avatar ${size} ${uid === STUDIO_UID ? 'studio' : ''}`;
-  const inner = esc(initials(name));
-  if (link && uname) return `<a class="${cls}" style="--c:${color}" href="#/u/${esc(uname)}" aria-label="${esc(name)} profile">${inner}</a>`;
-  return `<span class="${cls}" style="--c:${color}" aria-hidden="true">${inner}</span>`;
+  const studio = uid === STUDIO_UID;
+  const cached = profileCache.get(uid);
+  const photo = studio ? '' : safePhotoURL(p.photoURL !== undefined ? p.photoURL : cached ? cached.photoURL : '');
+  const known = studio || p.photoURL !== undefined || cached !== undefined;
+  const cls = `avatar ${size} ${studio ? 'studio' : ''} ${photo ? 'has-photo' : ''}`;
+  const ini = esc(initials(name));
+  const inner = photo ? `<img src="${esc(photo)}" alt="" loading="lazy" decoding="async">` : ini;
+  const data = `data-uid="${esc(uid)}" data-ini="${ini}"${known ? ' data-h="1"' : ''}`;
+  if (link && uname) return `<a class="${cls}" style="--c:${color}" href="#/u/${esc(uname)}" aria-label="${esc(name)} profile" ${data}>${inner}</a>`;
+  return `<span class="${cls}" style="--c:${color}" aria-hidden="true" ${data}>${inner}</span>`;
 }
+function paintAvatar(el, url) {
+  const u = safePhotoURL(url);
+  if (u) { const img = el.querySelector('img'); if (img && img.getAttribute('src') === u) return; el.innerHTML = `<img src="${esc(u)}" alt="" loading="lazy" decoding="async">`; el.classList.add('has-photo'); }
+  else if (el.classList.contains('has-photo')) { el.textContent = el.dataset.ini || ''; el.classList.remove('has-photo'); }
+}
+function hydrateAvatars() {
+  document.querySelectorAll('.avatar[data-uid]:not([data-h])').forEach((el) => {
+    el.dataset.h = '1';
+    const uid = el.dataset.uid; if (!uid || uid === STUDIO_UID) return;
+    getProfile(uid).then((p) => { if (p && p.photoURL && el.isConnected) paintAvatar(el, p.photoURL); }).catch(() => {});
+  });
+}
+let hydrateRaf = 0;
+new MutationObserver(() => { cancelAnimationFrame(hydrateRaf); hydrateRaf = requestAnimationFrame(hydrateAvatars); })
+  .observe(document.body, { childList: true, subtree: true });
+const refreshAvatarsFor = (uid, url) => document.querySelectorAll(`.avatar[data-uid="${CSS.escape(uid)}"]`).forEach((el) => paintAvatar(el, url));
 const badge = (uid) => uid === STUDIO_UID ? '<span class="badge" title="Official studio account" aria-label="Official studio account">✓</span>' : '';
 function timeAgo(ts) {
   if (!ts) return 'just now';
@@ -96,12 +123,27 @@ const ICON = {
 
 // ---------------------------------------------------------------- data helpers
 const profileCache = new Map();
+const profileInflight = new Map();
 async function getProfile(uid) {
   if (profileCache.has(uid)) return profileCache.get(uid);
-  const snap = await getDoc(doc(db, 'users', uid));
-  const p = snap.exists() ? { uid, ...snap.data() } : null;
-  profileCache.set(uid, p);
-  return p;
+  if (!profileInflight.has(uid)) {
+    profileInflight.set(uid, getDoc(doc(db, 'users', uid)).then((snap) => {
+      const p = snap.exists() ? { uid, ...snap.data() } : null;
+      profileCache.set(uid, p); profileInflight.delete(uid);
+      return p;
+    }, (e) => { profileInflight.delete(uid); throw e; }));
+  }
+  return profileInflight.get(uid);
+}
+// Fresh read (stories row needs the current storyUntil); keeps the cache in sync.
+async function refreshProfile(uid) {
+  if (S.user && uid === S.user.uid && S.profile) {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (snap.exists()) { S.profile = snap.data(); profileCache.set(uid, { uid, ...S.profile }); }
+    return S.profile;
+  }
+  profileCache.delete(uid);
+  return getProfile(uid);
 }
 async function uidForUsername(username) {
   const snap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
@@ -125,6 +167,21 @@ async function isLiked(postId) {
   return snap.exists();
 }
 const chatIdFor = (a, b) => [a, b].sort().join('_');
+// Sends a DM (used by the chat page and story replies). `me` is the sender (studio for the admin).
+async function sendMessage(otherUid, text, me = S.user.uid) {
+  const cid = chatIdFor(me, otherUid);
+  const chatRef = doc(db, 'chats', cid);
+  const snap = await getDoc(chatRef).catch(() => null);
+  const exists = !!(snap && snap.exists());
+  const b = writeBatch(db);
+  const meta = { lastMessage: text.slice(0, 1000), lastAt: serverTimestamp(), lastSender: me };
+  if (exists) b.update(chatRef, meta);
+  else b.set(chatRef, { participants: [me, otherUid].sort(), ...meta, createdAt: serverTimestamp() });
+  b.set(doc(collection(db, 'chats', cid, 'messages')), { senderId: me, text: text.slice(0, 1000), createdAt: serverTimestamp() });
+  b.update(doc(db, 'users', me), { lastMessageAt: serverTimestamp() });
+  await b.commit();
+  if (!exists || snap.data().lastSender !== me) notify(otherUid, 'message', { text }, me);
+}
 
 // ---------------------------------------------------------------- shared social actions
 // Used by post cards, the post page, profiles and the vertical video feed (js/watch.js).
@@ -452,9 +509,15 @@ const watch = createWatch({
   S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, closeModal, isAdmin, stale,
   isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId,
   blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, commentsQuery: watchCommentsQuery,
+  openStory: () => { if (requireAuth()) composer.openStory(); },
   fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot }
 });
 async function pageWatch(postId, token) { return watch.render(postId, token); }
+const stories = createStories({
+  S, db, esc, avatar, badge, timeAgo, toast, friendlyError, requireAuth, STUDIO_UID, isAdmin,
+  openStory: () => composer.openStory(), sendMessage, refreshProfile,
+  fs: { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, writeBatch, Timestamp, serverTimestamp }
+});
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
   STUDIO_UID, youTubeId, tikTokId, stale, canGoBack: () => navCount > 1,
@@ -472,8 +535,10 @@ async function pageFeed(token) {
         <p class="muted" style="margin:6px 0 0">Follow the studio for new movies and music, like and comment on drops, save favorites, share your own creations, and message other fans.</p>
         <div class="row" style="justify-content:center;flex-wrap:wrap"><a class="btn" href="#/signup">Create account</a><a class="btn btn-ghost" href="#/login">Log in</a></div>
       </section>
+      <div id="stories" class="stories-slot"></div>
       <h2 style="margin:26px 0 14px;font-size:1.2rem">Latest from the community</h2>
       <div id="posts"></div>`;
+    stories.renderRow($('#stories'), token, stale);
     const snap = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)));
     if (stale(token)) return;
     renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet.');
@@ -483,8 +548,10 @@ async function pageFeed(token) {
   main.innerHTML = `
     ${verified ? '' : `<div class="banner">Check your inbox to verify <b>${esc(S.user.email)}</b>. <button class="link-btn" id="resend">Resend email</button></div>`}
     ${feedToggle('feed')}
+    <div id="stories" class="stories-slot"></div>
     <div class="row"><h1 class="page-title">Posts</h1><span class="spacer"></span><a class="btn btn-sm btn-ghost" href="#/new">New post</a></div>
     <div id="posts"><div class="spinner"></div></div>`;
+  stories.renderRow($('#stories'), token, stale);
   const rs = $('#resend'); if (rs) rs.onclick = async () => { try { await sendEmailVerification(S.user); toast('Verification email sent'); } catch (e) { toast(friendlyError(e)); } };
   const authors = [...new Set([S.user.uid, STUDIO_UID, ...S.following])].filter((u) => !S.blocked.has(u));
   const chunks = []; for (let i = 0; i < authors.length; i += 30) chunks.push(authors.slice(i, i + 30));
@@ -511,7 +578,7 @@ const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${ava
 
 // ---------------------------------------------------------------- compose (Post tab)
 // Camera / photo / library flow lives in js/create.js; the text + link form stays here.
-const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost });
+const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory });
 async function pageCompose(sub, token) {
   if (!requireAuth()) return;
   composer.render(token, { textForm: (slot) => textComposeForm(slot, sub === 'text') });
@@ -587,6 +654,31 @@ async function saveMediaPost({ upload, info, caption, asStudio }) {
   });
   b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
   await b.commit();
+  return ref.id;
+}
+
+// Saves a 24h story after the Cloudinary upload. expiresAt is set a little under 24 h from the
+// client clock so the rule (expiresAt <= server time + 24 h) holds even with a few minutes of skew.
+async function saveStory({ upload, info, caption, asStudio }) {
+  const urls = deliveryUrls(upload);
+  const { authorId, author } = await postAuthor(asStudio);
+  const ref = doc(collection(db, 'stories'));
+  const n = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+  const expiresAt = Timestamp.fromMillis(Date.now() + LIMITS.storyHours * 3600e3 - 5 * 60e3);
+  const b = writeBatch(db);
+  b.set(ref, {
+    authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
+    mediaType: urls.mediaType, mediaUrl: urls.mediaUrl, posterUrl: urls.posterUrl,
+    width: n(upload.width || info.width, 20000), height: n(upload.height || info.height, 20000),
+    duration: urls.mediaType === 'video' ? Math.min(LIMITS.storyVideoSeconds + 1, Math.round((Number(upload.duration) || Number(info.duration) || 0) * 10) / 10) : 0,
+    caption: String(caption || '').slice(0, LIMITS.storyCaptionMax),
+    cloudinaryPublicId: String(upload.public_id).slice(0, 255),
+    createdAt: serverTimestamp(), expiresAt
+  });
+  b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp(), storyUntil: expiresAt });
+  await b.commit();
+  if (authorId === S.user.uid) S.profile.storyUntil = expiresAt;
+  profileCache.delete(authorId);
   return ref.id;
 }
 
@@ -669,7 +761,7 @@ async function pageProfile(username, tab, token) {
   main.innerHTML = `
     <section class="card pad">
       <div class="profile-head">
-        ${avatar(u, 'lg', false)}
+        <div class="pav" id="pav">${avatar(u, 'lg', false)}</div>
         <div style="min-width:0">
           <h1>${esc(u.displayName)}${badge(uid)}</h1>
           <div class="muted">@${esc(u.username)}</div>
@@ -681,6 +773,7 @@ async function pageProfile(username, tab, token) {
         </div>
       </div>
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
+      <div id="pstories"></div>
       <div class="profile-actions">
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
@@ -692,6 +785,7 @@ async function pageProfile(username, tab, token) {
     ${mine ? `<nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/saved" class="${tab ? 'active' : ''}">Saved</a></nav>` : '<div style="height:16px"></div>'}
     <div id="posts"><div class="spinner"></div></div>`;
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
+  if (!blocked) stories.renderProfile($('#pav'), $('#pstories'), uid, u, token, stale);
   $('#report-user')?.addEventListener('click', () => reportDialog('user', uid, '', '@' + u.username));
   $('#block')?.addEventListener('click', () => blockUser(uid, u.username));
   $('#unblock')?.addEventListener('click', () => unblockUser(uid, u.username));
@@ -765,7 +859,11 @@ async function pageSettings() {
   main.innerHTML = `
     <h1 class="page-title">Edit profile</h1>
     <form id="settings" class="card pad">
-      <div class="row" style="margin-bottom:16px">${avatar({ ...p, uid: S.user.uid }, 'lg', false)}<p class="muted small" style="margin:0">Your avatar uses your initials and the color you pick below.</p></div>
+      <div class="av-edit" id="av-edit">
+        <button type="button" class="av-pick" id="av-pick" aria-label="Change profile photo">${avatar({ ...p, uid: S.user.uid }, 'lg', false)}<span class="av-cam" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.8 5h4.4a1.5 1.5 0 0 1 1.2.6L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/><circle cx="12" cy="13" r="3.5"/></svg></span></button>
+        <div><button type="button" class="link-btn" id="av-change">${safePhotoURL(p.photoURL) ? 'Change profile photo' : 'Add a profile photo'}</button>
+        <p class="muted small" style="margin:2px 0 0">${safePhotoURL(p.photoURL) ? 'Your photo shows everywhere your name does.' : 'Until you add one, your avatar uses your initials and the color below.'}</p></div>
+      </div>
       <div class="field"><label for="s-name">Display name</label><input id="s-name" type="text" maxlength="50" required value="${esc(p.displayName)}"></div>
       <div class="field"><label for="s-user">Username</label><input id="s-user" type="text" maxlength="20" required value="${esc(p.username)}" autocapitalize="none" autocomplete="off" spellcheck="false">
         <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore.</p></div>
@@ -782,6 +880,20 @@ async function pageSettings() {
       <p class="small muted">Want your account deleted? Message <a href="#/u/lonekeemstudios">@lonekeemstudios</a> and we’ll remove it.</p>
     </section>`;
   $('#s-out').onclick = async () => { await signOut(auth); location.hash = '#/feed'; };
+  const setPhoto = async (url) => {
+    await updateDoc(doc(db, 'users', S.user.uid), { photoURL: url });
+    S.profile.photoURL = url;
+    profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile });
+    refreshAvatarsFor(S.user.uid, url);
+    const c = $('#av-change'); if (c) c.textContent = url ? 'Change profile photo' : 'Add a profile photo';
+    const h = $('#av-edit p'); if (h) h.textContent = url ? 'Your photo shows everywhere your name does.' : 'Until you add one, your avatar uses your initials and the color below.';
+  };
+  const editor = createAvatarEditor({
+    esc, toast, friendlyError, getUid: () => S.user && S.user.uid,
+    hasPhoto: () => !!safePhotoURL(S.profile.photoURL), onSaved: setPhoto, onRemoved: () => setPhoto('')
+  });
+  S.unsubs.push(editor.close);
+  $('#av-pick').onclick = editor.open; $('#av-change').onclick = editor.open;
   $('#s-reset').onclick = async () => { try { await sendPasswordResetEmail(auth, S.user.email); toast('Password reset email sent'); } catch (e) { toast(friendlyError(e)); } };
   $('#settings').onsubmit = async (ev) => {
     ev.preventDefault();
@@ -873,14 +985,7 @@ async function pageChat(otherUid, asStudio, token) {
     const input = $('#chat-text'); const text = input.value.trim(); if (!text) return;
     input.value = '';
     try {
-      const b = writeBatch(db);
-      const meta = { lastMessage: text.slice(0, 1000), lastAt: serverTimestamp(), lastSender: me };
-      if (chatExists) b.update(chatRef, meta);
-      else b.set(chatRef, { participants: [me, otherUid].sort(), ...meta, createdAt: serverTimestamp() });
-      b.set(doc(collection(db, 'chats', cid, 'messages')), { senderId: me, text: text.slice(0, 1000), createdAt: serverTimestamp() });
-      b.update(doc(db, 'users', me), { lastMessageAt: serverTimestamp() });
-      await b.commit();
-      if (!chatExists || lastSender !== me) notify(otherUid, 'message', { text }, me);
+      await sendMessage(otherUid, text, me);
       chatExists = true; lastSender = me;
     } catch (e) {
       input.value = text;

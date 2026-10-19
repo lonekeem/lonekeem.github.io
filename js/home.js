@@ -1,5 +1,6 @@
 // Homepage add-ons: header account button + like / comment / save bar on studio videos.
 import { auth, db } from './firebase-init.js';
+import { safePhotoURL } from './media-config.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
   doc, getDoc, onSnapshot, writeBatch, setDoc, deleteDoc, serverTimestamp, increment
@@ -14,7 +15,7 @@ function renderAccount() {
   if (!slot) return;
   if (me && profile) {
     const color = /^#[0-9a-f]{3,8}$/i.test(profile.color || '') ? profile.color : '#8a2be2';
-    slot.innerHTML = `<a class="acct-btn" href="app.html#/feed" aria-label="Open the community"><span class="acct-label">Community</span><span class="acct-avatar" style="--c:${color}">${esc(initials(profile.displayName))}</span></a>`;
+    slot.innerHTML = `<a class="acct-btn" href="app.html#/feed" aria-label="Open the community"><span class="acct-label">Community</span><span class="acct-avatar" style="--c:${color}">${safePhotoURL(profile.photoURL) ? `<img src="${esc(safePhotoURL(profile.photoURL))}" alt="">` : esc(initials(profile.displayName))}</span></a>`;
   } else if (me) {
     slot.innerHTML = `<a class="acct-pill" href="app.html#/onboard">Finish sign-up</a>`;
   } else {

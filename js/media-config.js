@@ -15,7 +15,11 @@
 export const CLOUDINARY = {
   cloudName: 'REPLACE_WITH_CLOUD_NAME', // <-- PLACEHOLDER: set to the real cloud name
   uploadPreset: 'lks_user_uploads',    // unsigned preset (see scripts/cloudinary-setup.mjs)
-  folder: 'lks/user-uploads'           // enforced by the preset; informational here
+  folder: 'lks/user-uploads',          // enforced by the preset; informational here
+  // Separate unsigned presets so avatars and stories land in their own folders
+  // (created by scripts/cloudinary-setup.mjs together with the posts preset).
+  avatarPreset: 'lks_avatars',         // folder lks/avatars, jpg/png/webp only
+  storyPreset: 'lks_stories'           // folder lks/stories, same formats/eager as posts
 };
 
 // Client-side limits (Cloudinary free plan caps: images 10 MB, videos 100 MB).
@@ -23,7 +27,12 @@ export const LIMITS = {
   maxVideoSeconds: 60,
   maxVideoMB: 100,
   maxImageMB: 10,
-  captionMax: 2000 // same as the existing text post limit
+  captionMax: 2000, // same as the existing text post limit
+  storyVideoSeconds: 15,
+  storyImageSeconds: 5, // how long a photo story stays on screen
+  storyCaptionMax: 120,
+  storyHours: 24,
+  avatarSize: 512
 };
 
 export const VIDEO_EXT = ['mp4', 'mov', 'webm'];
@@ -38,6 +47,7 @@ export const VIDEO_T = 'c_limit,h_1920,w_1920/vc_h264,q_auto';
 export const POSTER_T = 'so_1,c_limit,h_1920,w_1920/q_auto';
 export const IMAGE_T = 'c_limit,h_1920,w_1920/f_auto,q_auto';
 export const THUMB_T = 'c_fill,g_auto,h_640,w_480/f_auto,q_auto';
+export const AVATAR_T = 'c_fill,h_512,w_512/f_auto,q_auto';
 
 export const uploadsReady = () =>
   !!(CLOUDINARY.cloudName && CLOUDINARY.uploadPreset && !/^REPLACE_/.test(CLOUDINARY.cloudName));
@@ -64,3 +74,12 @@ export function deliveryUrls(r) {
     posterUrl: `${base}image/upload/${THUMB_T}/${v}${r.public_id}`
   };
 }
+
+// Avatar URL saved as users/{uid}.photoURL (the image is already a square 512px JPEG).
+export function avatarUrl(r) {
+  const v = r.version ? `v${r.version}/` : '';
+  return `${deliveryBase()}image/upload/${AVATAR_T}/${v}${r.public_id}`;
+}
+// Only Cloudinary image URLs on our cloud are ever rendered as avatars.
+export const safePhotoURL = (u) =>
+  typeof u === 'string' && u.length <= 500 && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\/[^?#"'<>\s]+$/.test(u) ? u : '';

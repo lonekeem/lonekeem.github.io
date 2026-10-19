@@ -16,6 +16,7 @@ const IC = {
   flip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>',
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>',
+  story: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9" stroke-dasharray="2.6 2.4"/><path d="M12 3a9 9 0 0 1 9 9"/><path d="M12 8v8M8 12h8"/></svg>',
   camoff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M15.5 10.5 21.5 7v10l-2.3-1.3M13 6h1.5a1 1 0 0 1 1 1v3.5M15.5 15.5V17a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h2.5"/></svg>'
 };
 const RING_R = 46, RING_C = 2 * Math.PI * RING_R;
@@ -73,7 +74,7 @@ function imageMeta(url) {
   });
 }
 // Returns { kind, url, duration, width, height, previewable } or throws a friendly Error.
-export async function inspectFile(file, known = {}) {
+export async function inspectFile(file, known = {}, maxSeconds = LIMITS.maxVideoSeconds, forStory = false) {
   const kind = classify(file);
   if (!kind) throw new Error('That file type isn’t supported. Use MP4, MOV or WebM videos, or JPG, PNG, HEIC or WebP photos.');
   const maxMB = kind === 'video' ? LIMITS.maxVideoMB : LIMITS.maxImageMB;
@@ -84,9 +85,11 @@ export async function inspectFile(file, known = {}) {
   const url = URL.createObjectURL(file);
   const meta = kind === 'video' ? await videoMeta(url) : await imageMeta(url);
   const duration = known.duration || meta.duration || 0;
-  if (kind === 'video' && duration > LIMITS.maxVideoSeconds + 0.5) {
+  if (kind === 'video' && duration > maxSeconds + 0.5) {
     URL.revokeObjectURL(url);
-    throw new Error(`That video is ${fmtTime(duration)} long. Videos can be up to ${LIMITS.maxVideoSeconds} seconds; trim it and try again.`);
+    throw new Error(forStory
+      ? `That video is ${fmtTime(duration)} long. Story videos can be up to ${maxSeconds} seconds; trim it and try again.`
+      : `That video is ${fmtTime(duration)} long. Videos can be up to ${maxSeconds} seconds; trim it and try again.`);
   }
   return { kind, url, duration, width: meta.width || 0, height: meta.height || 0, previewable: !meta.unknown };
 }
@@ -104,8 +107,11 @@ export const cameraSupport = () => ({
 
 // ------------------------------------------------------------------ composer
 export function createComposer(ctx) {
-  const { S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost } = ctx;
+  const { S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory } = ctx;
   let ov = null;       // overlay element (camera or preview)
+  let target = 'post'; // 'post' or 'story' (24h story: video up to 15 s, text overlay)
+  const isStory = () => target === 'story';
+  const maxSec = () => (isStory() ? LIMITS.storyVideoSeconds : LIMITS.maxVideoSeconds);
   let stream = null;
   let cleanupFns = [];
 
@@ -139,7 +145,7 @@ export function createComposer(ctx) {
         const file = el.files && el.files[0]; el.value = '';
         if (!file) return;
         try {
-          const info = await inspectFile(file);
+          const info = await inspectFile(file, {}, maxSec(), isStory());
           openPreview(file, info, id === 'in-library' ? 'library' : 'capture');
         } catch (e) { toast(e.message || 'That file can’t be used.'); }
       };
@@ -156,6 +162,7 @@ export function createComposer(ctx) {
       <div class="create-grid">
         <button class="create-opt" data-src="video"><span class="ci">${IC.video}</span><b>Record video</b><small>Up to ${LIMITS.maxVideoSeconds} seconds</small></button>
         <button class="create-opt" data-src="photo"><span class="ci">${IC.photo}</span><b>Take photo</b><small>Front or back camera</small></button>
+        <button class="create-opt wide story-opt" data-src="story"><span class="ci">${IC.story}</span><b>Add to your story</b><small>Photo or video up to ${LIMITS.storyVideoSeconds}s · disappears after ${LIMITS.storyHours} hours</small></button>
         <button class="create-opt wide" data-src="library"><span class="ci">${IC.library}</span><b>Upload from library</b><small>Videos up to ${LIMITS.maxVideoSeconds}s / ${LIMITS.maxVideoMB} MB · photos up to ${LIMITS.maxImageMB} MB</small></button>
       </div>
       <div class="divider">or</div>
@@ -165,6 +172,8 @@ export function createComposer(ctx) {
     main.querySelectorAll('.create-opt').forEach((b) => {
       b.onclick = () => {
         const src = b.dataset.src;
+        if (src === 'story') return openStory();
+        target = 'post';
         if (src === 'library') return pickFile('in-library');
         const sup = cameraSupport();
         if (!sup.stream || (src === 'video' && !sup.recorder)) return pickFile(src === 'video' ? 'in-cap-video' : 'in-cap-photo');
@@ -173,6 +182,20 @@ export function createComposer(ctx) {
     });
     textForm($('#text-slot'));
     S.unsubs.push(closeOverlay);
+  }
+
+  // Story camera: opened from the Create page, the "+" on your avatar in the stories row,
+  // or the For You overlay. Needs the inputs in the DOM, so it brings its own.
+  function openStory() {
+    target = 'story';
+    const sup = cameraSupport();
+    if (sup.stream) return openCamera('photo');
+    // No in-page camera: fall back to the library picker (mounted in a temporary overlay).
+    mountOverlay(`<div class="cam-msg" role="alert">${IC.story}<h2>Add to your story</h2><p>Pick a photo or a video up to ${LIMITS.storyVideoSeconds} seconds.</p>
+      <div class="cam-msg-btns"><button class="btn" data-a="library">Choose from library</button><button class="btn btn-ghost" data-a="close">Cancel</button></div></div>${inputsHtml}`, 'cam-camera has-msg');
+    wireInputs(ov);
+    ov.querySelector('[data-a=library]').onclick = () => pickFile('in-library');
+    ov.querySelector('[data-a=close]').onclick = closeOverlay;
   }
 
   // ---------------------------------------------------------------- camera
@@ -184,7 +207,8 @@ export function createComposer(ctx) {
       <div class="cam-flash" aria-hidden="true"></div>
       <div class="cam-top">
         <button class="cam-btn" data-a="close" aria-label="Close camera">${IC.close}</button>
-        <div class="cam-timer" hidden><span class="rec-dot" aria-hidden="true"></span><span class="t">0:00</span> / ${fmtTime(LIMITS.maxVideoSeconds)}</div>
+        <div class="cam-timer" hidden><span class="rec-dot" aria-hidden="true"></span><span class="t">0:00</span> / ${fmtTime(maxSec())}</div>
+        ${isStory() ? '<span class="cam-story-chip">Story</span>' : ''}
         <button class="cam-btn" data-a="flip" aria-label="Switch to back camera">${IC.flip}</button>
       </div>
       <div class="cam-msg" hidden role="alert"></div>
@@ -212,7 +236,7 @@ export function createComposer(ctx) {
       el.dataset.mode = mode;
       el.querySelectorAll('[data-mode]').forEach((b) => { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
       shutter.setAttribute('aria-label', mode === 'video' ? (recording ? 'Stop recording' : 'Record video') : 'Take photo');
-      hint.textContent = mode === 'video' ? (recording ? 'Tap to stop' : `Tap to record, or hold · up to ${LIMITS.maxVideoSeconds}s`) : 'Tap to take a photo';
+      hint.textContent = mode === 'video' ? (recording ? 'Tap to stop' : `Tap to record, or hold · up to ${maxSec()}s`) : (isStory() ? 'Tap for a photo story' : 'Tap to take a photo');
     }
     function showMsg(title, body, actions) {
       msg.innerHTML = `${IC.camoff}<h2>${esc(title)}</h2><p>${body}</p><div class="cam-msg-btns">${actions}</div>`;
@@ -261,10 +285,10 @@ export function createComposer(ctx) {
 
     function tick() {
       const el2 = (performance.now() - recStart) / 1000;
-      const f = Math.min(1, el2 / LIMITS.maxVideoSeconds);
+      const f = Math.min(1, el2 / maxSec());
       prog.setAttribute('stroke-dashoffset', String(RING_C * (1 - f)));
       tEl.textContent = fmtTime(el2);
-      if (el2 >= LIMITS.maxVideoSeconds) { stopRec(); return; }
+      if (el2 >= maxSec()) { stopRec(); return; }
       raf = requestAnimationFrame(tick);
     }
     function startRec() {
@@ -291,14 +315,14 @@ export function createComposer(ctx) {
       paintMode();
     }
     async function finishRec() {
-      const dur = Math.min(LIMITS.maxVideoSeconds, recorder?.__dur || 0);
+      const dur = Math.min(maxSec(), recorder?.__dur || 0);
       const type = (recorder?.mimeType || pickRecorderMime() || 'video/webm').split(';')[0];
       const blob = new Blob(chunks, { type }); chunks = [];
       prog.setAttribute('stroke-dashoffset', String(RING_C)); timer.hidden = true; tEl.textContent = '0:00';
       if (dur < 1 || !blob.size) { hint.textContent = 'That was too short. Tap to record, or hold the button.'; return; }
       const file = new File([blob], `recording-${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`, { type });
       try {
-        const info = await inspectFile(file, { duration: dur });
+        const info = await inspectFile(file, { duration: dur }, maxSec(), isStory());
         stopStream();
         openPreview(file, { ...info, duration: dur }, 'camera', mode);
       } catch (e) { toast(e.message); }
@@ -314,7 +338,7 @@ export function createComposer(ctx) {
       c.toBlob(async (blob) => {
         if (!blob) return toast('Couldn’t take the photo. Try again.');
         const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        try { const info = await inspectFile(file); stopStream(); openPreview(file, info, 'camera', mode); }
+        try { const info = await inspectFile(file, {}, maxSec(), isStory()); stopStream(); openPreview(file, info, 'camera', mode); }
         catch (e) { toast(e.message); }
       }, 'image/jpeg', 0.92);
     }
@@ -360,18 +384,21 @@ export function createComposer(ctx) {
     const ready = uploadsReady();
     let xhr = null, uploaded = null, busy = false;
     const isVideo = info.kind === 'video';
-    const el = mountOverlay(`
-      <div class="pv-media ${isVideo ? 'is-video' : 'is-image'}">
-        ${info.previewable
-          ? (isVideo
-            ? `<video class="pv-el" src="${esc(info.url)}" playsinline webkit-playsinline autoplay loop muted aria-label="Your video"></video><button class="pv-sound" data-a="sound" aria-pressed="false">Tap for sound</button>`
-            : `<img class="pv-el" src="${esc(info.url)}" alt="Your photo">`)
-          : `<div class="pv-nopreview">${isVideo ? IC.video : IC.photo}<p>Preview isn’t available in this browser, but the ${isVideo ? 'video' : 'photo'} can still be posted.</p></div>`}
-      </div>
-      <div class="cam-top pv-top">
-        <button class="cam-btn pill" data-a="retake">${IC.back}<span>${source === 'library' ? 'Choose another' : 'Retake'}</span></button>
-        <span class="pv-chip">${isVideo ? `Video · ${fmtTime(info.duration)}` : 'Photo'} · ${fmtMB(file.size)}</span>
-      </div>
+    const story = isStory();
+    const panel = story ? `
+      <form class="pv-panel" id="pv-form" novalidate>
+        ${ready ? '' : notReadyNotice(true)}
+        <label for="pv-caption" class="sr-only">Text on your story</label>
+        <input id="pv-caption" type="text" maxlength="${LIMITS.storyCaptionMax}" placeholder="Add text to your story…" autocomplete="off" enterkeyhint="done">
+        <div class="pv-row small muted"><span>${isAdmin() ? '<label class="check pv-studio"><input type="checkbox" id="pv-studio"> <span>Share as <b>Lone Keem Studios</b></span></label>' : 'Visible to your followers for 24 hours.'}</span><span><span id="pv-count">0</span>/${LIMITS.storyCaptionMax}</span></div>
+        <div class="pv-progress" hidden aria-hidden="true"><span></span></div>
+        <p class="pv-status small muted" aria-live="polite"></p>
+        <p class="form-error" id="pv-err"></p>
+        <div class="pv-actions">
+          <button type="button" class="btn btn-ghost" data-a="cancel">Cancel</button>
+          <button type="submit" class="btn" id="pv-post" ${ready ? '' : 'disabled aria-disabled="true"'}>${ready ? 'Share to story' : 'Share · almost ready'}</button>
+        </div>
+      </form>` : `
       <form class="pv-panel" id="pv-form" novalidate>
         ${ready ? '' : notReadyNotice(true)}
         <label for="pv-caption" class="sr-only">Caption</label>
@@ -384,8 +411,22 @@ export function createComposer(ctx) {
           <button type="button" class="btn btn-ghost" data-a="cancel">Cancel</button>
           <button type="submit" class="btn" id="pv-post" ${ready ? '' : 'disabled aria-disabled="true"'}>${ready ? 'Post' : 'Post · almost ready'}</button>
         </div>
-      </form>
-      ${inputsHtml}`, 'cam-preview');
+      </form>`;
+    const el = mountOverlay(`
+      <div class="pv-media ${isVideo ? 'is-video' : 'is-image'}">
+        ${info.previewable
+          ? (isVideo
+            ? `<video class="pv-el" src="${esc(info.url)}" playsinline webkit-playsinline autoplay loop muted aria-label="Your video"></video><button class="pv-sound" data-a="sound" aria-pressed="false">Tap for sound</button>`
+            : `<img class="pv-el" src="${esc(info.url)}" alt="Your photo">`)
+          : `<div class="pv-nopreview">${isVideo ? IC.video : IC.photo}<p>Preview isn’t available in this browser, but the ${isVideo ? 'video' : 'photo'} can still be posted.</p></div>`}
+        ${story ? '<p class="story-cap pv-story-cap" hidden></p>' : ''}
+      </div>
+      <div class="cam-top pv-top">
+        <button class="cam-btn pill" data-a="retake">${IC.back}<span>${source === 'library' ? 'Choose another' : 'Retake'}</span></button>
+        <span class="pv-chip">${story ? 'Story · ' : ''}${isVideo ? `Video · ${fmtTime(info.duration)}` : 'Photo'} · ${fmtMB(file.size)}</span>
+      </div>
+      ${panel}
+      ${inputsHtml}`, 'cam-preview' + (story ? ' is-story' : ''));
     wireInputs(el);
     const media = el.querySelector('.pv-el');
     if (media && isVideo) {
@@ -394,7 +435,11 @@ export function createComposer(ctx) {
       sb.onclick = () => { media.muted = !media.muted; sb.setAttribute('aria-pressed', !media.muted); sb.textContent = media.muted ? 'Tap for sound' : 'Sound on'; media.play().catch(() => {}); };
     }
     const cap = el.querySelector('#pv-caption');
-    cap.oninput = () => (el.querySelector('#pv-count').textContent = cap.value.length);
+    const capOv = el.querySelector('.pv-story-cap');
+    cap.oninput = () => {
+      el.querySelector('#pv-count').textContent = cap.value.length;
+      if (capOv) { capOv.textContent = cap.value; capOv.hidden = !cap.value.trim(); }
+    };
     const bar = el.querySelector('.pv-progress'), barIn = bar.querySelector('span'), status = el.querySelector('.pv-status'), err = el.querySelector('#pv-err');
     const postBtn = el.querySelector('#pv-post');
     const revoke = () => URL.revokeObjectURL(info.url);
@@ -407,7 +452,7 @@ export function createComposer(ctx) {
     };
     el.querySelector('[data-a=cancel]').onclick = () => {
       if (busy && !confirm('Cancel this upload?')) return;
-      closeOverlay();
+      closeOverlay(); target = 'post';
     };
     el.querySelector('#pv-form').onsubmit = async (ev) => {
       ev.preventDefault();
@@ -419,8 +464,16 @@ export function createComposer(ctx) {
           bar.hidden = false; status.textContent = 'Uploading… 0%';
           uploaded = await upload(file, (f) => { barIn.style.transform = `scaleX(${f})`; status.textContent = f >= 1 ? 'Processing…' : `Uploading… ${Math.round(f * 100)}%`; });
         }
-        status.textContent = 'Saving your post…';
         const asStudio = isAdmin() && !!el.querySelector('#pv-studio')?.checked;
+        if (story) {
+          status.textContent = 'Sharing your story…';
+          await saveStory({ upload: uploaded, info, caption: cap.value.trim().slice(0, LIMITS.storyCaptionMax), asStudio });
+          closeOverlay(); target = 'post';
+          toast('Added to your story');
+          if (location.hash === '#/feed') window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/feed';
+          return;
+        }
+        status.textContent = 'Saving your post…';
         const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio });
         closeOverlay();
         toast('Posted!');
@@ -437,8 +490,8 @@ export function createComposer(ctx) {
       return new Promise((resolve, reject) => {
         const fd = new FormData();
         fd.append('file', f);
-        fd.append('upload_preset', CLOUDINARY.uploadPreset);
-        fd.append('tags', 'lks_user');
+        fd.append('upload_preset', story ? CLOUDINARY.storyPreset : CLOUDINARY.uploadPreset);
+        fd.append('tags', story ? 'lks_story' : 'lks_user');
         if (S.user) fd.append('context', `uid=${S.user.uid}`);
         xhr = new XMLHttpRequest();
         xhr.open('POST', uploadEndpoint());
@@ -462,5 +515,5 @@ export function createComposer(ctx) {
     }
   }
 
-  return { render, close: closeOverlay, deliveryUrls };
+  return { render, close: closeOverlay, deliveryUrls, openStory };
 }

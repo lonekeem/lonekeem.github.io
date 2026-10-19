@@ -124,7 +124,7 @@
  ]
 }
     </script>
-    <meta name="lks-version" content="social-2026-10-19-seo">
+    <meta name="lks-version" content="social-2026-10-19-stories">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -300,10 +300,11 @@
             background: linear-gradient(135deg, var(--purple), #6a3df0 60%, #3f7fe8);
         }
         .acct-pill svg { width: 16px; height: 16px; }
+        .acct-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
         .acct-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--muted); font-weight: 500; font-size: .95rem; }
         .acct-btn:hover { color: var(--text); }
         .acct-avatar {
-            --c: var(--purple); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+            --c: var(--purple); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; overflow: hidden;
             font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: .85rem; border: 1px solid rgba(255,255,255,.2);
             background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 45%, #000));
         }

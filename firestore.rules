@@ -36,7 +36,7 @@ service cloud.firestore {
     function validProfile(d) {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
-                               'usernameLower', 'displayNameLower'])
+                               'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil'])
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
         && isStr(d.displayName, 1, 50)
@@ -63,7 +63,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn() && uid == me()
         && validProfile(request.resource.data)
-        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt'])
+        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil'])
         && request.resource.data.createdAt == request.time
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if actingAs(uid)
@@ -74,7 +74,15 @@ service cloud.firestore {
             || getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid)
         && rateOk('lastPostAt', 20)
         && rateOk('lastCommentAt', 5)
-        && rateOk('lastMessageAt', 1);
+        && rateOk('lastMessageAt', 1)
+        // Profile photo: '' (removed) or an image on our Cloudinary cloud (blocked until the
+        // real cloud name is set, same placeholder as media posts). Checked only when it changes.
+        && (!('photoURL' in changed()) || request.resource.data.photoURL == ''
+            || cloudinaryImageUrl(request.resource.data.photoURL))
+        // "Has a live story until" hint, written together with a new story.
+        && (!('storyUntil' in changed()) || (request.resource.data.storyUntil is timestamp
+            && request.resource.data.storyUntil > request.time
+            && request.resource.data.storyUntil <= request.time + duration.value(24, 'h')));
       // Admin search-index rebuild: only the search fields, on any profile.
       allow update: if isAdmin()
         && changed().hasOnly(['usernameLower', 'displayNameLower'])
@@ -122,6 +130,10 @@ service cloud.firestore {
     // this is the ONLY line to change (scripts/set-cloud-name.sh <cloud_name> updates it and
     // js/media-config.js together). Media URLs must start with https://res.cloudinary.com/<cloud>/.
     function cloudinaryCloud() { return 'REPLACE_WITH_CLOUD_NAME'; }
+    function cloudinaryImageUrl(u) {
+      return u is string && u.size() <= 500
+        && u.matches('^https://res[.]cloudinary[.]com/' + cloudinaryCloud() + '/image/upload/[^?#]+$');
+    }
     function cloudinaryUrl(u) {
       return u is string && u.size() <= 500
         && u.matches('^https://res[.]cloudinary[.]com/' + cloudinaryCloud() + '/(image|video)/upload/[^?#]+$');
@@ -239,6 +251,61 @@ service cloud.firestore {
         allow delete: if signedIn()
           && (resource.data.authorId == me() || isAdmin() || get(postPath()).data.authorId == me())
           && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount - 1;
+      }
+    }
+
+    // ---------- Stories (24 h) ----------
+    // Visible to the owner and their followers (not to people they blocked); studio stories are public.
+    function canSeeStories(a) {
+      return (a == 'studio' && (!signedIn() || !blockedBy(a)))
+        || (signedIn() && (actingAs(a)
+            || (exists(/databases/$(database)/documents/follows/$(me() + '_' + a)) && !blockedBy(a))));
+    }
+    function validStory(d) {
+      let u = get(userPath(d.authorId)).data;
+      return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'mediaType', 'mediaUrl',
+                               'posterUrl', 'width', 'height', 'duration', 'caption', 'cloudinaryPublicId',
+                               'createdAt', 'expiresAt'])
+        && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'mediaType', 'mediaUrl',
+                            'posterUrl', 'width', 'height', 'duration', 'caption', 'cloudinaryPublicId',
+                            'createdAt', 'expiresAt'])
+        && d.authorName == u.displayName
+        && d.authorUsername == u.username
+        && d.authorColor == u.color
+        && d.mediaType in ['image', 'video']
+        && cloudinaryUrl(d.mediaUrl)
+        && cloudinaryUrl(d.posterUrl)
+        && d.width is int && d.width >= 0 && d.width <= 20000
+        && d.height is int && d.height >= 0 && d.height <= 20000
+        && d.duration is number && d.duration >= 0 && d.duration <= 16
+        && (d.mediaType == 'video' || d.duration == 0)
+        && isStr(d.caption, 0, 120)
+        && isStr(d.cloudinaryPublicId, 1, 255)
+        && d.cloudinaryPublicId.matches('^[A-Za-z0-9_./-]+$')
+        && d.createdAt == request.time
+        && d.expiresAt is timestamp
+        && d.expiresAt > request.time
+        && d.expiresAt <= request.time + duration.value(24, 'h')
+        && getAfter(userPath(d.authorId)).data.lastPostAt == request.time;
+    }
+    match /stories/{sid} {
+      allow read: if canSeeStories(resource.data.authorId);
+      allow create: if signedIn() && actingAs(request.resource.data.authorId) && validStory(request.resource.data);
+      allow delete: if signedIn() && (actingAs(resource.data.authorId) || isAdmin());
+
+      // Who viewed a story: written by each viewer, read by the owner.
+      match /viewers/{v} {
+        function story() { return get(/databases/$(database)/documents/stories/$(sid)).data; }
+        allow read: if signedIn() && (v == me() || actingAs(story().authorId) || isAdmin());
+        allow create: if signedIn() && v == me()
+          && story().authorId != me()
+          && canSeeStories(story().authorId)
+          && request.resource.data.keys().hasOnly(['viewedAt', 'name', 'username', 'color'])
+          && request.resource.data.viewedAt == request.time
+          && request.resource.data.name == get(userPath(me())).data.displayName
+          && request.resource.data.username == get(userPath(me())).data.username
+          && isStr(request.resource.data.color, 1, 20);
+        allow delete: if signedIn() && (v == me() || actingAs(story().authorId) || isAdmin());
       }
     }
 

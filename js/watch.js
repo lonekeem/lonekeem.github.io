@@ -22,7 +22,7 @@ const IC = {
 export function createWatch(ctx) {
   const { S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, isAdmin, stale,
     isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, commentsQuery,
-    blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON } = ctx;
+    blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, openStory } = ctx;
   const { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot } = ctx.fs;
   let muted = true; // stays the same while scrolling between videos
   let session = null;
@@ -150,7 +150,8 @@ export function createWatch(ctx) {
     main.innerHTML = `
       <a class="vhome" href="index.html" aria-label="Lone Keem Studios home page"><img src="logo.png" alt="" width="34" height="34"><span>Lone Keem Studios</span></a>
       <div class="vwrap" id="vwrap">
-        <div class="vtop">
+        <div class="vtop ${S.user && S.profile ? 'has-story' : ''}">
+          ${S.user && S.profile ? `<button class="vstory" id="vstory" aria-label="Add to your story">${avatar({ ...S.profile, uid: S.user.uid }, 'sm', false)}<span class="vplus" aria-hidden="true">+</span></button>` : ''}
           <nav class="feed-toggle on-video" aria-label="Feed"><a href="#/watch" class="active" aria-current="page">For You</a><a href="#/feed">Posts</a></nav>
           <button class="vmute" id="vmute" aria-pressed="true" aria-label="Unmute"></button>
           <a class="vsearch" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>
@@ -162,6 +163,7 @@ export function createWatch(ctx) {
         <div class="vsheet-root" id="vsheet-root"></div>
       </div>`;
 
+    $('#vstory')?.addEventListener('click', () => openStory());
     const feed = $('#vfeed'), wrap = $('#vwrap'), muteBtn = $('#vmute'), hint = $('#vunmute-hint'), sheetRoot = $('#vsheet-root');
     const slides = [...feed.querySelectorAll('.vslide')];
     const byId = new Map(posts.map((p) => [p.id, p]));
