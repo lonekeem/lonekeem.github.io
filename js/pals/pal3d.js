@@ -11,7 +11,7 @@ import { DANCES3D, clipFor } from './dances3d.js';
 
 const D = Math.PI / 180;
 let R = null, scene, cam, keyL, shadowPlane; const RES = 256;
-const cache = new Map();
+const cache = new Map(); let lost = false;
 export function webglOK() {
   try { if (localStorage.getItem('kemy-pal3d') === '0') return false; } catch { /* */ }
   const n = navigator; if (n.connection && n.connection.saveData) return false;
@@ -21,6 +21,7 @@ export function webglOK() {
 function init() {
   const cv = document.createElement('canvas'); cv.width = cv.height = RES;
   R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'low-power' });
+  cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; }); cv.addEventListener('webglcontextrestored', () => { lost = false; });
   R.setPixelRatio(1); R.setSize(RES, RES, false); R.setClearColor(0, 0);
   R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
   R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.9; R.outputColorSpace = THREE.SRGBColorSpace;
@@ -238,6 +239,7 @@ export function modePose(mode, t) {
   else Object.assign(P, { hy: s(t * 0.05) * 0.01, hrz: s(t * 0.03) * 0.02, aL: [23 + s(t * 0.05) * 3, 6, 16], aR: [23 - s(t * 0.05) * 3, 6, 16] });
   return P;
 }
+const sane = (P) => Object.values(P).every((v) => (Array.isArray(v) ? v.every(Number.isFinite) : typeof v !== 'number' || Number.isFinite(v)));
 function blend(a, b, k) { const o = {}; for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) { const x = a[key], y = b[key]; if (Array.isArray(x) || Array.isArray(y)) { const X = x || [14, 0, 10, 0], Y = y || [14, 0, 10, 0]; o[key] = X.map((v, i) => v + ((Y[i] ?? v) - v) * k); } else o[key] = (x || 0) + ((y || 0) - (x || 0)) * k; } return o; }
 // ---------------------------------------------------------------- draw into a 2D canvas (same args as drawPal)
 let frameN = -1, frameCount = 0; const BUDGET = 8;
@@ -245,11 +247,13 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   const f = Math.floor(performance.now() / 16); if (f !== frameN) { frameN = f; frameCount = 0; }
   if (++frameCount > BUDGET) return false; // too many Pals this frame: caller draws 2D
   if (!R) init();
+  if (lost) return false; // context lost (iOS memory pressure): caller draws the 2D Pal
   const key = JSON.stringify([pal.species, pal.colors, pal.outfit, stageOf(pal.level || 1)]);
   let m = cache.get(key); if (!m) { m = build(pal); cache.set(key, m); if (cache.size > 24) { const k0 = cache.keys().next().value; cache.delete(k0); } }
   const t = st.t || 0;
   let P = modePose(st.mode || 'idle', t);
   if (st.dance3d) { const D3 = clipFor(st.dance3d, m.userData.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
+  if (!sane(P)) P = modePose('idle', t); // never leave a broken / T-pose on screen
   apply(m, P, t, st.mode);
   m.rotation.y = ((st.face || 1) < 0 ? -0.28 : 0.28) + (P.ry || 0);
   scene.add(m); R.render(scene, cam); scene.remove(m);

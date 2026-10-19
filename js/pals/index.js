@@ -111,7 +111,7 @@ export function createPals(ctx) {
     el.innerHTML = `<div class="pal-strip" data-pals="1" aria-label="${esc(u.displayName)}'s Pals"><div class="pal-cv"></div>
       <div class="pal-tag"><b>${esc(act.name)}</b><small>${esc(formName(act))} · Lv ${act.level || 1} · <span class="pal-vibe" style="--v:${VIBES[sp.vibe].c}">${VIBES[sp.vibe].name}</span></small><small class="pal-pats">🐾 <b>${act.pats || 0}</b> pats</small></div>
       <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-pa="dance">💃 Dance</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Say hi</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
-    const host = el.querySelector('.pal-cv'); const W = Math.max(160, Math.min(host.clientWidth || 300, 560)), H = 104; const s = stage(host, W, H);
+    const host = el.querySelector('.pal-cv'); const W = Math.max(160, Math.min(host.clientWidth || 300, 560)), H = 150; const s = stage(host, W, H);
     const fx = particles();
     const actors = shown.map((p, i) => ({ p, x: W * (0.5 - i * 0.22) + (i ? 0 : 10), tx: 0, face: i % 2 ? 1 : -1, mode: 'idle', until: i * 60, react: 0, mood: moodOf(liveStats(p)), size: i ? 52 : 66 }));
     let guest = null, play = null, curT = 0, room = []; roomOf(db, uid).then((r) => { room = r.filter((id) => ITEM[id]); });

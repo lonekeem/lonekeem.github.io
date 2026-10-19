@@ -4,6 +4,7 @@
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, writeBatch, Timestamp, addDoc }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { drawPal, drawBubble, star } from './art.js';
+import { drawDancer } from './dance.js';
 import { getActivePal } from './core.js';
 export const PAL_GAMES = [
   { id: 'race', name: 'Pal Race', icon: '🏁', blurb: 'Tap to dash and hop over logs. Furthest Pal wins!' },
@@ -89,19 +90,19 @@ export function playGame(host, game, seed, { pal, oppPal, opp, onTick, sound }) 
           if (it.k === 'log') { c.fillStyle = '#a0683a'; c.beginPath(); c.roundRect(sx - 12, H - 128, 24, 18, 6); c.fill(); c.fillStyle = '#d8a070'; c.beginPath(); c.ellipse(sx + 10, H - 119, 4, 8, 0, 0, 7); c.fill(); }
           else { c.fillStyle = '#ffd34d'; star(c, sx, H - 165, 9); c.fill(); } }
         // opponent ghost on the back lane
-        if (o && oppPal) { const ox = 80 + (o.p * 4 - S.dist) * 0.9; c.globalAlpha = 0.8; drawPal(c, Math.max(-20, Math.min(W + 20, ox)), H - 236, 46, oppPal, { t: frame, mode: 'walk', face: 1 }); c.globalAlpha = 1; }
-        drawPal(c, 80, H - 110 + S.y, 64, pal, { t: frame, mode: S.stun ? 'shake' : 'walk', face: 1 });
+        if (o && oppPal) { const ox = 80 + (o.p * 4 - S.dist) * 0.9; c.globalAlpha = 0.8; drawDancer(c, Math.max(-20, Math.min(W + 20, ox)), H - 236, 46, oppPal, { t: frame, mode: 'walk', face: 1 }); c.globalAlpha = 1; }
+        drawDancer(c, 80, H - 110 + S.y, 64, pal, { t: frame, mode: S.stun ? 'shake' : 'walk', face: 1 });
         c.fillStyle = '#fff'; c.font = '700 13px Inter, sans-serif'; c.fillText(`${Math.floor(S.dist / 10)} m`, 12, 56);
       }
       if (game === 'bubbles') { for (const b of S.items) if (b.live && !b.hit) { drawBubble(c, b.x, b.y, b.r); if (b.gold) { c.fillStyle = 'rgba(255,211,77,.55)'; c.beginPath(); c.arc(b.x, b.y, b.r * 0.8, 0, 7); c.fill(); } }
-        drawPal(c, W / 2, H - 14, 70, pal, { t: frame, mode: 'happy' }); }
+        drawDancer(c, W / 2, H - 14, 70, pal, { t: frame, mode: 'happy' }); }
       if (game === 'stars') { for (const s of S.items) if (s.live) { if (s.k === 'cloud') { c.fillStyle = '#8890a8'; for (const [dx, r] of [[-10, 10], [0, 13], [10, 10]]) { c.beginPath(); c.arc(s.x + dx, s.y, r, 0, 7); c.fill(); } c.fillStyle = '#9fd0ff'; c.fillRect(s.x - 6, s.y + 12, 2, 6); c.fillRect(s.x + 4, s.y + 14, 2, 6); } else { c.fillStyle = '#ffd34d'; star(c, s.x, s.y, s.k === 'big' ? 14 : 9); c.fill(); } }
-        c.fillStyle = 'rgba(255,255,255,.15)'; c.fillRect(0, H - 60, W, 60); drawPal(c, S.x, H - 60, 62, pal, { t: frame, mode: S.stun ? 'shake' : 'happy' }); }
+        c.fillStyle = 'rgba(255,255,255,.15)'; c.fillRect(0, H - 60, W, 60); drawDancer(c, S.x, H - 60, 62, pal, { t: frame, mode: S.stun ? 'shake' : 'happy' }); }
       if (game === 'dance') { const lw = W / 4; const cols = ['#ff6fae', '#5aa8ff', '#6fd39a', '#ffd34d'];
         for (let i = 0; i < 4; i++) { c.fillStyle = `rgba(255,255,255,${0.06 + S.lanes[i] * 0.03})`; c.fillRect(i * lw + 2, 60, lw - 4, H - 60); }
         c.fillStyle = 'rgba(255,255,255,.6)'; c.fillRect(0, H - 122, W, 4);
         for (const n of S.items) { if (n.hit) continue; const y = H - 120 - (n.at - t) * 260; if (y < 50 || y > H) continue; c.fillStyle = cols[n.lane]; c.beginPath(); c.arc(n.lane * lw + lw / 2, y, 16, 0, 7); c.fill(); c.fillStyle = '#fff'; c.font = '700 14px sans-serif'; c.textAlign = 'center'; c.fillText(['◀', '▼', '▲', '▶'][n.lane], n.lane * lw + lw / 2, y + 5); c.textAlign = 'left'; }
-        drawPal(c, W / 2, H - 20, 72, pal, { t: frame, mode: S.lanes.some((x) => x > 0) ? 'happy' : 'hop' });
+        drawDancer(c, W / 2, H - 20, 72, pal, { t: frame, mode: S.lanes.some((x) => x > 0) ? 'happy' : 'hop' });
         if (S.flash[1] > 0) { c.fillStyle = '#fff'; c.font = '800 22px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(S.flash[0], W / 2, H / 2); c.textAlign = 'left'; } }
       for (const f of fx) { c.globalAlpha = f.life / 40; c.fillStyle = f.col; c.font = '800 18px Inter, sans-serif'; c.fillText(f.txt, f.x, f.y); } c.globalAlpha = 1;
       // HUD

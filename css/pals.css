@@ -1,9 +1,9 @@
 /* Kemy Pals */
-.pal-strip { position: relative; margin: 12px 0 4px; border-radius: 18px; background: linear-gradient(180deg, rgba(138,43,226,.10), rgba(138,43,226,.04)); border: 1px solid rgba(170,120,255,.25); overflow: hidden; }
-.pal-cv { width: 100%; height: 92px; } .pal-cv canvas { display: block; cursor: pointer; }
-.pal-tag { position: absolute; top: 8px; left: 12px; display: grid; gap: 1px; pointer-events: none; text-align: left; } .pal-tag b { font-family: "Space Grotesk", sans-serif; } .pal-tag small { color: var(--muted, #a39bb6); font-size: .74rem; }
+.pal-strip { position: relative; display: flex; flex-direction: column; margin: 12px 0 4px; border-radius: 18px; background: linear-gradient(180deg, rgba(138,43,226,.10), rgba(138,43,226,.04)); border: 1px solid rgba(170,120,255,.25); overflow: hidden; }
+.pal-cv { order: 3; width: 100%; height: 150px; flex: none; } .pal-cv canvas { display: block; cursor: pointer; }
+.pal-tag { order: 1; position: static; padding: 10px 12px 0; display: grid; gap: 1px; pointer-events: none; text-align: left; } .pal-tag b { font-family: "Space Grotesk", sans-serif; } .pal-tag small { color: var(--muted, #a39bb6); font-size: .74rem; }
 .pal-vibe { color: var(--v); font-weight: 600; } .pal-pats b { color: #ffd34d; }
-.pal-btns { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
+.pal-btns { order: 2; position: static; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 0; }
 .pal-hatch-cta { display: flex; gap: 10px; align-items: center; width: 100%; margin: 12px 0 4px; padding: 10px 12px; border-radius: 18px; border: 1px dashed rgba(190,140,255,.6); background: rgba(138,43,226,.08); color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .pal-hatch-cta span:last-child { display: grid; } .pal-hatch-cta small { color: var(--muted, #a39bb6); } .pal-egg-ic { width: 40px; height: 40px; flex: none; }
 .pal-sheet { display: grid; gap: 10px; text-align: left; } .pal-head { display: grid; gap: 2px; padding-right: 30px; } .pal-head b { font: 700 1.25rem "Space Grotesk", sans-serif; } .pal-head small { color: var(--muted); }

@@ -3,6 +3,7 @@
 // Kid-safe: input + output filters, a strict system prompt, short replies, and no personal info.
 import { doc, getDoc, setDoc, serverTimestamp, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { SPEC, VIBES, drawPal } from './art.js';
+import { drawDancer } from './dance.js';
 import { liveStats, moodOf, formName } from './core.js';
 import { VOICES, VOICE, SPECIES_VOICE, speak, stopSpeaking, sfx, canSpeak } from './voice.js';
 export const AI_URL = 'https://text.pollinations.ai/openai';
@@ -123,7 +124,7 @@ export function openTalk(ctx, p, { owner, mine, visitorChat, onHappy, ownsVoice,
   let talking = 0, emo = 'happy', emoT = 0, t = 0; const stats = liveStats(p); const mood = moodOf(stats);
   const frame = () => { if (!document.body.contains(cv)) { stopSpeaking(); return; } t++; c.clearRect(0, 0, 240, 170);
     let mode = 'idle'; if (talking > 0) { mode = 'eat'; talking--; } else if (emoT > 0) { emoT--; mode = emo === 'giggle' ? 'happy' : emo === 'sleepy' ? 'sleep' : emo === 'curious' ? 'walk' : 'happy'; }
-    drawPal(c, 120, 162, 128, p, { t, mode, mood, face: emo === 'curious' && emoT > 0 ? (Math.floor(t / 40) % 2 ? 1 : -1) : 1 });
+    drawDancer(c, 120, 162, 128, p, { t, mode, mood, face: emo === 'curious' && emoT > 0 ? (Math.floor(t / 40) % 2 ? 1 : -1) : 1 });
     if (emoT > 0 && emo === 'giggle') { c.fillStyle = '#ff6fae'; c.font = 'bold 16px sans-serif'; c.fillText('hehe', 170, 50 - (emoT % 30)); }
     if (emoT > 0 && emo === 'curious') { c.fillStyle = '#ffd34d'; c.font = 'bold 22px sans-serif'; c.fillText('?', 176, 46); }
     requestAnimationFrame(frame); };

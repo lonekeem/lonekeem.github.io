@@ -2,6 +2,7 @@
 import { ITEMS, ITEM, RARITY, SLOTS, SLOT_NAMES, todaysDeals, EARN } from './catalog.js';
 import { drawItemIcon } from './wear.js';
 import { drawPal } from './art.js';
+import { drawDancer } from './dance.js';
 import { createEconomy } from './economy.js';
 import { getAggregateFromServer, query, collection, where, sum } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -34,7 +35,7 @@ export function createShopUI(ctx) {
       <div class="pal-looks"><b class="small">Saved outfits</b><div id="cl-looks"></div></div>
       <div class="btns"><button class="btn" id="cl-save">Wear this</button><a class="btn btn-ghost" href="#/pals/shop" data-close>Shop for more</a></div></div>`);
     const root = document.querySelector('.pal-closet'); const pv = cvs(root.querySelector('.pal-cl-prev'), 220, 170);
-    anim(pv.cv, (t) => { pv.c.clearRect(0, 0, 220, 170); drawPal(pv.c, 110, 160, 130, { ...p, outfit: fit }, { t, mode: t % 240 < 60 ? 'happy' : 'idle' }); });
+    anim(pv.cv, (t) => { pv.c.clearRect(0, 0, 220, 170); drawDancer(pv.c, 110, 160, 130, { ...p, outfit: fit }, { t, mode: t % 240 < 60 ? 'happy' : 'idle' }); });
     function items() {
       const own = ITEMS.filter((i) => i.kind === 'wear' && i.slot === tab && inv[i.id]);
       root.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', b.dataset.tab === tab));

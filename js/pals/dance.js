@@ -157,7 +157,8 @@ export function drawDancer(c, x, y, size, pal, st = {}) {
     const on = amt > 0.001 && (st.dance || danceEnabled()); const beat = st.beat ?? (b.beat + (pal._off || 0));
     const d = on ? danceFor(pal, beat, st.dance) : null;
     const g = RM() && d && !d.gentle ? danceById('hula') || d : d;
-    if (P3.drawPal3D(c, x, y, size, pal, { ...st, dance3d: g ? g.id : null, beat, amt: on ? amt * (RM() ? 0.5 : 1) : 0 })) {
+    let ok3 = false; try { ok3 = P3.drawPal3D(c, x, y, size, pal, { ...st, dance3d: g ? g.id : null, beat, amt: on ? amt * (RM() ? 0.5 : 1) : 0 }); } catch (e) { console.warn('3D Pal off:', e); P3 = null; }
+    if (ok3) {
       if (on && amt > 0.6 && !RM() && g) { const p = poseAt(g, beat); if (p.star) { const t = st.t || 0; sparkle(c, x - size * 0.5, y - size * 1.1, size * 0.09, t); sparkle(c, x + size * 0.5, y - size * 0.9, size * 0.07, t + 20); } }
       return;
     }
