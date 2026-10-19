@@ -54,7 +54,7 @@ const pv = await (await fetch(`${FS}/users/${A.uid}/pets/p1`)).json(); ok('voice
 await clearModal(A);
 // level up to unlock a 2nd egg, hatch it, then switch the active Pal
 await A.p.evaluate(() => { location.hash = '#/me'; }); await A.p.waitForSelector('[data-pa=care]'); await A.p.click('[data-pa=care]'); await A.p.waitForSelector('[data-dbg]');
-for (let i = 0; i < 7; i++) { await A.p.click('[data-dbg]'); await A.p.waitForTimeout(1300); } await clearModal(A);
+for (let i = 0; i < 7; i++) { await A.p.evaluate(() => document.querySelector('[data-dbg]')?.click()); await A.p.waitForTimeout(1300); } await clearModal(A);
 await A.p.evaluate(() => { location.hash = '#/pals'; }); await A.p.waitForSelector('.pal-box'); await A.p.waitForTimeout(800);
 const egg = await A.p.$('[data-hatch]'); if (egg) { await egg.click(); await A.p.waitForSelector('#pal-form'); await A.p.click('[data-species="elephant"]'); await A.p.fill('#pal-name', 'Toots'); await A.p.click('#pal-form [type=submit]'); await A.p.waitForTimeout(3000); }
 await A.p.waitForSelector('[data-act]', { timeout: 10000 }).catch(() => {}); const sw = await A.p.$$('[data-act]'); ok('active Pal switcher shows', sw.length >= 2, String(sw.length));
@@ -68,7 +68,7 @@ await A.p.waitForSelector('.g-result', { timeout: 40000 }).then(() => ok('Pal Ga
 await clearModal(A);
 // online Pal Game: A creates a link game, B joins
 const B = await account('b'); await hatch(B, 'Puff', 'kitten');
-await A.p.evaluate(() => { location.hash = '#/pals'; }); await A.p.waitForTimeout(800); await A.p.evaluate(() => { location.hash = '#/games/pals'; }); await A.p.waitForSelector('[data-m=friend]'); await A.p.click('[data-g=bubbles]'); await A.p.click('[data-m=friend]'); await A.p.click('#pg-friend [type=submit]');
+await A.p.evaluate(() => { location.hash = '#/'; }); await A.p.waitForTimeout(800); await A.p.evaluate(() => { location.hash = '#/games/pals'; }); await A.p.waitForSelector('[data-m=friend]'); await A.p.click('[data-g=bubbles]'); await A.p.click('[data-m=friend]'); await A.p.click('#pg-friend [type=submit]');
 await A.p.waitForSelector('.pg-wait input', { timeout: 15000 }); const link = await A.p.inputValue('.pg-wait input');
 await B.p.evaluate((h) => { location.hash = h; }, '#' + link.split('#')[1]);
 await Promise.all([A.p.waitForSelector('.pg-cv', { timeout: 20000 }), B.p.waitForSelector('.pg-cv', { timeout: 20000 })]).then(() => ok('friend match starts for both', true)).catch(() => ok('friend match starts for both', false));
