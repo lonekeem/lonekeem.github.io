@@ -2,7 +2,7 @@
 // g = 'g' | 'b' | 'a' only drives the Girls / Boys / All filter. Free items: id 'f_*' (rules let them be worn
 // without a purchase). Premium items: letters-only ids, bought with Star Coins through the normal shop purchase.
 export const WSLOTS = ['head', 'hair', 'face', 'ears', 'neck', 'body', 'bottom', 'full', 'feet', 'back', 'bag', 'held', 'wrist', 'hand'];
-export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Held Items', wrist: 'Bracelets & Watches', hand: 'Rings' };
+export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Hand Items', wrist: 'Bracelets & Watches', hand: 'Rings' };
 export const JEWELRY = ['ears', 'neck', 'wrist', 'hand', 'face', 'bag'];
 const C = { pink: '#ff8ac0', red: '#e8434f', blue: '#4a8aff', navy: '#2a3a7a', green: '#4ab070', yellow: '#ffd34d', purple: '#8a55dc', white: '#f6f2ff', black: '#2a2438', orange: '#ff8a2a', mint: '#7ae0c0', lilac: '#c8a8ff', gold: '#ffcf3a', silver: '#d0d8e8', rose: '#f0a0b0', teal: '#2ab0b0' };
 const T = { pink: 'Pink', red: 'Red', blue: 'Blue', navy: 'Navy', green: 'Green', yellow: 'Sunny', purple: 'Purple', white: 'White', black: 'Midnight', orange: 'Orange', mint: 'Mint', lilac: 'Lilac', gold: 'Gold', silver: 'Silver', rose: 'Rose Gold', teal: 'Teal' };
@@ -45,6 +45,8 @@ const BASE = [
   ['wand', 'Star Wand', 'held', 'wand', 'g', ['gold', 'pink'], 0], ['balloon', 'Balloon', 'held', 'balloon', 'a', ['red', 'blue', 'pink'], 0], ['icecream', 'Ice Cream', 'held', 'icecream', 'a', ['pink'], 0],
   ['teddy', 'Teddy', 'held', 'teddy', 'a', ['orange'], 0], ['guitar', 'Toy Guitar', 'held', 'guitar', 'b', ['red', 'blue'], 120, 'r'], ['ball', 'Ball', 'held', 'ball', 'b', ['white', 'orange'], 0],
   ['mic', 'Microphone', 'held', 'mic', 'a', ['silver', 'gold'], 100, 'r'], ['umbrella', 'Umbrella', 'held', 'umbrella', 'a', ['yellow', 'purple'], 0],
+  ['handbag', 'Handbag', 'held', 'handbag', 'g', ['pink', 'red', 'black'], 0], ['phone', 'Toy Phone', 'held', 'phone', 'a', ['purple', 'blue', 'pink'], 0], ['bouquet', 'Flower Bunch', 'held', 'bouquet', 'g', ['pink', 'yellow'], 0],
+  ['bobatea', 'Bubble Tea', 'held', 'boba', 'a', ['lilac', 'orange', 'mint'], 0], ['bball', 'Basketball', 'held', 'bball', 'b', ['orange'], 0], ['bigguitar', 'Rock Guitar', 'held', 'guitar2', 'a', ['red', 'black', 'teal'], 180, 'r'],
   ['bracelet', 'Bracelet', 'wrist', 'bracelet', 'g', ['gold', 'silver', 'pink'], 0], ['beadband', 'Bead Bracelet', 'wrist', 'beadband', 'a', ['mint', 'lilac'], 0],
   ['watch', 'Watch', 'wrist', 'watch', 'b', ['black', 'blue', 'silver'], 0], ['smartwatch', 'Glow Watch', 'wrist', 'watch', 'a', ['purple'], 110, 'r'],
   ['ring', 'Ring', 'hand', 'ring', 'a', ['gold', 'silver'], 0], ['gemring', 'Gem Ring', 'hand', 'gem', 'g', ['pink', 'blue', 'purple'], 140, 'r'], ['starring', 'Superstar Ring', 'hand', 'gem', 'a', ['gold'], 500, 'l'],
@@ -54,6 +56,9 @@ for (const [id, name, slot, st, g, cols, p, r] of BASE) for (const k of cols) {
   const wid = (p ? '' : 'f_') + id + (cols.length > 1 ? '_' + k : '');
   WEAR.push({ id: p ? wid.replace(/[^a-z_]/g, '').slice(0, 16) : wid.slice(0, 15), name: (cols.length > 1 ? T[k] + ' ' : '') + name, kind: 'wear', slot, st, col: C[k], p, r: r || 'c', g, free: !p });
 }
+// Care food held in the paws while eating (not sold here; the food shop sells snacks)
+for (const [id, st, col] of [['f_food_berry', 'berry', '#ff4f6f'], ['f_food_cookie', 'cookie', '#e0a060'], ['f_food_cake', 'cake', '#ffc6f0'], ['f_food_apple', 'apple', '#ffcf3a'], ['f_food_carrot', 'carrot', '#ff8a2a'], ['f_food_fish', 'fish', '#7ab8e8'], ['f_food_bamboo', 'bamboo', '#7ad070'], ['f_food_honey', 'honey', '#ffb31a'], ['f_food_leaf', 'leaf', '#4ab070'], ['f_food_seed', 'seed', '#d8b080']])
+  WEAR.push({ id, name: st, kind: 'wear', slot: 'held', st, col, p: 0, r: 'c', g: 'a', free: true, hidden: true });
 export const WEAR_BY = Object.fromEntries(WEAR.map((w) => [w.id, w]));
 // Looks: premium patterns and Rare Pal variants (needs users/{uid}/inv/{id})
 export const PATTERNS = [

@@ -299,7 +299,7 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   // dance changes flow into each other instead of snapping
   const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * 0.28 : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * 0.42 : b; } P = o; }
   m.userData.prev = P; m.userData.pt = t;
-  apply(m, P, t, st.mode);
+  apply(m, P, t, st.mode); grip(m, st.dance3d ? st.amt ?? 1 : 0, st.mode, t);
   m.rotation.y = st.yaw != null ? st.yaw : ((st.face || 1) < 0 ? -0.28 : 0.28) + (P.ry || 0);
   scene.add(m); R.render(scene, cam); scene.remove(m);
   const w = size * 1.65; c.drawImage(R.domElement, x - w / 2, y - w * 0.87, w, w);
@@ -396,7 +396,23 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B }) {
     if (st === 'backpack') { const b = mesh(cap(0.2, 0.12), M(c), J.Chest); b.position.set(0, -0.08, -0.46); b.scale.z = 0.55; for (const s of [-1, 1]) { const st2 = mesh(geo('strp', () => new THREE.TorusGeometry(0.2, 0.018, 6, 20, Math.PI)), M(c), J.Chest); st2.rotation.y = Math.PI / 2; st2.position.set(s * 0.22, 0.02, -0.05); } }
     else { const b = mesh(geo('bagb' + st, () => new THREE.BoxGeometry(st === 'purse' ? 0.16 : 0.22, st === 'purse' ? 0.12 : 0.16, 0.06)), M(c, { cc: 0.8 }), J.Hips); b.position.set(0.5, 0.05, 0.12); const s2 = mesh(geo('bagstrap', () => new THREE.TorusGeometry(0.55, 0.012, 6, 30)), M(c), J.Chest); s2.rotation.set(0, Math.PI / 2, 0.75); s2.position.y = -0.1; } }
   // held item (right hand)
-  w = W('held'); const hand = J.RightHand; if (w && hand) { const st = w.st, c = w.col, g = new THREE.Group(); g.position.set(0, -0.1, 0.06); hand.add(g);
+  w = W('held'); const hand = J.RightHand; if (w && hand) { const st = w.st, c = w.col, g = new THREE.Group(); g.position.set(0, -0.1, 0.06); g.scale.setScalar(st === 'guitar2' || st === 'balloon' || st === 'handbag' || st === 'umbrella' ? 1.35 : 1.7); if (!['handbag', 'balloon', 'guitar2', 'bball', 'ball'].includes(st)) { g.rotation.x = -1.1; g.position.set(0, -0.12, 0.08); } hand.add(g); J.grip = st; if (st === 'guitar2') J.twoHand = 1;
+    // fingers curl around the grip
+    hand.children.forEach((o) => { if (o.isMesh && o.geometry && o.geometry.type === 'CapsuleGeometry') { o.rotation.x = -1.1; o.position.z += 0.03; } });
+    if (st === 'handbag') { const b = mesh(geo('hbag', () => new THREE.BoxGeometry(0.2, 0.15, 0.08)), M(c, { cc: 0.8 }), g); b.position.y = -0.14; const h = mesh(geo('hbh', () => new THREE.TorusGeometry(0.06, 0.012, 8, 18, Math.PI)), M(c), g); h.position.y = -0.06; }
+    else if (st === 'phone') { const ph = mesh(geo('phn', () => new THREE.BoxGeometry(0.08, 0.15, 0.015)), M(c, { cc: 1 }), g); ph.position.set(0, 0.05, 0.02); const sc = mesh(geo('phs', () => new THREE.PlaneGeometry(0.065, 0.12)), M('#9ad8ff', { em: '#4a8aff' }), g); sc.position.set(0, 0.05, 0.029); }
+    else if (st === 'bouquet') { const k = mesh(cone(0.06, 0.2), M('#7ad070'), g); k.rotation.x = Math.PI; k.position.y = 0.04; for (let i = 0; i < 6; i++) { const a = i * 1.05; mesh(sph(0.04), M(i % 2 ? c : '#ffffff'), g).position.set(Math.cos(a) * 0.06, 0.17, Math.sin(a) * 0.06); } mesh(sph(0.04), M('#ffd34d'), g).position.y = 0.19; }
+    else if (st === 'boba') { const cu = mesh(geo('boba', () => new THREE.CylinderGeometry(0.06, 0.045, 0.16, 20)), M(c, { op: 0.85, cc: 1 }), g); cu.position.y = 0.05; for (let i = 0; i < 5; i++) mesh(sph(0.012), M('#3a2a2a'), g).position.set(-0.03 + i * 0.015, -0.01, 0.03); const lid = mesh(sph(1), M('#ffffff', { op: 0.7 }), g); lid.scale.set(0.062, 0.025, 0.062); lid.position.y = 0.13; const st2 = mesh(cap(0.008, 0.12), M('#ff6fae'), g); st2.position.set(0.02, 0.2, 0); }
+    else if (st === 'bball') { const b = mesh(sph(0.12), M(c, { r: 0.8 }), g); b.position.y = 0.04; for (const r of [0, Math.PI / 2]) { const l = mesh(geo('bbl', () => new THREE.TorusGeometry(0.121, 0.005, 6, 32)), M('#2a1a1a'), g); l.position.y = 0.04; l.rotation.y = r; } }
+    else if (st === 'guitar2') { g.rotation.set(0.2, 0, -0.95); g.position.set(0.12, 0.02, 0.16); const b = mesh(sph(1), M(c, { cc: 1 }), g); b.scale.set(0.16, 0.2, 0.05); const n = mesh(geo('gneck', () => new THREE.BoxGeometry(0.04, 0.42, 0.025)), M('#5a3a2a'), g); n.position.y = 0.36; mesh(geo('ghd', () => new THREE.BoxGeometry(0.07, 0.08, 0.03)), M('#2a2438'), g).position.y = 0.6; for (let i = 0; i < 4; i++) { const s2 = mesh(cap(0.002, 0.5), M('#e0e0e0'), g); s2.position.set(-0.012 + i * 0.008, 0.3, 0.03); } }
+    else if (['berry', 'cookie', 'cake', 'apple', 'carrot', 'fish', 'bamboo', 'honey', 'leaf', 'seed'].includes(st)) {
+      if (st === 'cookie') { const k = mesh(geo('cook', () => new THREE.CylinderGeometry(0.07, 0.07, 0.02, 20)), M(c), g); k.rotation.x = Math.PI / 2; }
+      else if (st === 'cake') { mesh(geo('cakeb', () => new THREE.CylinderGeometry(0.07, 0.07, 0.07, 20)), M('#fff0f8'), g); mesh(sph(0.02), M('#e8434f'), g).position.y = 0.05; }
+      else if (st === 'carrot' || st === 'bamboo') { const k = mesh(st === 'carrot' ? cone(0.03, 0.16) : cap(0.025, 0.2), M(c), g); k.rotation.z = 1.2; }
+      else if (st === 'fish') { const f = mesh(sph(1), M(c, { cc: 1 }), g); f.scale.set(0.1, 0.045, 0.03); const tl = mesh(cone(0.04, 0.06), M(c), g); tl.position.x = -0.11; tl.rotation.z = Math.PI / 2; }
+      else if (st === 'honey') { mesh(geo('hjar', () => new THREE.CylinderGeometry(0.05, 0.05, 0.09, 18)), M(c, { op: 0.9, cc: 1 }), g); }
+      else if (st === 'leaf') { const l = mesh(sph(1), M(c), g); l.scale.set(0.08, 0.04, 0.012); }
+      else mesh(sph(st === 'seed' ? 0.03 : st === 'apple' ? 0.07 : 0.05), M(c, { cc: 0.8 }), g); }
     if (st === 'wand') { const s = mesh(cap(0.012, 0.3), M('#ffffff'), g); s.position.y = 0.16; const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.035 : 0.08; sh[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } const st2 = mesh(geo('wstar', () => new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false })), M(c, { em: c }), g); st2.position.y = 0.34; }
     else if (st === 'balloon') { const s = mesh(cap(0.004, 0.6), M('#ffffff'), g); s.position.y = 0.32; const b = mesh(sph(1), M(c, { cc: 1 }), g); b.scale.set(0.15, 0.18, 0.15); b.position.y = 0.75; }
     else if (st === 'icecream') { const k = mesh(cone(0.05, 0.14), M('#e0a060'), g); k.rotation.x = Math.PI; k.position.y = 0.03; mesh(sph(0.06), M(c), g).position.y = 0.13; }
@@ -425,4 +441,16 @@ export function renderItemThumb(pal, slot, id, px = 96, opt = {}) {
   const [fx, fy, fw, fh] = FOCUS[slot] || [-0.05, -0.04, 1.1, 1.08]; const bx = S0 * 0.31, bw = S0 * 0.38, by = S0 * 0.06, bh = S0 * 0.8; // Pal's box in the render
   const sw = Math.max(fw * bw, fh * bh), sx = bx + fx * bw + (fw * bw - sw) / 2, sy = by + fy * bh + (fh * bh - sw) / 2;
   c.drawImage(R.domElement, sx, sy, sw, sw, 0, 0, px, px); return cv;
+}
+
+// Hand items: elbow bent so the item is held up in front; two-handed guitar brings the other paw to the neck;
+// eating lifts the food to the mouth. Dances keep their arm motion (blend shrinks with dance amount).
+function grip(m, amt, mode, t) {
+  const J = m.userData.J; if (!J.grip) return; const k = 1 - Math.min(1, amt) * 0.6;
+  // rig axes: upper arm -x = raise forward, lower arm +x = bend elbow forward
+  if (J.RightLowerArm) J.RightLowerArm.rotation.x += 0.9 * k;
+  if (J.RightUpperArm) J.RightUpperArm.rotation.x += -0.3 * k;
+  if (mode === 'eat' && J.RightUpperArm) { const bite = 0.5 + 0.5 * Math.sin(t * 0.25); J.RightUpperArm.rotation.x += -0.9 - 0.4 * bite; J.RightUpperArm.rotation.z += -0.35; J.RightLowerArm.rotation.x += 0.8 + 0.5 * bite; if (J.LeftLowerArm) { J.LeftUpperArm.rotation.x += -0.6; J.LeftLowerArm.rotation.x += 1.0; } }
+  if (J.twoHand && J.LeftUpperArm) { const k2 = 1 - Math.min(1, amt) * 0.7; J.LeftUpperArm.rotation.x += -0.9 * k2; J.LeftUpperArm.rotation.z += 0.55 * k2; J.LeftLowerArm.rotation.x += 1.1 * k2;
+    J.RightLowerArm.rotation.x += Math.sin(t * 0.5) * 0.15 * k2; }
 }

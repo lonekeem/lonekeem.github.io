@@ -12,7 +12,7 @@ addItems([...WEAR.filter((w) => w.p), ...BGS.filter((b) => b.p).map((b) => ({ ..
 const EMO = { cap: '🧢', beanie: '🧶', bucket: '👒', tiara: '👸', crown: '👑', tophat: '🎩', helmet: '⛑️', earband: '🐱', wizard: '🧙', santa: '🎅', flowers: '🌸', bow: '🎀', bow2: '🎀', clips: '⭐', pigtails: '💇', bun: '🍡', quiff: '💈',
   round: '👓', lens: '🕶️', heart: '💖', star: '🌟', stud: '💎', hoop: '⭕', drop: '✨', beads: '📿', chain: '⛓️', locket: '💝', medal: '🏅', scarf: '🧣', tie: '👔', bowtie: '🎀', tee: '👕', hoodie: '🧥', jersey: '🎽', sweater: '🧶', puffer: '🧥', blouse: '👚',
   shorts: '🩳', skirt: '👗', tutu: '🩰', pants: '👖', dress: '👗', gown: '👸', overalls: '👖', pjs: '🌙', suit: '🤵', kit: '⚽', uniform: '🏫', coat: '🧥', swim: '🩱', dino: '🦖', astro: '🧑‍🚀', hero: '🦸', xmas: '🎄',
-  sneakers: '👟', boots: '🥾', flats: '🩰', sandals: '🩴', cape: '🦸', wings: '🧚', angel: '😇', jetpack: '🚀', backpack: '🎒', purse: '👛', satchel: '💼', wand: '🪄', balloon: '🎈', icecream: '🍦', teddy: '🧸', guitar: '🎸', ball: '⚽', mic: '🎤', umbrella: '☂️',
+  sneakers: '👟', boots: '🥾', flats: '🩰', sandals: '🩴', cape: '🦸', wings: '🧚', angel: '😇', jetpack: '🚀', backpack: '🎒', purse: '👛', satchel: '💼', wand: '🪄', balloon: '🎈', icecream: '🍦', teddy: '🧸', guitar: '🎸', guitar2: '🎸', handbag: '👜', phone: '📱', bouquet: '💐', boba: '🧋', bball: '🏀', ball: '⚽', mic: '🎤', umbrella: '☂️',
   bracelet: '💫', beadband: '📿', watch: '⌚', ring: '💍', gem: '💍' };
 export function createPalStore(ctx) {
   const { S, esc, toast, openModal, closeModal, friendlyError, requireAuth, econ, myPals, activeOf, commit } = ctx;
@@ -30,7 +30,7 @@ export function createPalStore(ctx) {
         <button class="ps-bgbtn" id="ps-bgbtn" type="button" aria-label="Change background">🖼️</button><button class="ps-bgbtn ps-rot" id="ps-rot" type="button" aria-label="Spin">🔄</button></div>
       <div class="ps-actions"><button class="btn btn-sm btn-ghost" id="ps-undo">↶ Undo</button><button class="btn btn-sm btn-ghost" id="ps-reset">Reset</button><button class="btn btn-sm btn-ghost" id="ps-rand">🎲 Random</button><button class="btn btn-sm" id="ps-save">💾 Save Look</button></div>
       <div class="ps-looks" id="ps-looks"></div>
-      <div class="ps-tabs" role="tablist">${[['outfits', '👗 Outfits'], ['jewelry', '💍 Jewelry & Accessories'], ['looks', '🎨 Looks'], ['bgs', '🖼️ Backgrounds'], ['dances', '💃 Dances'], ['pals', '🐾 Pals']].map(([k, n]) => `<button class="chip" data-tab="${k}" role="tab">${n}</button>`).join('')}</div>
+      <div class="ps-tabs" role="tablist">${[['outfits', '👗 Outfits'], ['jewelry', '💍 Jewelry & Accessories'], ['hand', '🧸 Hand Items'], ['looks', '🎨 Looks'], ['bgs', '🖼️ Backgrounds'], ['dances', '💃 Dances'], ['pals', '🐾 Pals']].map(([k, n]) => `<button class="chip" data-tab="${k}" role="tab">${n}</button>`).join('')}</div>
       <div id="ps-filters" class="ps-filters"></div><div id="ps-grid" class="ps-grid"></div></section>`;
     const $ = (s) => main.querySelector(s);
     // stage: background + 3D Pal, drag to rotate, wheel/pinch to zoom
@@ -46,8 +46,8 @@ export function createPalStore(ctx) {
     const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; pv.textContent = u.length ? `Preview · ${u.length} to buy · ★${u.reduce((a, b) => a + (b.p || 0), 0)}` : ''; grid(); };
     const tile = (id, name, price, r, emo, on, ownd, extra = '') => `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${extra} style="--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}"><span class="ps-emo" data-th="${esc(id)}">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : `★ ${price}`}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`;
     function filters() {
-      const f = $('#ps-filters'); if (tab !== 'outfits' && tab !== 'jewelry') { f.innerHTML = ''; return; }
-      const sl = tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s));
+      const f = $('#ps-filters'); if (tab !== 'outfits' && tab !== 'jewelry' && tab !== 'hand') { f.innerHTML = ''; return; }
+      const sl = tab === 'hand' ? [] : tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s) && s !== 'held');
       f.innerHTML = `<div class="ps-row">${[['a', 'All'], ['g', 'Girls'], ['b', 'Boys']].map(([k, n]) => `<button class="chip ${gf === k ? 'on' : ''}" data-g="${k}">${n}</button>`).join('')}</div>
         <div class="ps-row"><button class="chip ${slot === 'all' ? 'on' : ''}" data-s="all">Everything</button>${sl.map((s) => `<button class="chip ${slot === s ? 'on' : ''}" data-s="${s}">${WSLOT_NAMES[s]}</button>`).join('')}</div><p class="small">Anyone can wear anything ✨</p>`;
       f.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { gf = b.dataset.g; filters(); grid(); });
@@ -63,8 +63,8 @@ export function createPalStore(ctx) {
       if (q.length) requestAnimationFrame(pump); }
     function grid() {
       const g = $('#ps-grid'); let h = '';
-      if (tab === 'outfits' || tab === 'jewelry') { const sl = tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s));
-        const list = WEAR.filter((w) => sl.includes(w.slot) && (slot === 'all' || w.slot === slot) && (gf === 'a' || w.g === gf || w.g === 'a'));
+      if (tab === 'outfits' || tab === 'jewelry' || tab === 'hand') { const sl = tab === 'hand' ? ['held'] : tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s) && s !== 'held');
+        const list = WEAR.filter((w) => !w.hidden && sl.includes(w.slot) && (slot === 'all' || w.slot === slot) && (gf === 'a' || w.g === gf || w.g === 'a'));
         h = list.map((w) => tile(w.id, w.name, w.p, w.r, EMO[w.st] || '✨', D.outfit[w.slot] === w.id, own(w.id), `data-slot="${w.slot}" style="--ic:${w.col}"`)).join(''); }
       if (tab === 'bgs') h = `<button class="ps-tile ${!D.bg ? 'on' : ''}" data-bg=""><span class="ps-emo">🟪</span><b>Plain Stage</b><small>Free</small></button>` + BGS.map((b) => `<button class="ps-tile ps-bgt ${D.bg === b.id ? 'on' : ''}" data-bg="${b.id}" style="--rc:${RARITY[b.r].col}"><canvas width="96" height="64"></canvas><b>${esc(b.name)}</b><small>${own(b.id) ? (b.p ? '✓ Owned' : 'Free') : `★ ${b.p} · ${RARITY[b.r].name}`}${b.fx && !/sparkle|twinkle/.test(b.fx) ? ' · animated' : ''}</small></button>`).join('');
       if (tab === 'looks') h = `<h3 class="ps-h">Patterns</h3>` + PATTERNS.map((x) => tile(x.id, x.name, x.p, x.r || 'c', { none: '⬜', spots: '🟤', stripes: '〰️', sparkle: '✨', pt_hearts: '💗', pt_stars: '⭐', pt_rainbow: '🌈', pt_galaxy: '🌌' }[x.id], D.pattern === x.id, own(x.id), 'data-pt="1"')).join('')
@@ -86,8 +86,8 @@ export function createPalStore(ctx) {
     $('#ps-bgbtn').onclick = () => { setTab('bgs'); $('#ps-grid').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     $('#ps-undo').onclick = () => { if (!hist.length) return toast('Nothing to undo'); D = JSON.parse(hist.pop()); refresh(); };
     $('#ps-reset').onclick = () => { snap(); D = saved(); refresh(); toast('Back to your saved look'); };
-    $('#ps-rand').onclick = () => { snap(); const o = {}; for (const s of ['head', 'hair', 'face', 'neck', 'feet', 'held']) if (Math.random() < 0.6) { const l = WEAR.filter((w) => w.slot === s && w.free); o[s] = l[Math.floor(Math.random() * l.length)].id; }
-      const fl = WEAR.filter((w) => w.slot === 'full' && w.free); if (Math.random() < 0.5) o.full = fl[Math.floor(Math.random() * fl.length)].id; else for (const s of ['body', 'bottom']) { const l = WEAR.filter((w) => w.slot === s && w.free); o[s] = l[Math.floor(Math.random() * l.length)].id; }
+    $('#ps-rand').onclick = () => { snap(); const o = {}; for (const s of ['head', 'hair', 'face', 'neck', 'feet', 'held']) if (Math.random() < 0.6) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
+      const fl = WEAR.filter((w) => w.slot === 'full' && w.free); if (Math.random() < 0.5) o.full = fl[Math.floor(Math.random() * fl.length)].id; else for (const s of ['body', 'bottom']) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
       D.outfit = o; const fb = BGS.filter((b) => !b.p); D.bg = fb[Math.floor(Math.random() * fb.length)].id; refresh(); };
     async function save() {
       const u = unowned(); const cost = u.reduce((a, b) => a + (b.p || 0), 0);
