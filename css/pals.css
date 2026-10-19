@@ -38,3 +38,15 @@
 .pal-gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 10px 0 14px; }
 .pal-gcard { display: grid; justify-items: center; gap: 2px; padding: 8px; border-radius: 16px; background: rgba(138,43,226,.06); border: 1px solid rgba(170,120,255,.2); text-align: center; position: relative; }
 .pal-gcard.got { border-color: rgba(255,211,77,.6); } .pal-gcard small { color: var(--muted); font-size: .7rem; } .pal-got { position: absolute; top: 6px; right: 6px; font-size: .62rem; font-weight: 700; background: #ffd34d; color: #2a1458; border-radius: 999px; padding: 1px 6px; }
+/* live overlay */
+.pal-live { position: absolute; z-index: 6; right: 10px; top: 96px; width: 96px; height: 96px; touch-action: none; cursor: grab; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
+.pal-live[hidden] { display: none; }
+.pal-live-hide { position: absolute; z-index: 6; right: 10px; top: 62px; font: 600 11px Inter, sans-serif; color: #fff; background: rgba(40,18,84,.7); border: 1px solid rgba(200,160,255,.45); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+/* scroll pop-ups: mid-height edges, clear of bottom video controls */
+.pal-pop { position: fixed; z-index: 90; top: 38%; width: 90px; height: 90px; cursor: pointer; transition: transform .45s cubic-bezier(.3,1.6,.5,1), opacity .4s; animation: palpeek .55s cubic-bezier(.3,1.6,.5,1) both; }
+.pal-pop.left { left: 0; --from: -100px; } .pal-pop.right { right: 0; --from: 100px; }
+.pal-pop.out { opacity: 0; transform: translateX(var(--from)); }
+.pal-pop.rm { animation: palfade .3s both; transition: opacity .3s; } .pal-pop.rm.out { transform: none; }
+.pal-pop-say { position: absolute; bottom: 82px; white-space: nowrap; background: #fff; color: #2a1458; font: 700 12px Inter, sans-serif; padding: 5px 10px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.pal-pop.left .pal-pop-say { left: 10px; } .pal-pop.right .pal-pop-say { right: 10px; } .pal-pop.poof .pal-pop-say { opacity: 0; transition: opacity .2s; }
+@keyframes palpeek { from { transform: translateX(var(--from)); } to { transform: none; } } @keyframes palfade { from { opacity: 0; } to { opacity: 1; } }

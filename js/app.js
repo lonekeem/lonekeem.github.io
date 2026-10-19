@@ -604,7 +604,7 @@ const stories = createStories({
   openStory: () => composer.openStory(), sendMessage, refreshProfile,
   fs: { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, writeBatch, Timestamp, serverTimestamp }
 });
-const live = createLive({
+const live = createLive({ palLive: (root, o) => pals.liveOverlay(root, o),
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal, reportDialog: (...x) => reportDialog(...x),
   fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
 });

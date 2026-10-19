@@ -1,5 +1,6 @@
 // Kemy Pals: original virtual pets that live next to your profile.
 import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf } from './art.js';
+import { liveOverlay, popups } from './overlays.js';
 import { createStore, liveStats, moodOf, patPal, readPet, firstPet, formName, isNight, xpToLevel, MAX_PALS, tsMs, listPals, getActivePal, playdate, newPlaydates } from './core.js';
 
 export const PALS_COPY = "Meet your Kemy Pal 🐾 Hatch your own cute companion from dozens of Pals like a baby elephant, puppy, panda, baby dragon and more, give it a name, colors and outfits, and watch it hang out next to your profile. Give it bubbly showers, feed it snacks, brush it, tuck it into bed and play catch, and watch it glow up as you level. Collect up to 6 Pals, and let your friends give yours a pat.";
@@ -32,6 +33,7 @@ export function createPals(ctx) {
   const { S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth } = ctx; const notify = ctx.notify || (() => {});
   if (!document.getElementById('pals-css')) { const l = document.createElement('link'); l.id = 'pals-css'; l.rel = 'stylesheet'; l.href = 'css/pals.css?v=1'; document.head.appendChild(l); }
   let mine = null; // { uid, list, store }
+  const pop = popups({ S, db });
   const debug = () => localStorage.getItem('kemy-pals-debug') === '1';
   async function myPals(force) {
     if (!S.user || !S.profile) return null;
@@ -313,7 +315,10 @@ export function createPals(ctx) {
         if (p) return `<div class="pal-card ${act && act.id === id ? 'active' : ''}" data-id="${id}"><div class="pal-thumb"></div><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv ${p.level}</small>
           <div class="pal-card-b"><button class="btn btn-sm" data-c="care">Care</button><button class="btn btn-sm btn-ghost" data-c="style">Style</button>${act && act.id === id ? '<span class="pal-on">On profile</span>' : '<button class="btn btn-sm btn-ghost" data-c="show">Show on profile</button>'}</div></div>`;
         return id === firstEmpty && m.list.length < n ? `<button class="pal-card egg" data-hatch="${id}"><div class="pal-thumb"></div><b>Egg ready!</b><small>Tap to hatch</small></button>` : `<div class="pal-card locked"><div class="pal-lock">🔒</div><small>Level up your Pals to unlock</small></div>`; }).join('')}</div>
-      ${debug() ? '<p class="small muted">Test mode is on (debug XP button in the care sheet).</p>' : ''}</section>`;
+      <label class="check small pal-popset"><input type="checkbox" id="pal-pops" ${pop.enabled() ? 'checked' : ''}> Pal pop-ups while I scroll videos</label>
+      ${debug() ? '<p class="small muted">Test mode is on (debug XP button in the care sheet). <button class="btn btn-sm btn-ghost" id="pal-poptest">Test pop-up</button></p>' : ''}</section>`;
+    main.querySelector('#pal-pops').onchange = (e) => { pop.set(e.target.checked); toast(e.target.checked ? 'Pal pop-ups on' : 'Pal pop-ups off'); };
+    const pt = main.querySelector('#pal-poptest'); if (pt) pt.onclick = () => pop.show(true);
     main.querySelectorAll('.pal-card[data-id]').forEach((card) => { const p = m.list.find((x) => x.id === card.dataset.id); const s = stage(card.querySelector('.pal-thumb'), 110, 90);
       const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawPal(s.c, 55, 84, 74, p, { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
       card.querySelectorAll('[data-c]').forEach((b) => b.onclick = async () => { const c = b.dataset.c;
@@ -335,5 +340,5 @@ export function createPals(ctx) {
   }
   // XP from activity elsewhere in the app: dispatchEvent(new CustomEvent('kemy:xp', { detail: { n } }))
   addEventListener('kemy:xp', async (e) => { try { const m = await myPals(); if (!m) return; const p = activeOf(m); if (!p) return; await commit(p, { xpGain: Math.min(60, (e.detail && e.detail.n) || 10) }); } catch {} });
-  return { renderProfile, onRoute, page, intro, openSheet, gallery };
+  return { renderProfile, onRoute, page, intro, openSheet, gallery, liveOverlay: (root, o) => liveOverlay({ S, db, toast }, root, o), popups: pop };
 }

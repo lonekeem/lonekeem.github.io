@@ -502,7 +502,8 @@ service cloud.firestore {
       let n = request.resource.data;
       let o = resource.data;
       return actingAs(o.hostId) && o.status == 'live'
-        && changed().hasOnly(['heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount', 'status', 'endedAt', 'endedBy'])
+        && changed().hasOnly(['heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount', 'status', 'endedAt', 'endedBy', 'palHidden'])
+        && (!('palHidden' in n) || n.palHidden is bool)
         && n.heartbeatAt == request.time
         && n.viewerCount is int && n.viewerCount >= 0 && n.viewerCount <= maxViewers(o)
         && n.peakViewers is int && n.peakViewers >= o.peakViewers && n.peakViewers <= maxViewers(o)

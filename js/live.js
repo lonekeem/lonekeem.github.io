@@ -420,6 +420,7 @@ export function createLive(ctx) {
         </div>
       </div></div>`;
     const root = $('#lv'), v = $('#lv-video');
+    ctx.palLive && ctx.palLive(root, { liveId: id, hostId: host.uid, isHost: true });
     v.srcObject = H.stream; v.play().catch(() => {});
     const counted = () => [...peers.values()].filter((p) => p.connected).length;
     const paint = () => {
@@ -614,6 +615,7 @@ export function createLive(ctx) {
           <button class="lv-starbtn" id="lv-starbtn" aria-label="Send a star (or tap the video)">${STAR}<span class="lv-starbadge" id="lv-starsn" aria-label="Total stars">0</span></button></div>` : ''}
       </div></div>`;
     const root = $('#lv'), v = $('#lv-video');
+    ctx.palLive && ctx.palLive(root, { liveId: id, hostId: l.hostId, isHost: false });
     let pc = null, left = false, connected = false, connT = 0, starsOut = null;
     const unsubs = [];
     const waitMsg = (html, spinner = false) => { const w = $('#lv-wait'); if (!w) return; w.hidden = false; w.querySelector('#lv-wait-msg').innerHTML = html; const sp = w.querySelector('.spinner'); if (sp) sp.hidden = !spinner; };
@@ -761,6 +763,7 @@ export function createLive(ctx) {
           : `<p class="lv-hostnote small"><a href="#/login?next=${encodeURIComponent('#/live/' + id)}">Log in</a> to chat and send stars.</p>`}
       </div></div>`;
     const root = $('#lv');
+    ctx.palLive && ctx.palLive(root, { liveId: id, hostId: l.hostId, isHost: !!host });
     let left = false, player = null, playing = false, starsOut = null, stars = l.starCount || 0;
     let peak = l.peakViewers || 0, total = l.totalViewers || 0, lastCount = l.viewerCount || 0;
     const unsubs = []; const timers = [];

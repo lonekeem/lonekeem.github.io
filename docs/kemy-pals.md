@@ -56,3 +56,7 @@ liveStats(pal) -> { happy, hunger, energy, clean }; moodOf(stats) -> { dirty, sa
 - **Pal Park (real time)**: keep positions in a separate ephemeral collection (e.g. `parkRooms/{room}/walkers/{uid}`
   `{ x, y, face, mode, petId, at }`); render each walker with `drawPal` using the pet doc fetched once. Don't write pet docs per frame.
 - Pet docs are small and public, so cache them per session.
+
+## Overlays (`js/pals/overlays.js`)
+- `liveOverlay(ctx, root, { liveId, hostId, isHost })`: the host's active Pal bounces onto live screens (in-app WebRTC and YouTube big live) as a DOM canvas overlay (never in the video). Draggable (position saved per device), catches/wiggles when `.lstar` stars float, waves when the viewer count rises, viewers tap to pet (2.5 s local cooldown + one counted pat per day via the pats rules). The host's "Hide Pal" sets `lives/{id}.palHidden` (whitelisted in the host live-update rule).
+- `popups({ S, db })`: occasional pop-ups of your own Pal while scrolling video screens (For You, Following, Explore, Movies/Songs, profiles, stories, posts): at most once per 4 minutes, mid-height screen edge (clear of bottom video controls), mood lines ("Feed me!"), tap = bubble poof. Toggle in Pal Box (`localStorage['kemy-pals-popups']`). Reduced motion: fade only.
