@@ -14,8 +14,9 @@ const D = Math.PI / 180;
 let R = null, scene, cam, keyL, shadowPlane;
 // Graphics: 'ultra' (opt-in) | 'high' (default) | 'low' (= 2D art). Ultra steps down if FPS stays under ~30.
 const GK = 'kemy-pal-gfx';
-export function gfxLevel() { try { const v = localStorage.getItem(GK); if (v === 'ultra' || v === 'high' || v === 'low') return v; } catch { /* */ } const n = navigator; void n; return 'high'; }
-export function setGfx(v) { try { localStorage.setItem(GK, v); } catch { /* */ } if (R) { const r = v === 'ultra' ? 448 : 256; RES = r; R.setSize(r, r, false); keyL.shadow.mapSize.set(v === 'ultra' ? 1024 : 512, v === 'ultra' ? 1024 : 512); keyL.shadow.map?.dispose(); keyL.shadow.map = null; } }
+export function gfxLevel() { if (autoG) return autoG; try { const v = localStorage.getItem(GK); if (v === 'ultra' || v === 'high' || v === 'low') return v; } catch { /* */ } const n = navigator; void n; return 'high'; }
+let autoG = null; // auto step-down lasts for this visit only (never saved), so a slow moment doesn't stick forever
+export function setGfx(v, auto) { if (auto) autoG = v; else { autoG = null; try { localStorage.setItem(GK, v); } catch { /* */ } } if (R) { const r = v === 'ultra' ? 448 : 256; RES = r; R.setSize(r, r, false); keyL.shadow.mapSize.set(v === 'ultra' ? 1024 : 512, v === 'ultra' ? 1024 : 512); keyL.shadow.map?.dispose(); keyL.shadow.map = null; } }
 let RES = 448;
 const cache = new Map(); let lost = false;
 export function webglOK() {
@@ -282,7 +283,7 @@ function blend(a, b, k) { const o = {}; for (const key of new Set([...Object.key
 // ---------------------------------------------------------------- draw into a 2D canvas (same args as drawPal)
 let frameN = -1, frameCount = 0; const BUDGET = 8;
 let lastF = 0, slow = 0;
-function watchFps(now) { if (lastF) { const dt = now - lastF; if (dt > 34 && dt < 400) slow++; else if (dt < 25) slow = Math.max(0, slow - 2); if (slow > 120) { slow = 0; const g = gfxLevel(); if (g === 'ultra') setGfx('high'); else if (g === 'high') { setGfx('low'); lost = true; } } } lastF = now; }
+function watchFps(now) { if (lastF) { const dt = now - lastF; if (dt > 34 && dt < 400) slow++; else if (dt < 25) slow = Math.max(0, slow - 2); if (slow > 120) { slow = 0; const g = gfxLevel(); if (g === 'ultra') setGfx('high', 1); else if (g === 'high') { setGfx('low', 1); lost = true; } } } lastF = now; }
 export function drawPal3D(c, x, y, size, pal, st = {}) {
   const now = performance.now(), f = Math.floor(now / 16); if (f !== frameN) { frameN = f; frameCount = 0; watchFps(now); }
   if (++frameCount > BUDGET) return false; // too many Pals this frame: caller draws 2D
