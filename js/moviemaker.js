@@ -17,7 +17,7 @@ export const STYLES = {
   comic: { name: 'Comic', genre: 'Action', prompt: 'comic book panel art, halftone dots, bold ink lines, dynamic composition, vivid colors' },
   claymation: { name: 'Claymation', genre: 'Animation', prompt: 'claymation stop motion still, handmade plasticine characters, soft studio lighting, miniature set' }
 };
-const MOODS = { upbeat: 'Upbeat', calm: 'Calm', epic: 'Epic', spooky: 'Spooky', none: 'No music' };
+const MOODS = { theme: 'Kemy theme: Stand Up Strong (Lone Keem)', upbeat: 'Upbeat', calm: 'Calm', epic: 'Epic', spooky: 'Spooky', none: 'No music' };
 
 // ---------------------------------------------------------------- safety
 const BLOCK = [
@@ -163,11 +163,30 @@ export async function placeholderArt(text, seed) {
 function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 function wrap(g, text, maxW) { const words = String(text).split(/\s+/); const lines = []; let cur = ''; for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur); return lines; }
 
-// ---------------------------------------------------------------- music (original loops, synthesised)
+// ---------------------------------------------------------------- music
+// Kemy's theme song (default): "Stand Up Strong" (Instrumental), written by Lone Keem. Loops to fit the movie.
+let themeBuf = null;
+function themeMusic(ac, dest, seconds) {
+  const out = ac.createGain(); out.gain.value = 0.0001; out.connect(dest);
+  let src = null, stopped = false;
+  const t0 = ac.currentTime + 0.05;
+  out.gain.exponentialRampToValueAtTime(0.5, t0 + 1.5); out.gain.setValueAtTime(0.5, t0 + Math.max(2, seconds - 2.5)); out.gain.exponentialRampToValueAtTime(0.0001, t0 + seconds);
+  (async () => {
+    try {
+      if (!themeBuf) { const r = await fetch(new URL('../assets/audio/kemy-theme.mp3', import.meta.url)); if (!r.ok) throw new Error('theme ' + r.status); themeBuf = await ac.decodeAudioData(await r.arrayBuffer()); }
+      if (stopped) return;
+      src = ac.createBufferSource(); src.buffer = themeBuf; src.loop = true; src.connect(out);
+      const off = Math.max(0, ac.currentTime - t0); src.start(ac.currentTime, off % themeBuf.duration); src.stop(t0 + seconds + 0.1);
+    } catch (e) { console.warn('theme music unavailable', e); }
+  })();
+  return () => { stopped = true; try { src && src.stop(); } catch { /* */ } out.disconnect(); };
+}
+// original loops, synthesised
 const PROG = { upbeat: [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]], calm: [[0, 4, 7, 11], [5, 9, 12, 16], [9, 12, 16, 19], [7, 11, 14, 17]], epic: [[0, 3, 7], [8, 12, 15], [3, 7, 10], [10, 14, 17]], spooky: [[0, 3, 6], [1, 4, 8], [0, 3, 7], [11, 14, 17]] };
 const ROOT = { upbeat: 60, calm: 57, epic: 50, spooky: 52 }, BPM = { upbeat: 112, calm: 72, epic: 84, spooky: 66 };
 export function startMusic(ac, dest, mood, seconds) {
   if (mood === 'none') return () => {};
+  if (mood === 'theme') return themeMusic(ac, dest, seconds);
   const out = ac.createGain(); out.gain.value = 0.0001; out.connect(dest);
   const t0 = ac.currentTime + 0.05; out.gain.exponentialRampToValueAtTime(0.32, t0 + 1.5); out.gain.setValueAtTime(0.32, t0 + Math.max(2, seconds - 2.5)); out.gain.exponentialRampToValueAtTime(0.0001, t0 + seconds);
   const beat = 60 / BPM[mood], bar = beat * 4, nodes = [];

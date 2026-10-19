@@ -1,4 +1,5 @@
 // Kemy Pals: original virtual pets that live next to your profile.
+import { playIntro } from '../theme.js';
 import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf } from './art.js';
 import { liveOverlay, popups } from './overlays.js';
 import { createShopUI } from './shop.js';
@@ -320,7 +321,7 @@ export function createPals(ctx) {
     const box = document.querySelector('.pal-eggbox'); const s = stage(box, 200, 150); let cracks = 0, hatched = 0; const fx = particles();
     const f = (t) => { s.c.clearRect(0, 0, 200, 150); if (!hatched) drawEgg(s.c, 100, 140, 120, RM() ? 0 : t * (1 + cracks), cracks); else { hatched++; drawPal(s.c, 100, 140, 110, { species: 'kemy', level: 1 }, { t, mode: 'happy' }); s.c.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - hatched / 30)})`; s.c.fillRect(0, 0, 200, 150); } fx.draw(s.c); };
     f.el = s.cv; loop(f);
-    const crack = () => { cracks++; snd('pop'); fx.add(100, 80, 'star', 4); if (cracks >= 3) { hatched = 1; snd('hatch'); fx.add(100, 70, 'star', 18); setTimeout(() => creator({ slot: freeSlot, first: !m.list.length, onDone: () => { if (location.hash.startsWith('#/u/') || location.hash.startsWith('#/pals')) dispatchEvent(new HashChangeEvent('hashchange')); } }), 900); } };
+    const crack = () => { cracks++; if (cracks === 1) playIntro(); snd('pop'); fx.add(100, 80, 'star', 4); if (cracks >= 3) { hatched = 1; snd('hatch'); fx.add(100, 70, 'star', 18); setTimeout(() => creator({ slot: freeSlot, first: !m.list.length, onDone: () => { if (location.hash.startsWith('#/u/') || location.hash.startsWith('#/pals')) dispatchEvent(new HashChangeEvent('hashchange')); } }), 900); } };
     s.cv.onclick = crack; document.getElementById('pal-crack').onclick = crack;
   }
   function onRoute(hash) {
