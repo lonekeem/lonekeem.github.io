@@ -1296,3 +1296,38 @@ body.cam-open .mini-player { display: none; }
 .lv-msg { position: relative; }
 .lv-rep { margin-left: auto; align-self: center; flex: none; border: 0; background: none; color: rgba(255,255,255,.55); padding: 4px; cursor: pointer; pointer-events: auto; }
 .lv-rep:hover, .lv-rep:focus-visible { color: #ffd166; }
+/* ---------- Kemy AI Movie Maker ---------- */
+.mm { max-width: 860px; margin: 0 auto; }
+.mm-form textarea, .mm-head input, .mm-fields textarea { width: 100%; }
+.mm-styles { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 4px 0 14px; }
+.mm-styles legend { font-weight: 600; margin-bottom: 6px; }
+.mm-styles label { position: relative; }
+.mm-styles input { position: absolute; opacity: 0; }
+.mm-styles span { display: inline-block; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(160,110,255,.35); background: rgba(138,43,226,.08); cursor: pointer; }
+.mm-styles input:checked + span { background: linear-gradient(135deg,#8a2be2,#b45cff); color: #fff; border-color: transparent; }
+.mm-styles input:focus-visible + span { outline: 2px solid #ffd166; }
+.mm-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 560px) { .mm-row { grid-template-columns: 1fr 1fr; } .mm-row .field:last-child { grid-column: 1 / -1; } }
+.mm-note { margin: 10px 0; }
+.mm-free { margin: 8px 0 0; text-align: center; }
+.mm-collapsed > :not(#mm-go):not(.form-error) { display: none; }
+.mm-head { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; flex-wrap: wrap; }
+.mm-head input { flex: 1; min-width: 200px; font: 700 1.3rem "Space Grotesk", Inter, sans-serif; background: transparent; border: 0; border-bottom: 2px solid rgba(160,110,255,.4); color: inherit; padding: 4px 0; }
+.mm-scenes { display: grid; gap: 12px; }
+.mm-scene { display: grid; grid-template-columns: 240px 1fr; gap: 12px; padding: 10px; }
+@media (max-width: 600px) { .mm-scene { grid-template-columns: 1fr; } }
+.mm-art { position: relative; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; background: #150d24; display: grid; place-items: center; }
+.mm-art img { width: 100%; height: 100%; object-fit: cover; }
+.mm-wait { display: grid; place-items: center; gap: 8px; text-align: center; padding: 10px; }
+.mm-num { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.6); color: #ffd166; font-weight: 700; border-radius: 999px; padding: 1px 9px; font-size: .8rem; }
+.mm-ph { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,.6); font-size: .7rem; border-radius: 6px; padding: 1px 6px; }
+.mm-fields { display: grid; gap: 6px; align-content: start; }
+.mm-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+#mm-add { margin: 10px 0; }
+.mm-out canvas, .mm-video { width: 100%; aspect-ratio: 16/9; border-radius: 12px; background: #000; display: block; }
+.mm-video { margin-top: 12px; }
+.mm-post { margin-top: 14px; border-top: 1px solid rgba(160,110,255,.2); padding-top: 12px; }
+.wmm { margin-left: 6px; }
+.mm select { width: 100%; background: #07050c; border: 1px solid var(--border); border-radius: 12px; padding: 11px 12px; font-size: 16px; color: inherit; }
+.mm .mm-head input[type=text] { background: transparent; border: 0; border-bottom: 2px solid rgba(160,110,255,.4); border-radius: 0; padding: 4px 0; font: 700 1.3rem "Space Grotesk", Inter, sans-serif; }
+.mm-fields textarea { min-height: 64px; }

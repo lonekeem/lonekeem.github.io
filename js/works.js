@@ -385,7 +385,7 @@ export function createWorks(ctx) {
       <section class="wsec">
         <h2 class="wsec-h">${WORK_IC[kind]} ${esc(D.heading)}</h2>
         <p class="wintro clamp" id="wintro">${esc(D.intro)}</p><button class="link-btn wmorebtn" type="button" aria-expanded="false">more</button>
-        <a class="btn btn-sm wnew" href="#/new/${kind}">+ Share ${isSong ? 'a song' : 'a movie'}</a>
+        <a class="btn btn-sm wnew" href="#/new/${kind}">+ Share ${isSong ? 'a song' : 'a movie'}</a>${isSong ? '' : '<a class="btn btn-sm btn-ghost wnew wmm" href="#/new/aimovie">✨ Make an AI movie</a>'}
         <div class="wpicks" hidden><h3>★ Studio Picks</h3><div class="wrow"></div></div>
         <div class="wchips" role="toolbar" aria-label="Genres"><button class="chip on" data-g="">All</button>${GENRES[kind].map((g) => `<button class="chip" data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div>
         <div class="wsort" role="tablist"><button class="on" data-s="createdAt">New</button><button data-s="viewCount">${isSong ? 'Most played' : 'Most viewed'}</button><button data-s="likeCount">Top starred</button></div>
@@ -432,5 +432,27 @@ export function createWorks(ctx) {
     container.innerHTML = v.length ? `<div class="wgrid">${v.map((p) => tile(p)).join('')}</div>` : `<div class="empty">${empty}</div>`;
     wireTiles(container, v);
   }
-  return { isWork, card, page, explore, grid, composePage, tile, player };
+  // Post a finished movie file (used by the Kemy AI Movie Maker). Same rules as the compose form.
+  async function publishMovie({ file, title, desc = '', genre = 'Animation', aiTools = 'Kemy AI Movie Maker', rating = 'all', runtime = 0, onProgress }) {
+    if (!requireAuth()) throw new Error('Sign in to post.');
+    if (file.size > 100 * 1048576) throw new Error('Movies can be up to 100 MB.');
+    if (runtime > 600.5) throw new Error('Uploads can be up to 10 minutes.');
+    const r = await upload(file, CLOUDINARY.uploadPreset, 'lks_movie', onProgress);
+    const d = deliveryUrls(r);
+    const rt = Math.min(601, Math.round((r.duration || runtime) * 10) / 10);
+    const { authorId, author } = await postAuthor(false);
+    const work = { title: String(title).slice(0, 80), genre: GENRES.movie.includes(genre) ? genre : 'Animation', aiTools: aiTools.slice(0, 100), runtime: rt, yt: '', cover: '', rights: true, rating };
+    const ref = doc(collection(db, 'posts'));
+    const b = writeBatch(db);
+    b.set(ref, {
+      authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
+      type: 'movie', text: String(desc).slice(0, 1000), linkUrl: '', mediaUrl: d.mediaUrl, mediaType: 'video', poster: d.posterUrl,
+      work, ...searchFields({ text: [work.title, desc, work.genre, aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
+      createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
+    });
+    b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
+    await b.commit();
+    return ref.id;
+  }
+  return { isWork, card, page, explore, grid, composePage, tile, player, publishMovie };
 }

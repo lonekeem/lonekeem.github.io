@@ -197,6 +197,7 @@ export function createComposer(ctx) {
         <button class="create-opt" data-src="photo"><span class="ci">${IC.photo}</span><b>Take photo</b><small>Front or back camera</small></button>
         <button class="create-opt wide live-opt" data-src="live"><span class="ci">${ICONS.live}</span><b>Go Live</b><small>Stream from your camera to up to ${LIVE_CAP} viewers · live chat + stars</small></button>
         <button class="create-opt wide story-opt" data-src="story"><span class="ci">${IC.story}</span><b>Add to your story</b><small>Photo or video up to ${LIMITS.storyVideoSeconds}s · disappears after ${LIMITS.storyHours} hours</small></button>
+        <button class="create-opt wide work-opt mm-opt" data-src="aimovie"><span class="ci">✨</span><b>Make an AI movie</b><small>Type an idea: Kemy writes, paints, narrates and edits it for you. Free.</small></button>
         <button class="create-opt wide work-opt" data-src="movie"><span class="ci">${WORK_IC.movie}</span><b>Movie</b><small>${WORK_DESC.movie.sub}</small></button>
         <button class="create-opt wide work-opt" data-src="song"><span class="ci">${WORK_IC.song}</span><b>Song</b><small>${WORK_DESC.song.sub}</small></button>
         <button class="create-opt wide" data-src="library"><span class="ci">${IC.library}</span><b>Upload from library</b><small>Videos up to ${fmtLimit(LIMITS.maxVideoSeconds, true)} / ${LIMITS.maxVideoMB} MB · photos up to ${LIMITS.maxImageMB} MB</small></button>
@@ -209,7 +210,7 @@ export function createComposer(ctx) {
       b.onclick = () => {
         const src = b.dataset.src;
         if (src === 'live') { location.hash = '#/live/new'; return; }
-        if (src === 'movie' || src === 'song') { location.hash = '#/new/' + src; return; }
+        if (src === 'movie' || src === 'song' || src === 'aimovie') { location.hash = '#/new/' + src; return; }
         if (src === 'story') return openStory();
         target = 'post';
         if (src === 'library') return pickFile('in-library');

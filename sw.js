@@ -1,8 +1,8 @@
-const CACHE = 'lks-v27';
+const CACHE = 'lks-v28';
 const CORE = [
   './', 'index.html', 'app.html', 'terms.html', 'privacy.html', 'guidelines.html',
   'css/app.css', 'kemy-logo.png', 'favicon-32.png', 'js/app.js', 'js/home.js', 'js/firebase-init.js', 'js/watch.js',
-  'js/create.js', 'js/media-config.js', 'js/search.js', 'js/search-index.js', 'js/stories.js', 'js/avatar-editor.js', 'js/views.js', 'js/icons.js', 'js/live.js', 'js/account-delete.js', 'js/comments.js', 'js/tapstar.js', 'js/snapedit.js', 'js/works.js', 'js/fx/looks.js', 'js/fx/engine.js', 'js/fx/face.js', 'js/fx/pipeline.js', 'js/fx/picker.js',
+  'js/create.js', 'js/media-config.js', 'js/search.js', 'js/search-index.js', 'js/stories.js', 'js/avatar-editor.js', 'js/views.js', 'js/icons.js', 'js/live.js', 'js/account-delete.js', 'js/comments.js', 'js/tapstar.js', 'js/snapedit.js', 'js/works.js', 'js/moviemaker.js', 'js/fx/looks.js', 'js/fx/engine.js', 'js/fx/face.js', 'js/fx/pipeline.js', 'js/fx/picker.js',
   'css/games.css', 'js/games/index.js', 'js/games/boards.js', 'js/games/cards.js', 'js/games/net.js', 'js/games/sfx.js', 'js/games/art.js', 'js/games/trivia.js', 'js/games/starcards.js', 'js/games/questions.json', 'js/games/pool.js', 'js/games/pool-engine.js',
   'logo.png', 'icon-192.png', 'icon-512.png', 'favicon.ico'
 ];

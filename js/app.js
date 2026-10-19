@@ -260,6 +260,21 @@ const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c ===
 // up (unsigned browser uploads can't delete; see scripts/cloudinary-setup.mjs notes).
 async function deletePost(p) {
   await deleteDoc(doc(db, 'posts', p.id));
+  // Admin: the Cloudinary files can only be erased with the API secret, which never ships in the site.
+  // Show the ready-to-run local cleanup command instead (scripts/cloudinary-cleanup.mjs).
+  const urls = [p.mediaUrl, p.poster, p.work && p.work.cover].filter((u) => /res\.cloudinary\.com\//.test(u || ''));
+  if (isAdmin() && urls.length) adminMediaCleanup(urls);
+}
+function adminMediaCleanup(urls) {
+  const cmd = `bash -c 'set -a; source ~/.config/lks/cloudinary.env; set +a; node scripts/cloudinary-cleanup.mjs --delete ${urls.map((u) => `"${u}"`).join(' ')}'`;
+  setTimeout(() => {
+    openModal(`<h2 style="font-size:1.2rem">Delete the media files too?</h2>
+      <p class="small muted">The post is gone. Its ${urls.length} file${urls.length > 1 ? 's are' : ' is'} still on Cloudinary. Run this in the repo on the admin computer (it reads the key from ~/.config/lks/cloudinary.env):</p>
+      <textarea id="amc-cmd" readonly rows="5" style="width:100%;font:12px ui-monospace,monospace">${esc(cmd)}</textarea>
+      <p class="small muted">Or run the script with no file names for a full orphan sweep (dry run first).</p>
+      <div class="btns"><button class="btn" id="amc-copy" type="button">Copy command</button><button class="btn btn-ghost" type="button" data-close>Close</button></div>`);
+    $('#amc-copy').onclick = async () => { try { await navigator.clipboard.writeText(cmd); toast('Copied'); } catch { $('#amc-cmd').select(); } };
+  }, 300);
 }
 let works = null;
 function getWorks() {
@@ -526,7 +541,7 @@ const routes = [
   [/^#\/feed$/, pageFeed, 'feed'],
   [/^#\/explore(?:\/(movies|songs))?$/, pageExplore, 'explore'],
   [/^#\/search(?:\?(.*))?$/, pageSearch, 'explore'],
-  [/^#\/new(?:\/(text|menu|movie|song))?$/, pageCompose, 'new'],
+  [/^#\/new(?:\/(text|menu|movie|song|aimovie))?$/, pageCompose, 'new'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
   [/^#\/me$/, pageMe, 'me'],
@@ -694,6 +709,7 @@ const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin
 async function pageCompose(sub, token) {
   if (!requireAuth()) return;
   if (sub === 'movie' || sub === 'song') return getWorks().composePage(sub, token);
+  if (sub === 'aimovie') { const { createMovieMaker } = await import('./moviemaker.js'); return createMovieMaker({ S, main, esc, toast, friendlyError, publishMovie: (o) => getWorks().publishMovie(o) }).page(token); }
   composer.render(token, { sub, textForm: (slot) => textComposeForm(slot, sub === 'text') });
 }
 async function postAuthor(asStudio) {
