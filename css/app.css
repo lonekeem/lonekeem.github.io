@@ -855,3 +855,45 @@ body.live-mode .app-main { max-width: none; padding: 0; min-height: 0; }
 .lv-sum-grid b { font: 700 1.35rem "Space Grotesk", sans-serif; }
 .lv-sum-grid span { color: var(--muted); font-size: .8rem; }
 @media (prefers-reduced-motion: reduce) { .lb-star, .live-ring, .sbub.is-live .sring, .pav.is-live { animation: none; } }
+
+/* ---------- Delete account ---------- */
+.danger-zone { border-color: rgba(255,92,122,.35); }
+.danger-zone .btn-danger { min-height: 44px; }
+.btn-danger-solid { background: linear-gradient(120deg, #ff5c7a, #d6284f); color: #fff; border: 0; }
+.btn-danger-solid:disabled { opacity: .45; cursor: not-allowed; }
+.del-title { font-size: 1.2rem; margin: 0 0 6px; color: #ffb3c1; }
+.del-list { margin: 6px 0 12px; padding-left: 18px; line-height: 1.5; color: rgba(255,255,255,.85); }
+.site-notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 9999; max-width: min(92vw, 420px);
+  padding: 12px 18px; border-radius: 14px; background: #1a0f2e; color: #fff; border: 1px solid rgba(181,123,255,.5);
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); font: 500 .95rem Inter, system-ui, sans-serif; text-align: center; transition: opacity .5s; }
+.site-notice.out { opacity: 0; }
+
+/* ---------- Comment threads: replies + stars ---------- */
+.cthread { border-top: 1px solid rgba(255,255,255,.06); padding: 2px 0 6px; }
+.cthread:first-child { border-top: 0; }
+.cthread > .comment { border-top: 0; }
+.comment { align-items: flex-start; }
+.comment .cname { font-weight: 600; color: var(--text); text-decoration: none; }
+.comment .cacts { display: flex; gap: 14px; margin-top: 2px; }
+.comment .cacts .link-btn { min-height: 32px; padding: 0; color: rgba(255,255,255,.62); font-weight: 600; }
+.comment .cacts .link-btn:hover { color: #d9b8ff; }
+.comment .cacts .cdel-btn { color: #ffb3c1; }
+.comment.reply { padding: 8px 0 4px; border-top: 0; }
+.comment.reply .avatar.sm { width: 28px; height: 28px; font-size: .7rem; }
+.creplies { margin-left: 44px; border-left: 2px solid rgba(138,43,226,.35); padding-left: 10px; }
+.creplies-tog { margin: 0 0 4px 44px; min-height: 32px; font-weight: 600; color: #c9a2ff; display: inline-flex; align-items: center; gap: 8px; }
+.creplies-tog::before { content: ''; width: 22px; height: 1px; background: rgba(181,123,255,.6); }
+.cstar { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  min-width: 44px; min-height: 44px; margin: -4px -6px 0 0; padding: 4px; border: 0; background: none; color: #ffc83d; cursor: pointer; border-radius: 12px; }
+.cstar svg { width: 19px; height: 19px; transition: transform .18s; filter: drop-shadow(0 0 3px rgba(138,43,226,.5)); }
+.cstar.on svg { fill: #ffc83d; filter: drop-shadow(0 0 4px rgba(138,43,226,.95)) drop-shadow(0 0 9px rgba(181,123,255,.7)); }
+.cstar.on svg, .cstar:active svg { transform: scale(1.12); }
+.cstar .cn { font-size: .72rem; color: rgba(255,255,255,.7); line-height: 1.1; min-height: .8rem; }
+.cstar:focus-visible { outline: 2px solid #b57bff; outline-offset: 1px; }
+.comment.is-deleted .cdel { font-style: italic; font-size: .9rem; padding-top: 6px; }
+.cdel-av { background: rgba(255,255,255,.08) !important; border: 1px dashed rgba(255,255,255,.2); }
+.reply-chip { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 6px 12px;
+  border-radius: 12px; background: rgba(138,43,226,.14); border: 1px solid rgba(181,123,255,.3); font-size: .85rem; }
+.reply-chip .link-btn { min-height: 32px; }
+.vsheet .reply-chip { margin: 6px 12px 0; }
+.reply-chip[hidden] { display: none; }

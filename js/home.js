@@ -13,6 +13,17 @@ const initials = (n) => { const p = String(n || '?').trim().split(/\s+/); return
 let me = null, profile = null;
 
 const slot = document.getElementById('account-slot');
+// One-time notice (e.g. "Your account was deleted.") left by the app before redirecting here.
+try {
+  const note = sessionStorage.getItem('lks-notice');
+  if (note) {
+    sessionStorage.removeItem('lks-notice');
+    const n = document.createElement('div');
+    n.className = 'site-notice'; n.setAttribute('role', 'status'); n.textContent = note;
+    document.body.appendChild(n);
+    setTimeout(() => n.classList.add('out'), 5200); setTimeout(() => n.remove(), 5800);
+  }
+} catch {}
 function renderAccount() {
   if (!slot) return;
   if (me && profile) {

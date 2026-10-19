@@ -87,7 +87,10 @@ service cloud.firestore {
       allow update: if isAdmin()
         && changed().hasOnly(['usernameLower', 'displayNameLower'])
         && validUserSearch(request.resource.data);
-      allow delete: if (signedIn() && uid == me()) || isAdmin();
+      // Account deletion: you can delete your own profile (the studio account and the admin's own
+      // account can't be deleted this way); the admin can remove other accounts.
+      allow delete: if uid != 'studio'
+        && ((signedIn() && uid == me() && !isAdmin()) || (isAdmin() && uid != me()));
 
       // Private favourites
       match /saved/{postId} {
@@ -113,7 +116,7 @@ service cloud.firestore {
         allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
           && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
-          && request.resource.data.type in ['follow', 'like', 'comment', 'message']
+          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like']
           && actingAs(request.resource.data.fromUid)
           && request.resource.data.fromUid != uid
           && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName
@@ -210,7 +213,10 @@ service cloud.firestore {
         return changed().hasOnly(['commentCount', 'lastCommentId'])
           && isStr(n.lastCommentId, 1, 100)
           && ((n.commentCount == o.commentCount + 1 && !exists(cP) && existsAfter(cP))
-              || (n.commentCount == o.commentCount - 1 && exists(cP) && !existsAfter(cP)));
+              || (n.commentCount == o.commentCount - 1 && exists(cP) && !existsAfter(cP))
+              // "Comment deleted" (a comment with replies is blanked instead of removed)
+              || (n.commentCount == o.commentCount - 1 && exists(cP) && existsAfter(cP)
+                  && get(cP).data.get('deleted', false) == false && getAfter(cP).data.get('deleted', false) == true));
       }
 
       allow read: if true;
@@ -240,15 +246,21 @@ service cloud.firestore {
       match /likes/{likerId} {
         allow read: if true;
         allow create: if signedIn() && likerId == me()
-          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.keys().hasOnly(['createdAt', 'uid'])
+          && request.resource.data.get('uid', me()) == me()
           && request.resource.data.createdAt == request.time
           && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount + 1;
         allow delete: if signedIn() && likerId == me()
           && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount - 1;
+        // Leftovers of a deleted post (deleted with it in the same batch, or afterwards).
+        allow delete: if signedIn() && !existsAfter(postPath());
       }
 
       match /views/{viewerId} {
         allow read: if signedIn() && viewerId == me();
+        // The author can list them only to clean up when deleting the post / their account.
+        allow list: if signedIn() && actingAs(get(postPath()).data.authorId);
+        allow delete: if signedIn() && !existsAfter(postPath());
         allow create: if signedIn() && viewerId == me()
           && request.resource.data.keys().hasOnly(['createdAt'])
           && request.resource.data.createdAt == request.time
@@ -256,23 +268,114 @@ service cloud.firestore {
       }
 
       match /comments/{cid} {
+        function cPath(id) { return /databases/$(database)/documents/posts/$(postId)/comments/$(id); }
+        function me_() { return get(userPath(me())).data; }
+        function canModerate() {
+          return resource.data.authorId == me() || isAdmin() || actingAs(get(postPath()).data.authorId);
+        }
+        // A reply: one level deep, under a live (not deleted) top-level comment, which counts it.
+        function validReplyTo(pid) {
+          let par = get(cPath(pid)).data;
+          let parAfter = getAfter(cPath(pid)).data;
+          return pid is string && pid != cid && exists(cPath(pid))
+            && !('parentId' in par) && par.get('deleted', false) == false
+            && parAfter.get('replyCount', 0) == par.get('replyCount', 0) + 1
+            && parAfter.lastReplyId == cid;
+        }
+        // Stars on a comment: exactly +/-1, tied to your own likes/{uid} doc.
+        function cLikeChange() {
+          let likeP = /databases/$(database)/documents/posts/$(postId)/comments/$(cid)/likes/$(me());
+          let n = request.resource.data;
+          let o = resource.data;
+          return changed().hasOnly(['likeCount']) && n.likeCount is int
+            && ((n.likeCount == o.get('likeCount', 0) + 1 && !exists(likeP) && existsAfter(likeP))
+                || (n.likeCount == o.get('likeCount', 0) - 1 && exists(likeP) && !existsAfter(likeP)));
+        }
+        // Reply count on a top-level comment: +/-1, tied to the reply being added/removed.
+        function replyChange() {
+          let n = request.resource.data;
+          let o = resource.data;
+          let rP = cPath(n.lastReplyId);
+          return changed().hasOnly(['replyCount', 'lastReplyId']) && isStr(n.lastReplyId, 1, 100)
+            && !('parentId' in o)
+            && ((n.replyCount == o.get('replyCount', 0) + 1 && !exists(rP) && existsAfter(rP)
+                 && getAfter(rP).data.parentId == cid)
+                || (n.replyCount == o.get('replyCount', 0) - 1 && exists(rP) && !existsAfter(rP)
+                    && get(rP).data.parentId == cid));
+        }
+        // Deleting a comment that has replies leaves a blank "Comment deleted" placeholder.
+        function softDelete() {
+          let n = request.resource.data;
+          return canModerate() && !('parentId' in resource.data)
+            && resource.data.get('deleted', false) == false
+            && changed().hasOnly(['deleted', 'text', 'authorName', 'authorUsername', 'authorColor'])
+            && n.deleted == true && n.text == '' && n.authorName == '' && n.authorUsername == '' && n.authorColor == ''
+            && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount - 1
+            && getAfter(postPath()).data.lastCommentId == cid;
+        }
+
         allow read: if true;
         allow create: if signedIn()
           && !blockedBy(get(postPath()).data.authorId)
-          && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'text', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'text', 'createdAt',
+                                                   'parentId', 'likeCount', 'replyCount'])
           && request.resource.data.authorId == me()
-          && request.resource.data.authorName == get(userPath(me())).data.displayName
-          && request.resource.data.authorUsername == get(userPath(me())).data.username
+          && request.resource.data.authorName == me_().displayName
+          && request.resource.data.authorUsername == me_().username
           && isStr(request.resource.data.authorColor, 1, 20)
           && isStr(request.resource.data.text, 1, 500)
           && request.resource.data.createdAt == request.time
+          && request.resource.data.get('likeCount', 0) == 0
+          && request.resource.data.get('replyCount', 0) == 0
+          && (!('parentId' in request.resource.data) || validReplyTo(request.resource.data.parentId))
           && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount + 1
           && getAfter(postPath()).data.lastCommentId == cid
           && (isAdmin() || getAfter(userPath(me())).data.lastCommentAt == request.time);
-        allow delete: if signedIn()
-          && (resource.data.authorId == me() || isAdmin() || get(postPath()).data.authorId == me())
+        allow update: if signedIn() && (cLikeChange() || replyChange() || softDelete());
+        // Hard delete: the author, the admin or the post's owner. Replies update their parent's
+        // count (unless the parent is gone); a comment with replies must be blanked instead.
+        allow delete: if signedIn() && canModerate()
+          && resource.data.get('deleted', false) == false
+          && (('parentId' in resource.data)
+              ? (!existsAfter(cPath(resource.data.parentId))
+                 || (getAfter(cPath(resource.data.parentId)).data.get('replyCount', 0)
+                       == get(cPath(resource.data.parentId)).data.get('replyCount', 0) - 1
+                     && getAfter(cPath(resource.data.parentId)).data.lastReplyId == cid))
+              : resource.data.get('replyCount', 0) == 0)
           && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount - 1;
+        // Leftovers of a deleted post.
+        allow delete: if signedIn() && !existsAfter(postPath());
+        // A blank "Comment deleted" placeholder whose replies are all gone (it holds no content).
+        allow delete: if signedIn() && resource.data.get('deleted', false) == true
+          && resource.data.get('replyCount', 0) == 0;
+
+        match /likes/{likerId} {
+          function cmt() { return /databases/$(database)/documents/posts/$(postId)/comments/$(cid); }
+          allow read: if true;
+          allow create: if signedIn() && likerId == me()
+            && request.resource.data.keys().hasOnly(['createdAt', 'uid'])
+            && request.resource.data.uid == me()
+            && request.resource.data.createdAt == request.time
+            && get(cmt()).data.get('deleted', false) == false
+            && getAfter(cmt()).data.likeCount == get(cmt()).data.get('likeCount', 0) + 1;
+          allow delete: if signedIn() && likerId == me() && existsAfter(cmt())
+            && getAfter(cmt()).data.likeCount == get(cmt()).data.get('likeCount', 0) - 1;
+          // Leftovers of a deleted comment / post.
+          allow delete: if signedIn() && (!existsAfter(cmt()) || !existsAfter(postPath()));
+        }
       }
+    }
+
+    // Collection-group lookups used by account deletion: your comments anywhere, and the
+    // notifications your own actions created in other people's inboxes.
+    match /{path=**}/comments/{cid} {
+      allow read: if true;
+    }
+    match /{path=**}/likes/{lid} {
+      allow read: if true;
+    }
+    match /{path=**}/notifications/{nid} {
+      allow read, delete: if signedIn() && resource.data.fromUid == me();
     }
 
     // ---------- Stories (24 h) ----------
@@ -488,8 +591,11 @@ service cloud.firestore {
           && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
           && getAfter(chatPath()).data.lastAt == request.time
           && getAfter(userPath(request.resource.data.senderId)).data.lastMessageAt == request.time;
-        allow delete: if isAdmin();
+        allow delete: if isAdmin() || leavingForGood();
       }
+      // Account deletion: once your profile is gone, you can delete chats you were part of.
+      function leavingForGood() { return signedIn() && me() in parts() && me() != 'studio' && !exists(userPath(me())); }
+      allow delete: if leavingForGood();
     }
 
     // ---------- Reports (admin only can read) ----------

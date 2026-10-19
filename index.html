@@ -124,7 +124,7 @@
  ]
 }
     </script>
-    <meta name="lks-version" content="social-2026-10-19-live">
+    <meta name="lks-version" content="social-2026-10-19-comments">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -138,6 +138,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <style>
+        .site-notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 9999; max-width: min(92vw, 420px); padding: 12px 18px; border-radius: 14px; background: #1a0f2e; color: #fff; border: 1px solid rgba(181,123,255,.5); box-shadow: 0 10px 30px rgba(0,0,0,.5); font: 500 .95rem Inter, system-ui, sans-serif; text-align: center; transition: opacity .5s; }
+        .site-notice.out { opacity: 0; }
         :root {
             --bg: #000000;
             --surface: #0e0b16;

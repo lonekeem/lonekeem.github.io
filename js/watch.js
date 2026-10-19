@@ -22,7 +22,7 @@ const IC = {
 
 export function createWatch(ctx) {
   const { S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, isAdmin, stale,
-    isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, commentsQuery,
+    isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, comments,
     blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, openStory, views } = ctx;
   const { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot } = ctx.fs;
   let muted = true; // stays the same while scrolling between videos
@@ -411,41 +411,17 @@ export function createWatch(ctx) {
         </section>`;
       requestAnimationFrame(() => sheetRoot.classList.add('open'));
       sheetRoot.querySelectorAll('[data-close-sheet]').forEach((b) => (b.onclick = closeSheet));
-      sheetUnsub = onSnapshot(commentsQuery(p.id), (qs) => {
-        const box = sheetRoot.querySelector('#vsheet-list'); if (!box) return;
-        const list = qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !S.blocked.has(c.authorId));
-        p.commentCount = qs.size;
-        sheetRoot.querySelector('.vsc').textContent = fmt(qs.size);
-        sheetRoot.querySelector('.vsw').textContent = qs.size === 1 ? 'comment' : 'comments';
-        sl.querySelector('[data-a=comment] .c').textContent = fmt(qs.size);
-        box.innerHTML = list.length ? '' : '<p class="muted small center" style="margin:28px 0">No comments yet. Be the first!</p>';
-        list.forEach((c) => {
-          const canDelete = S.user && (c.authorId === S.user.uid || isAdmin() || p.authorId === S.user.uid);
-          const row = document.createElement('div'); row.className = 'comment';
-          row.innerHTML = `${avatar({ uid: c.authorId, displayName: c.authorName, username: c.authorUsername, color: c.authorColor }, 'sm')}
-            <div class="body"><div><a style="font-weight:600;color:var(--text);text-decoration:none" href="#/u/${esc(c.authorUsername)}">${esc(c.authorName)}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
-            <div class="text">${linkify(esc(c.text))}</div>
-            <div class="small">${S.user && c.authorId !== S.user.uid ? '<button class="link-btn small" data-c="report">Report</button>' : ''} ${canDelete ? '<button class="link-btn small" data-c="del" style="color:#ffb3c1;margin-left:10px">Delete</button>' : ''}</div></div>`;
-          row.onclick = async (e) => {
-            const a = e.target.dataset.c;
-            if (a === 'report') reportDialog('comment', c.id, p.id, c.text);
-            if (a === 'del' && confirm('Delete this comment?')) {
-              try { await deleteComment(p.id, c.id); toast('Comment deleted'); } catch (err) { toast(friendlyError(err)); }
-            }
-          };
-          box.appendChild(row);
-        });
-      }, (e) => { const box = sheetRoot.querySelector('#vsheet-list'); if (box) box.innerHTML = `<p class="muted small">${esc(friendlyError(e))}</p>`; });
       const form = sheetRoot.querySelector('#vsheet-form');
-      if (form) form.onsubmit = async (ev) => {
-        ev.preventDefault();
-        const input = form.querySelector('input'); const text = input.value.trim(); if (!text) return;
-        const err = sheetRoot.querySelector('#vsheet-err'); err.textContent = '';
-        const b = form.querySelector('button'); b.disabled = true;
-        try { await addComment(p, text); input.value = ''; }
-        catch (e) { err.textContent = e.code === 'permission-denied' ? 'Please wait a few seconds between comments.' : friendlyError(e); }
-        b.disabled = false;
-      };
+      sheetUnsub = comments.mount({
+        p, box: sheetRoot.querySelector('#vsheet-list'), form, input: form && form.querySelector('input'), err: sheetRoot.querySelector('#vsheet-err'),
+        onCount: (n) => {
+          p.commentCount = n;
+          const c = sheetRoot.querySelector('.vsc'); if (!c) return;
+          c.textContent = fmt(n);
+          sheetRoot.querySelector('.vsw').textContent = n === 1 ? 'comment' : 'comments';
+          const sc = sl.querySelector('[data-a=comment] .c'); if (sc) sc.textContent = fmt(n);
+        }
+      });
     }
 
     // ---------------------------------------------------------- keyboard

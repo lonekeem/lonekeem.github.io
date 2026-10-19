@@ -20,6 +20,8 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ICONS } from './icons.js';
 import { createLive } from './live.js';
+import { createAccountDeleter } from './account-delete.js';
+import { createComments } from './comments.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -192,7 +194,7 @@ async function sendMessage(otherUid, text, me = S.user.uid) {
 async function likePost(p, on) {
   const b = writeBatch(db);
   const likeRef = doc(db, 'posts', p.id, 'likes', S.user.uid);
-  if (on) b.set(likeRef, { createdAt: serverTimestamp() }); else b.delete(likeRef);
+  if (on) b.set(likeRef, { uid: S.user.uid, createdAt: serverTimestamp() }); else b.delete(likeRef);
   b.update(doc(db, 'posts', p.id), { likeCount: increment(on ? 1 : -1) });
   await b.commit();
   S.liked.set(p.id, on);
@@ -208,28 +210,20 @@ async function followUser(uid, on) {
   if (on) { await setDoc(ref, { follower: S.user.uid, followee: uid, createdAt: serverTimestamp() }); S.following.add(uid); notify(uid, 'follow'); }
   else { await deleteDoc(ref); S.following.delete(uid); }
 }
-async function addComment(p, text) {
-  const ref = doc(collection(db, 'posts', p.id, 'comments'));
-  const b = writeBatch(db);
-  b.set(ref, { authorId: S.user.uid, authorName: S.profile.displayName, authorUsername: S.profile.username, authorColor: S.profile.color, text: text.slice(0, 500), createdAt: serverTimestamp() });
-  b.update(doc(db, 'posts', p.id), { commentCount: increment(1), lastCommentId: ref.id });
-  b.update(doc(db, 'users', S.user.uid), { lastCommentAt: serverTimestamp() });
-  await b.commit();
-  notify(p.authorId, 'comment', { postId: p.id, text });
-}
-async function deleteComment(postId, cid) {
-  const b = writeBatch(db);
-  b.delete(doc(db, 'posts', postId, 'comments', cid));
-  b.update(doc(db, 'posts', postId), { commentCount: increment(-1), lastCommentId: cid });
-  await b.commit();
-}
+// Comments, replies and comment stars live in comments.js.
+const comments = createComments({
+  db, S, esc, avatar: (...x) => avatar(...x), badge: (...x) => badge(...x), timeAgo: (...x) => timeAgo(...x), linkify: (...x) => linkify(...x),
+  toast: (m) => toast(m), friendlyError: (e) => friendlyError(e), isAdmin: () => isAdmin(),
+  reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x)
+});
+const addComment = (p, text) => comments.addComment(p, text);
+const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c === 'string' ? { id: c } : c);
 // Owner or admin. Removes the Firestore doc; the Cloudinary file stays until an admin cleans it
 // up (unsigned browser uploads can't delete; see scripts/cloudinary-setup.mjs notes).
 async function deletePost(p) {
   await deleteDoc(doc(db, 'posts', p.id));
 }
 const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
-const watchCommentsQuery = (postId) => query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(200));
 
 // ---------------------------------------------------------------- embeds
 function youTubeId(url) {
@@ -402,6 +396,12 @@ function openModal(inner, { dismissable = true } = {}) {
   setTimeout(() => $('.modal input, .modal textarea, .modal .btn', root)?.focus(), 30);
 }
 function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
+const accountDeleter = createAccountDeleter({
+  auth, db, esc, openModal, closeModal, friendlyError,
+  isProtected: (u) => u.uid === STUDIO_UID || (u.email === ADMIN_EMAIL && u.emailVerified),
+  // Stop live listeners first so they don't error while data disappears.
+  beforeDelete: () => { S.unsubs.forEach((u) => u()); S.unsubs = []; S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; }
+});
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
 // The welcome "Watch now" button always points at the studio's newest video post.
@@ -519,7 +519,7 @@ const stale = (t) => t !== routeToken;
 const watch = createWatch({
   S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, closeModal, isAdmin, stale,
   isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId,
-  blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, commentsQuery: watchCommentsQuery,
+  blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, comments,
   openStory: () => { if (requireAuth()) composer.openStory(); },
   views: { viewsHtml, trackVideo, trackVisible },
   fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot }
@@ -715,42 +715,9 @@ async function pagePost(postId, token) {
         : `<p class="muted small" style="margin-top:12px"><a href="#/login?next=${encodeURIComponent('#/post/' + postId)}">Log in</a> or <a href="#/signup">create an account</a> to comment.</p>`}
     </section>`;
   $('#post-slot').appendChild(postCard(p, { detail: true }));
-  const unsub = onSnapshot(watchCommentsQuery(postId), (qs) => {
-    const box = $('#comments'); if (!box) return;
-    const list = qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !S.blocked.has(c.authorId));
-    box.innerHTML = list.length ? '' : '<p class="muted small">No comments yet. Say something nice!</p>';
-    list.forEach((c) => {
-      const canDelete = S.user && (c.authorId === S.user.uid || isAdmin() || p.authorId === S.user.uid);
-      const row = document.createElement('div'); row.className = 'comment';
-      row.innerHTML = `${avatar({ uid: c.authorId, displayName: c.authorName, username: c.authorUsername, color: c.authorColor }, 'sm')}
-        <div class="body"><div><a style="font-weight:600;color:var(--text);text-decoration:none" href="#/u/${esc(c.authorUsername)}">${esc(c.authorName)}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
-        <div class="text">${linkify(esc(c.text))}</div>
-        <div class="small">${S.user && c.authorId !== S.user.uid ? '<button class="link-btn small" data-a="report">Report</button>' : ''} ${canDelete ? '<button class="link-btn small" data-a="del" style="color:#ffb3c1;margin-left:10px">Delete</button>' : ''}</div></div>`;
-      row.onclick = async (e) => {
-        const a = e.target.dataset.a;
-        if (a === 'report') reportDialog('comment', c.id, postId, c.text);
-        if (a === 'del' && confirm('Delete this comment?')) {
-          try {
-            await deleteComment(postId, c.id); toast('Comment deleted');
-          } catch (err) { toast(friendlyError(err)); }
-        }
-      };
-      box.appendChild(row);
-    });
-  }, (e) => { const box = $('#comments'); if (box) box.innerHTML = `<p class="muted small">${esc(friendlyError(e))}</p>`; });
-  S.unsubs.push(unsub);
   const form = $('#comment-form');
-  if (form) form.onsubmit = async (ev) => {
-    ev.preventDefault();
-    const input = $('#comment-text'); const text = input.value.trim(); if (!text) return;
-    const err = $('#comment-err'); err.textContent = '';
-    const btn = $('button', form); btn.disabled = true;
-    try {
-      await addComment(p, text);
-      input.value = '';
-    } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Please wait a few seconds between comments.' : friendlyError(e); }
-    btn.disabled = false;
-  };
+  S.unsubs.push(comments.mount({ p, box: $('#comments'), form, input: $('#comment-text'), err: $('#comment-err'),
+    onCount: (n) => { const s = $('#post-slot a.act[aria-label="Comments"] span'); if (s) s.textContent = n; } }));
 }
 
 // ---------------------------------------------------------------- profiles
@@ -905,9 +872,15 @@ async function pageSettings() {
       <h2 style="font-size:1.05rem">Account</h2>
       <p class="muted small">Signed in as ${esc(S.user.email || '')}</p>
       <div class="row" style="flex-wrap:wrap"><button class="btn btn-sm btn-ghost" id="s-reset">Send password reset email</button><button class="btn btn-sm btn-ghost" id="s-out">Log out</button></div>
-      <p class="small muted">Want your account deleted? Message <a href="#/u/lonekeemstudios">@lonekeemstudios</a> and we’ll remove it.</p>
-    </section>`;
+    </section>
+    ${isAdmin() ? '' : `<section class="card pad danger-zone" style="margin-top:16px" aria-labelledby="dz-h">
+      <h2 id="dz-h" style="font-size:1.05rem">Delete account</h2>
+      <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
+      <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
+    </section>`}`;
   $('#s-out').onclick = async () => { await signOut(auth); location.hash = '#/feed'; };
+  const del = $('#s-delete');
+  if (del) del.onclick = () => accountDeleter.open(S.profile);
   const setPhoto = async (url) => {
     await updateDoc(doc(db, 'users', S.user.uid), { photoURL: url });
     S.profile.photoURL = url;
@@ -1033,7 +1006,7 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', message: 'sent you a message' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
@@ -1080,10 +1053,8 @@ async function pageAdmin(token) {
           if (!confirm('Delete the reported content?')) return;
           if (r.targetType === 'post') await deleteDoc(doc(db, 'posts', r.targetId));
           else {
-            const b = writeBatch(db);
-            b.delete(doc(db, 'posts', r.postId, 'comments', r.targetId));
-            b.update(doc(db, 'posts', r.postId), { commentCount: increment(-1), lastCommentId: r.targetId });
-            await b.commit();
+            const cs = await getDoc(doc(db, 'posts', r.postId, 'comments', r.targetId));
+            if (cs.exists()) await comments.deleteComment(r.postId, { id: cs.id, ...cs.data() });
           }
         }
         await deleteDoc(doc(db, 'reports', r.id)); el.remove(); toast(a === 'remove' ? 'Content deleted' : 'Report dismissed');
