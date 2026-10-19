@@ -37,7 +37,7 @@ function particles() {
 }
 export function createPals(ctx) {
   const { S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth } = ctx; const notify = ctx.notify || (() => {});
-  if (!document.getElementById('pals-css')) { const l = document.createElement('link'); l.id = 'pals-css'; l.rel = 'stylesheet'; l.href = 'css/pals.css?v=1'; document.head.appendChild(l); }
+  if (!document.getElementById('pals-css')) { const l = document.createElement('link'); l.id = 'pals-css'; l.rel = 'stylesheet'; l.href = 'css/pals.css?v=2'; document.head.appendChild(l); }
   let mine = null; // { uid, list, store }
   const pop = popups({ S, db });
   const shop = createShopUI(ctx);
@@ -91,15 +91,18 @@ export function createPals(ctx) {
   // ---------------------------------------------------------------- profile strip
   async function renderProfile(el, uid, u, isMine) {
     if (!el) return;
+    const tok = String((+el.dataset.palTok || 0) + 1); el.dataset.palTok = tok; const stale = () => el.dataset.palTok !== tok || !document.body.contains(el);
     let list = [];
     try { list = await listPals(db, uid); } catch { list = []; }
     if (!list.length) { if (isMine) { el.innerHTML = `<button class="pal-hatch-cta" id="pal-cta"><span class="pal-egg-ic"></span><span><b>Hatch your Kemy Pal</b><small>${esc(PALS_SHORT.replace('Pals: ', ''))}</small></span></button>`; el.querySelector('#pal-cta').onclick = () => intro(true); miniEgg(el.querySelector('.pal-egg-ic')); } else el.innerHTML = ''; return; }
+    if (stale()) return;
     if (isMine) { const m = await myPals(); if (m) list = m.list.slice(); }
+    if (stale() || !list.length) return;
     const act = list.find((p) => p.id === u.activePet) || list[0];
     if (isMine) { applyPatBoost(act); applyPlaydates(act); }
-    const shown = [act, ...list.filter((p) => p !== act)].slice(0, 3);
+    const shown = [act]; // only the active Pal; the others live in the Pal Box (a playdate guest is added separately)
     const sp = SPEC[act.species] || SPECIES[0];
-    el.innerHTML = `<div class="pal-strip" aria-label="${esc(u.displayName)}'s Pals"><div class="pal-cv"></div>
+    el.innerHTML = `<div class="pal-strip" data-pals="1" aria-label="${esc(u.displayName)}'s Pals"><div class="pal-cv"></div>
       <div class="pal-tag"><b>${esc(act.name)}</b><small>${esc(formName(act))} · Lv ${act.level || 1} · <span class="pal-vibe" style="--v:${VIBES[sp.vibe].c}">${VIBES[sp.vibe].name}</span></small><small class="pal-pats">🐾 <b>${act.pats || 0}</b> pats</small></div>
       <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Talk</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Say hi</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
     const host = el.querySelector('.pal-cv'); const W = Math.max(160, Math.min(host.clientWidth || 300, 560)), H = 104; const s = stage(host, W, H);

@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/pals.css"><link rel="stylesheet" href="../../css/games.css"></head>
+<body><main style="padding:12px;display:grid;gap:10px">
+<div class="field"><label>Email</label><input type="email" placeholder="you@example.com" value="kid@example.com"></div>
+<form class="comment-form"><input type="text" placeholder="Add a comment…" value="So cute!"></form>
+<form class="chat-form"><input type="text" placeholder="Message…"></form>
+<div class="sinput"><input type="search" placeholder="Search Kemy…"></div>
+<div style="background:#000;padding:6px"><form class="lv-form"><button type="button" class="lv-emoji">😊</button><input placeholder="Say something" value="hi live"></form></div>
+<textarea placeholder="Write a bio">I love pals</textarea>
+<input class="rc-esearch" placeholder="Search emoji">
+<div contenteditable="true" style="min-height:40px;padding:8px;border-radius:12px">Caption text</div>
+</main><div id="modal-root"></div>
+<script type="module">
+try { if (location.hash.includes('talk')) {
+const { openTalk } = await import('../../js/pals/talk.js');
+const openModal = (inner) => { document.getElementById('modal-root').innerHTML = `<div class="modal-backdrop" role="dialog"><div class="card modal">${inner}</div></div>`; };
+openTalk({ esc: s => String(s), openModal, toast(){}, db: null, S: {} }, { id: 'p1', name: 'Bubbles', species: 'elephant', level: 3, colors: {}, stats: {} }, { owner: 'keem', mine: true, visitorChat: false, onHappy(){}, ownsVoice: () => false, saveVoice(){} });
+for (let i = 0; i < 6; i++) { const d = document.createElement('div'); d.className = i % 2 ? 'tk-p' : 'tk-u'; d.textContent = (i % 2 ? 'Pal reply number ' : 'My message ') + i; document.getElementById('tk-log').appendChild(d); }
+} } catch (e) { window.err = String(e.stack || e); }
+window.ready = true;
+</script></body></html>

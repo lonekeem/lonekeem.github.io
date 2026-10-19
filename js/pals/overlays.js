@@ -62,7 +62,7 @@ export function liveOverlay({ S, db, toast }, root, { liveId, hostId, isHost }) 
 // ---------------------------------------------------------------- scroll pop-ups
 const LINES = { hungry: ['Feed me! 🍓', 'Snack time?', 'My tummy rumbled!'], dirty: ['Bath time? 🫧', 'I rolled in mud…'], tired: ['So sleepy…', 'Nap soon? 🌙'], sad: ['I miss you!', 'Play with me?'], ok: ['Hi hi! 👋', 'Ooh, nice video!', 'Wheee!', 'You’re the best!', 'Peekaboo!', '✨ So cool!'] };
 // any screen where you scroll through videos: For You, Following, Explore, Movies/Songs, profiles, stories
-export const POP_ROUTES = /^(#?$|#\/(watch|feed|explore|search|u\/|works|movies|songs|stories|story|post\/))/;
+export const POP_ROUTES = /^(#?$|#\/(watch|feed|explore|search|works|movies|songs|stories|story|post\/))/; // never on profiles (#/u/, #/me): the profile Pal is already there
 export function popups({ S, db }) {
   const KEY = 'kemy-pals-popups', LAST = 'kemy-pals-pop-last';
   let pal = null, shown = false, scrolled = 0, loaded = 0;
@@ -77,15 +77,16 @@ export function popups({ S, db }) {
   };
   document.addEventListener('scroll', onScroll, { capture: true, passive: true });
   document.addEventListener('wheel', onScroll, { passive: true }); document.addEventListener('touchmove', onScroll, { passive: true });
+  addEventListener('hashchange', () => { if (!POP_ROUTES.test(location.hash || '')) document.querySelectorAll('.pal-pop').forEach((e) => { e.remove(); shown = false; }); });
   async function show(force) {
-    const p = await ensure(); if (!p || shown || (!force && !enabled())) return; shown = true; localStorage.setItem(LAST, String(Date.now()));
+    const p = await ensure(); if ((!force && !POP_ROUTES.test(location.hash || '')) || document.querySelector('.pal-strip, .pal-pop') || document.activeElement?.matches?.('input, textarea, [contenteditable]')) return; if (!p || shown || (!force && !enabled())) return; shown = true; localStorage.setItem(LAST, String(Date.now()));
     const mood = moodOf(liveStats(p)); const key = mood.hungry ? 'hungry' : mood.dirty ? 'dirty' : mood.tired ? 'tired' : mood.sad ? 'sad' : 'ok';
     const line = LINES[key][Math.floor(Math.random() * LINES[key].length)]; const side = Math.random() < 0.5 ? 'left' : 'right';
     const el = document.createElement('div'); el.className = `pal-pop ${side}${RM() ? ' rm' : ''}`; el.setAttribute('role', 'button'); el.setAttribute('aria-label', `${p.name} says: ${line}. Tap to say bye.`); el.tabIndex = 0;
     const say = document.createElement('span'); say.className = 'pal-pop-say'; say.textContent = line; el.appendChild(say);
     const { cv, c } = canvasEl(90, 90); el.appendChild(cv); document.body.appendChild(el);
     let t = 0, poof = 0, on = true; const face = side === 'left' ? 1 : -1;
-    const f = () => { if (!on) return; t++; c.clearRect(0, 0, 90, 90);
+    const f = () => { if (!on || !el.isConnected) return; t++; c.clearRect(0, 0, 90, 90);
       if (poof) { poof++; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; drawBubble(c, 45 + Math.cos(a) * poof * 1.4, 50 + Math.sin(a) * poof * 1.4, Math.max(1, 6 - poof * 0.2)); } if (poof > 24) { on = false; el.remove(); shown = false; } }
       else drawPal(c, 45, 86, 68, p, { t, face, mode: t < 90 && !RM() ? 'happy' : 'idle', mood });
       requestAnimationFrame(f); };

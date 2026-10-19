@@ -116,3 +116,21 @@
 .park-found { position: absolute; left: 10px; top: 10px; font: 800 13px Inter, sans-serif; color: #fff; background: rgba(40,18,84,.55); padding: 4px 10px; border-radius: 999px; }
 .park-card { display: grid; gap: 8px; } .park-card textarea, .park-card select { width: 100%; }
 @media (min-width: 900px) { .park-joy { display: none; } }
+
+/* Talk to your Pal: keep the input and newest message above the on-screen keyboard */
+.modal-backdrop:has(.pal-talk) { position: fixed; inset: auto 0 auto 0; top: var(--vv-top, 0px); height: var(--vv-h, 100dvh); padding: 10px; place-items: end center; z-index: 1000; }
+.modal:has(.pal-talk) { max-height: 100%; display: flex; flex-direction: column; padding: 16px 14px 12px; overflow: hidden; }
+.modal:has(.pal-talk) > .pal-talk { flex: 1 1 auto; min-height: 0; max-height: none; display: flex; flex-direction: column; overflow: hidden; }
+.pal-talk > * { flex: 0 0 auto; }
+.pal-talk-log { flex: 1 1 auto; min-height: 60px; max-height: none; overscroll-behavior: contain; scroll-padding-bottom: 8px; }
+.pal-talk:not(.kb) .pal-talk-log { max-height: 150px; }
+.pal-talk-form { position: sticky; bottom: 0; padding-top: 4px; }
+.pal-talk-form input { font-size: 16px !important; height: 44px; padding: 0 14px; border: 1.5px solid rgba(138,43,226,.45); border-radius: 12px; }
+/* keyboard open: shrink the Pal to a small strip so the chat gets the room */
+.pal-talk.kb .pal-talk-stage { min-height: 0; height: 76px; padding-top: 0; overflow: hidden; }
+.pal-talk.kb .pal-talk-stage canvas { transform: scale(.45); transform-origin: 50% 100%; margin-top: -94px; }
+.pal-talk.kb .pal-bubble { display: none; }
+.pal-talk.kb .pal-ai-note { display: none; }
+.pal-talk.kb .pal-talk-head { font-size: .9rem; }
+body.typing .pal-pop { display: none !important; }
+.pal-talk-head { padding-right: 34px; }

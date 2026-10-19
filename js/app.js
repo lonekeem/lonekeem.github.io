@@ -1448,3 +1448,10 @@ onAuthStateChanged(auth, async (user) => {
   if (user && /^#\/(login|signup|onboard)/.test(location.hash)) { const n = pendingNext || nextHash(); pendingNext = null; return go(n); }
   route();
 });
+
+// While a text field is focused on a touch device, hide the bottom nav (with interactive-widget=resizes-content it would ride on top of the keyboard)
+{
+  const TXT = 'input:not([type=range],[type=checkbox],[type=radio],[type=color],[type=file],[type=button],[type=submit]), textarea, [contenteditable]:not([contenteditable=false])';
+  document.addEventListener('focusin', (e) => { if (matchMedia('(pointer: coarse)').matches && e.target.matches?.(TXT)) document.body.classList.add('kb-open'); });
+  document.addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement?.matches?.(TXT)) document.body.classList.remove('kb-open'); }, 60));
+}

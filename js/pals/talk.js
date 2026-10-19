@@ -129,8 +129,24 @@ export function openTalk(ctx, p, { owner, mine, visitorChat, onHappy, ownsVoice,
     requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
   const bub = root.querySelector('#tk-bub'), log = root.querySelector('#tk-log');
-  const add = (who, text) => { const el = document.createElement('div'); el.className = 'tk-' + who; el.textContent = text; log.appendChild(el); log.scrollTop = log.scrollHeight; };
+  const add = (who, text) => { const el = document.createElement('div'); el.className = 'tk-' + who; el.textContent = text; log.appendChild(el); toBottom(); };
+  // On-screen keyboard: size the chat to the visual viewport so the input + newest message stay visible
+  const bd = root.closest('.modal-backdrop'), inp = root.querySelector('#tk-in'), vv = window.visualViewport;
+  function toBottom() { requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; if (inp && document.activeElement === inp) inp.scrollIntoView({ block: 'nearest' }); }); }
+  const fit = () => {
+    if (!document.body.contains(root)) { off(); return; }
+    const h = vv ? vv.height : innerHeight, top = vv ? vv.offsetTop : 0;
+    if (bd) { bd.style.setProperty('--vv-h', h + 'px'); bd.style.setProperty('--vv-top', top + 'px'); }
+    const typing = !!inp && document.activeElement === inp;
+    root.classList.toggle('kb', typing && (h < screen.height * 0.72 || h < 560)); document.body.classList.toggle('typing', typing);
+    toBottom();
+  };
+  const off = () => { vv?.removeEventListener('resize', fit); vv?.removeEventListener('scroll', fit); removeEventListener('resize', fit); document.body.classList.remove('typing'); };
+  vv?.addEventListener('resize', fit); vv?.addEventListener('scroll', fit); addEventListener('resize', fit);
+  if (inp) { inp.addEventListener('focus', () => { fit(); setTimeout(fit, 300); setTimeout(fit, 700); }); inp.addEventListener('blur', () => setTimeout(fit, 50)); }
+  fit(); dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'pal-talk' } }));
   function say(text) {
+    dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'pal-talk' } }));
     bub.textContent = text; bub.classList.add('on'); emo = emotionOf(text); add('p', text);
     const v = voiceOf(p); const sec = Math.min(8, 1 + text.length / 14);
     if (!canSpeak()) { talking = sec * 60; emoT = 120; return; }

@@ -1453,3 +1453,20 @@ body:has(.vwrap) .pal-pop { top: 24%; }
 /* the action rail sits on the right in the feed: Pal pop-ups peek from the left there */
 body:has(.vwrap) .pal-pop.right { right: auto; left: 0; --from: -100px; }
 body:has(.vwrap) .pal-pop.right .pal-pop-say { right: auto; left: 10px; }
+/* ===== Typed text: always high-contrast. Dark boxes = light text, light boxes = #111 text (see .field-light) ===== */
+:where(input:not([type]), input[type=number], input[type=tel]) { width: 100%; background: #07050c; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 16px; color: var(--text); }
+:where(input, textarea, [contenteditable]) { -webkit-text-fill-color: currentColor; caret-color: currentColor; }
+:where(input, textarea)::placeholder { color: #b9aed0; -webkit-text-fill-color: #b9aed0; opacity: 1; }
+/* any light text box: black text, black caret, dark-gray placeholder */
+.field-light, .field-light :is(input, textarea), .pal-talk-form input { color: #111 !important; -webkit-text-fill-color: #111 !important; caret-color: #111 !important; background-color: #fff !important; }
+:is(.field-light, .pal-talk-form) :is(input, textarea)::placeholder, .field-light::placeholder { color: #55505f !important; -webkit-text-fill-color: #55505f !important; }
+/* iOS/Chrome autofill paints a light yellow box: keep text dark there, or repaint dark fields dark */
+:where(input, textarea):-webkit-autofill { -webkit-text-fill-color: var(--text); caret-color: var(--text); -webkit-box-shadow: 0 0 0 1000px #07050c inset; box-shadow: 0 0 0 1000px #07050c inset; transition: background-color 9999s; }
+.field-light input:-webkit-autofill, .pal-talk-form input:-webkit-autofill { -webkit-text-fill-color: #111 !important; -webkit-box-shadow: 0 0 0 1000px #fff inset; box-shadow: 0 0 0 1000px #fff inset; }
+select option { color: #111; background: #fff; }
+:is(input, textarea, select, [contenteditable]):focus-visible { outline: none; border-color: var(--purple-light); box-shadow: 0 0 0 3px rgba(138,43,226,.45); }
+@media (forced-colors: active) { :is(input, textarea, select, [contenteditable]) { -webkit-text-fill-color: FieldText !important; caret-color: FieldText !important; } :is(input, textarea)::placeholder { -webkit-text-fill-color: GrayText !important; color: GrayText !important; } }
+@media (prefers-contrast: more) { :is(input, textarea)::placeholder { color: #ddd6ea; -webkit-text-fill-color: #ddd6ea; } }
+/* iOS zooms into any field under 16px */
+@supports (-webkit-touch-callout: none) { html :is(input, textarea, select) { font-size: max(16px, 1em) !important; } }
+body.kb-open .bottom-nav, body.kb-open .pal-pop { display: none !important; }
