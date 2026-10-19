@@ -166,7 +166,6 @@ export function drawDancer(c, x, y, size, pal, st = {}) {
     const g = RM() && d && !d.gentle ? danceById('hula') || d : d;
     let ok3 = false; try { ok3 = P3.drawPal3D(c, x, y, size, pal, { ...st, dance3d: g ? g.id : null, beat, amt: on ? amt * (RM() ? 0.5 : 1) : 0 }); } catch (e) { console.warn('3D Pal off:', e); P3 = null; }
     if (ok3) {
-      if (on && amt > 0.6 && g && size >= 56 && st.label !== false) { c.save(); const fs = Math.max(10, Math.round(size * 0.15)); c.font = `700 ${fs}px Inter, system-ui, sans-serif`; c.textAlign = 'center'; const tw = c.measureText(g.name).width + fs; const ly = Math.max(2, y - size * 1.22 - fs * 1.5); c.fillStyle = 'rgba(30,12,60,.72)'; c.beginPath(); c.roundRect(x - tw / 2, ly, tw, fs * 1.45, fs * 0.72); c.fill(); c.fillStyle = '#ffe680'; c.fillText(g.name, x, ly + fs * 1.08); c.restore(); }
       if (on && amt > 0.6 && !RM() && g) { const p = poseAt(g, beat); if (p.star) { const t = st.t || 0; sparkle(c, x - size * 0.5, y - size * 1.1, size * 0.09, t); sparkle(c, x + size * 0.5, y - size * 0.9, size * 0.07, t + 20); } }
       return;
     }
