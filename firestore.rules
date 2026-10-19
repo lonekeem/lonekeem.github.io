@@ -116,7 +116,7 @@ service cloud.firestore {
         allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
           && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
-          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like']
+          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game']
           && actingAs(request.resource.data.fromUid)
           && request.resource.data.fromUid != uid
           && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName
@@ -607,6 +607,200 @@ service cloud.firestore {
       // Account deletion: once your profile is gone, you can delete chats you were part of.
       function leavingForGood() { return signedIn() && me() in parts() && me() != 'studio' && !exists(userPath(me())); }
       allow delete: if leavingForGood();
+    }
+
+    // ---------- Games (js/games/*): turn-based multiplayer, no Cloud Functions ----------
+    // Board games (stardrop, klgrid, checkers): two players, moves only on your turn, boards are
+    // strings whose piece counts must change the way one legal move can. Trivia / Star Cards rooms:
+    // the host's client runs the round (it is the referee); members write only their own intents,
+    // answers and heartbeats. Results are written by participants with consistency checks.
+    function gBoardType(t) { return t in ['stardrop', 'klgrid', 'checkers']; }
+    function gMax(t) { return gBoardType(t) ? 2 : t == 'trivia' ? 8 : 6; }
+    function gCount(s, re) { return s.replace(re, '').size(); }
+    function gProfile() { return get(userPath(me())).data; }
+    function gBoardOk(t, ob, nb, turn) {
+      let mine = turn == 0 ? '[^a]' : '[^b]';
+      let theirs = turn == 0 ? '[^b]' : '[^a]';
+      let mineK = turn == 0 ? '[^aA]' : '[^bB]';
+      let theirsK = turn == 0 ? '[^bB]' : '[^aA]';
+      return nb is string && nb.size() == ob.size() && nb != ob
+        && ((t == 'stardrop' && nb.matches('^[.ab]{42}$')
+              && gCount(nb, mine) == gCount(ob, mine) + 1 && gCount(nb, theirs) == gCount(ob, theirs))
+         || (t == 'klgrid' && (nb.matches('^[.ab]{9}$') || nb.matches('^[.ab]{81}$'))
+              && gCount(nb, mine) == gCount(ob, mine) + 1 && gCount(nb, theirs) == gCount(ob, theirs))
+         || (t == 'checkers' && nb.matches('^[.aAbB]{32}$')
+              && gCount(nb, mineK) == gCount(ob, mineK) && gCount(nb, theirsK) <= gCount(ob, theirsK)));
+    }
+    function gCardsTotal(pv) {
+      let c = pv.counts;
+      return (c.size() > 0 ? c[0] : 0) + (c.size() > 1 ? c[1] : 0) + (c.size() > 2 ? c[2] : 0)
+        + (c.size() > 3 ? c[3] : 0) + (c.size() > 4 ? c[4] : 0) + (c.size() > 5 ? c[5] : 0)
+        + pv.deckCount + pv.discardCount;
+    }
+    function gSeatStep(o, n, i) { return i >= n.size() || i >= o.size() || (n[i] - o[i] <= 4 && o[i] - n[i] <= 1); }
+    function gCountsOk(o, n) {
+      return n.counts is list && n.counts.size() == request.resource.data.players.size() && gCardsTotal(n) == 108
+        && (!('pv' in o) || o.pv.round != n.round
+            || (gSeatStep(o.pv.counts, n.counts, 0) && gSeatStep(o.pv.counts, n.counts, 1) && gSeatStep(o.pv.counts, n.counts, 2)
+                && gSeatStep(o.pv.counts, n.counts, 3) && gSeatStep(o.pv.counts, n.counts, 4) && gSeatStep(o.pv.counts, n.counts, 5)));
+    }
+    match /games/{gid} {
+      function gPath() { return /databases/$(database)/documents/games/$(gid); }
+      function nd() { return request.resource.data; }
+      function od() { return resource.data; }
+      function member() { return signedIn() && me() in resource.data.players; }
+      function otherP() { return od().players[0] == me() ? od().players[1] : od().players[0]; }
+      function hbOnly() {
+        return changed().hasOnly(['hb']) && nd().hb.diff(od().hb).affectedKeys().hasOnly([me()])
+          && nd().hb[me()] == request.time;
+      }
+      function validNames(d) {
+        return d.players is list && d.players.size() >= 1 && d.players.size() <= gMax(d.type)
+          && d.names is list && d.names.size() == d.players.size()
+          && d.unames is list && d.unames.size() == d.players.size()
+          && d.colors is list && d.colors.size() == d.players.size();
+      }
+      allow read: if true;
+      allow create: if signedIn()
+        && nd().keys().hasOnly(['type', 'mode', 'status', 'players', 'names', 'unames', 'colors', 'host', 'invitee', 'quick',
+                                'createdAt', 'updatedAt', 'winnerUid', 'endReason', 'rematch', 'hb', 'board', 'turn', 'moveNo',
+                                'last', 'turnAt', 'round', 'qs', 'roundAt', 'roundLen', 'scores', 'pv', 'seedHash', 'seeds', 'intent', 'call', 'from'])
+        && nd().type in ['stardrop', 'klgrid', 'checkers', 'trivia', 'starcards']
+        && isStr(nd().mode, 0, 20)
+        && nd().status == 'waiting' && nd().host == me() && nd().players[0] == me() && validNames(nd())
+        && nd().names[0] == gProfile().displayName && nd().unames[0] == gProfile().username
+        && isStr(nd().invitee, 0, 128) && nd().quick is bool
+        && nd().createdAt == request.time && nd().winnerUid == '' && nd().rematch == ''
+        && (!gBoardType(nd().type) || (nd().players.size() == 1 && nd().board.matches('^[.]{9}$|^[.]{42}$|^[.]{81}$|^b{12}[.]{8}a{12}$')
+                                        && nd().turn == 0 && nd().moveNo == 0));
+      allow update: if signedIn() && (
+        // heartbeat
+        (member() && hbOnly())
+        // join a waiting game / room
+        || (!member() && od().status == 'waiting' && od().invitee in ['', me()]
+            && changed().hasOnly(['players', 'names', 'unames', 'colors', 'status', 'turnAt', 'updatedAt'])
+            && nd().players == od().players.concat([me()]) && validNames(nd())
+            && nd().names == od().names.concat([gProfile().displayName])
+            && nd().unames == od().unames.concat([gProfile().username])
+            && ((gBoardType(od().type) && nd().status == 'active' && nd().turnAt == request.time)
+                || (!gBoardType(od().type) && nd().status == 'waiting')))
+        // board move (only the player whose turn it is)
+        || (member() && gBoardType(od().type) && od().status == 'active' && od().players[od().turn] == me()
+            && changed().hasOnly(['board', 'turn', 'moveNo', 'last', 'turnAt', 'updatedAt', 'status', 'winnerUid', 'endReason'])
+            && nd().moveNo == od().moveNo + 1 && nd().turn == 1 - od().turn && nd().turnAt == request.time
+            && isStr(nd().last, 1, 60) && nd().last.matches('^[0-9-]+$')
+            && gBoardOk(od().type, od().board, nd().board, od().turn)
+            && ((nd().status == 'active' && nd().winnerUid == '')
+                || (nd().status == 'done' && ((nd().winnerUid == me() && nd().endReason == 'win') || (nd().winnerUid == 'draw' && nd().endReason == 'draw')))))
+        // forfeit (board games) or claim a win when the other player timed out / disappeared
+        || (member() && gBoardType(od().type) && od().status == 'active' && nd().status == 'done'
+            && changed().hasOnly(['status', 'winnerUid', 'endReason', 'updatedAt'])
+            && ((nd().endReason == 'forfeit' && nd().winnerUid == otherP())
+                || (nd().endReason == 'timeout' && nd().winnerUid == me() && od().players[od().turn] != me()
+                    && (request.time > od().turnAt + duration.value(65, 's')
+                        || (otherP() in od().hb && od().hb[otherP()] < request.time - duration.value(45, 's'))))))
+        // cancel a waiting board game nobody joined
+        || (member() && od().host == me() && od().status == 'waiting' && nd().status == 'done'
+            && changed().hasOnly(['status', 'endReason', 'updatedAt']) && nd().endReason == 'cancelled')
+        // link a rematch once
+        || (member() && od().status == 'done' && changed().hasOnly(['rematch', 'updatedAt'])
+            && od().rematch == '' && isStr(nd().rematch, 1, 40))
+        // room host runs Trivia / Star Cards (lobby seats incl. computer players, rounds, scores)
+        || (member() && !gBoardType(od().type) && od().host == me() && od().status != 'done'
+            && nd().host == me() && nd().players[0] == od().players[0] && validNames(nd())
+            && (od().status == 'waiting' || (nd().players == od().players && nd().names == od().names))
+            && nd().status in ['waiting', 'active', 'done']
+            && (nd().status != 'done' || nd().winnerUid in nd().players || nd().winnerUid == 'draw')
+            && !changed().hasAny(['type', 'createdAt', 'from'])
+            && (od().type != 'starcards' || !('pv' in nd()) || gCountsOk(od(), nd().pv)))
+        // host migration when the host's heartbeat is stale
+        || (member() && !gBoardType(od().type) && od().status != 'done' && changed().hasOnly(['host', 'hb'])
+            && nd().host == me() && od().hb[od().host] < request.time - duration.value(30, 's')
+            && nd().hb[me()] == request.time)
+        // Star Cards: a seated player sends an intent (play/draw/pass) or a call (LAST STAR! / catch)
+        || (member() && od().type == 'starcards' && od().status == 'active'
+            && ((changed().hasOnly(['intent', 'updatedAt']) && nd().intent.uid == me()
+                 && nd().intent.keys().hasOnly(['uid', 't', 'card', 'color', 'last', 'n'])
+                 && nd().intent.t in ['play', 'draw', 'pass'] && od().players[od().pv.turn] == me())
+             || (changed().hasOnly(['call', 'updatedAt']) && nd().call.uid == me()
+                 && nd().call.keys().hasOnly(['uid', 't', 'n']) && nd().call.t in ['last', 'catch'])))
+      );
+      allow delete: if isAdmin();
+
+      // Quick-chat emotes from players and signed-in spectators (preset ids only).
+      match /chat/{cid} {
+        allow read: if true;
+        allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
+          && request.resource.data.uid == me() && request.resource.data.e is int
+          && request.resource.data.e >= 0 && request.resource.data.e <= 9 && request.resource.data.at == request.time;
+        allow delete: if isAdmin();
+      }
+      // Trivia answers: one doc per player, overwritten each round; only you and the host read it.
+      match /answers/{uid} {
+        function room() { return get(gPath()).data; }
+        allow read: if signedIn() && (me() == uid || me() == room().host);
+        allow create, update: if signedIn() && me() == uid && uid in room().players && room().status == 'active'
+          && room().type == 'trivia'
+          && request.resource.data.keys().hasOnly(['round', 'choice', 'at'])
+          && request.resource.data.round == room().round && request.resource.data.choice is int
+          && request.resource.data.choice >= 0 && request.resource.data.choice <= 3
+          && request.resource.data.at == request.time
+          && request.time < room().roundAt + duration.value(room().roundLen + 3, 's')
+          && (resource == null || resource.data.round != request.resource.data.round);
+        allow delete: if isAdmin();
+      }
+      // Star Cards hands: hands/{uid} readable only by that player (and the host who deals);
+      // hands/_dealer holds the shuffled pile + seed, readable only by the host until revealed.
+      match /hands/{hid} {
+        function room() { return getAfter(gPath()).data; }
+        allow read: if signedIn() && (me() == hid || me() == get(gPath()).data.host);
+        allow write: if signedIn() && me() == room().host && room().type == 'starcards'
+          && (hid == '_dealer'
+              || (request.resource.data.keys().hasOnly(['hand', 'seat', 'drawn', 'dealt', 'round'])
+                  && request.resource.data.seat is int && room().players[request.resource.data.seat] == hid
+                  && request.resource.data.hand is list
+                  && request.resource.data.hand.size() == room().pv.counts[request.resource.data.seat]));
+      }
+      // Result receipts: one per player per game, so a result is counted once.
+      match /rec/{uid} {
+        allow read: if true;
+        allow create: if signedIn() && me() in getAfter(gPath()).data.players && uid in getAfter(gPath()).data.players
+          && getAfter(gPath()).data.status == 'done'
+          && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
+          && getAfter(/databases/$(database)/documents/gameStats/$(uid)).data.last == gid;
+      }
+    }
+
+    // ---------- Game records (wins / losses / draws per game) ----------
+    match /gameStats/{uid} {
+      function gs() { return request.resource.data; }
+      function gG() { return getAfter(/databases/$(database)/documents/games/$(gs().last)).data; }
+      function gKey() { return gG().type + '_' + (gG().winnerUid == uid ? 'w' : gG().winnerUid == 'draw' ? 'd' : 'l'); }
+      function gFresh() {
+        return !exists(/databases/$(database)/documents/games/$(gs().last)/rec/$(uid))
+          && existsAfter(/databases/$(database)/documents/games/$(gs().last)/rec/$(uid));
+      }
+      function gOk() {
+        return signedIn() && isStr(gs().last, 1, 40) && gG().status == 'done'
+          && uid in gG().players && me() in gG().players && gFresh()
+          && gs().updatedAt == request.time
+          && gs().name == get(userPath(uid)).data.displayName && gs().uname == get(userPath(uid)).data.username
+          && isStr(gs().color, 0, 20);
+      }
+      allow read: if true;
+      allow create: if gOk() && gs().keys().hasOnly([gKey(), 'last', 'updatedAt', 'name', 'uname', 'color']) && gs()[gKey()] == 1;
+      allow update: if gOk() && changed().hasOnly([gKey(), 'last', 'updatedAt', 'name', 'uname', 'color'])
+        && gs()[gKey()] == resource.data.get(gKey(), 0) + 1;
+      allow delete: if isAdmin() || (signedIn() && uid == me());
+    }
+
+    // ---------- Quick-match queue: one slot per game type ----------
+    match /gameQueue/{qid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && qid.matches('^[a-z-]{3,30}$')
+        && request.resource.data.keys().hasOnly(['gid', 'uid', 'at'])
+        && request.resource.data.uid in [me(), ''] && isStr(request.resource.data.gid, 0, 40)
+        && request.resource.data.at == request.time;
     }
 
     // ---------- Reports (admin only can read) ----------

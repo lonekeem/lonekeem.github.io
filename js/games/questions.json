@@ -1,0 +1,1505 @@
+{
+"note": "Original Lone Keem Studios trivia. The first answer is the right one; the app shuffles them.",
+"questions": [
+{
+"cat": "General",
+"q": "What is the largest planet in our solar system?",
+"a": [
+"Jupiter",
+"Saturn",
+"Neptune",
+"Earth"
+]
+},
+{
+"cat": "General",
+"q": "How many continents are there on Earth?",
+"a": [
+"7",
+"5",
+"6",
+"8"
+]
+},
+{
+"cat": "General",
+"q": "What gas do plants mostly take in from the air to make food?",
+"a": [
+"Carbon dioxide",
+"Oxygen",
+"Nitrogen",
+"Helium"
+]
+},
+{
+"cat": "General",
+"q": "What is the chemical symbol for gold?",
+"a": [
+"Au",
+"Ag",
+"Gd",
+"Go"
+]
+},
+{
+"cat": "General",
+"q": "Which ocean is the largest?",
+"a": [
+"Pacific",
+"Atlantic",
+"Indian",
+"Arctic"
+]
+},
+{
+"cat": "General",
+"q": "How many sides does a hexagon have?",
+"a": [
+"6",
+"5",
+"7",
+"8"
+]
+},
+{
+"cat": "General",
+"q": "What is the capital city of Japan?",
+"a": [
+"Tokyo",
+"Osaka",
+"Kyoto",
+"Seoul"
+]
+},
+{
+"cat": "General",
+"q": "Which planet is known as the Red Planet?",
+"a": [
+"Mars",
+"Venus",
+"Mercury",
+"Jupiter"
+]
+},
+{
+"cat": "General",
+"q": "What is the freezing point of water in degrees Celsius?",
+"a": [
+"0",
+"32",
+"-10",
+"100"
+]
+},
+{
+"cat": "General",
+"q": "What is the hardest natural substance?",
+"a": [
+"Diamond",
+"Quartz",
+"Iron",
+"Granite"
+]
+},
+{
+"cat": "General",
+"q": "How many minutes are in a full day?",
+"a": [
+"1,440",
+"1,200",
+"2,400",
+"960"
+]
+},
+{
+"cat": "General",
+"q": "Which animal is the largest mammal on Earth?",
+"a": [
+"Blue whale",
+"African elephant",
+"Giraffe",
+"Sperm whale"
+]
+},
+{
+"cat": "General",
+"q": "What is the capital of Australia?",
+"a": [
+"Canberra",
+"Sydney",
+"Melbourne",
+"Perth"
+]
+},
+{
+"cat": "General",
+"q": "How many bones are in the adult human body?",
+"a": [
+"206",
+"186",
+"212",
+"300"
+]
+},
+{
+"cat": "General",
+"q": "Which language has the most native speakers?",
+"a": [
+"Mandarin Chinese",
+"English",
+"Spanish",
+"Hindi"
+]
+},
+{
+"cat": "General",
+"q": "What is the square root of 144?",
+"a": [
+"12",
+"14",
+"11",
+"16"
+]
+},
+{
+"cat": "General",
+"q": "What is the longest river in Africa?",
+"a": [
+"Nile",
+"Congo",
+"Niger",
+"Zambezi"
+]
+},
+{
+"cat": "General",
+"q": "Which country has the city of Marrakesh?",
+"a": [
+"Morocco",
+"Egypt",
+"Tunisia",
+"Algeria"
+]
+},
+{
+"cat": "General",
+"q": "What is H2O better known as?",
+"a": [
+"Water",
+"Hydrogen peroxide",
+"Salt",
+"Ozone"
+]
+},
+{
+"cat": "General",
+"q": "How many players are on the field for one soccer team?",
+"a": [
+"11",
+"10",
+"9",
+"12"
+]
+},
+{
+"cat": "General",
+"q": "Which organ pumps blood around the body?",
+"a": [
+"Heart",
+"Lungs",
+"Liver",
+"Kidneys"
+]
+},
+{
+"cat": "General",
+"q": "What is the smallest prime number?",
+"a": [
+"2",
+"1",
+"3",
+"0"
+]
+},
+{
+"cat": "General",
+"q": "In which country are the ancient pyramids of Giza?",
+"a": [
+"Egypt",
+"Mexico",
+"Peru",
+"Sudan"
+]
+},
+{
+"cat": "General",
+"q": "What do bees make?",
+"a": [
+"Honey",
+"Silk",
+"Wax paper",
+"Milk"
+]
+},
+{
+"cat": "General",
+"q": "Which planet has the most famous rings?",
+"a": [
+"Saturn",
+"Uranus",
+"Mars",
+"Mercury"
+]
+},
+{
+"cat": "General",
+"q": "What is the capital of Canada?",
+"a": [
+"Ottawa",
+"Toronto",
+"Vancouver",
+"Montreal"
+]
+},
+{
+"cat": "General",
+"q": "How many hours are in a week?",
+"a": [
+"168",
+"144",
+"172",
+"120"
+]
+},
+{
+"cat": "General",
+"q": "Which is the tallest mountain above sea level?",
+"a": [
+"Mount Everest",
+"K2",
+"Kilimanjaro",
+"Denali"
+]
+},
+{
+"cat": "General",
+"q": "What color do you get by mixing blue and yellow?",
+"a": [
+"Green",
+"Purple",
+"Orange",
+"Brown"
+]
+},
+{
+"cat": "General",
+"q": "What is the main language spoken in Brazil?",
+"a": [
+"Portuguese",
+"Spanish",
+"French",
+"Italian"
+]
+},
+{
+"cat": "General",
+"q": "How many legs does a spider have?",
+"a": [
+"8",
+"6",
+"10",
+"12"
+]
+},
+{
+"cat": "General",
+"q": "What is the closest star to Earth?",
+"a": [
+"The Sun",
+"Proxima Centauri",
+"Sirius",
+"Polaris"
+]
+},
+{
+"cat": "General",
+"q": "Which metal is liquid at room temperature?",
+"a": [
+"Mercury",
+"Lead",
+"Tin",
+"Aluminium"
+]
+},
+{
+"cat": "General",
+"q": "What is 15 multiplied by 4?",
+"a": [
+"60",
+"45",
+"50",
+"75"
+]
+},
+{
+"cat": "General",
+"q": "Which continent is the Sahara Desert on?",
+"a": [
+"Africa",
+"Asia",
+"Australia",
+"South America"
+]
+},
+{
+"cat": "General",
+"q": "What is the largest country by area?",
+"a": [
+"Russia",
+"Canada",
+"China",
+"United States"
+]
+},
+{
+"cat": "General",
+"q": "Which instrument measures temperature?",
+"a": [
+"Thermometer",
+"Barometer",
+"Odometer",
+"Compass"
+]
+},
+{
+"cat": "General",
+"q": "How many days are in a leap year?",
+"a": [
+"366",
+"365",
+"364",
+"367"
+]
+},
+{
+"cat": "General",
+"q": "What is the capital of Italy?",
+"a": [
+"Rome",
+"Milan",
+"Venice",
+"Naples"
+]
+},
+{
+"cat": "General",
+"q": "Which shape has three sides?",
+"a": [
+"Triangle",
+"Square",
+"Pentagon",
+"Circle"
+]
+},
+{
+"cat": "General",
+"q": "What is the boiling point of water at sea level in Celsius?",
+"a": [
+"100",
+"90",
+"120",
+"80"
+]
+},
+{
+"cat": "General",
+"q": "Which bird is known for copying human speech?",
+"a": [
+"Parrot",
+"Penguin",
+"Owl",
+"Ostrich"
+]
+},
+{
+"cat": "General",
+"q": "What is the currency of Japan?",
+"a": [
+"Yen",
+"Won",
+"Yuan",
+"Ringgit"
+]
+},
+{
+"cat": "General",
+"q": "What part of the plant soaks up water from the soil?",
+"a": [
+"Roots",
+"Leaves",
+"Petals",
+"Seeds"
+]
+},
+{
+"cat": "General",
+"q": "Which planet is closest to the Sun?",
+"a": [
+"Mercury",
+"Venus",
+"Earth",
+"Mars"
+]
+},
+{
+"cat": "General",
+"q": "How many strings does a standard violin have?",
+"a": [
+"4",
+"5",
+"6",
+"3"
+]
+},
+{
+"cat": "General",
+"q": "What is the largest organ of the human body?",
+"a": [
+"Skin",
+"Liver",
+"Brain",
+"Heart"
+]
+},
+{
+"cat": "General",
+"q": "Which country gifted the Statue of Liberty to the United States?",
+"a": [
+"France",
+"England",
+"Spain",
+"Germany"
+]
+},
+{
+"cat": "General",
+"q": "What is the capital of Kenya?",
+"a": [
+"Nairobi",
+"Mombasa",
+"Kampala",
+"Addis Ababa"
+]
+},
+{
+"cat": "General",
+"q": "How many zeros are in one million?",
+"a": [
+"6",
+"5",
+"7",
+"9"
+]
+},
+{
+"cat": "General",
+"q": "Which animal is known as the king of the jungle?",
+"a": [
+"Lion",
+"Tiger",
+"Gorilla",
+"Elephant"
+]
+},
+{
+"cat": "General",
+"q": "What is the fastest land animal?",
+"a": [
+"Cheetah",
+"Lion",
+"Pronghorn",
+"Greyhound"
+]
+},
+{
+"cat": "General",
+"q": "Which gas makes up most of Earth's air?",
+"a": [
+"Nitrogen",
+"Oxygen",
+"Carbon dioxide",
+"Argon"
+]
+},
+{
+"cat": "General",
+"q": "What is the capital of Jamaica?",
+"a": [
+"Kingston",
+"Montego Bay",
+"Ocho Rios",
+"Negril"
+]
+},
+{
+"cat": "General",
+"q": "What do you call a baby kangaroo?",
+"a": [
+"Joey",
+"Cub",
+"Kit",
+"Calf"
+]
+},
+{
+"cat": "General",
+"q": "How many degrees are in a right angle?",
+"a": [
+"90",
+"45",
+"180",
+"60"
+]
+},
+{
+"cat": "General",
+"q": "Which is the largest desert in the world, counting cold deserts?",
+"a": [
+"Antarctica",
+"Sahara",
+"Gobi",
+"Arabian"
+]
+},
+{
+"cat": "General",
+"q": "What is the main ingredient in guacamole?",
+"a": [
+"Avocado",
+"Tomato",
+"Pea",
+"Cucumber"
+]
+},
+{
+"cat": "General",
+"q": "Which planet spins on its side the most?",
+"a": [
+"Uranus",
+"Neptune",
+"Saturn",
+"Venus"
+]
+},
+{
+"cat": "General",
+"q": "What is the capital of Spain?",
+"a": [
+"Madrid",
+"Barcelona",
+"Seville",
+"Valencia"
+]
+},
+{
+"cat": "Music",
+"q": "How many lines are on a standard music staff?",
+"a": [
+"5",
+"4",
+"6",
+"7"
+]
+},
+{
+"cat": "Music",
+"q": "Which instrument has 88 keys on a standard full-size model?",
+"a": [
+"Piano",
+"Organ",
+"Accordion",
+"Harpsichord"
+]
+},
+{
+"cat": "Music",
+"q": "What does BPM stand for in music?",
+"a": [
+"Beats per minute",
+"Bars per measure",
+"Bass power meter",
+"Beats per measure"
+]
+},
+{
+"cat": "Music",
+"q": "Which musical term means to play loudly?",
+"a": [
+"Forte",
+"Piano",
+"Largo",
+"Adagio"
+]
+},
+{
+"cat": "Music",
+"q": "What is a group of four musicians called?",
+"a": [
+"Quartet",
+"Trio",
+"Quintet",
+"Duet"
+]
+},
+{
+"cat": "Music",
+"q": "Which Austrian composer wrote The Magic Flute?",
+"a": [
+"Mozart",
+"Beethoven",
+"Bach",
+"Haydn"
+]
+},
+{
+"cat": "Music",
+"q": "Which composer kept writing music after losing his hearing?",
+"a": [
+"Beethoven",
+"Chopin",
+"Vivaldi",
+"Handel"
+]
+},
+{
+"cat": "Music",
+"q": "Which music genre grew out of 1970s block parties in the Bronx?",
+"a": [
+"Hip hop",
+"Grunge",
+"Disco",
+"Ska"
+]
+},
+{
+"cat": "Music",
+"q": "What does a DJ use to blend two tracks together?",
+"a": [
+"Mixer",
+"Metronome",
+"Capo",
+"Tuner"
+]
+},
+{
+"cat": "Music",
+"q": "How many notes are in a standard major scale before the octave repeats?",
+"a": [
+"7",
+"8",
+"5",
+"12"
+]
+},
+{
+"cat": "Music",
+"q": "Which instrument family does the trumpet belong to?",
+"a": [
+"Brass",
+"Woodwind",
+"Percussion",
+"Strings"
+]
+},
+{
+"cat": "Music",
+"q": "Which instrument family does the flute belong to?",
+"a": [
+"Woodwind",
+"Brass",
+"Strings",
+"Percussion"
+]
+},
+{
+"cat": "Music",
+"q": "What is the highest standard female singing voice?",
+"a": [
+"Soprano",
+"Alto",
+"Mezzo",
+"Tenor"
+]
+},
+{
+"cat": "Music",
+"q": "What is the lowest standard male singing voice?",
+"a": [
+"Bass",
+"Baritone",
+"Tenor",
+"Alto"
+]
+},
+{
+"cat": "Music",
+"q": "Which country is reggae music from?",
+"a": [
+"Jamaica",
+"Cuba",
+"Brazil",
+"Trinidad"
+]
+},
+{
+"cat": "Music",
+"q": "Which Jamaican artist sang One Love with The Wailers?",
+"a": [
+"Bob Marley",
+"Peter Tosh",
+"Jimmy Cliff",
+"Toots Hibbert"
+]
+},
+{
+"cat": "Music",
+"q": "What device keeps a steady beat for practice?",
+"a": [
+"Metronome",
+"Amplifier",
+"Pedal",
+"Capo"
+]
+},
+{
+"cat": "Music",
+"q": "Who is known as the King of Pop?",
+"a": [
+"Michael Jackson",
+"Elvis Presley",
+"Prince",
+"Stevie Wonder"
+]
+},
+{
+"cat": "Music",
+"q": "Who is known as the King of Rock and Roll?",
+"a": [
+"Elvis Presley",
+"Chuck Berry",
+"Little Richard",
+"Buddy Holly"
+]
+},
+{
+"cat": "Music",
+"q": "Which band released the album Abbey Road?",
+"a": [
+"The Beatles",
+"The Rolling Stones",
+"Queen",
+"Pink Floyd"
+]
+},
+{
+"cat": "Music",
+"q": "What is the musical term for gradually getting louder?",
+"a": [
+"Crescendo",
+"Diminuendo",
+"Staccato",
+"Legato"
+]
+},
+{
+"cat": "Music",
+"q": "How many strings does a standard bass guitar have?",
+"a": [
+"4",
+"6",
+"5",
+"8"
+]
+},
+{
+"cat": "Music",
+"q": "Which steel percussion instrument comes from Trinidad and Tobago?",
+"a": [
+"Steelpan",
+"Marimba",
+"Cajon",
+"Tabla"
+]
+},
+{
+"cat": "Music",
+"q": "In music, what does a sharp sign do to a note?",
+"a": [
+"Raises it a half step",
+"Lowers it a half step",
+"Makes it longer",
+"Makes it quieter"
+]
+},
+{
+"cat": "Music",
+"q": "Which city is famous as the birthplace of jazz?",
+"a": [
+"New Orleans",
+"Chicago",
+"Memphis",
+"Detroit"
+]
+},
+{
+"cat": "Music",
+"q": "Which Detroit record label became famous for soul hits in the 1960s?",
+"a": [
+"Motown",
+"Stax",
+"Atlantic",
+"Def Jam"
+]
+},
+{
+"cat": "Music",
+"q": "What do you call the speed of a piece of music?",
+"a": [
+"Tempo",
+"Pitch",
+"Timbre",
+"Key"
+]
+},
+{
+"cat": "Music",
+"q": "Which instrument did Jimi Hendrix famously play?",
+"a": [
+"Guitar",
+"Drums",
+"Saxophone",
+"Piano"
+]
+},
+{
+"cat": "Music",
+"q": "A song's repeating main section is usually called the what?",
+"a": [
+"Chorus",
+"Bridge",
+"Intro",
+"Outro"
+]
+},
+{
+"cat": "Music",
+"q": "Which electronic instrument creates sound with oscillators?",
+"a": [
+"Synthesizer",
+"Ukulele",
+"Banjo",
+"Harp"
+]
+},
+{
+"cat": "Music",
+"q": "What is an a cappella performance?",
+"a": [
+"Singing with no instruments",
+"Singing in Italian",
+"A solo drum part",
+"Music in a church only"
+]
+},
+{
+"cat": "Music",
+"q": "Which classical composer wrote The Four Seasons?",
+"a": [
+"Vivaldi",
+"Mozart",
+"Bach",
+"Tchaikovsky"
+]
+},
+{
+"cat": "Music",
+"q": "Which Russian composer wrote the music for The Nutcracker ballet?",
+"a": [
+"Tchaikovsky",
+"Rachmaninoff",
+"Stravinsky",
+"Prokofiev"
+]
+},
+{
+"cat": "Music",
+"q": "What does MIDI let electronic instruments do?",
+"a": [
+"Talk to each other",
+"Play louder",
+"Tune themselves",
+"Record video"
+]
+},
+{
+"cat": "Music",
+"q": "Which K-pop group released Dynamite in 2020?",
+"a": [
+"BTS",
+"BLACKPINK",
+"EXO",
+"TWICE"
+]
+},
+{
+"cat": "Music",
+"q": "Which Barbadian singer released Umbrella?",
+"a": [
+"Rihanna",
+"Beyonce",
+"Shakira",
+"Adele"
+]
+},
+{
+"cat": "Music",
+"q": "Which singer is known as the Queen of Soul?",
+"a": [
+"Aretha Franklin",
+"Whitney Houston",
+"Diana Ross",
+"Etta James"
+]
+},
+{
+"cat": "Music",
+"q": "Which instrument has pedals, strings and is plucked, often shown in orchestras?",
+"a": [
+"Harp",
+"Cello",
+"Lute",
+"Zither"
+]
+},
+{
+"cat": "Music",
+"q": "How many beats does a whole note get in 4/4 time?",
+"a": [
+"4",
+"2",
+"1",
+"8"
+]
+},
+{
+"cat": "Music",
+"q": "What is the name for a song's tune you can hum?",
+"a": [
+"Melody",
+"Harmony",
+"Rhythm",
+"Meter"
+]
+},
+{
+"cat": "Music",
+"q": "Afrobeat pioneer Fela Kuti was from which country?",
+"a": [
+"Nigeria",
+"Ghana",
+"Senegal",
+"Kenya"
+]
+},
+{
+"cat": "Music",
+"q": "What does it mean when a singer uses Auto-Tune?",
+"a": [
+"Pitch is corrected by software",
+"The mic gets louder",
+"The song speeds up",
+"Echo is removed"
+]
+},
+{
+"cat": "Music",
+"q": "Which festival in Coachella Valley is famous for music?",
+"a": [
+"Coachella",
+"Glastonbury",
+"Lollapalooza",
+"Tomorrowland"
+]
+},
+{
+"cat": "Music",
+"q": "Which English festival is held at Worthy Farm?",
+"a": [
+"Glastonbury",
+"Reading",
+"Download",
+"Isle of Wight"
+]
+},
+{
+"cat": "Music",
+"q": "What is a remix?",
+"a": [
+"A new version of a song made from its parts",
+"A live recording",
+"A song's lyrics sheet",
+"A music video"
+]
+},
+{
+"cat": "Movies",
+"q": "Which film features a ship called the Titanic hitting an iceberg, released in 1997?",
+"a": [
+"Titanic",
+"Poseidon",
+"The Abyss",
+"Waterworld"
+]
+},
+{
+"cat": "Movies",
+"q": "In The Wizard of Oz, what color are Dorothy's slippers in the 1939 film?",
+"a": [
+"Ruby red",
+"Silver",
+"Gold",
+"Emerald green"
+]
+},
+{
+"cat": "Movies",
+"q": "Which animated studio made Toy Story, the first fully computer-animated feature film?",
+"a": [
+"Pixar",
+"DreamWorks",
+"Blue Sky",
+"Illumination"
+]
+},
+{
+"cat": "Movies",
+"q": "Which 1975 film about a shark was directed by Steven Spielberg?",
+"a": [
+"Jaws",
+"Deep Blue Sea",
+"The Reef",
+"Open Water"
+]
+},
+{
+"cat": "Movies",
+"q": "What is the name of the wizarding school in the Harry Potter films?",
+"a": [
+"Hogwarts",
+"Durmstrang",
+"Beauxbatons",
+"Ilvermorny"
+]
+},
+{
+"cat": "Movies",
+"q": "Which movie has the line, May the Force be with you?",
+"a": [
+"Star Wars",
+"Star Trek",
+"Dune",
+"Avatar"
+]
+},
+{
+"cat": "Movies",
+"q": "What kind of animal is Simba in The Lion King?",
+"a": [
+"Lion",
+"Tiger",
+"Cheetah",
+"Leopard"
+]
+},
+{
+"cat": "Movies",
+"q": "Which film series features a time-travelling DeLorean car?",
+"a": [
+"Back to the Future",
+"Terminator",
+"Looper",
+"Interstellar"
+]
+},
+{
+"cat": "Movies",
+"q": "What is the highest award at the Academy Awards often called?",
+"a": [
+"Oscar",
+"Emmy",
+"Grammy",
+"Tony"
+]
+},
+{
+"cat": "Movies",
+"q": "Which 2009 James Cameron film is set on the moon Pandora?",
+"a": [
+"Avatar",
+"Aliens",
+"Titanic",
+"Elysium"
+]
+},
+{
+"cat": "Movies",
+"q": "In Finding Nemo, what kind of fish is Nemo?",
+"a": [
+"Clownfish",
+"Blue tang",
+"Goldfish",
+"Pufferfish"
+]
+},
+{
+"cat": "Movies",
+"q": "Which superhero is also known as the Dark Knight?",
+"a": [
+"Batman",
+"Superman",
+"Iron Man",
+"Spider-Man"
+]
+},
+{
+"cat": "Movies",
+"q": "Which country is the Bollywood film industry based in?",
+"a": [
+"India",
+"Pakistan",
+"Bangladesh",
+"Sri Lanka"
+]
+},
+{
+"cat": "Movies",
+"q": "Which actor played Jack Sparrow in Pirates of the Caribbean?",
+"a": [
+"Johnny Depp",
+"Orlando Bloom",
+"Brad Pitt",
+"Tom Cruise"
+]
+},
+{
+"cat": "Movies",
+"q": "What is the name of the hobbit who carries the ring in The Lord of the Rings?",
+"a": [
+"Frodo",
+"Bilbo",
+"Sam",
+"Pippin"
+]
+},
+{
+"cat": "Movies",
+"q": "In Frozen, what is the name of Elsa's sister?",
+"a": [
+"Anna",
+"Ariel",
+"Belle",
+"Moana"
+]
+},
+{
+"cat": "Movies",
+"q": "Which film studio uses a roaring lion in its logo?",
+"a": [
+"MGM",
+"Paramount",
+"Universal",
+"Warner Bros."
+]
+},
+{
+"cat": "Movies",
+"q": "Which Marvel hero is the King of Wakanda?",
+"a": [
+"Black Panther",
+"Thor",
+"Doctor Strange",
+"Ant-Man"
+]
+},
+{
+"cat": "Movies",
+"q": "What is the job of a film's director?",
+"a": [
+"Guides how the film is made",
+"Writes the music",
+"Sells tickets",
+"Builds sets only"
+]
+},
+{
+"cat": "Movies",
+"q": "Which green ogre lives in a swamp in a 2001 animated film?",
+"a": [
+"Shrek",
+"Grinch",
+"Hulk",
+"Yoda"
+]
+},
+{
+"cat": "Movies",
+"q": "Which 1993 film features dinosaurs brought back to life on an island?",
+"a": [
+"Jurassic Park",
+"King Kong",
+"The Land Before Time",
+"Godzilla"
+]
+},
+{
+"cat": "Movies",
+"q": "In Toy Story, what is the name of the space ranger toy?",
+"a": [
+"Buzz Lightyear",
+"Woody",
+"Rex",
+"Zurg"
+]
+},
+{
+"cat": "Movies",
+"q": "Which wizard is the headmaster of Hogwarts for most of the Harry Potter films?",
+"a": [
+"Albus Dumbledore",
+"Severus Snape",
+"Gandalf",
+"Merlin"
+]
+},
+{
+"cat": "Movies",
+"q": "Which film features a boy named Elliott and a friendly alien?",
+"a": [
+"E.T. the Extra-Terrestrial",
+"Close Encounters",
+"Super 8",
+"Arrival"
+]
+},
+{
+"cat": "Movies",
+"q": "What does CGI stand for in films?",
+"a": [
+"Computer-generated imagery",
+"Camera guided input",
+"Cinema graphic interface",
+"Color grading index"
+]
+},
+{
+"cat": "Movies",
+"q": "Which city is home to the Hollywood sign?",
+"a": [
+"Los Angeles",
+"San Francisco",
+"Las Vegas",
+"San Diego"
+]
+},
+{
+"cat": "Movies",
+"q": "Which French city hosts a famous film festival each May?",
+"a": [
+"Cannes",
+"Paris",
+"Lyon",
+"Nice"
+]
+},
+{
+"cat": "Movies",
+"q": "In The Matrix, which pill does Neo take?",
+"a": [
+"Red",
+"Blue",
+"Green",
+"White"
+]
+},
+{
+"cat": "Movies",
+"q": "Which animated film features a girl named Moana sailing the ocean?",
+"a": [
+"Moana",
+"Brave",
+"Tangled",
+"Encanto"
+]
+},
+{
+"cat": "Movies",
+"q": "What are the little yellow helpers in Despicable Me called?",
+"a": [
+"Minions",
+"Gremlins",
+"Smurfs",
+"Oompa Loompas"
+]
+},
+{
+"cat": "Movies",
+"q": "What is a film's trailer?",
+"a": [
+"A short preview",
+"The final scene",
+"The credits",
+"A behind-the-scenes book"
+]
+},
+{
+"cat": "Movies",
+"q": "Which superhero is Peter Parker?",
+"a": [
+"Spider-Man",
+"Batman",
+"Flash",
+"Captain America"
+]
+},
+{
+"cat": "Movies",
+"q": "Which wizard tells a Balrog You shall not pass?",
+"a": [
+"Gandalf",
+"Saruman",
+"Radagast",
+"Elrond"
+]
+},
+{
+"cat": "Movies",
+"q": "What genre are movies that mostly try to scare you?",
+"a": [
+"Horror",
+"Musical",
+"Western",
+"Documentary"
+]
+},
+{
+"cat": "Movies",
+"q": "Which Disney film features a family with magical gifts in Colombia?",
+"a": [
+"Encanto",
+"Coco",
+"Luca",
+"Soul"
+]
+},
+{
+"cat": "Movies",
+"q": "In Coco, which holiday is central to the story?",
+"a": [
+"Day of the Dead",
+"Christmas",
+"Carnival",
+"Halloween"
+]
+},
+{
+"cat": "Movies",
+"q": "Which movie features the toy cowboy Woody?",
+"a": [
+"Toy Story",
+"Cars",
+"Up",
+"Inside Out"
+]
+},
+{
+"cat": "Movies",
+"q": "What does a film's soundtrack include?",
+"a": [
+"Its music",
+"Its script",
+"Its cast list",
+"Its posters"
+]
+},
+{
+"cat": "Movies",
+"q": "In Up, how does Carl make his house fly?",
+"a": [
+"Balloons",
+"A jet engine",
+"Wings",
+"A kite"
+]
+},
+{
+"cat": "Movies",
+"q": "Which film monster is a giant ape on Skull Island?",
+"a": [
+"King Kong",
+"Godzilla",
+"Mothra",
+"Rodan"
+]
+},
+{
+"cat": "Movies",
+"q": "Which film studio created Shrek?",
+"a": [
+"DreamWorks",
+"Pixar",
+"Disney",
+"Laika"
+]
+},
+{
+"cat": "Movies",
+"q": "Which emotion is blue in Inside Out?",
+"a": [
+"Sadness",
+"Fear",
+"Joy",
+"Anger"
+]
+},
+{
+"cat": "Movies",
+"q": "Which hero carries a shield with a star on it?",
+"a": [
+"Captain America",
+"Thor",
+"Hawkeye",
+"Wolverine"
+]
+},
+{
+"cat": "Movies",
+"q": "Which kind of film follows real events with no actors, usually?",
+"a": [
+"Documentary",
+"Thriller",
+"Comedy",
+"Fantasy"
+]
+},
+{
+"cat": "Movies",
+"q": "In The Lion King, who is Simba's father?",
+"a": [
+"Mufasa",
+"Scar",
+"Rafiki",
+"Zazu"
+]
+}
+]
+}

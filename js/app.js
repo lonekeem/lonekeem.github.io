@@ -23,6 +23,7 @@ import { createLive } from './live.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
+import { createGames, CONTROLLER as GAMES_ICON } from './games/index.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -483,6 +484,8 @@ const routes = [
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
   [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
+  [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
+  [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/settings$/, pageSettings, 'me'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
@@ -498,7 +501,7 @@ async function route() {
   S.unsubs.forEach((u) => u()); S.unsubs = [];
   closeModal();
   // Accept short deep links like app.html#watch/<postId> as well as #/watch/<postId>.
-  const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch');
+  const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch').replace(/^#game\//, '#/game/');
   const token = ++routeToken;
   for (const [re, fn, nav] of routes) {
     const m = hash.match(re);
@@ -552,6 +555,7 @@ const live = createLive({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal,
   fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
 });
+const games = createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile });
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
   STUDIO_UID, youTubeId, tikTokId, stale, canGoBack: () => navCount > 1,
@@ -601,6 +605,7 @@ async function pageFeed(token) {
 async function pageExplore(token) {
   main.innerHTML = `
     <h1 class="page-title">Explore</h1>
+    <a class="g-promo" href="#/games">${GAMES_ICON}<span><b>Games</b><small>Star Drop, Star Cards, Trivia &amp; more. Play friends or the computer.</small></span><span aria-hidden="true">›</span></a>
     <div id="ex-top"></div>
     <h2 style="margin:22px 0 14px;font-size:1.15rem">Recent posts</h2>
     <div id="posts"><div class="spinner"></div></div>`;
@@ -786,6 +791,7 @@ async function pageProfile(username, tab, token) {
       </div>
       ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
       <div id="pstories"></div>
+      <div id="pgames"></div>
       <div class="profile-actions">
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
@@ -798,6 +804,7 @@ async function pageProfile(username, tab, token) {
     <div id="posts"><div class="spinner"></div></div>`;
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
   if (!blocked) stories.renderProfile($('#pav'), $('#pstories'), uid, u, token, stale);
+  if (!blocked) games.renderProfile($('#pgames'), uid);
   if (!blocked) live.renderProfile($('#pav'), $('.profile-actions'), uid, mine || (uid === STUDIO_UID && isAdmin()), token);
   $('#report-user')?.addEventListener('click', () => reportDialog('user', uid, '', '@' + u.username));
   $('#block')?.addEventListener('click', () => blockUser(uid, u.username));
@@ -1024,9 +1031,9 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
-    const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
+    const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b>${esc(n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
   }).join('') : '<div class="empty">No notifications yet.</div>';
