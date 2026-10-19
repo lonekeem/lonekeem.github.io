@@ -1,0 +1,270 @@
+rules_version = '2';
+// Lone Keem Studios - Firestore security rules.
+// Admin = the verified Google/email account lillykemoy1@gmail.com.
+// The studio account has the fixed id "studio" and is managed by the admin.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'lillykemoy1@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    // Acting as yourself, or the admin acting as the studio account.
+    function actingAs(uid) { return signedIn() && (uid == me() || (uid == 'studio' && isAdmin())); }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function isStr(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // ---------- Usernames (uniqueness) ----------
+    match /usernames/{name} {
+      allow read: if true;
+      allow create: if signedIn()
+        && name.matches('^[a-z0-9_.]{3,20}$')
+        && request.resource.data.keys().hasOnly(['uid'])
+        && actingAs(request.resource.data.uid)
+        && getAfter(userPath(request.resource.data.uid)).data.username == name;
+      allow delete: if isAdmin() || (signedIn() && actingAs(resource.data.uid)
+        && (!existsAfter(userPath(resource.data.uid))
+            || getAfter(userPath(resource.data.uid)).data.username != name));
+    }
+
+    // ---------- Profiles ----------
+    function validProfile(d) {
+      return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
+                               'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio'])
+        && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
+        && isStr(d.displayName, 1, 50)
+        && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+        && isStr(d.bio, 0, 160)
+        && isStr(d.color, 1, 20)
+        && d.welcomed is bool
+        && d.createdAt is timestamp;
+    }
+    // Rate limit: a "last action" timestamp may only be set to now, and only after `secs` seconds.
+    function rateOk(field, secs) {
+      return !(field in changed())
+        || (request.resource.data[field] == request.time
+            && (isAdmin() || !(field in resource.data)
+                || resource.data[field] + duration.value(secs, 's') < request.time));
+    }
+
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if signedIn() && uid == me()
+        && validProfile(request.resource.data)
+        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt'])
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
+      allow update: if actingAs(uid)
+        && validProfile(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.get('isStudio', false) == resource.data.get('isStudio', false)
+        && (request.resource.data.username == resource.data.username
+            || getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid)
+        && rateOk('lastPostAt', 20)
+        && rateOk('lastCommentAt', 5)
+        && rateOk('lastMessageAt', 1);
+      allow delete: if (signedIn() && uid == me()) || isAdmin();
+
+      // Private favourites
+      match /saved/{postId} {
+        allow read, delete: if signedIn() && uid == me();
+        allow create: if signedIn() && uid == me()
+          && request.resource.data.keys().hasOnly(['postId', 'createdAt'])
+          && request.resource.data.postId == postId
+          && request.resource.data.createdAt == request.time;
+      }
+
+      // Private block list (rules can still check it with exists())
+      match /blocks/{other} {
+        allow read, delete: if actingAs(uid);
+        allow create: if actingAs(uid) && other != uid
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time;
+      }
+
+      match /notifications/{nid} {
+        allow read, delete: if actingAs(uid);
+        allow update: if actingAs(uid)
+          && changed().hasOnly(['read']) && request.resource.data.read is bool;
+        allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
+          && exists(userPath(uid))
+          && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && request.resource.data.type in ['follow', 'like', 'comment', 'message']
+          && actingAs(request.resource.data.fromUid)
+          && request.resource.data.fromUid != uid
+          && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName
+          && request.resource.data.fromUsername == get(userPath(request.resource.data.fromUid)).data.username
+          && isStr(request.resource.data.postId, 0, 100)
+          && isStr(request.resource.data.text, 0, 140)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.read == false;
+      }
+    }
+
+    // ---------- Posts ----------
+    function validNewPost(d) {
+      let u = get(userPath(d.authorId)).data;
+      return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
+                               'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
+                               'commentCount', 'lastCommentId', 'studio'])
+        && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
+                            'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
+                            'commentCount', 'lastCommentId', 'studio'])
+        && d.authorName == u.displayName
+        && d.authorUsername == u.username
+        && d.authorColor == u.color
+        && d.type in ['text', 'link', 'media']
+        && isStr(d.text, 0, 2000)
+        && isStr(d.linkUrl, 0, 300)
+        && isStr(d.mediaUrl, 0, 500)
+        && d.mediaType in ['', 'image', 'video']
+        && isStr(d.poster, 0, 500)
+        && (d.linkUrl == '' || d.linkUrl.matches('^https://([a-z0-9-]+[.])*(youtube[.]com|youtu[.]be|tiktok[.]com)/.*$'))
+        && (d.authorId == 'studio' || d.mediaUrl == ''
+            || d.mediaUrl.matches('^https://(res[.]cloudinary[.]com|firebasestorage[.]googleapis[.]com)/.*$'))
+        && (d.text.size() > 0 || d.linkUrl != '' || d.mediaUrl != '')
+        && d.createdAt == request.time
+        && d.likeCount == 0 && d.commentCount == 0 && d.lastCommentId == ''
+        && d.studio == (d.authorId == 'studio')
+        && getAfter(userPath(d.authorId)).data.lastPostAt == request.time;
+    }
+
+    match /posts/{postId} {
+      function postPath() { return /databases/$(database)/documents/posts/$(postId); }
+      function likeChange() {
+        let likeP = /databases/$(database)/documents/posts/$(postId)/likes/$(me());
+        let n = request.resource.data;
+        let o = resource.data;
+        return changed().hasOnly(['likeCount'])
+          && ((n.likeCount == o.likeCount + 1 && !exists(likeP) && existsAfter(likeP))
+              || (n.likeCount == o.likeCount - 1 && exists(likeP) && !existsAfter(likeP)));
+      }
+      function commentChange() {
+        let n = request.resource.data;
+        let o = resource.data;
+        let cP = /databases/$(database)/documents/posts/$(postId)/comments/$(n.lastCommentId);
+        return changed().hasOnly(['commentCount', 'lastCommentId'])
+          && isStr(n.lastCommentId, 1, 100)
+          && ((n.commentCount == o.commentCount + 1 && !exists(cP) && existsAfter(cP))
+              || (n.commentCount == o.commentCount - 1 && exists(cP) && !existsAfter(cP)));
+      }
+
+      allow read: if true;
+      allow create: if signedIn() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data);
+      allow update: if signedIn() && (likeChange() || commentChange());
+      allow delete: if signedIn() && (resource.data.authorId == me() || isAdmin());
+
+      match /likes/{likerId} {
+        allow read: if true;
+        allow create: if signedIn() && likerId == me()
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time
+          && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount + 1;
+        allow delete: if signedIn() && likerId == me()
+          && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount - 1;
+      }
+
+      match /comments/{cid} {
+        allow read: if true;
+        allow create: if signedIn()
+          && !blockedBy(get(postPath()).data.authorId)
+          && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'text', 'createdAt'])
+          && request.resource.data.authorId == me()
+          && request.resource.data.authorName == get(userPath(me())).data.displayName
+          && request.resource.data.authorUsername == get(userPath(me())).data.username
+          && isStr(request.resource.data.authorColor, 1, 20)
+          && isStr(request.resource.data.text, 1, 500)
+          && request.resource.data.createdAt == request.time
+          && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount + 1
+          && getAfter(postPath()).data.lastCommentId == cid
+          && (isAdmin() || getAfter(userPath(me())).data.lastCommentAt == request.time);
+        allow delete: if signedIn()
+          && (resource.data.authorId == me() || isAdmin() || get(postPath()).data.authorId == me())
+          && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount - 1;
+      }
+    }
+
+    // ---------- Follows (id = followerUid_followeeUid) ----------
+    match /follows/{fid} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['follower', 'followee', 'createdAt'])
+        && request.resource.data.follower == me()
+        && request.resource.data.followee is string
+        && request.resource.data.followee != me()
+        && fid == me() + '_' + request.resource.data.followee
+        && exists(userPath(request.resource.data.followee))
+        && !blockedBy(request.resource.data.followee)
+        && request.resource.data.createdAt == request.time;
+      allow delete: if signedIn()
+        && (resource.data.follower == me() || resource.data.followee == me() || isAdmin());
+    }
+
+    // ---------- Direct messages (id = sortedUidA_sortedUidB) ----------
+    // The admin can read and reply to chats with the studio account ("studio").
+    function isBlocked(owner, who) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(who)); }
+    match /chats/{chatId} {
+      function parts() { return chatId.split('_'); }
+      function otherOf(a) { return parts()[0] == a ? parts()[1] : parts()[0]; }
+      function inChat() { return signedIn() && (me() in parts() || ('studio' in parts() && isAdmin())); }
+      function chatPath() { return /databases/$(database)/documents/chats/$(chatId); }
+
+      allow get: if inChat();
+      allow list: if signedIn() && (me() in resource.data.participants
+        || ('studio' in resource.data.participants && isAdmin()));
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['participants', 'lastMessage', 'lastAt', 'lastSender', 'createdAt'])
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants[0] < request.resource.data.participants[1]
+        && chatId == request.resource.data.participants[0] + '_' + request.resource.data.participants[1]
+        && request.resource.data.lastSender in request.resource.data.participants
+        && actingAs(request.resource.data.lastSender)
+        && exists(userPath(otherOf(request.resource.data.lastSender)))
+        && !isBlocked(otherOf(request.resource.data.lastSender), request.resource.data.lastSender)
+        && isStr(request.resource.data.lastMessage, 0, 1000)
+        && request.resource.data.lastAt == request.time
+        && request.resource.data.createdAt == request.time;
+      allow update: if inChat()
+        && changed().hasOnly(['lastMessage', 'lastAt', 'lastSender'])
+        && isStr(request.resource.data.lastMessage, 0, 1000)
+        && request.resource.data.lastSender in parts()
+        && actingAs(request.resource.data.lastSender)
+        && request.resource.data.lastAt == request.time
+        && !isBlocked(otherOf(request.resource.data.lastSender), request.resource.data.lastSender);
+
+      match /messages/{mid} {
+        allow read: if inChat();
+        allow create: if inChat()
+          && request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt'])
+          && request.resource.data.senderId in parts()
+          && actingAs(request.resource.data.senderId)
+          && isStr(request.resource.data.text, 1, 1000)
+          && request.resource.data.createdAt == request.time
+          && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
+          && getAfter(chatPath()).data.lastAt == request.time
+          && getAfter(userPath(request.resource.data.senderId)).data.lastMessageAt == request.time;
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ---------- Reports (admin only can read) ----------
+    match /reports/{rid} {
+      allow read, delete: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'postId', 'reason', 'excerpt', 'createdAt'])
+        && request.resource.data.reporterId == me()
+        && request.resource.data.targetType in ['post', 'comment', 'user']
+        && isStr(request.resource.data.targetId, 1, 200)
+        && isStr(request.resource.data.postId, 0, 200)
+        && isStr(request.resource.data.reason, 1, 500)
+        && isStr(request.resource.data.excerpt, 0, 300)
+        && request.resource.data.createdAt == request.time;
+    }
+  }
+}

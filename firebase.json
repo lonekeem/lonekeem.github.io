@@ -1,0 +1,18 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Lone Keem Studios",
+        "supportEmail": "lillykemoy1@gmail.com",
+        "authorizedRedirectUris": [
+          "https://lone-keem-studios.firebaseapp.com/__/auth/handler"
+        ]
+      }
+    }
+  }
+}

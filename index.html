@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lone Keem Studios — AI movies, music &amp; music videos</title>
     <meta name="description" content="Lone Keem Studios is a creative studio where AI meets imagination. We create cinematic AI-generated movies, music, and visual experiences that bring bold ideas to life.">
-    <meta name="lks-version" content="redesign-2026-10-19">
+    <meta name="lks-version" content="social-2026-10-19">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -166,12 +166,48 @@
         .site-footer { border-top: 1px solid rgba(255, 255, 255, 0.07); padding: 32px 0 40px; text-align: center; color: var(--muted); font-size: 0.92rem; }
         .site-footer p { margin: 0; }
 
+        /* Account button + social bar (community features) */
+        .header-top { display: contents; }
+        .header-top .brand { order: 1; }
+        .nav { order: 2; margin-left: auto; }
+        .account-slot { display: flex; align-items: center; min-height: 40px; order: 3; }
+        .acct-pill {
+            display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: #fff; font-weight: 600; font-size: .92rem;
+            padding: 8px 15px; border-radius: 999px; white-space: nowrap;
+            background: linear-gradient(135deg, var(--purple), #6a3df0 60%, #3f7fe8);
+        }
+        .acct-pill svg { width: 16px; height: 16px; }
+        .acct-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--muted); font-weight: 500; font-size: .95rem; }
+        .acct-btn:hover { color: var(--text); }
+        .acct-avatar {
+            --c: var(--purple); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+            font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: .85rem; border: 1px solid rgba(255,255,255,.2);
+            background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 45%, #000));
+        }
+        .social-bar { display: flex; align-items: center; gap: 4px; margin: 12px -6px 0; }
+        .soc {
+            display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 8px 12px; border-radius: 999px;
+            background: none; border: 0; color: var(--muted); font: inherit; font-weight: 500; font-size: .95rem; cursor: pointer; text-decoration: none;
+        }
+        .soc:hover { background: rgba(255,255,255,.06); color: var(--text); }
+        .soc svg { width: 22px; height: 22px; }
+        .soc.save { margin-left: auto; }
+        .soc.like.on { color: #ff5ca8; }
+        .soc.save.on { color: var(--blue); }
+        .soc.on svg { fill: currentColor; }
+        .community-cta { margin-top: 28px; text-align: center; color: var(--muted); }
+        .foot-links { display: flex; gap: 6px 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px !important; }
+        .foot-links a { color: var(--muted); }
+        .foot-links a:hover { color: var(--text); }
+
         /* Mobile */
         @media (max-width: 760px) {
             :root { --header-h: 116px; }
             .header-inner { flex-direction: column; align-items: stretch; gap: 6px; padding-top: 10px; padding-bottom: 8px; }
-            .brand { justify-content: center; }
+            .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px; }
+            .nav { margin-left: 0; }
             .brand img { width: 36px; height: 36px; }
+            .acct-label { display: none; }
             .nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
             .nav a { text-align: center; padding: 11px 4px; font-size: 0.93rem; min-height: 44px; }
             .nav .long { display: none; }
@@ -194,10 +230,13 @@
 
     <header class="site-header">
         <div class="container header-inner">
-            <a class="brand" href="#top" aria-label="Lone Keem Studios, back to top">
-                <img src="logo.png" alt="Lone Keem Studios KL logo" width="42" height="42">
-                <span>Lone Keem Studios</span>
-            </a>
+            <div class="header-top">
+                <a class="brand" href="#top" aria-label="Lone Keem Studios, back to top">
+                    <img src="logo.png" alt="Lone Keem Studios KL logo" width="42" height="42">
+                    <span>Lone Keem Studios</span>
+                </a>
+                <div class="account-slot" id="account-slot"><a class="acct-pill" href="app.html#/login">Sign in</a></div>
+            </div>
             <nav class="nav" aria-label="Main">
                 <a href="#music-videos"><span class="long">Music </span>Videos</a>
                 <a href="#movies">Movies</a>
@@ -251,7 +290,7 @@
                     </article>
                     -->
 
-                    <article class="card video-card" id="stand-up-strong">
+                    <article class="card video-card" id="stand-up-strong" data-post-id="stand-up-strong">
                         <video controls playsinline preload="metadata" controlsList="nodownload"
                                oncontextmenu="return false;" poster="videos/stand-up-strong.jpg"
                                width="576" height="826" aria-label="Stand Up Strong music video">
@@ -265,6 +304,7 @@
                         </div>
                     </article>
                 </div>
+                <p class="community-cta">Like, comment and save your favorites. <a href="app.html#/signup">Join the community</a> to follow the studio and share what you create.</p>
             </div>
         </section>
 
@@ -386,10 +426,17 @@
 
     <footer class="site-footer">
         <div class="container">
+            <p class="foot-links">
+                <a href="app.html#/feed">Community</a>
+                <a href="guidelines.html">Community Guidelines</a>
+                <a href="terms.html">Terms</a>
+                <a href="privacy.html">Privacy</a>
+            </p>
             <p>&copy; 2026 Lone Keem Studios. All rights reserved.</p>
         </div>
     </footer>
 
+    <script type="module" src="js/home.js"></script>
     <script>
         // Highlight the nav link for the section currently on screen
         (function () {

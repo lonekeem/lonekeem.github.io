@@ -1,0 +1,33 @@
+// Firebase setup for Lone Keem Studios. The web config below is public by design;
+// access is controlled by Firestore security rules (firestore.rules).
+export const SDK = 'https://www.gstatic.com/firebasejs/12.4.0';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+import { getFirestore } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+
+export const firebaseConfig = {
+  apiKey: 'AIzaSyCF3hTcGkjpYb_4k-35R-qYcHsDcOR9yoY',
+  authDomain: 'lone-keem-studios.firebaseapp.com',
+  projectId: 'lone-keem-studios',
+  storageBucket: 'lone-keem-studios.firebasestorage.app',
+  messagingSenderId: '109889516666',
+  appId: '1:109889516666:web:eb0e1e7f319f500974b7c3'
+};
+
+export const ADMIN_EMAIL = 'lillykemoy1@gmail.com';
+export const STUDIO_UID = 'studio';
+
+// Photo / video uploads. Firebase Storage needs the paid Blaze plan, so uploads are OFF for now.
+// To turn them on with a free Cloudinary account: create an *unsigned* upload preset, then set
+//   provider: 'cloudinary', cloudName: '<your cloud name>', uploadPreset: '<your preset name>'
+export const UPLOADS = {
+  provider: 'none', // 'none' | 'cloudinary'
+  cloudName: '',
+  uploadPreset: '',
+  maxImageMB: 10,
+  maxVideoMB: 100
+};
+
+export const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
