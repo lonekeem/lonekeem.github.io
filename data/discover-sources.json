@@ -1,0 +1,156 @@
+{
+  "_readme": "Curated outside sources for the Funny, News and Dance tabs. Edit this list, then run: node scripts/discover-fetch.mjs (the GitHub Action also runs it every 6 hours). Only add public, family-friendly channels and reputable news outlets. Videos are shown as youtube-nocookie embeds and news as headline cards that link to the original. Nothing is re-uploaded.",
+  "maxPerChannel": 6,
+  "maxAgeDays": 45,
+  "youtube": [
+    {
+      "name": "Just For Laughs Gags",
+      "channelId": "UCpsSadsgX_Qk9i6i_bJoUwQ",
+      "cat": "funny"
+    },
+    {
+      "name": "America's Funniest Home Videos",
+      "channelId": "UC_zEzzq54Rm0iy7lmmZbCIg",
+      "cat": "funny"
+    },
+    {
+      "name": "Mr Bean",
+      "channelId": "UCkAGrHCLFmlK3H2kd6isipg",
+      "cat": "funny"
+    },
+    {
+      "name": "Dude Perfect",
+      "channelId": "UCRijo3ddMTht_IHyNSNXpNQ",
+      "cat": "funny"
+    },
+    {
+      "name": "The Dodo",
+      "channelId": "UCINb0wqPz-A0dV9nARjJlOQ",
+      "cat": "funny"
+    },
+    {
+      "name": "CNN 10",
+      "channelId": "UCTOoRgpHTjAQPk6Ak70u-pA",
+      "cat": "news"
+    },
+    {
+      "name": "CBC Kids News",
+      "channelId": "UCWUA2W6LueNy9BSovivFVvQ",
+      "cat": "news"
+    },
+    {
+      "name": "NASA",
+      "channelId": "UCLA_DiR1FfKNvjuUpBHmylQ",
+      "cat": "news"
+    },
+    {
+      "name": "GoNoodle",
+      "channelId": "UC2YBT7HYqCbbvzu3kKZ3wnw",
+      "cat": "dance"
+    },
+    {
+      "name": "KIDZ BOP",
+      "channelId": "UCKE0Xnj818IDaHvIcRiq0Bg",
+      "cat": "dance"
+    },
+    {
+      "name": "STEEZY",
+      "channelId": "UCh9o08eUSNWTacXJqTTtbXA",
+      "cat": "dance"
+    },
+    {
+      "name": "Matt Steffanina",
+      "channelId": "UCcG6zooS9BlSgiT0_ICuD0A",
+      "cat": "dance"
+    }
+  ],
+  "news": [
+    {
+      "name": "BBC Newsround",
+      "url": "https://feeds.bbci.co.uk/newsround/rss.xml",
+      "site": "https://www.bbc.co.uk/newsround",
+      "max": 12
+    },
+    {
+      "name": "Science News Explores",
+      "url": "https://www.snexplores.org/feed",
+      "site": "https://www.snexplores.org/",
+      "max": 8
+    },
+    {
+      "name": "NASA",
+      "url": "https://www.nasa.gov/news-release/feed/",
+      "site": "https://www.nasa.gov/",
+      "max": 6
+    },
+    {
+      "name": "BBC News: Science",
+      "url": "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+      "site": "https://www.bbc.co.uk/news/science_and_environment",
+      "max": 8
+    }
+  ],
+  "blockWords": [
+    "kill",
+    "killed",
+    "killing",
+    "murder",
+    "shooting",
+    "shot dead",
+    "gun",
+    "stab",
+    "dead",
+    "death",
+    "dies",
+    "died",
+    "war",
+    "attack",
+    "terror",
+    "bomb",
+    "explosion",
+    "abuse",
+    "assault",
+    "rape",
+    "sex",
+    "sexual",
+    "nude",
+    "naked",
+    "porn",
+    "drug",
+    "drugs",
+    "drunk",
+    "alcohol",
+    "suicide",
+    "blood",
+    "gore",
+    "horror",
+    "violence",
+    "violent",
+    "crime",
+    "prison",
+    "hostage",
+    "massacre",
+    "weapon",
+    "missile",
+    "explicit",
+    "nsfw",
+    "18+",
+    "damn",
+    "hell",
+    "wtf",
+    "f***",
+    "sh*t",
+    "prank gone wrong",
+    "scary",
+    "shotgun",
+    "criminal",
+    "criminals",
+    "police chase",
+    "fight",
+    "fighting",
+    "twerk",
+    "twerking",
+    "sexy",
+    "explicit lyrics"
+  ]
+}

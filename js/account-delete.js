@@ -65,11 +65,12 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       }
     }));
     await step('Clearing your watch progress…', async () => deleteRefs(await sub(['users', uid, 'watch'])));
+    await step('Clearing your feed interests…', async () => deleteRefs([doc(db, 'users', uid, 'prefs', 'feed')]));
     await step('Deleting your posts…', () => drain(query(collection(db, 'posts'), where('authorId', '==', uid)), async (docs) => {
       for (const d of docs) {
         ownPosts.add(d.id);
         const refs = [];
-        for (const c of ['likes', 'comments', 'views']) refs.push(...await sub(['posts', d.id, c]).catch(() => []));
+        for (const c of ['likes', 'comments', 'views', 'shares']) refs.push(...await sub(['posts', d.id, c]).catch(() => []));
         // stars on the comments under it
         for (const r of refs.filter((x) => x.parent.id === 'comments')) refs.push(...await sub(['posts', d.id, 'comments', r.id, 'likes']).catch(() => []));
         // The post goes in the first batch, so the rules see it as deleted for its leftovers.

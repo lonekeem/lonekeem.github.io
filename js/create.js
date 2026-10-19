@@ -7,6 +7,7 @@ import {
   CLOUDINARY, LIMITS, VIDEO_EXT, IMAGE_EXT, uploadsReady, uploadEndpoint, deliveryUrls
 } from './media-config.js';
 import { ICONS } from './icons.js';
+import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { LIVE_CAP } from './live.js';
 import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
@@ -574,6 +575,7 @@ export function createComposer(ctx) {
         ${ready ? '' : notReadyNotice(true)}
         <label for="pv-caption" class="sr-only">Caption</label>
         <textarea id="pv-caption" maxlength="${LIMITS.captionMax}" rows="2" placeholder="Write a caption…"></textarea>
+        ${catPickerHtml('pv-cat', '', esc)}
         <div class="pv-row small muted"><span>${isAdmin() ? '<label class="check pv-studio"><input type="checkbox" id="pv-studio"> <span>Post as <b>Lone Keem Studios</b></span></label>' : 'By posting you agree to the <a href="guidelines.html">Community Guidelines</a>.'}</span><span><span id="pv-count">0</span>/${LIMITS.captionMax}</span></div>
         <div class="pv-progress" hidden aria-hidden="true"><span></span></div>
         <p class="pv-status small muted" aria-live="polite"></p>
@@ -645,7 +647,7 @@ export function createComposer(ctx) {
           return;
         }
         status.textContent = 'Saving your post…';
-        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio });
+        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat') });
         closeOverlay();
         dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 30 } }));
         toast(isVideo && file.size > LIMITS.eagerOnlyMB * 1048576 ? 'Posted! Long videos can take a few minutes to finish processing.' : 'Posted!');

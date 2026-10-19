@@ -1,6 +1,7 @@
 // Kemy community Movies + Songs. Stored as posts (type 'movie' | 'song') with a validated `work`
 // map, so stars, comments + replies, saves, views/plays, reports, search, feeds, profiles and
 // account deletion all reuse the post system. Uploads go straight to Cloudinary (unsigned presets).
+import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
 import { createSeries } from './series.js';
 
@@ -140,6 +141,7 @@ export function createWorks(ctx) {
           `<fieldset class="wrate"><legend>Age rating</legend>${RATINGS.map(([v, l], i) => `<label><input type="radio" name="rating" value="${v}" ${i ? '' : 'checked'}> <span>${l}</span></label>`).join('')}</fieldset>`}
         <div class="field"><label for="w-ai">AI tools used <span class="muted small">(optional)</span></label><input id="w-ai" type="text" maxlength="100" placeholder="${isSong ? 'e.g. Suno, Udio' : 'e.g. Sora, Runway, Suno'}"></div>
         ${isSong ? '' : series().pickerHtml(pre)}
+        ${catPickerHtml('w-cat', kind === 'song' ? 'music' : '', esc)}
         <label class="check wrights"><input type="checkbox" id="w-rights"> <span>I made this or have the rights to share it, and it follows the <a href="guidelines.html" target="_blank">Community Guidelines</a>.</span></label>
         <div class="pv-progress" hidden><span></span></div><p class="small muted" id="w-status" aria-live="polite"></p>
         <p class="form-error" id="w-err"></p>
@@ -222,7 +224,7 @@ export function createWorks(ctx) {
         b.set(ref, {
           authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
           type: kind, text: desc.slice(0, 1000), linkUrl: yt ? `https://www.youtube.com/watch?v=${yt}` : '', mediaUrl, mediaType, poster: isSong ? '' : poster,
-          work, ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
+          work, ...(pickedCat(main, 'w-cat') ? { cat: pickedCat(main, 'w-cat') } : {}), ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
           createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
         });
         b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });

@@ -10,6 +10,10 @@
 import { burstStar, onDoubleTap } from './tapstar.js';
 import { keepTrying } from './media-config.js';
 import { ICONS } from './icons.js';
+import { rankForYou, rankTrending, mixIn, createPrefsStore } from './feedrank.js';
+import { catOf, CATS } from './feed-cats.js';
+import { loadDiscover } from './discover.js';
+export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['trending', 'Trending']];
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
   comment: ICONS.comment,
@@ -26,7 +30,15 @@ export function createWatch(ctx) {
   const { S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, isAdmin, stale,
     isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, comments,
     blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, openStory, views } = ctx;
-  const { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot } = ctx.fs;
+  const { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot, orderBy, writeBatch, serverTimestamp, increment, setDoc } = ctx.fs;
+  let postCache = null, postCacheAt = 0, store = null, storeUid = null;
+  const prefsStore = () => {
+    const uid = S.user?.uid || '';
+    if (!store || storeUid !== uid) { store?.flush(); store = createPrefsStore({ db, fs: { doc, getDoc, setDoc, serverTimestamp }, uid }); storeUid = uid; }
+    return store;
+  };
+  const catChip = (p) => { const c = CATS.find((x) => x.id === catOf(p)); return c ? ` · <span class="vcat">${c.emoji} ${c.label}</span>` : ''; };
+  const ago = (iso) => { const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000); return s < 3600 ? Math.max(1, Math.round(s / 60)) + 'm' : s < 86400 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd'; };
   let muted = true; // stays the same while scrolling between videos
   let session = null;
 
@@ -43,20 +55,84 @@ export function createWatch(ctx) {
     }
     return '';
   }
-  async function loadPosts() {
+  // Newest 60 videos, 60 photos and 60 link posts (180 reads), cached for 3 minutes so switching
+  // tabs or coming back to the feed costs nothing. Falls back to unordered if an index is missing.
+  async function loadPosts(force = false) {
+    if (!force && postCache && Date.now() - postCacheAt < 180e3) return postCache.filter((p) => !S.blocked.has(p.authorId));
     const posts = collection(db, 'posts');
-    const [v, im, l] = await Promise.all([
-      getDocs(query(posts, where('mediaType', '==', 'video'), limit(60))),
-      getDocs(query(posts, where('mediaType', '==', 'image'), limit(60))),
-      getDocs(query(posts, where('type', '==', 'link'), limit(60)))
-    ]);
+    const q = (f, v) => getDocs(query(posts, where(f, '==', v), orderBy('createdAt', 'desc'), limit(60)))
+      .catch(() => getDocs(query(posts, where(f, '==', v), limit(60))));
+    const [v, im, l] = await Promise.all([q('mediaType', 'video'), q('mediaType', 'image'), q('type', 'link')]);
     const seen = new Map();
     [...v.docs, ...im.docs, ...l.docs].forEach((d) => seen.set(d.id, { id: d.id, ...d.data() }));
-    return [...seen.values()].filter((p) => kindOf(p) && !S.blocked.has(p.authorId)).sort((a, b) => ms(b) - ms(a));
+    postCache = [...seen.values()].filter((p) => kindOf(p)).sort((a, b) => ms(b) - ms(a)); postCacheAt = Date.now();
+    return postCache.filter((p) => !S.blocked.has(p.authorId));
+  }
+  async function followingPosts(own) {
+    const ids = [...S.following].filter((u) => !S.blocked.has(u));
+    const out = new Map(own.filter((p) => S.following.has(p.authorId)).map((p) => [p.id, p]));
+    for (let i = 0; i < Math.min(ids.length, 30); i += 10) {
+      try { (await getDocs(query(collection(db, 'posts'), where('authorId', 'in', ids.slice(i, i + 10)), limit(40)))).docs.forEach((d) => { const p = { id: d.id, ...d.data() }; if (kindOf(p)) out.set(p.id, p); }); } catch { /* keep what we have */ }
+    }
+    return [...out.values()].sort((a, b) => ms(b) - ms(a));
+  }
+  // Builds the list for a tab: Kemy posts ranked on this device, outside items mixed in.
+  async function buildTab(tab) {
+    const st = prefsStore(); await st.load();
+    const [own, disc] = await Promise.all([loadPosts(), loadDiscover()]);
+    const prefs = st.prefs, opts = { following: S.following, seen: prefs.seen || {} };
+    const funnyVids = disc.videos.filter((v) => v.cat === 'funny'), newsVids = disc.videos.filter((v) => v.cat === 'news');
+    if (tab === 'following') return followingPosts(own);
+    if (tab === 'trending') return rankTrending(own);
+    if (tab === 'funny' || tab === 'dance') return mixIn(rankForYou(own.filter((p) => catOf(p) === tab), prefs, opts), rankForYou(disc.videos.filter((v) => v.cat === tab), prefs, opts), 2);
+    if (tab === 'news') {
+      const vids = rankForYou(newsVids, prefs, opts), heads = disc.news.slice(), outside = [];
+      while (vids.length || heads.length) { if (heads.length) outside.push(heads.shift()); if (vids.length) outside.push(vids.shift()); }
+      return mixIn(rankForYou(own.filter((p) => catOf(p) === 'news'), prefs, opts), outside, 1);
+    }
+    return mixIn(rankForYou(own, prefs, opts), rankForYou(funnyVids, prefs, opts).slice(0, 12), 4);
+  }
+
+  // Outside items: a YouTube video (tap Watch to load the youtube-nocookie player) or a news headline card.
+  function externalSlideHtml(p, i) {
+    const yt = p.kind === 'youtube';
+    const poster = yt ? `https://i.ytimg.com/vi/${encodeURIComponent(p.ytId)}/hqdefault.jpg` : (p.image || '');
+    const label = yt ? 'From YouTube' : 'News';
+    const media = yt
+      ? `<div class="vcard">
+           <img class="vthumb" src="${esc(poster)}" alt="" loading="lazy" referrerpolicy="no-referrer">
+           <button class="btn vwatch" data-a="watch">${IC.play}Watch</button>
+           <p class="small vsrc">From YouTube · ${esc(p.source)}</p>
+         </div>
+         <div class="vembed" hidden></div>`
+      : `<div class="vnews">
+           ${poster ? `<img class="vnews-img" src="${esc(poster)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+           <p class="vnews-src">📰 ${esc(p.source)}</p>
+           <h2 class="vnews-title">${esc(p.text)}</h2>
+           ${p.summary ? `<p class="vnews-sum">${esc(p.summary)}</p>` : ''}
+           <a class="btn vnews-go" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" data-a="outlink">Read on ${esc(p.source)} ↗</a>
+         </div>`;
+    return `
+      <section class="vslide vext" data-i="${i}" data-id="${esc(p.id)}" data-kind="${yt ? 'youtube' : 'news'}" aria-roledescription="${yt ? 'video' : 'news story'}" aria-label="${esc(label)} · ${esc(p.source)}: ${esc(p.text.slice(0, 80))}">
+        <div class="vbg" ${poster ? `style="background-image:url('${esc(poster)}')"` : ''} aria-hidden="true"></div>
+        ${media}
+        <div class="vgrad" aria-hidden="true"></div>
+        <div class="vmeta">
+          <div class="vcreator"><span class="vext-badge">${yt ? '▶ From YouTube' : '📰 News'}</span>
+            ${p.sourceUrl ? `<a class="vname" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(p.source)}</a>` : `<span class="vname">${esc(p.source)}</span>`}</div>
+          ${yt ? `<p class="vcaption">${esc(p.text)}</p>` : ''}
+          <p class="vsub">${esc(ago(p.published))} ago${catChip(p)} · ${yt ? 'Shown with YouTube’s player' : 'Opens the original story'}</p>
+        </div>
+        <div class="vrail">
+          <a class="vact" href="${esc(yt ? p.linkUrl : p.url)}" target="_blank" rel="noopener noreferrer" data-a="outlink" aria-label="Open on ${yt ? 'YouTube' : esc(p.source)}"><span class="vext-ic" aria-hidden="true">↗</span><span>${yt ? 'YouTube' : 'Open'}</span></a>
+          <button class="vact" data-a="share" aria-label="Share">${IC.share}<span>Share</span></button>
+        </div>
+      </section>`;
   }
 
   // ------------------------------------------------------------ slide markup
   function slideHtml(p, i) {
+    if (p.external) return externalSlideHtml(p, i);
     const kind = kindOf(p);
     const mine = S.user && p.authorId === S.user.uid;
     const following = S.following.has(p.authorId);
@@ -90,7 +166,7 @@ export function createWatch(ctx) {
             ${mine ? '' : `<button class="vfollow ${following ? 'on' : ''}" data-a="follow" data-uid="${esc(p.authorId)}" aria-pressed="${following}">${following ? 'Following' : 'Follow'}</button>`}
           </div>
           ${p.text ? `<p class="vcaption" data-a="more">${linkify(esc(p.text))}</p>` : ''}
-          <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))} · ${views.viewsHtml(p.viewCount, p.id, 'vviews')}</p>
+          <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))} · ${views.viewsHtml(p.viewCount, p.id, 'vviews')}${catChip(p)}</p>
         </div>
         <div class="vrail">
           <button class="vact like" data-a="like" aria-pressed="false" aria-label="Give a star">${IC.heart}<span class="n">${fmt(p.likeCount)}</span></button>
@@ -101,8 +177,9 @@ export function createWatch(ctx) {
         </div>
       </section>`;
   }
-  function endHtml(count) {
+  function endHtml(count, tab = 'foryou') {
     const following = S.following.has(STUDIO_UID);
+    if (!count && tab === 'following') return `<section class="vslide vend" data-kind="end" data-i="0" aria-label="End of feed"><div class="vend-inner"><img src="logo.png" alt="Lone Keem Studios KL logo" width="84" height="84"><h2>Nobody to show yet</h2><p>Follow creators and their videos land here, newest first.</p><a class="btn" href="#/watch">Find creators in For You</a></div></section>`;
     return `
       <section class="vslide vend" data-kind="end" data-i="${count}" aria-label="End of feed">
         <div class="vend-inner">
@@ -138,11 +215,14 @@ export function createWatch(ctx) {
   }
 
   // ------------------------------------------------------------ main render
-  async function render(postId, token) {
-    const posts = await loadPosts();
+  async function render(postId, token, tab = 'foryou') {
+    if (!FEED_TABS.some(([t]) => t === tab)) tab = 'foryou';
+    const posts = await buildTab(tab);
     if (stale(token)) return;
+    const st = prefsStore();
     let startId = postId || '';
-    if (postId && !posts.some((p) => p.id === postId)) {
+    if (postId && /^(yt|news)-/.test(postId) && !posts.some((p) => p.id === postId)) startId = '';
+    else if (postId && !posts.some((p) => p.id === postId)) {
       const snap = await getDoc(doc(db, 'posts', postId));
       if (stale(token)) return;
       if (snap.exists()) {
@@ -157,13 +237,14 @@ export function createWatch(ctx) {
       <div class="vwrap" id="vwrap">
         <div class="vtop ${S.user && S.profile ? 'has-story' : ''}">
           ${S.user && S.profile ? `<button class="vstory" id="vstory" aria-label="Add to your story">${avatar({ ...S.profile, uid: S.user.uid }, 'sm', false)}<span class="vplus" aria-hidden="true">+</span></button>` : ''}
-          <nav class="feed-toggle on-video" aria-label="Feed"><a href="#/watch" class="active" aria-current="page">For You</a><a href="#/feed">Posts</a></nav>
+          <nav class="feed-toggle on-video" aria-label="Feed"><a href="#/watch" class="active" aria-current="page">Videos</a><a href="#/feed">Posts</a></nav>
           <button class="vmute" id="vmute" aria-pressed="true" aria-label="Unmute"></button>
           <a class="vsearch" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>
           <button class="vunmute-hint" id="vunmute-hint" tabindex="-1" aria-hidden="true"></button>
         </div>
+        <nav class="vtabs" aria-label="Feed tabs">${FEED_TABS.map(([t, l]) => `<a href="#/watch${t === 'foryou' ? '' : '/' + t}" class="${t === tab ? 'active' : ''}" ${t === tab ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>
         <div class="vfeed" id="vfeed" tabindex="-1" aria-label="Video feed. Swipe up or press the down arrow for the next video.">
-          ${posts.map(slideHtml).join('')}${endHtml(posts.length)}
+          ${posts.map(slideHtml).join('')}${endHtml(posts.length, tab)}
         </div>
         <div class="vsheet-root" id="vsheet-root"></div>
       </div>`;
@@ -198,8 +279,22 @@ export function createWatch(ctx) {
       const box = sl?.querySelector('.vembed'); if (!box || box.hidden) return;
       box.innerHTML = ''; box.hidden = true; sl.querySelector('.vcard').hidden = false;
     }
+    // Learning: how long you stayed on the slide you just left, and how much of it you watched.
+    let enteredAt = 0;
+    const watched = new Map();   // slide index -> { max: furthest second, done: watched to the end }
+    function judge(i) {
+      const p = byId.get(slides[i]?.dataset.id); if (!p || !enteredAt) return;
+      const dwell = performance.now() - enteredAt, v = vid(i), w = watched.get(i) || {};
+      let frac = 0;
+      if (v && v.duration) frac = w.done ? 1 : Math.min(1, (w.max || v.currentTime) / v.duration);
+      else frac = Math.min(1, dwell / 8000);
+      if (dwell < 2000 && frac < 0.25) st.signal(p, 'skip');
+      else { st.signal(p, 'watch', frac); if (frac >= 0.9) st.signal(p, 'complete'); }
+    }
     function activate(i) {
       if (i === active) return;
+      if (active >= 0) judge(active);
+      enteredAt = performance.now();
       const prev = slides[active];
       if (prev) { vid(active)?.pause(); closeEmbed(prev); }
       active = i;
@@ -214,7 +309,7 @@ export function createWatch(ctx) {
         }
       });
       const id = slides[i].dataset.id;
-      if (id && location.hash.startsWith('#/watch')) history.replaceState(null, '', '#/watch/' + id);
+      if (id && location.hash.startsWith('#/watch')) history.replaceState(null, '', '#/watch/' + (tab === 'foryou' ? '' : tab + '/') + id);
       playActive();
     }
 
@@ -234,8 +329,12 @@ export function createWatch(ctx) {
       const scrub = sl.querySelector('.vscrub'), range = scrub.querySelector('input'), tlab = scrub.querySelector('.vtime');
       let dragging = false;
       const paintTime = () => { tlab.textContent = `${clock(v.currentTime)} / ${clock(v.duration)}`; };
+      const si = +sl.dataset.i;
       v.addEventListener('timeupdate', () => {
         if (!v.duration) return;
+        const w = watched.get(si) || { max: 0, done: false };
+        if (v.currentTime + 1 < w.max && w.max > v.duration * 0.8) w.done = true;   // looped back to the start
+        w.max = Math.max(w.max, v.currentTime); watched.set(si, w);
         bar.style.transform = `scaleX(${v.currentTime / v.duration})`;
         if (!scrub.hidden && !dragging) { range.value = String(Math.round(1000 * v.currentTime / v.duration)); paintTime(); }
       });
@@ -276,7 +375,7 @@ export function createWatch(ctx) {
 
     // Views: videos count after a few seconds of real playback; photos / link cards after ~2 s on screen.
     slides.forEach((sl) => {
-      const p = byId.get(sl.dataset.id); if (!p) return;
+      const p = byId.get(sl.dataset.id); if (!p || p.external) return;
       const v = sl.querySelector('video');
       if (v) views.trackVideo(v, p.id, p.authorId); else views.trackVisible(sl, p.id, p.authorId);
     });
@@ -301,7 +400,7 @@ export function createWatch(ctx) {
     });
 
     // Likes: show the current user's state.
-    posts.forEach((p, i) => isLiked(p.id).then((on) => paintLike(slides[i], on)).catch(() => {}));
+    posts.forEach((p, i) => { if (!p.external) isLiked(p.id).then((on) => paintLike(slides[i], on)).catch(() => {}); });
     function paintLike(sl, on) { const b = sl.querySelector('[data-a=like]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); }
     function paintSave(sl, on) { const b = sl.querySelector('[data-a=save]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = on ? 'Saved' : 'Save'; }
     function paintFollow(uid, on) {
@@ -311,7 +410,7 @@ export function createWatch(ctx) {
         else b.textContent = on ? 'Following' : 'Follow';
       });
     }
-    posts.forEach((p, i) => paintSave(slides[i], S.saved.has(p.id)));
+    posts.forEach((p, i) => { if (!p.external) paintSave(slides[i], S.saved.has(p.id)); });
 
     // One delegated handler for every overlay button.
     feed.addEventListener('click', async (ev) => {
@@ -320,9 +419,10 @@ export function createWatch(ctx) {
       const a = btn.dataset.a;
       if (a === 'more') { if (!ev.target.closest('a')) btn.classList.toggle('open'); return; }
       if (a === 'replay') { slides[0].scrollIntoView({ behavior: 'smooth' }); return; }
+      if (a === 'outlink') { st.signal(p, 'open'); return; }
       if (a === 'share') return share(p);
-      if (a === 'comment') return openComments(p, sl);
-      if (a === 'watch') return openEmbed(p, sl);
+      if (a === 'comment') { st.signal(p, 'open'); return openComments(p, sl); }
+      if (a === 'watch') { st.signal(p, 'watch', 1); return openEmbed(p, sl); }
       if (a === 'menu') return openMenu(p, sl);
       if (a === 'like') {
         if (needAuth(p.id, 'give stars')) return;
@@ -330,12 +430,14 @@ export function createWatch(ctx) {
         const cur = Number(p.likeCount) || 0;
         paintLike(sl, on); p.likeCount = Math.max(0, cur + (on ? 1 : -1)); n.textContent = fmt(p.likeCount); btn.disabled = true;
         if (on) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
+        if (on) st.signal(p, 'star');
         try { await likePost(p, on); } catch (e) { paintLike(sl, !on); p.likeCount = cur; n.textContent = fmt(cur); toast(friendlyError(e)); }
         btn.disabled = false; return;
       }
       if (a === 'save') {
         if (needAuth(p.id, 'save videos')) return;
         const on = !S.saved.has(p.id); paintSave(sl, on);
+        if (on) st.signal(p, 'save');
         try { await savePost(p.id, on); toast(on ? 'Saved to your profile' : 'Removed from saved'); }
         catch (e) { paintSave(sl, !on); toast(friendlyError(e)); }
         return;
@@ -357,23 +459,37 @@ export function createWatch(ctx) {
       if (v) { v.muted = muted; if (v.paused) playActive(); }
     };
 
+    // Shares count once per account (posts/{id}/shares/{uid} + shareCount) and teach the ranking.
+    async function countShare(p) {
+      st.signal(p, 'share');
+      if (p.external || !S.user || !S.profile) return;
+      const k = 'kemy-shared-' + S.user.uid + '-' + p.id; if (localStorage.getItem(k)) return;
+      localStorage.setItem(k, '1');
+      try {
+        const b = writeBatch(db);
+        b.set(doc(db, 'posts', p.id, 'shares', S.user.uid), { createdAt: serverTimestamp() });
+        b.update(doc(db, 'posts', p.id), { shareCount: increment(1) });
+        await b.commit(); p.shareCount = (Number(p.shareCount) || 0) + 1;
+      } catch { /* already counted on another device */ }
+    }
     async function share(p) {
-      const url = location.origin + location.pathname + '#/watch/' + p.id;
+      const url = p.external ? (p.kind === 'news' ? p.url : p.linkUrl) : location.origin + location.pathname + '#/watch/' + p.id;
+      const title = p.external ? `${p.text.slice(0, 80)} (${p.source})` : `${p.authorName} on Lone Keem Studios`;
       if (navigator.share) {
-        try { await navigator.share({ title: `${p.authorName} on Lone Keem Studios`, text: (p.text || '').slice(0, 120), url }); return; }
+        try { await navigator.share({ title, text: p.external ? '' : (p.text || '').slice(0, 120), url }); countShare(p); return; }
         catch (e) { if (e && e.name === 'AbortError') return; }
       }
-      try { await navigator.clipboard.writeText(url); toast('Link copied'); }
+      try { await navigator.clipboard.writeText(url); toast('Link copied'); countShare(p); }
       catch { prompt('Copy this link:', url); }
     }
 
     function openEmbed(p, sl) {
       const box = sl.querySelector('.vembed'); const kind = sl.dataset.kind;
       const src = kind === 'youtube'
-        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(youTubeId(p.linkUrl))}?autoplay=1&playsinline=1&rel=0`
+        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(p.ytId || youTubeId(p.linkUrl))}?autoplay=1&playsinline=1&rel=0`
         : `https://www.tiktok.com/player/v1/${encodeURIComponent(tikTokId(p.linkUrl))}?autoplay=1&rel=0`;
       box.innerHTML = `<button class="vembed-close" data-a="close-embed" aria-label="Close player">${IC.close}</button>
-        <div class="vembed-frame ${kind === 'tiktok' || p.linkUrl.includes('/shorts/') ? 'tall' : ''}"><iframe src="${esc(src)}" title="${kind === 'youtube' ? 'YouTube' : 'TikTok'} video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
+        <div class="vembed-frame ${kind === 'tiktok' || p.short || p.linkUrl.includes('/shorts/') ? 'tall' : ''}"><iframe src="${esc(src)}" title="${kind === 'youtube' ? 'YouTube' : 'TikTok'} video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
       box.hidden = false; sl.querySelector('.vcard').hidden = true;
       box.querySelector('.vembed-close').onclick = (e) => { e.stopPropagation(); closeEmbed(sl); };
     }
@@ -465,7 +581,7 @@ export function createWatch(ctx) {
       else if (e.key === 'm') muteBtn.click();
     };
     document.addEventListener('keydown', onKey);
-    const onVis = () => { if (document.hidden) vid(active)?.pause(); else if (active >= 0 && !sheetRoot.classList.contains('open')) playActive(); };
+    const onVis = () => { if (document.hidden) { vid(active)?.pause(); st.flush(true); } else if (active >= 0 && !sheetRoot.classList.contains('open')) playActive(); };
     document.addEventListener('visibilitychange', onVis);
 
     // Start at the deep-linked video (if any), then begin observing.
@@ -476,6 +592,8 @@ export function createWatch(ctx) {
     session = { wrap };
 
     S.unsubs.push(() => {
+      if (active >= 0) judge(active);
+      st.flush();
       io.disconnect();
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVis);
@@ -485,5 +603,5 @@ export function createWatch(ctx) {
     });
   }
 
-  return { render, get active() { return session; } };
+  return { render, get active() { return session; }, buildTab, refresh: () => { postCache = null; } };
 }

@@ -1416,3 +1416,31 @@ body.cam-open .mini-player { display: none; }
 .mm-pup,.mm-line{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}.mm-pup select,.mm-line select{max-width:46%}.mm-px{flex:1;min-width:80px}.mm-ltext{flex:1;min-width:120px}
 .mm-row2{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
 .mm-sprev{width:100%;height:auto;display:block;border-radius:10px}
+
+/* ---------- Feed tabs (For You / Following / Funny / News / Dance / Trending) + outside items ---------- */
+.vtabs { position: absolute; z-index: 5; top: calc(env(safe-area-inset-top) + 54px); left: 0; right: 0; display: flex; gap: 6px; padding: 0 12px; overflow-x: auto; scrollbar-width: none; justify-content: safe center; }
+.vtabs::-webkit-scrollbar { display: none; }
+.vtabs a { flex: none; padding: 5px 12px; border-radius: 999px; font-size: .86rem; font-weight: 600; color: rgba(255,255,255,.85); background: rgba(0,0,0,.35); backdrop-filter: blur(6px); text-decoration: none; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.vtabs a.active { background: #fff; color: #1a0a30; text-shadow: none; }
+.vcard { inset: 104px 18px 150px; }
+.vcat { white-space: nowrap; }
+.vext-badge { display: inline-block; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.18); font-size: .76rem; font-weight: 700; letter-spacing: .02em; margin-right: 8px; }
+.vext .vname { color: #fff; font-weight: 700; }
+.vext-ic { font-size: 1.5rem; line-height: 1; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,.35); }
+.vnews { position: absolute; inset: 104px 18px 170px; display: flex; flex-direction: column; justify-content: center; gap: 10px; max-width: 560px; margin: 0 auto; color: #fff; }
+.vnews-img { width: 100%; max-height: 38vh; object-fit: cover; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.vnews-src { margin: 0; font-weight: 700; font-size: .9rem; opacity: .9; }
+.vnews-title { margin: 0; font-size: clamp(1.3rem, 5vw, 1.8rem); line-height: 1.2; text-shadow: 0 2px 10px rgba(0,0,0,.6); }
+.vnews-sum { margin: 0; opacity: .9; line-height: 1.45; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+.vnews-go { align-self: flex-start; }
+.vslide[data-kind=news] .vbg { filter: blur(30px) brightness(.45); }
+/* category picker on upload forms */
+.catpick { border: 0; padding: 0; margin: 10px 0; }
+.catpick legend { margin-bottom: 6px; }
+.catpick-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.catchip input { position: absolute; opacity: 0; pointer-events: none; }
+.catchip span { display: inline-block; padding: 5px 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); font-size: .85rem; cursor: pointer; }
+.catchip input:checked + span { background: linear-gradient(90deg, #8a2be2, #4da3ff); border-color: transparent; color: #fff; }
+.catchip input:focus-visible + span { outline: 2px solid #c9a8ff; outline-offset: 2px; }
+.vunmute-hint { top: calc(env(safe-area-inset-top) + 100px); }
+.vwrap[data-kind=youtube] .vunmute-hint, .vwrap[data-kind=news] .vunmute-hint, .vwrap[data-kind=news] .vmute { display: none; }

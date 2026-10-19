@@ -64,6 +64,16 @@ service cloud.firestore {
                 || resource.data[field] + duration.value(secs, 's') < request.time));
     }
 
+    // Private feed interests (For You ranking), readable / writable only by the owner.
+    match /users/{uid}/prefs/{docId} {
+      function scoreMap(m, n) { return m is map && m.size() <= n; }
+      allow read, delete: if signedIn() && uid == me();
+      allow create, update: if signedIn() && uid == me() && docId == 'feed'
+        && request.resource.data.keys().hasOnly(['cats', 'creators', 'updatedAt'])
+        && scoreMap(request.resource.data.cats, 20) && scoreMap(request.resource.data.creators, 60)
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /users/{uid} {
       allow read: if true;
       allow create: if signedIn() && uid == me()
@@ -169,14 +179,19 @@ service cloud.firestore {
         && (!('hashtags' in d) || (d.hashtags is list && d.hashtags.size() <= 20
                                    && d.hashtags.join(' ').size() <= 900));
     }
+    // Feed categories (keep in sync with js/feed-cats.js).
+    function postCats() {
+      return ['funny', 'news', 'music', 'gaming', 'pals', 'art', 'sports', 'movies', 'animals', 'food', 'dance', 'learning', 'other'];
+    }
     function validNewPost(d) {
       let u = get(userPath(d.authorId)).data;
       return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                                'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                                'commentCount', 'lastCommentId', 'studio',
                                'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId',
-                               'keywords', 'hashtags', 'work'])
+                               'keywords', 'hashtags', 'work', 'cat'])
         && validPostSearch(d)
+        && (!('cat' in d) || d.cat in postCats())
         && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                             'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                             'commentCount', 'lastCommentId', 'studio'])
@@ -276,7 +291,20 @@ service cloud.firestore {
         return isAdmin() && changed().hasOnly(['featured']) && request.resource.data.featured is bool
           && resource.data.type in ['movie', 'song'];
       }
-      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange()));
+      // Category: the author (or admin) can set / change it later.
+      function catChange() {
+        return changed().hasOnly(['cat']) && (actingAs(resource.data.authorId) || isAdmin())
+          && request.resource.data.cat in postCats();
+      }
+      // Shares: exactly +1, once per account (shares/{uid} created in the same batch).
+      function shareChange() {
+        let shareP = /databases/$(database)/documents/posts/$(postId)/shares/$(request.auth.uid);
+        return changed().hasOnly(['shareCount'])
+          && request.resource.data.shareCount is int
+          && request.resource.data.shareCount == resource.data.get('shareCount', 0) + 1
+          && !exists(shareP) && existsAfter(shareP);
+      }
+      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange() || catChange() || shareChange()));
       allow delete: if signedIn() && (resource.data.authorId == me() || isAdmin());
 
       match /likes/{likerId} {
@@ -290,6 +318,16 @@ service cloud.firestore {
           && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount - 1;
         // Leftovers of a deleted post (deleted with it in the same batch, or afterwards).
         allow delete: if signedIn() && !existsAfter(postPath());
+      }
+
+      match /shares/{sharerId} {
+        allow read: if signedIn() && sharerId == me();
+        allow list: if signedIn() && actingAs(get(postPath()).data.authorId);
+        allow create: if signedIn() && sharerId == me()
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time
+          && getAfter(postPath()).data.get('shareCount', 0) == get(postPath()).data.get('shareCount', 0) + 1;
+        allow delete: if signedIn() && (sharerId == me() || !existsAfter(postPath()));
       }
 
       match /views/{viewerId} {

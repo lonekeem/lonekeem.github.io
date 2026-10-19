@@ -1,0 +1,31 @@
+# Refreshes data/discover.json (Funny / News tabs) from the curated public RSS feeds in
+# data/discover-sources.json. Free: GitHub Actions + public feeds, no API keys or secrets.
+name: Refresh Discover feed
+on:
+  schedule:
+    - cron: '17 */6 * * *'   # every 6 hours
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: discover
+  cancel-in-progress: true
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/discover-fetch.mjs
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- data/discover.json; then echo "No changes"; exit 0; fi
+          git config user.name "kemy-discover-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/discover.json
+          git commit -m "Discover: refresh Funny/News sources"
+          for i in 1 2 3; do git pull --rebase --autostash && git push && exit 0; sleep 5; done
+          exit 1

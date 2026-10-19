@@ -1,5 +1,6 @@
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
+import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
 import { createComposer } from './create.js';
 import { deliveryUrls, LIMITS, safePhotoURL, keepTrying } from './media-config.js';
@@ -539,7 +540,7 @@ function renderChrome(name) {
 // ---------------------------------------------------------------- router
 const routes = [
   [/^#?\/?$/, () => location.replace('#/watch'), 'watch'],
-  [/^#\/watch(?:\/([\w-]+))?$/, pageWatch, 'watch'],
+  [/^#\/watch(?:\/(following|funny|news|dance|trending))?(?:\/([\w-]+))?$/, pageWatch, 'watch'],
   [/^#\/feed$/, pageFeed, 'feed'],
   [/^#\/explore(?:\/(movies|songs))?$/, pageExplore, 'explore'],
   [/^#\/search(?:\?(.*))?$/, pageSearch, 'explore'],
@@ -618,9 +619,9 @@ const watch = createWatch({
   blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, comments,
   openStory: () => { if (requireAuth()) composer.openStory(); },
   views: { viewsHtml, trackVideo, trackVisible },
-  fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot }
+  fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot, orderBy, writeBatch, serverTimestamp, increment, setDoc }
 });
-async function pageWatch(postId, token) { return watch.render(postId, token); }
+async function pageWatch(tab, postId, token) { return watch.render(postId, token, tab || 'foryou'); }
 const stories = createStories({
   S, db, esc, avatar, badge, timeAgo, toast, friendlyError, requireAuth, STUDIO_UID, isAdmin,
   openStory: () => composer.openStory(), sendMessage, refreshProfile,
@@ -739,6 +740,7 @@ function textComposeForm(slot, open) {
           <div class="small muted" style="text-align:right"><span id="count">0</span>/${LIMITS.captionMax}</div></div>
         <div class="field"><label for="post-link">YouTube or TikTok link <span class="muted">(optional)</span></label>
           <input id="post-link" type="url" inputmode="url" placeholder="https://youtube.com/watch?v=…"></div>
+        ${catPickerHtml('post-cat', '', esc)}
         <p class="small muted">By posting you agree to the <a href="guidelines.html">Community Guidelines</a>. Only share things you made or have the right to share.</p>
         <p class="form-error" id="compose-err"></p>
         <button class="btn btn-block" type="submit" id="compose-btn">Post</button>
@@ -760,7 +762,7 @@ function textComposeForm(slot, open) {
       const b = writeBatch(db);
       b.set(ref, {
         authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
-        type: linkUrl ? 'link' : 'text', text, linkUrl, mediaUrl: '', mediaType: '', poster: '',
+        type: linkUrl ? 'link' : 'text', text, linkUrl, mediaUrl: '', mediaType: '', poster: '', ...(pickedCat(main, 'post-cat') ? { cat: pickedCat(main, 'post-cat') } : {}),
         ...searchFields({ text, authorName: author.displayName, authorUsername: author.username }),
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
       });
@@ -776,7 +778,7 @@ function textComposeForm(slot, open) {
 }
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
-async function saveMediaPost({ upload, info, caption, asStudio }) {
+async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
   const urls = deliveryUrls(upload);
   const { authorId, author } = await postAuthor(asStudio);
   const ref = doc(collection(db, 'posts'));
@@ -788,7 +790,7 @@ async function saveMediaPost({ upload, info, caption, asStudio }) {
     type: 'media', text: caption.slice(0, LIMITS.captionMax), linkUrl: '',
     mediaUrl: urls.mediaUrl, mediaType: urls.mediaType, poster: urls.posterUrl, posterUrl: urls.posterUrl,
     width: n(upload.width || info.width, 20000), height: n(upload.height || info.height, 20000), duration,
-    cloudinaryPublicId: String(upload.public_id).slice(0, 255),
+    cloudinaryPublicId: String(upload.public_id).slice(0, 255), ...(cat ? { cat } : {}),
     ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
   });
