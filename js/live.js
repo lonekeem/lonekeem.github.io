@@ -471,7 +471,9 @@ export function createLive(ctx) {
         else addPeer(uid);           // added, or re-joined (modified)
       });
     }, (e) => console.warn('viewers', e));
-    const unsubChat = watchChat(id, root, (n, initial) => { if (!initial) { stars += n; paint(); soon(); } });
+    // Star messages already in the chat (e.g. after a reload) are a floor for the total, never added twice.
+    let initStars = 0;
+    const unsubChat = watchChat(id, root, (n, initial) => { if (initial) { initStars += n; stars = Math.max(stars, initStars); paint(); } else { stars += n; paint(); soon(); } });
     const unsubLive = onSnapshot(liveRef(id), (d) => {
       const l = d.data();
       if (l && l.status === 'ended' && l.endedBy === 'admin' && !ended) {
@@ -576,7 +578,8 @@ export function createLive(ctx) {
     const waitMsg = (html, spinner = false) => { const w = $('#lv-wait'); if (!w) return; w.hidden = false; w.querySelector('#lv-wait-msg').innerHTML = html; const sp = w.querySelector('.spinner'); if (sp) sp.hidden = !spinner; };
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
     const totals = starTotal(root, l.starCount || 0);
-    unsubs.push(watchChat(id, root, (n, initial) => { if (!initial) totals.add(n); }));
+    let initStars = 0;
+    unsubs.push(watchChat(id, root, (n, initial) => { if (initial) { initStars += n; totals.doc(initStars); } else totals.add(n); }));
     unsubs.push(onSnapshot(liveRef(id), (d) => {
       const x = d.data(); if (!x) return;
       root.querySelector('#lv-count span').textContent = fmtCount(x.viewerCount || 0);
@@ -720,7 +723,10 @@ export function createLive(ctx) {
     const note = (html) => { const n = $('#lv-ytnote'); if (!n) return; n.hidden = !html; n.innerHTML = html || ''; };
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
     const totals = starTotal(root, l.starCount || 0);
-    if (chatOn) unsubs.push(watchChat(id, root, (n, initial) => { if (!initial) { stars += n; totals.add(n); } }));
+    let initStars = 0;
+    if (chatOn) unsubs.push(watchChat(id, root, (n, initial) => {
+      if (initial) { initStars += n; stars = Math.max(stars, initStars); totals.doc(initStars); } else { stars += n; totals.add(n); }
+    }));
     // Player (lazy: the API script only loads when a YouTube live is opened).
     (async () => {
       const box = $('#lv-ytbox');

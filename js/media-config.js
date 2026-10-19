@@ -24,8 +24,12 @@ export const CLOUDINARY = {
 
 // Client-side limits (Cloudinary free plan caps: images 10 MB, videos 100 MB).
 export const LIMITS = {
-  maxVideoSeconds: 60,
-  maxVideoMB: 100,
+  maxVideoSeconds: 600,      // library uploads: up to 10 minutes
+  cameraVideoSeconds: 180,   // in-app camera: up to 3 minutes (720p, ~2.5 Mbps ≈ 56 MB)
+  recordBitrate: 2_500_000,
+  maxVideoMB: 100,           // Cloudinary free plan cap per video
+  chunkMB: 20,               // files bigger than this upload in 20 MB chunks (with retry)
+  eagerOnlyMB: 40,           // free plan: videos over 40 MB only play once the eager version is ready
   maxImageMB: 10,
   captionMax: 2000, // same as the existing text post limit
   storyVideoSeconds: 15,
@@ -83,3 +87,33 @@ export function avatarUrl(r) {
 // Only Cloudinary image URLs on our cloud are ever rendered as avatars.
 export const safePhotoURL = (u) =>
   typeof u === 'string' && u.length <= 500 && /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\/[^?#"'<>\s]+$/.test(u) ? u : '';
+
+// The original upload without any transformation (".../video/upload/v123/id.mp4").
+// Used as a fallback while the eager H.264 version of a fresh upload is still being made.
+export function rawVideoUrl(url) {
+  const m = /^(.*\/video\/upload\/)(?:[^/]+\/)*?(v\d+\/.+)$/.exec(url || '');
+  return m ? m[1] + m[2] : '';
+}
+
+// Fresh Cloudinary videos can take a while: long ones (over 40 MB) only play once the eager
+// version is ready, which can take a few minutes. On error, try the untransformed original
+// once, then keep retrying the normal URL with a growing delay (about 8 minutes in total).
+// show(state): 'processing' | 'ok' | 'failed'.
+export function keepTrying(v, show, opts = {}) {
+  const main = opts.src || v.getAttribute('src') || '';
+  if (!/res\.cloudinary\.com\/.+\/video\/upload\//.test(main)) return;
+  const raw = rawVideoUrl(main);
+  let tries = 0, timer = 0;
+  v.addEventListener('error', () => {
+    if (!v.getAttribute('src')) return;
+    if (tries >= (opts.max || 24)) { show('failed'); return; }
+    tries++; show('processing'); clearTimeout(timer);
+    if (tries === 1 && raw && raw !== main) { v.src = raw; v.load(); opts.onRetry?.(); return; }
+    timer = setTimeout(() => {
+      if (!v.getAttribute('src')) return;
+      v.src = main + (main.includes('?') ? '&' : '?') + 'r=' + tries; v.load(); opts.onRetry?.();
+    }, Math.min(30000, 4000 + tries * 2000));
+  });
+  const ok = () => { if (tries) show('ok'); };
+  v.addEventListener('loadeddata', ok); v.addEventListener('playing', ok);
+}

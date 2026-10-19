@@ -28,6 +28,10 @@ const LIB_ACCEPT = 'video/mp4,video/quicktime,video/webm,image/jpeg,image/png,im
 
 const fmtTime = (s) => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const fmtMB = (b) => (b / 1048576 >= 10 ? Math.round(b / 1048576) : (b / 1048576).toFixed(1)) + ' MB';
+// 600 -> "10 minutes" ("10 min" when short), 15 -> "15 seconds".
+const fmtLimit = (sec, short = false) => sec >= 60
+  ? `${Math.round(sec / 60)} ${short ? 'min' : Math.round(sec / 60) === 1 ? 'minute' : 'minutes'}`
+  : `${sec} ${short ? 's' : 'seconds'}`;
 const extOf = (name) => (String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || '';
 
 export const notReadyNotice = (compact) => compact ? `
@@ -81,7 +85,9 @@ export async function inspectFile(file, known = {}, maxSeconds = LIMITS.maxVideo
   if (!kind) throw new Error('That file type isn’t supported. Use MP4, MOV or WebM videos, or JPG, PNG, HEIC or WebP photos.');
   const maxMB = kind === 'video' ? LIMITS.maxVideoMB : LIMITS.maxImageMB;
   if (file.size > maxMB * 1048576) {
-    throw new Error(kind === 'video' ? `That video is ${fmtMB(file.size)}. Videos can be up to ${maxMB} MB.` : `That photo is ${fmtMB(file.size)}. Photos can be up to ${maxMB} MB.`);
+    throw new Error(kind === 'video'
+      ? `That video is ${fmtMB(file.size)}, and videos can be up to ${maxMB} MB. Tip: export or save it at 720p (most phones and editing apps have this option), which keeps a 10-minute video under ${maxMB} MB, then try again.`
+      : `That photo is ${fmtMB(file.size)}. Photos can be up to ${maxMB} MB.`);
   }
   if (!file.size) throw new Error('That file is empty. Try another one.');
   const url = URL.createObjectURL(file);
@@ -91,7 +97,7 @@ export async function inspectFile(file, known = {}, maxSeconds = LIMITS.maxVideo
     URL.revokeObjectURL(url);
     throw new Error(forStory
       ? `That video is ${fmtTime(duration)} long. Story videos can be up to ${maxSeconds} seconds; trim it and try again.`
-      : `That video is ${fmtTime(duration)} long. Videos can be up to ${maxSeconds} seconds; trim it and try again.`);
+      : `That video is ${fmtTime(duration)} long. Videos can be up to ${fmtLimit(maxSeconds)}; trim it and try again.`);
   }
   return { kind, url, duration, width: meta.width || 0, height: meta.height || 0, previewable: !meta.unknown };
 }
@@ -113,7 +119,7 @@ export function createComposer(ctx) {
   let ov = null;       // overlay element (camera or preview)
   let target = 'post'; // 'post' or 'story' (24h story: video up to 15 s, text overlay)
   const isStory = () => target === 'story';
-  const maxSec = () => (isStory() ? LIMITS.storyVideoSeconds : LIMITS.maxVideoSeconds);
+  const maxSec = () => (isStory() ? LIMITS.storyVideoSeconds : LIMITS.cameraVideoSeconds);
   let stream = null;
   let cleanupFns = [];
 
@@ -147,7 +153,8 @@ export function createComposer(ctx) {
         const file = el.files && el.files[0]; el.value = '';
         if (!file) return;
         try {
-          const info = await inspectFile(file, {}, maxSec(), isStory());
+          // Library files (and the phone's own camera app) get the 10-minute limit; stories stay 15s.
+          const info = await inspectFile(file, {}, isStory() ? LIMITS.storyVideoSeconds : LIMITS.maxVideoSeconds, isStory());
           openPreview(file, info, id === 'in-library' ? 'library' : 'capture');
         } catch (e) { toast(e.message || 'That file can’t be used.'); }
       };
@@ -162,11 +169,11 @@ export function createComposer(ctx) {
       <h1 class="page-title">Create</h1>
       ${ready ? '' : notReadyNotice()}
       <div class="create-grid">
-        <button class="create-opt" data-src="video"><span class="ci">${IC.video}</span><b>Record video</b><small>Up to ${LIMITS.maxVideoSeconds} seconds</small></button>
+        <button class="create-opt" data-src="video"><span class="ci">${IC.video}</span><b>Record video</b><small>Up to ${fmtLimit(LIMITS.cameraVideoSeconds)}</small></button>
         <button class="create-opt" data-src="photo"><span class="ci">${IC.photo}</span><b>Take photo</b><small>Front or back camera</small></button>
         <button class="create-opt wide live-opt" data-src="live"><span class="ci">${ICONS.live}</span><b>Go Live</b><small>Stream from your camera to up to ${LIVE_CAP} viewers · live chat + stars</small></button>
         <button class="create-opt wide story-opt" data-src="story"><span class="ci">${IC.story}</span><b>Add to your story</b><small>Photo or video up to ${LIMITS.storyVideoSeconds}s · disappears after ${LIMITS.storyHours} hours</small></button>
-        <button class="create-opt wide" data-src="library"><span class="ci">${IC.library}</span><b>Upload from library</b><small>Videos up to ${LIMITS.maxVideoSeconds}s / ${LIMITS.maxVideoMB} MB · photos up to ${LIMITS.maxImageMB} MB</small></button>
+        <button class="create-opt wide" data-src="library"><span class="ci">${IC.library}</span><b>Upload from library</b><small>Videos up to ${fmtLimit(LIMITS.maxVideoSeconds, true)} / ${LIMITS.maxVideoMB} MB · photos up to ${LIMITS.maxImageMB} MB</small></button>
       </div>
       <div class="divider">or</div>
       <div id="text-slot"></div>
@@ -252,7 +259,8 @@ export function createComposer(ctx) {
     async function start() {
       msg.hidden = true; el.classList.remove('has-msg');
       stopStream();
-      const video = { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
+      // 720p keeps a 3-minute recording around 55 MB (under the 100 MB cap).
+      const video = { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
       try {
         try { stream = await navigator.mediaDevices.getUserMedia({ video, audio: true }); }
         catch (e) {
@@ -298,7 +306,7 @@ export function createComposer(ctx) {
     function startRec() {
       if (!stream || recording) return;
       const mimeType = pickRecorderMime();
-      try { recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 128_000 }); }
+      try { recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: LIMITS.recordBitrate, audioBitsPerSecond: 128_000 }); }
       catch { recorder = new MediaRecorder(stream); }
       chunks = [];
       recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -480,7 +488,7 @@ export function createComposer(ctx) {
         status.textContent = 'Saving your post…';
         const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio });
         closeOverlay();
-        toast('Posted!');
+        toast(isVideo && file.size > LIMITS.eagerOnlyMB * 1048576 ? 'Posted! Long videos can take a few minutes to finish processing.' : 'Posted!');
         location.hash = '#/watch/' + id;
       } catch (e) {
         busy = false; postBtn.disabled = false; postBtn.textContent = 'Try again';
@@ -490,32 +498,67 @@ export function createComposer(ctx) {
       }
     };
 
+    // Uploads straight to Cloudinary. Big files go in ~20 MB chunks (X-Unique-Upload-Id +
+    // Content-Range), each retried up to 3 times, so a long video survives a shaky connection.
     function upload(f, onProgress) {
-      return new Promise((resolve, reject) => {
-        const fd = new FormData();
-        fd.append('file', f);
+      const CH = LIMITS.chunkMB * 1048576;
+      const fields = (fd) => {
         fd.append('upload_preset', story ? CLOUDINARY.storyPreset : CLOUDINARY.uploadPreset);
         fd.append('tags', story ? 'lks_story' : 'lks_user');
         if (S.user) fd.append('context', `uid=${S.user.uid}`);
+      };
+      const failMsg = (m, status) => /format|allowed/i.test(m) ? 'That file type isn’t allowed. Use MP4, MOV, WebM, JPG, PNG, HEIC or WebP.'
+        : /size|too large/i.test(m) || status === 413 ? 'That file is too big to upload. Try exporting it at 720p.'
+        : /preset/i.test(m) ? 'Uploads aren’t set up correctly yet. Please try again later.'
+        : 'The upload didn’t go through. Check your connection and try again.';
+      // One request; resolves with the parsed JSON (or rejects with a retryable flag).
+      const send = (blob, headers, onBytes) => new Promise((resolve, reject) => {
+        const fd = new FormData(); fd.append('file', blob, f.name || 'upload'); fields(fd);
         xhr = new XMLHttpRequest();
         xhr.open('POST', uploadEndpoint());
-        xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+        Object.entries(headers || {}).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) onBytes(Math.min(blob.size, e.loaded * (blob.size / e.total))); };
         xhr.onload = () => {
-          let j = null; try { j = JSON.parse(xhr.responseText); } catch { /* */ }
+          const st = xhr.status; let j = null; try { j = JSON.parse(xhr.responseText); } catch { /* */ }
           xhr = null;
-          if (j && j.public_id && j.secure_url) return resolve(j);
+          if (st >= 200 && st < 300 && j) return resolve(j);
           const m = (j && j.error && j.error.message) || '';
-          const er = new Error(m || 'Upload failed.');
-          er.userMessage = /format|allowed/i.test(m) ? 'That file type isn’t allowed. Use MP4, MOV, WebM, JPG, PNG, HEIC or WebP.'
-            : /size|too large/i.test(m) ? 'That file is too big to upload.'
-            : /preset/i.test(m) ? 'Uploads aren’t set up correctly yet. Please try again later.'
-            : 'The upload didn’t go through. Check your connection and try again.';
+          const er = new Error(m || 'Upload failed.'); er.userMessage = failMsg(m, st);
+          er.retry = st >= 500 || st === 0 || st === 408 || st === 429;
           reject(er);
         };
-        xhr.onerror = () => { xhr = null; const er = new Error('Network error'); er.userMessage = 'Network problem during upload. Check your connection and try again.'; reject(er); };
-        xhr.onabort = () => { xhr = null; const er = new Error('aborted'); er.userMessage = 'Upload cancelled.'; reject(er); };
+        xhr.onerror = () => { xhr = null; const er = new Error('Network error'); er.userMessage = 'Network problem during upload. Check your connection and try again.'; er.retry = true; reject(er); };
+        xhr.onabort = () => { xhr = null; const er = new Error('aborted'); er.userMessage = 'Upload cancelled.'; er.aborted = true; reject(er); };
         xhr.send(fd);
       });
+      const withRetry = async (fn, label) => {
+        for (let attempt = 1; ; attempt++) {
+          try { return await fn(); }
+          catch (e) {
+            if (e.aborted || !e.retry || attempt >= 3) throw e;
+            status.textContent = `Connection hiccup${label ? ' on ' + label : ''}, retrying (${attempt}/2)…`;
+            await new Promise((r) => setTimeout(r, 1500 * attempt));
+          }
+        }
+      };
+      const done = (j) => {
+        if (j && j.public_id && j.secure_url) return j;
+        const er = new Error('Upload failed.'); er.userMessage = 'The upload didn’t finish. Please try again.'; throw er;
+      };
+      if (f.size <= CH) return withRetry(() => send(f, null, (b) => onProgress(b / f.size))).then(done);
+      return (async () => {
+        const id = 'lks-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        const total = f.size; const parts = Math.ceil(total / CH);
+        let last = null;
+        for (let i = 0; i < parts; i++) {
+          const start = i * CH, end = Math.min(total, start + CH);
+          const blob = f.slice(start, end, f.type);
+          last = await withRetry(() => send(blob, { 'X-Unique-Upload-Id': id, 'Content-Range': `bytes ${start}-${end - 1}/${total}` },
+            (b) => onProgress((start + b) / total)), `part ${i + 1} of ${parts}`);
+          onProgress(end / total);
+        }
+        return done(last);
+      })();
     }
   }
 

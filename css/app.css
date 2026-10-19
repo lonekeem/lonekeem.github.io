@@ -974,3 +974,15 @@ body.live-mode .app-main { max-width: none; padding: 0; min-height: 0; }
 .lv-starbtn { position: relative; }
 .lv-starbadge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
   background: linear-gradient(120deg, #b57bff, #8a2be2); color: #fff; font: 700 .68rem/1 Inter, sans-serif; box-shadow: 0 0 0 2px rgba(10,4,22,.9); pointer-events: none; }
+
+/* Longer videos: scrub bar on For You slides, processing note on feed cards */
+.vscrub { position: absolute; z-index: 4; left: 12px; right: 12px; bottom: 6px; display: flex; align-items: center; gap: 10px; }
+.vscrub[hidden] { display: none; }
+.vscrub input { flex: 1; min-width: 0; height: 28px; margin: 0; accent-color: var(--purple-light); background: transparent; touch-action: none; cursor: pointer; }
+.vscrub .vtime { flex: none; font: 600 .76rem/1 'Space Grotesk', Inter, sans-serif; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); font-variant-numeric: tabular-nums; }
+.vslide.long .vprogress { display: none; }
+.vslide.long .vmeta { bottom: 46px; }
+.vslide.long .vrail { bottom: 50px; }
+.post-media { position: relative; }
+.media-note { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(84%, 320px); padding: 10px 14px; border-radius: 14px; background: rgba(0,0,0,.72); color: #fff; font-size: .9rem; text-align: center; pointer-events: none; }
+.media-note[hidden] { display: none; }

@@ -8,6 +8,7 @@
 // All stars (likes) / comments / saves / follows go through the shared actions in app.js.
 
 import { burstStar, onDoubleTap } from './tapstar.js';
+import { keepTrying } from './media-config.js';
 import { ICONS } from './icons.js';
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
@@ -30,6 +31,7 @@ export function createWatch(ctx) {
   let session = null;
 
   const ms = (p) => p.createdAt?.toMillis?.() || 0;
+  const clock = (s) => { s = Math.max(0, Math.floor(Number(s) || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
   const fmt = (n) => { n = Number(n) || 0; return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n); };
   function kindOf(p) {
     if (p.mediaType === 'video' && p.mediaUrl) return 'video';
@@ -68,6 +70,7 @@ export function createWatch(ctx) {
            ${poster ? `poster="${esc(poster)}"` : ''} data-src="${esc(p.mediaUrl)}" aria-label="${esc(p.text || 'Video')}" oncontextmenu="return false;"></video>
          <div class="vstate" aria-hidden="true">${IC.play}</div><div class="vspin" aria-hidden="true"></div>
          <div class="vprogress" aria-hidden="true"><span></span></div>
+         <div class="vscrub" hidden><input type="range" min="0" max="1000" step="1" value="0" aria-label="Seek in video"><span class="vtime" aria-hidden="true">0:00 / 0:00</span></div>
          <div class="vfail" hidden><p>This video is still processing. It’ll play in a moment…</p></div>`
       : `<div class="vcard">
            ${poster ? `<img class="vthumb" src="${esc(poster)}" alt="" loading="lazy">` : `<div class="vthumb vthumb-tt" aria-hidden="true">TikTok</div>`}
@@ -227,7 +230,24 @@ export function createWatch(ctx) {
     slides.forEach((sl) => {
       const v = sl.querySelector('video'); if (!v) return;
       const bar = sl.querySelector('.vprogress span');
-      v.addEventListener('timeupdate', () => { if (v.duration) bar.style.transform = `scaleX(${v.currentTime / v.duration})`; });
+      // Long videos (over a minute) get a draggable scrub bar with the time.
+      const scrub = sl.querySelector('.vscrub'), range = scrub.querySelector('input'), tlab = scrub.querySelector('.vtime');
+      let dragging = false;
+      const paintTime = () => { tlab.textContent = `${clock(v.currentTime)} / ${clock(v.duration)}`; };
+      v.addEventListener('timeupdate', () => {
+        if (!v.duration) return;
+        bar.style.transform = `scaleX(${v.currentTime / v.duration})`;
+        if (!scrub.hidden && !dragging) { range.value = String(Math.round(1000 * v.currentTime / v.duration)); paintTime(); }
+      });
+      v.addEventListener('durationchange', () => {
+        const long = Number.isFinite(v.duration) && v.duration > 60;
+        scrub.hidden = !long; sl.classList.toggle('long', long); if (long) paintTime();
+      });
+      range.addEventListener('pointerdown', () => { dragging = true; });
+      range.addEventListener('input', () => { dragging = true; if (v.duration) { v.currentTime = (range.value / 1000) * v.duration; paintTime(); } });
+      range.addEventListener('change', () => { dragging = false; });
+      range.addEventListener('pointerup', () => { dragging = false; });
+      scrub.addEventListener('click', (e) => e.stopPropagation());
       v.addEventListener('waiting', () => sl.classList.add('loading'));
       v.addEventListener('playing', () => { sl.classList.remove('loading'); sl.classList.remove('paused'); });
       v.addEventListener('canplay', () => sl.classList.remove('loading'));
@@ -241,7 +261,7 @@ export function createWatch(ctx) {
       const v = sl.querySelector('video');
       if (!v && !sl.querySelector('.vimage')) return;
       onDoubleTap(sl, {
-        ignore: (e) => !!e.target.closest('button, a, input, textarea, iframe, [data-a], .vrail, .vmeta, .vembed, .vcard'),
+        ignore: (e) => !!e.target.closest('button, a, input, textarea, iframe, [data-a], .vrail, .vmeta, .vembed, .vcard, .vscrub'),
         single: v ? () => {
           if (v.paused) { v.muted = muted; v.play().catch(() => {}); sl.classList.remove('paused'); }
           else { v.pause(); sl.classList.add('paused'); }
@@ -271,17 +291,13 @@ export function createWatch(ctx) {
     // Fresh Cloudinary uploads: the eager H.264 version can take a moment; retry a few times.
     slides.forEach((sl) => {
       const v = sl.querySelector('video'); if (!v) return;
-      let tries = 0;
-      v.addEventListener('error', () => {
-        if (!v.getAttribute('src') || !/res\.cloudinary\.com/.test(v.dataset.src) || tries >= 6) return;
-        tries++; sl.querySelector('.vfail').hidden = false;
-        setTimeout(() => {
-          if (!v.getAttribute('src')) return;
-          v.src = v.dataset.src + (v.dataset.src.includes('?') ? '&' : '?') + 'r=' + tries; v.load();
-          if (slides[active] === sl) playActive();
-        }, 6000);
-      });
-      v.addEventListener('playing', () => { sl.querySelector('.vfail').hidden = true; });
+      const box = sl.querySelector('.vfail'), msg = box.querySelector('p');
+      keepTrying(v, (st) => {
+        box.hidden = st === 'ok';
+        msg.textContent = st === 'failed' ? 'This video couldn’t load. Try again later.'
+          : 'This video is still processing. Long videos can take a few minutes; it’ll play by itself when it’s ready.';
+      }, { src: v.dataset.src, onRetry: () => { if (slides[active] === sl) playActive(); } });
+      v.addEventListener('playing', () => { box.hidden = true; });
     });
 
     // Likes: show the current user's state.

@@ -2,7 +2,7 @@
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { createWatch } from './watch.js';
 import { createComposer } from './create.js';
-import { deliveryUrls, LIMITS, safePhotoURL } from './media-config.js';
+import { deliveryUrls, LIMITS, safePhotoURL, keepTrying } from './media-config.js';
 import { createStories } from './stories.js';
 import { createAvatarEditor } from './avatar-editor.js';
 import { createSearch, SEARCH_ICON } from './search.js';
@@ -241,7 +241,7 @@ function mediaHtml(p) {
   const poster = p.poster || p.posterUrl || '';
   const dims = Number(p.width) > 0 && Number(p.height) > 0 ? `width="${Number(p.width)}" height="${Number(p.height)}"` : '';
   if (p.mediaUrl && p.mediaType === 'video') {
-    return `<div class="post-media"><video controls playsinline preload="metadata" controlsList="nodownload" ${dims} ${poster ? `poster="${esc(poster)}"` : ''} src="${esc(p.mediaUrl)}"></video></div>`;
+    return `<div class="post-media"><video controls playsinline preload="metadata" controlsList="nodownload" ${dims} ${poster ? `poster="${esc(poster)}"` : ''} src="${esc(p.mediaUrl)}"></video><div class="media-note" hidden role="status"></div></div>`;
   }
   if (p.mediaUrl && p.mediaType === 'image') return `<div class="post-media"><img src="${esc(p.mediaUrl)}" ${dims} alt="Photo posted by ${esc(p.authorName)}" loading="lazy"></div>`;
   if (p.linkUrl) {
@@ -297,6 +297,14 @@ function postCard(p, { detail = false } = {}) {
   // Views: videos after a few seconds of playback, everything else after ~2 s on screen.
   const pv = $('.post-media video', el);
   if (pv) trackVideo(pv, p.id, p.authorId); else trackVisible(el, p.id, p.authorId);
+  if (pv) {
+    const note = $('.media-note', el);
+    keepTrying(pv, (st) => {
+      note.hidden = st === 'ok';
+      note.textContent = st === 'failed' ? 'This video couldn’t load. Try again later.'
+        : 'Still processing… long videos can take a few minutes. It’ll play here when it’s ready.';
+    });
+  }
 
   // Double-tap the photo/video to give a star (never removes one).
   const media = $('.post-media', el);
