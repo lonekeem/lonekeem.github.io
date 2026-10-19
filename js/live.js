@@ -176,19 +176,22 @@ export function createLive(ctx) {
     return { add(n) { seen += n; paint(); }, doc(n) { doc = Math.max(doc, n || 0); paint(); }, get value() { return Math.max(doc, (base || 0) + seen); } };
   }
   const tapIgnore = (e) => !!e.target.closest('button, a, input, textarea, form, label, .lv-top, .lv-row, .lv-ytnote, .lv-chat, .lv-hostnote, .lv-wait-in .btn');
-  function chatLine(c) {
-    return `<div class="lv-msg">${avatar({ uid: c.authorId, displayName: c.name, username: c.username, color: c.color }, 'xs', false)}<p><b>${esc(c.name)}</b> ${esc(c.text)}</p></div>`;
+  const FLAG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>';
+  function chatLine(c, cid) {
+    const rep = cid && S.user && c.authorId !== me() ? `<button class="lv-rep" data-rep="${esc(cid)}" aria-label="Report message from ${esc(c.name)}">${FLAG}</button>` : '';
+    return `<div class="lv-msg" data-cid="${esc(cid || '')}">${avatar({ uid: c.authorId, displayName: c.name, username: c.username, color: c.color }, 'xs', false)}<p><b>${esc(c.name)}</b> <span class="lv-t">${esc(c.text)}</span></p>${rep}</div>`;
   }
   function watchChat(id, root, onStars) {
     let first = true;
     const list = root.querySelector('.lv-chat');
+    list.addEventListener('click', (e) => { const b = e.target.closest('[data-rep]'); if (!b) return; const t = b.closest('.lv-msg').querySelector('.lv-t')?.textContent || ''; ctx.reportDialog('live chat', `${id}/${b.dataset.rep}`, id, t); });
     return onSnapshot(query(collection(db, 'lives', id, 'chat'), orderBy('createdAt'), limitToLast(30)), (qs) => {
       qs.docChanges().forEach((ch) => {
         if (ch.type !== 'added') return;
         const c = ch.doc.data();
         if (S.blocked.has(c.authorId)) return;
         if (c.type === 'msg') {
-          list.insertAdjacentHTML('beforeend', chatLine(c));
+          list.insertAdjacentHTML('beforeend', chatLine(c, ch.doc.id));
           while (list.children.length > 30) list.firstElementChild.remove();
           list.scrollTop = list.scrollHeight;
         } else if (c.type === 'star' && !first) {
@@ -303,6 +306,7 @@ export function createLive(ctx) {
     const stop = () => { if (fx) { fx.stop(); fx = null; } if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; v.srcObject = null; };
     S.unsubs.push(() => { if (!hostSession) { stop(); document.body.classList.remove('live-mode'); } });
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
+    { const rb = document.getElementById('lv-report'); if (rb) rb.onclick = () => ctx.reportDialog('live', l.id, l.id, `${l.hostName || ''}: ${l.title || 'live'}`); }
     async function startCam() {
       const my = ++camTry;
       $('#lv-err').textContent = ''; $('#lv-start').disabled = true;
@@ -598,6 +602,7 @@ export function createLive(ctx) {
         ${signedIn && !mine && l.hostId !== me() && !following ? `<button class="lv-follow" id="lv-follow" aria-label="Follow ${esc(l.hostName)}">Follow</button>` : ''}
         ${liveBadge()}
         <span class="lv-count" id="lv-count" aria-live="polite">${IC.people}<span>${fmtCount(l.viewerCount || 0)}</span></span>
+        ${signedIn && l.hostId !== me() ? `<button class="lv-report" id="lv-report" aria-label="Report this live">${FLAG}</button>` : ''}
         <button class="lv-x" id="lv-x" aria-label="Leave live">${IC.close}</button>
       </header>
       ${isAdmin() ? `<button class="lv-admin-end" id="lv-admin-end">End live (guidelines)</button>` : ''}
@@ -613,6 +618,7 @@ export function createLive(ctx) {
     const unsubs = [];
     const waitMsg = (html, spinner = false) => { const w = $('#lv-wait'); if (!w) return; w.hidden = false; w.querySelector('#lv-wait-msg').innerHTML = html; const sp = w.querySelector('.spinner'); if (sp) sp.hidden = !spinner; };
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
+    { const rb = document.getElementById('lv-report'); if (rb) rb.onclick = () => ctx.reportDialog('live', l.id, l.id, `${l.hostName || ''}: ${l.title || 'live'}`); }
     const totals = starTotal(root, l.starCount || 0);
     let initStars = 0;
     unsubs.push(watchChat(id, root, (n, initial) => { if (initial) { initStars += n; totals.doc(initStars); } else totals.add(n); }));
@@ -738,6 +744,8 @@ export function createLive(ctx) {
         ${liveBadge()}
         <span class="lv-count" id="lv-count" aria-live="polite" title="Signed-in viewers in the app">${IC.people}<span>${fmtCount(l.viewerCount || 0)}</span></span>
         ${host ? `<button class="lv-end" id="lv-end">End</button>` : ''}
+        ${signedIn && l.hostId !== me() ? `<button class="lv-report" id="lv-report" aria-label="Report this live">${FLAG}</button>` : ''}
+        ${signedIn && l.hostId !== me() ? `<button class="lv-report" id="lv-report" aria-label="Report this live">${FLAG}</button>` : ''}
         <button class="lv-x" id="lv-x" aria-label="Leave live">${IC.close}</button>
       </header>
       <div class="lv-ytnote" id="lv-ytnote" hidden></div>
@@ -758,6 +766,7 @@ export function createLive(ctx) {
     const unsubs = []; const timers = [];
     const note = (html) => { const n = $('#lv-ytnote'); if (!n) return; n.hidden = !html; n.innerHTML = html || ''; };
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
+    { const rb = document.getElementById('lv-report'); if (rb) rb.onclick = () => ctx.reportDialog('live', l.id, l.id, `${l.hostName || ''}: ${l.title || 'live'}`); }
     const totals = starTotal(root, l.starCount || 0);
     let initStars = 0;
     if (chatOn) unsubs.push(watchChat(id, root, (n, initial) => {

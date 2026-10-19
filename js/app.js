@@ -605,7 +605,7 @@ const stories = createStories({
   fs: { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, writeBatch, Timestamp, serverTimestamp }
 });
 const live = createLive({
-  S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal,
+  S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal, reportDialog: (...x) => reportDialog(...x),
   fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
 });
 const pals = createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth });
@@ -1161,14 +1161,15 @@ async function pageAdmin(token) {
   for (const r of reports) {
     const reporter = await getProfile(r.reporterId);
     const target = r.targetType === 'user' ? await getProfile(r.targetId) : null;
-    const link = r.targetType === 'user' ? (target ? `#/u/${target.username}` : '') : `#/post/${r.postId || r.targetId}`;
+    const isLive = r.targetType === 'live' || r.targetType === 'live chat';
+    const link = r.targetType === 'user' ? (target ? `#/u/${target.username}` : '') : isLive ? `#/live/${r.postId || r.targetId}` : `#/post/${r.postId || r.targetId}`;
     const el = document.createElement('div'); el.className = 'card pad'; el.style.marginBottom = '12px';
     el.innerHTML = `<div class="row"><span class="tag" style="text-transform:uppercase;font-size:.75rem;color:var(--blue)">${esc(r.targetType)}</span><span class="spacer"></span><span class="muted small">${esc(timeAgo(r.createdAt))}</span></div>
       <p style="margin:10px 0 4px"><b>Reason:</b> ${esc(r.reason)}</p>
       ${r.excerpt ? `<p class="muted small" style="margin:0 0 6px">“${esc(r.excerpt)}”</p>` : ''}
       <p class="muted small" style="margin:0">Reported by @${esc(reporter?.username || 'unknown')}</p>
       <div class="profile-actions">${link ? `<a class="btn btn-sm btn-ghost" href="${esc(link)}">Open</a>` : ''}
-        ${r.targetType !== 'user' ? '<button class="btn btn-sm btn-danger" data-a="remove">Delete content</button>' : ''}
+        ${r.targetType !== 'user' && r.targetType !== 'live' ? '<button class="btn btn-sm btn-danger" data-a="remove">Delete content</button>' : ''}
         <button class="btn btn-sm btn-ghost" data-a="dismiss">Dismiss</button></div>`;
     el.onclick = async (e) => {
       const a = e.target.dataset.a; if (!a) return;
@@ -1176,6 +1177,7 @@ async function pageAdmin(token) {
         if (a === 'remove') {
           if (!confirm('Delete the reported content?')) return;
           if (r.targetType === 'post') await deleteDoc(doc(db, 'posts', r.targetId));
+          else if (r.targetType === 'live chat') { const [lid, cid] = r.targetId.split('/'); await deleteDoc(doc(db, 'lives', lid, 'chat', cid)); }
           else {
             const cs = await getDoc(doc(db, 'posts', r.postId, 'comments', r.targetId));
             if (cs.exists()) await comments.deleteComment(r.postId, { id: cs.id, ...cs.data() });

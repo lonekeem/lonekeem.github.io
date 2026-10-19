@@ -102,24 +102,33 @@
         <h2>What we collect</h2>
         <ul>
             <li><b>Account info:</b> your email address and password (or your Google sign-in), handled by Google Firebase Authentication. We never see your password.</li>
-            <li><b>Profile info:</b> your display name, @username, bio and avatar color. These are public.</li>
-            <li><b>Activity:</b> your posts, comments, likes, follows and who you follow. These are public.</li>
+            <li><b>Profile info:</b> your display name, @username (and your account ID), bio, pronouns, website, avatar color and avatar photo. These are public.</li>
+            <li><b>Activity:</b> your posts, captions, hashtags, comments, gold stars (likes), follows, and the views and plays you add to posts. These are public or shown as counts.</li>
+            <li><b>Photos and videos:</b> photo and video posts, stories, snaps and your avatar photo, uploaded to our media host, Cloudinary.</li>
+            <li><b>Community Movies and Songs:</b> movie files, audio files, posters and cover art you upload are stored with Cloudinary. Titles, descriptions, lyrics, genres, ratings, “AI tools used” and YouTube links are stored in Cloud Firestore and are public.</li>
+            <li><b>Games:</b> game records, scores, wins, leaderboards and online match moves are stored in Cloud Firestore. <b>Kemy’s Bubble Quest</b> keeps your best times on your device, and in Firestore (for the leaderboard) when you’re signed in.</li>
+            <li><b>Kemy Pals:</b> your Pal’s name, species, look, care stats, XP and visits are stored in Cloud Firestore and shown on your profile.</li>
             <li><b>Saved posts and your block list:</b> private to you.</li>
-            <li><b>Direct messages:</b> visible only to you and the person you're chatting with. Messages sent to @lonekeemstudios are read by the studio owner.</li>
+            <li><b>Direct messages, live chat, story replies and game quick chat:</b> direct messages are visible only to you and the person you’re chatting with. Messages sent to @lonekeemstudios are read by the studio owner. Live chat is visible to everyone in that live.</li>
             <li><b>Reports:</b> if you report something, the studio owner sees the report and who sent it.</li>
+            <li><b>Recent searches</b> stay on your device and are never uploaded.</li>
         </ul>
+        <h2>Camera and microphone</h2>
+        <p>Kemy uses your camera and microphone only while you film a photo or video, add a story or snap, or go live, and only after your browser asks you for permission. Filters and face effects run on your device. Nothing from your camera is saved unless you choose to post it.</p>
+        <h2>Live streams</h2>
+        <p>Kemy lives are sent <b>peer-to-peer</b> (WebRTC, always encrypted) straight from the host to viewers. Live video and audio are <b>not recorded or stored</b> on any server. Only the live’s title, viewer count, gold stars, chat messages and reports are stored in Cloud Firestore. If a host links a <b>YouTube live</b>, it plays in an embedded YouTube player, and YouTube’s own privacy policy applies to it.</p>
         <h2>How it's used</h2>
-        <p>Only to run the site: show your profile and posts, deliver messages and notifications, keep the community safe, and send account emails like email verification or password reset.</p>
+        <p>Only to run the app: show your profile, posts, movies, songs and games, deliver messages and notifications, keep the community safe, and send account emails like email verification or password reset.</p>
         <h2>What we don't do</h2>
-        <p>We don't sell your information, and we don't show ads.</p>
+        <p>We don't sell your information, we don't share it with advertisers, and we don't show ads. Kemy has no ad, analytics or crash-reporting tools, and doesn't collect your location or contacts.</p>
         <h2>Where it's stored</h2>
-        <p>Data is stored with Google Firebase (Authentication and Cloud Firestore). The site itself is hosted on GitHub Pages. Embedded YouTube or TikTok videos are loaded from those services when you view them.</p>
+        <p>Account data, posts, messages, game data and Pals are stored with Google Firebase (Authentication and Cloud Firestore). Photos, videos and audio are stored with Cloudinary. Both act as service providers for us. The site is hosted on GitHub Pages, and everything is sent over HTTPS. The Kemy Android app opens this same site and collects nothing extra. Embedded YouTube or TikTok players load from those services only when you play them.</p>
         <h2>Your choices</h2>
         <ul>
-            <li>You can edit your profile, delete your posts and comments, unsave posts, unfollow and block people at any time.</li>
-            <li><b>Delete your account any time</b> from <a href="app.html#/settings">Edit profile</a> → <b>Delete account</b>. This permanently removes your profile and @handle, your posts and stories (with their comments, stars and views), your comments on other posts, your follows and followers, saved posts, blocks, notifications, live sessions, your message threads and your login.</li>
-            <li>A few small things can stay: the star and view counts you added to other people's posts (they no longer link to a profile) and reports you sent, which we keep for safety.</li>
-            <li>Photos and videos you uploaded are stored with our media host (Cloudinary). After you delete your account they no longer appear anywhere in the app, but the files can only be erased by the admin. To have them removed, email <a href="mailto:lillykemoy1@gmail.com?subject=Remove%20my%20media%20files">lillykemoy1@gmail.com</a> with your old @handle.</li>
+            <li>You can edit your profile, delete your posts, movies, songs and comments, unsave posts, unfollow and block people at any time.</li>
+            <li><b>Delete your account any time in the app</b> from <a href="app.html#/settings">Edit profile</a> → <b>Delete account</b>. This permanently removes your profile and @handle, your posts, movies, songs and stories (with their comments, stars and views), your comments on other posts, your follows and followers, saved posts, blocks, notifications, live sessions, your Kemy Pals, your message threads and your login.</li>
+            <li>A few small things can stay: the star and view counts you added to other people's posts (they no longer link to a profile) reports you sent, which we keep for safety, and your past game matches, game stats and Bubble Quest leaderboard times. Email us (below) and we’ll remove those too.</li>
+            <li><b>Media removal:</b> photos, videos and audio you uploaded stay on Cloudinary after you delete your account, but they no longer appear anywhere in the app. To have the files erased, email <a href="mailto:lillykemoy1@gmail.com?subject=Remove%20my%20media%20files">lillykemoy1@gmail.com</a> with your @handle.</li>
         </ul>
         <h2>Age</h2>
         <p>Accounts are for people 13 and older. If you believe a younger child has an account, please let us know and we'll remove it.</p>

@@ -1290,3 +1290,9 @@ button.bubble.snapmsg { cursor: pointer; }
 .mp-prog span { display: block; height: 100%; background: linear-gradient(90deg, #8a2be2, #FFC83D); transform-origin: left; transform: scaleX(0); }
 body.has-mini main { padding-bottom: 84px; }
 body.cam-open .mini-player { display: none; }
+/* Report inside lives */
+.lv-report { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(0,0,0,.45); color: #fff; cursor: pointer; }
+.lv-report svg { width: 16px; height: 16px; }
+.lv-msg { position: relative; }
+.lv-rep { margin-left: auto; align-self: center; flex: none; border: 0; background: none; color: rgba(255,255,255,.55); padding: 4px; cursor: pointer; pointer-events: auto; }
+.lv-rep:hover, .lv-rep:focus-visible { color: #ffd166; }

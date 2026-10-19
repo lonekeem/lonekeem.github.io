@@ -878,7 +878,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'postId', 'reason', 'excerpt', 'createdAt'])
         && request.resource.data.reporterId == me()
-        && request.resource.data.targetType in ['post', 'comment', 'user']
+        && request.resource.data.targetType in ['post', 'comment', 'user', 'live', 'live chat']
         && isStr(request.resource.data.targetId, 1, 200)
         && isStr(request.resource.data.postId, 0, 200)
         && isStr(request.resource.data.reason, 1, 500)
