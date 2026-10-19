@@ -1,4 +1,4 @@
-const CACHE = 'lks-v20';
+const CACHE = 'lks-v21';
 const CORE = [
   './', 'index.html', 'app.html', 'terms.html', 'privacy.html', 'guidelines.html',
   'css/app.css', 'js/app.js', 'js/home.js', 'js/firebase-init.js', 'js/watch.js',
