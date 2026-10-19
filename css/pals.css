@@ -31,3 +31,10 @@
 /* tall Pal sheets scroll inside the modal on small phones */
 .modal:has(.pal-creator), .modal:has(.pal-sheet), .modal:has(.pal-intro) { max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 22px 16px 18px; }
 .modal-backdrop:has(.pal-creator), .modal-backdrop:has(.pal-sheet) { padding: 12px; }
+.pal-sp { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); max-height: 230px; overflow-y: auto; padding: 2px; }
+.pal-th { display: block; width: 44px; height: 40px; margin: 0 auto; } .pal-chip.sp.mystery { background: linear-gradient(160deg, rgba(255,211,77,.25), rgba(180,124,240,.25)); }
+.pal-q { display: grid; place-items: center; width: 40px; height: 40px; margin: 0 auto; font: 700 24px "Space Grotesk", sans-serif; color: #ffd34d; }
+.pal-count { font-weight: 700; color: #ffd34d; }
+.pal-gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 10px 0 14px; }
+.pal-gcard { display: grid; justify-items: center; gap: 2px; padding: 8px; border-radius: 16px; background: rgba(138,43,226,.06); border: 1px solid rgba(170,120,255,.2); text-align: center; position: relative; }
+.pal-gcard.got { border-color: rgba(255,211,77,.6); } .pal-gcard small { color: var(--muted); font-size: .7rem; } .pal-got { position: absolute; top: 6px; right: 6px; font-size: .62rem; font-weight: 700; background: #ffd34d; color: #2a1458; border-radius: 999px; padding: 1px 6px; }

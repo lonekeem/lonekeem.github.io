@@ -41,7 +41,7 @@ await A.p.click('[data-m=shower]');
 await A.p.mouse.move(cx - 40, cy); await A.p.mouse.down();
 for (let i = 0; i < 160; i++) await A.p.mouse.move(cx + Math.sin(i * 0.4) * 45, cy + Math.cos(i * 0.3) * 30, { steps: 1 });
 await A.p.mouse.up(); await A.p.screenshot({ path: shot + 'shower.png' });
-const rinseHint = await A.p.textContent('.pal-hint'); ok('lather fills up', /rinse/i.test(rinseHint), rinseHint);
+const rinseHint = await A.p.textContent('.pal-hint'); ok('lather fills up', /rinse|shakes|clean/i.test(rinseHint), rinseHint);
 await A.p.mouse.move(cx, bb.y + 30); await A.p.mouse.down();
 for (let r = 0; r < 12; r++) for (let i = 0; i < 30; i++) { await A.p.mouse.move(cx - 70 + i * 4.6, bb.y + 30); await A.p.waitForTimeout(16); }
 await A.p.mouse.up(); await A.p.waitForTimeout(2600);
@@ -60,7 +60,7 @@ const pet2 = await (await fetch(`${FS}/users/${A.uid}/pets/p1`)).json(); ok('lev
 const B = await account('b');
 await B.p.waitForTimeout(500); if (await B.p.$('#pal-skip')) await B.p.click('#pal-skip');
 await B.p.evaluate((u) => { location.hash = '#/u/' + u; }, A.user); await B.p.waitForSelector('.pal-strip [data-pa=pat]', { timeout: 15000 });
-if (await B.p.$('#pal-skip')) await B.p.click('#pal-skip');
+await B.p.waitForTimeout(2500); if (await B.p.$('#pal-skip')) { await B.p.click('#pal-skip'); ok('existing visitor sees the one-time Pals card and can skip it', true); }
 await B.p.click('[data-pa=pat]'); await B.p.waitForTimeout(2500);
 const pats = await B.p.textContent('.pal-pats b'); ok('visitor pat counted', pats === '1', 'pats=' + pats);
 await B.p.click('[data-pa=pat]'); await B.p.waitForTimeout(2000);

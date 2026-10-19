@@ -535,7 +535,7 @@ const routes = [
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
   [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
-  [/^#\/pals$/, (t) => pals.page(main, t, stale), 'me'],
+  [/^#\/pals(?:\/(gallery))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/settings$/, pageSettings, 'me'],
@@ -608,7 +608,7 @@ const live = createLive({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal, reportDialog: (...x) => reportDialog(...x),
   fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
 });
-const pals = createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth });
+const pals = createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth, notify });
 const games = createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile });
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
@@ -1130,7 +1130,7 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}

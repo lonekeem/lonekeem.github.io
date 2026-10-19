@@ -121,7 +121,7 @@ service cloud.firestore {
         allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
           && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
-          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game']
+          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play']
           && actingAs(request.resource.data.fromUid)
           && request.resource.data.fromUid != uid
           && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName
@@ -909,7 +909,7 @@ service cloud.firestore {
       function stat(v) { return v is int && v >= 0 && v <= 100; }
       function palValid() {
         return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt'])
-          && pd().species in ['kemy', 'twinkbun', 'nimbo', 'ember', 'mossy', 'jelly', 'prism', 'zap', 'luno', 'petal']
+          && pd().species is string && pd().species.matches('^[a-z]{2,16}$')
           && isStr(pd().name, 1, 20)
           && pd().colors is map && pd().colors.keys().hasOnly(['body', 'accent', 'eye']) && hex(pd().colors.body) && hex(pd().colors.accent) && hex(pd().colors.eye)
           && pd().pattern in ['none', 'spots', 'stripes', 'sparkle']
@@ -944,6 +944,17 @@ service cloud.firestore {
           && request.resource.data.at == request.time
           && (resource == null || resource.data.at + duration.value(20, 'h') < request.time)
           && getAfter(petPath()).data.pats == get(petPath()).data.pats + 1;
+        allow delete: if signedIn() && (vid == me() || uid == me());
+      }
+      // play dates: a visitor's Pal plays with this Pal, once per visitor per 20 hours
+      match /playdates/{vid} {
+        allow read: if true;
+        allow create, update: if signedIn() && vid == me() && uid != me()
+          && request.resource.data.keys().hasOnly(['uid', 'pet', 'at']) && request.resource.data.uid == vid
+          && request.resource.data.pet is string && request.resource.data.pet.matches('^p[1-6]$')
+          && exists(/databases/$(database)/documents/users/$(vid)/pets/$(request.resource.data.pet))
+          && request.resource.data.at == request.time
+          && (resource == null || resource.data.at + duration.value(20, 'h') < request.time);
         allow delete: if signedIn() && (vid == me() || uid == me());
       }
     }

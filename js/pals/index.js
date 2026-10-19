@@ -1,8 +1,8 @@
 // Kemy Pals: original virtual pets that live next to your profile.
 import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf } from './art.js';
-import { createStore, liveStats, moodOf, patPal, readPet, firstPet, formName, isNight, xpToLevel, MAX_PALS, tsMs } from './core.js';
+import { createStore, liveStats, moodOf, patPal, readPet, firstPet, formName, isNight, xpToLevel, MAX_PALS, tsMs, listPals, getActivePal, playdate, newPlaydates } from './core.js';
 
-export const PALS_COPY = "Meet your Kemy Pal 🐾 Hatch your own cute companion, give it a name, colors and outfits, and watch it hang out next to your profile. Give it bubbly showers, feed it snacks, brush it, tuck it into bed and play catch, and watch it glow up as you level. Collect up to 6 Pals, and let your friends give yours a pat.";
+export const PALS_COPY = "Meet your Kemy Pal 🐾 Hatch your own cute companion from dozens of Pals like a baby elephant, puppy, panda, baby dragon and more, give it a name, colors and outfits, and watch it hang out next to your profile. Give it bubbly showers, feed it snacks, brush it, tuck it into bed and play catch, and watch it glow up as you level. Collect up to 6 Pals, and let your friends give yours a pat.";
 export const PALS_SHORT = 'Pals: hatch, dress up and play with your own cute virtual pet.';
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ACC_LABEL = { none: 'None', bow: 'Bow', crown: 'Crown', shades: 'Star shades', scarf: 'Scarf', hat: 'Hat', badge: 'KL badge' };
@@ -29,7 +29,7 @@ function particles() {
     draw(c) { for (const p of P) { p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.life--; c.globalAlpha = Math.max(0, p.life / 50); if (p.kind === 'heart') { c.fillStyle = '#ff6fae'; heart(c, p.x, p.y, 5); c.fill(); } else if (p.kind === 'drop') { c.fillStyle = '#8fd0ff'; c.beginPath(); c.ellipse(p.x, p.y, 2, 3, 0, 0, 7); c.fill(); } else { c.fillStyle = '#ffd34d'; star(c, p.x, p.y, 4.5); c.fill(); c.strokeStyle = '#b26bff'; c.lineWidth = 0.8; c.stroke(); } } c.globalAlpha = 1; for (let i = P.length - 1; i >= 0; i--) if (P[i].life <= 0) P.splice(i, 1); } };
 }
 export function createPals(ctx) {
-  const { S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth } = ctx;
+  const { S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth } = ctx; const notify = ctx.notify || (() => {});
   if (!document.getElementById('pals-css')) { const l = document.createElement('link'); l.id = 'pals-css'; l.rel = 'stylesheet'; l.href = 'css/pals.css?v=1'; document.head.appendChild(l); }
   let mine = null; // { uid, list, store }
   const debug = () => localStorage.getItem('kemy-pals-debug') === '1';
@@ -68,46 +68,83 @@ export function createPals(ctx) {
   // ---------------------------------------------------------------- profile strip
   async function renderProfile(el, uid, u, isMine) {
     if (!el) return;
-    let p = null;
-    try { p = u.activePet ? await readPet(db, uid, u.activePet) : null; if (!p) p = await firstPet(db, uid); } catch { p = null; }
-    if (!p) { if (isMine) el.innerHTML = `<button class="pal-hatch-cta" id="pal-cta"><span class="pal-egg-ic"></span><span><b>Hatch your Kemy Pal</b><small>${esc(PALS_SHORT.replace('Pals: ', ''))}</small></span></button>`, el.querySelector('#pal-cta').onclick = () => intro(true), miniEgg(el.querySelector('.pal-egg-ic')); else el.innerHTML = ''; return; }
-    if (isMine) { const m = await myPals(); const mp = m && m.list.find((x) => x.id === p.id); if (mp) p = mp; applyPatBoost(p); }
-    el.innerHTML = `<div class="pal-strip" aria-label="${esc(u.displayName)}'s Pal ${esc(p.name)}"><div class="pal-cv"></div>
-      <div class="pal-tag"><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv ${p.level || 1} · <span class="pal-vibe" style="--v:${VIBES[SPEC[p.species].vibe].c}">${VIBES[SPEC[p.species].vibe].name}</span></small><small class="pal-pats">🐾 <b>${p.pats || 0}</b> pats</small></div>
-      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Give a pat</button>'}</div></div>`;
-    const host = el.querySelector('.pal-cv'); const W = Math.max(140, Math.min(host.clientWidth || 300, 520)); const s = stage(host, W, 92);
-    const fx = particles(); const A = { x: W * 0.5, tx: W * 0.5, face: 1, mode: 'idle', until: 0, t: 0, react: 0 };
-    const stats = liveStats(p); const mood = moodOf(stats);
-    const f = (t) => {
-      A.t = t; const c = s.c; c.clearRect(0, 0, W, 92);
-      const night = isNight();
-      if (A.react > 0) { A.react--; A.mode = 'happy'; }
-      else if (night || stats.energy < 15) A.mode = 'sleep';
-      else if (RM()) A.mode = 'idle';
-      else {
-        if (t > A.until) { const r = Math.random(); if (r < 0.45) { A.tx = 30 + Math.random() * (W - 60); A.mode = 'walk'; } else if (r < 0.6 && !mood.sad) { A.mode = 'hop'; A.until = t + 70; } else { A.mode = 'idle'; A.until = t + 120 + Math.random() * 160; } if (A.mode === 'walk') A.until = t + 600; }
-        if (A.mode === 'walk') { const d = A.tx - A.x; A.face = Math.sign(d) || A.face; A.x += Math.sign(d) * Math.min(Math.abs(d), mood.tired ? 0.35 : 0.7); if (Math.abs(d) < 1) { A.mode = 'idle'; A.until = t + 100; } }
-      }
-      // time-of-day sky tint
-      const h = new Date().getHours(); c.fillStyle = night ? 'rgba(40,30,110,.35)' : h < 10 ? 'rgba(255,210,150,.18)' : h > 17 ? 'rgba(255,150,190,.16)' : 'rgba(170,140,255,.10)';
-      c.beginPath(); c.roundRect(0, 0, W, 92, 18); c.fill();
-      c.fillStyle = 'rgba(120,220,160,.35)'; c.beginPath(); c.ellipse(W / 2, 86, W * 0.48, 7, 0, 0, 7); c.fill();
+    let list = [];
+    try { list = await listPals(db, uid); } catch { list = []; }
+    if (!list.length) { if (isMine) { el.innerHTML = `<button class="pal-hatch-cta" id="pal-cta"><span class="pal-egg-ic"></span><span><b>Hatch your Kemy Pal</b><small>${esc(PALS_SHORT.replace('Pals: ', ''))}</small></span></button>`; el.querySelector('#pal-cta').onclick = () => intro(true); miniEgg(el.querySelector('.pal-egg-ic')); } else el.innerHTML = ''; return; }
+    if (isMine) { const m = await myPals(); if (m) list = m.list.slice(); }
+    const act = list.find((p) => p.id === u.activePet) || list[0];
+    if (isMine) { applyPatBoost(act); applyPlaydates(act); }
+    const shown = [act, ...list.filter((p) => p !== act)].slice(0, 3);
+    const sp = SPEC[act.species] || SPECIES[0];
+    el.innerHTML = `<div class="pal-strip" aria-label="${esc(u.displayName)}'s Pals"><div class="pal-cv"></div>
+      <div class="pal-tag"><b>${esc(act.name)}</b><small>${esc(formName(act))} · Lv ${act.level || 1} · <span class="pal-vibe" style="--v:${VIBES[sp.vibe].c}">${VIBES[sp.vibe].name}</span></small><small class="pal-pats">🐾 <b>${act.pats || 0}</b> pats</small></div>
+      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
+    const host = el.querySelector('.pal-cv'); const W = Math.max(160, Math.min(host.clientWidth || 300, 560)), H = 104; const s = stage(host, W, H);
+    const fx = particles();
+    const actors = shown.map((p, i) => ({ p, x: W * (0.5 - i * 0.22) + (i ? 0 : 10), tx: 0, face: i % 2 ? 1 : -1, mode: 'idle', until: i * 60, react: 0, mood: moodOf(liveStats(p)), size: i ? 52 : 66 }));
+    let guest = null, play = null, curT = 0;
+    const f = (t) => { curT = t;
+      const c = s.c; c.clearRect(0, 0, W, H); const night = isNight(); const h = new Date().getHours();
+      c.fillStyle = night ? 'rgba(40,30,110,.35)' : h < 10 ? 'rgba(255,210,150,.18)' : h > 17 ? 'rgba(255,150,190,.16)' : 'rgba(170,140,255,.10)'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill();
+      c.fillStyle = 'rgba(120,220,160,.35)'; c.beginPath(); c.ellipse(W / 2, H - 6, W * 0.48, 7, 0, 0, 7); c.fill();
       if (night) { c.fillStyle = '#fff3b0'; c.beginPath(); c.arc(W - 22, 18, 7, 0, 7); c.fill(); c.fillStyle = 'rgba(40,30,110,1)'; c.beginPath(); c.arc(W - 19, 16, 6, 0, 7); c.fill(); }
-      drawPal(c, A.x, 84, 66, p, { t, face: A.face, mode: A.mode, mood: { ...mood, sad: mood.sad && A.react <= 0 } });
+      const all = guest ? [...actors, guest] : actors;
+      for (const A of all) {
+        if (play && (A === actors[0] || A === guest)) continue;
+        if (A.react > 0) { A.react--; A.mode = 'react'; continue; }
+        if (A.goTo != null) { const d = A.goTo - A.x; A.face = Math.sign(d) || A.face; A.x += Math.sign(d) * Math.min(Math.abs(d), 1.1); A.mode = 'walk'; if (Math.abs(d) < 1) { A.goTo = null; A.arrived && A.arrived(); } continue; }
+        if (night || A.mood.tired) { A.mode = 'sleep'; continue; }
+        if (RM()) { A.mode = 'idle'; continue; }
+        if (t > A.until) { const r = Math.random(); if (r < 0.45) { A.tx = 30 + Math.random() * (W - 60); A.mode = 'walk'; A.until = t + 600; } else if (r < 0.6 && !A.mood.sad) { A.mode = 'hop'; A.until = t + 70; } else { A.mode = 'idle'; A.until = t + 120 + Math.random() * 160; } }
+        if (A.mode === 'walk') { const d = A.tx - A.x; A.face = Math.sign(d) || A.face; A.x += Math.sign(d) * Math.min(Math.abs(d), A.mood.tired ? 0.35 : 0.7); if (Math.abs(d) < 1) { A.mode = 'idle'; A.until = t + 100; } }
+      }
+      if (play) stepPlay(t, c);
+      for (const A of [...all].sort((a, b) => a.size - b.size)) drawPal(c, A.x, H - 8, A.size, A.p, { t, face: A.face, mode: A.mode, mood: { ...A.mood, sad: A.mood.sad && A.mode !== 'react' } });
+      if (guest) { c.fillStyle = 'rgba(255,255,255,.85)'; c.font = '600 10px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(guest.p.name, guest.x, H - 8 - guest.size - 4); c.textAlign = 'left'; }
       fx.draw(c);
     };
+    // the two Pals' play-date animations
+    const PLAYS = ['high-five', 'chase', 'snack', 'bubbles', 'dance'];
+    function stepPlay(t, c) {
+      const a = actors[0], g = guest, k = t - play.t0, mid = (a.x + g.x) / 2;
+      if (play.kind === 'high-five') { a.mode = g.mode = 'hop'; a.face = Math.sign(g.x - a.x); g.face = -a.face; if (k % 36 === 18) { fx.add(mid, 40, 'star', 6); snd('pat'); } }
+      if (play.kind === 'chase') { const ph = Math.sin(k * 0.03); g.x = play.cx + ph * 70; a.x = play.cx + Math.sin(k * 0.03 - 0.6) * 70; a.mode = g.mode = 'walk'; a.face = Math.sign(Math.cos(k * 0.03 - 0.6)) || 1; g.face = Math.sign(Math.cos(k * 0.03)) || 1; }
+      if (play.kind === 'snack') { a.mode = g.mode = 'eat'; drawSnack(c, mid, H - 22, 7, 0); if (k % 30 === 0) snd('eat'); }
+      if (play.kind === 'bubbles') { a.mode = g.mode = 'react'; if (k % 8 === 0) play.b.push({ x: mid + (Math.random() - 0.5) * 40, y: H - 20, r: 3 + Math.random() * 4 }); for (const b of play.b) { b.y -= 0.8; drawBubble(c, b.x, b.y, b.r); } play.b = play.b.filter((b) => b.y > 0); }
+      if (play.kind === 'dance') { a.mode = g.mode = 'happy'; if (k % 40 === 0) fx.add(mid, 30, 'heart', 3); }
+      if (k > 240) { play = null; a.mode = g.mode = 'idle'; a.until = g.until = t + 120; finishPlay(); }
+    }
     f.el = s.cv; loop(f);
-    let pressT = 0, longT = null;
-    s.cv.addEventListener('pointerdown', () => { pressT = Date.now(); if (isMine) longT = setTimeout(() => { longT = null; openSheet(p); }, 550); });
-    s.cv.addEventListener('pointerup', (e) => { if (longT) { clearTimeout(longT); longT = null; } else if (isMine) return;
-      const r = s.cv.getBoundingClientRect(); const x = e.clientX - r.left; if (Math.abs(x - A.x) > 40) return;
-      A.react = 80; fx.add(A.x, 30, isMine ? 'heart' : 'star', 8); fx.add(A.x, 30, 'star', 4); snd('happy'); if (!isMine) doPat(); });
-    el.querySelectorAll('[data-pa]').forEach((b) => b.onclick = () => { if (b.dataset.pa === 'care') openSheet(p); else { A.react = 80; fx.add(A.x, 30, 'star', 10); snd('pat'); doPat(); } });
-    async function doPat() {
-      if (!S.user || !S.profile) { toast('Sign in to give pats'); return; }
-      try { const ok = await patPal(db, uid, p.id, S.user.uid); if (ok) { p.pats = (p.pats || 0) + 1; el.querySelector('.pal-pats b').textContent = p.pats; toast(`You gave ${p.name} a pat! 🐾`); } else toast(`${p.name} already got your pat today. Come back tomorrow!`); }
+    const hit = (x) => { const all = guest ? [...actors, guest] : actors; return all.find((A) => Math.abs(x - A.x) < A.size * 0.45); };
+    let longT = null;
+    s.cv.addEventListener('pointerdown', (e) => { if (isMine) longT = setTimeout(() => { longT = null; const r = s.cv.getBoundingClientRect(); const A = hit(e.clientX - r.left); if (A && A !== guest) openSheet(A.p); }, 550); });
+    s.cv.addEventListener('pointerup', (e) => { if (isMine && !longT) return; clearTimeout(longT); longT = null;
+      const r = s.cv.getBoundingClientRect(); const A = hit((e.clientX - r.left) * W / r.width); if (!A) return;
+      A.react = 90; fx.add(A.x, 30, 'heart', 6); fx.add(A.x, 30, 'star', 5); snd('happy'); if (!isMine && A !== guest) doPat(A.p); });
+    el.querySelectorAll('[data-pa]').forEach((b) => b.onclick = () => { const k = b.dataset.pa; if (k === 'care') openSheet(act); if (k === 'pat') { actors[0].react = 90; fx.add(actors[0].x, 30, 'star', 10); snd('pat'); doPat(act); } if (k === 'bring') bring(b); });
+    async function doPat(p) {
+      if (!S.user || !S.profile) { toast('Sign in to pat Pals'); return; }
+      try { const ok = await patPal(db, uid, p.id, S.user.uid); if (ok) { p.pats = (p.pats || 0) + 1; if (p === act) el.querySelector('.pal-pats b').textContent = p.pats; toast(`You patted ${p.name}! 🐾`); notify(uid, 'pal_pat', { text: `@${S.profile.username} patted ${p.name}` }); } else toast(`${p.name} already got your pat today. Come back tomorrow!`); }
       catch (e) { toast(friendlyError(e)); }
     }
+    async function bring(btn) {
+      if (!S.user || !S.profile) { requireAuth(); return; } if (guest) return;
+      const m = await myPals(); const mp = m && activeOf(m); if (!mp) { toast('Hatch a Pal first, then bring it to play!'); intro(true); return; }
+      btn.disabled = true; guest = { p: mp, x: -20, face: 1, mode: 'walk', until: 1e9, react: 0, mood: moodOf(liveStats(mp)), size: 58, guest: true };
+      const a = actors[0]; a.goTo = null; const side = a.x > W / 2 ? -1 : 1; guest.goTo = a.x + side * 38 - (side < 0 ? 0 : 0);
+      guest.arrived = () => { play = { kind: PLAYS[Math.floor(Math.random() * PLAYS.length)], t0: curT, cx: a.x, b: [] }; toast(`${mp.name} and ${act.name}: ${play.kind.replace('-', ' ')}!`); };
+    }
+    async function finishPlay() {
+      const mp = guest.p;
+      try { const ok = await playdate(db, uid, act.id, S.user.uid, mp.id);
+        if (ok) { const st = liveStats(mp); st.happy = Math.min(100, st.happy + 8); await commit(mp, { stats: st, xpGain: 15 }); notify(uid, 'pal_play', { text: `@${S.profile.username}'s ${mp.name} played with ${act.name}` }); toast(`Play date! ${mp.name} and ${act.name} both feel happier 💖`); }
+        else toast(`${mp.name} and ${act.name} already had a play date today. They still had fun!`);
+      } catch (e) { toast(friendlyError(e)); }
+    }
+  }
+  async function applyPlaydates(p) {
+    try { const k = `kemy-pals-play-${p.id}-${S.user.uid}`; const since = +(localStorage.getItem(k) || 0); const n = await newPlaydates(db, S.user.uid, p.id, since); localStorage.setItem(k, String(Date.now()));
+      if (n > 0 && since) { const st = liveStats(p); st.happy = Math.min(100, st.happy + 5 * Math.min(n, 4)); commit(p, { stats: st, xpGain: Math.min(60, 10 * n) }); toast(`${p.name} had ${n} play date${n > 1 ? 's' : ''} with friends' Pals!`); } } catch {}
   }
   function applyPatBoost(p) {
     const k = `kemy-pals-pats-${p.id}-${S.user.uid}`; const seen = +(localStorage.getItem(k) || 0); const n = (p.pats || 0) - seen;
@@ -151,7 +188,7 @@ export function createPals(ctx) {
     const dbg = root.querySelector('[data-dbg]'); if (dbg) dbg.onclick = () => commit(p, { stats: { ...st }, xpGain: 60 }, meters);
     const pos = (e) => { const r = s.cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
     s.cv.addEventListener('pointerdown', (e) => { const q = pos(e); G.ptr = q; G.last = { ...q, t: performance.now() }; s.cv.setPointerCapture(e.pointerId);
-      if (G.mode === 'home' && near(q.x, q.y, 60)) { G.react = 70; fx.add(G.palX, PY - SIZE * 0.6, 'heart', 6); fx.add(G.palX, PY - SIZE * 0.6, 'star', 4); snd('happy'); }
+      if (G.mode === 'home' && near(q.x, q.y, 60)) { G.react = 90; fx.add(G.palX, PY - SIZE * 0.6, 'heart', 6); fx.add(G.palX, PY - SIZE * 0.6, 'star', 4); snd('happy'); }
       if (G.mode === 'feed') { for (let i = 0; i < 3; i++) if (Math.hypot(q.x - (40 + i * 26), q.y - 26) < 16) G.drag = { kind: i, x: q.x, y: q.y }; }
       if (G.mode === 'bandage' && Math.hypot(q.x - 34, q.y - 30) < 22) G.drag = { kind: 'b', x: q.x, y: q.y };
       if (G.mode === 'bed') { finish({ energy: Math.min(40, 8 + G.sleepT / 6), happy: 4 }, 8, p.name + ' feels rested!'); }
@@ -174,7 +211,7 @@ export function createPals(ctx) {
       const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, G.mode === 'bed' ? '#1a1240' : '#f6e8ff'); g.addColorStop(1, G.mode === 'bed' ? '#2a1a5a' : '#dcc8ff'); c.fillStyle = g; c.fillRect(0, 0, W, H);
       c.fillStyle = G.mode === 'shower' ? '#bfe6ff' : G.mode === 'bed' ? '#3a2a6a' : '#c7f0d4'; c.fillRect(0, H - 34, W, 34);
       if (G.mode === 'shower') { c.fillStyle = '#fff'; c.strokeStyle = '#9fb8ff'; c.lineWidth = 2; c.beginPath(); c.roundRect(PX - 85, H - 46, 170, 34, 14); c.fill(); c.stroke(); }
-      let mode = G.react > 0 ? 'happy' : mood.tired ? 'idle' : 'idle'; if (G.react > 0) G.react--;
+      let mode = G.react > 0 ? 'react' : 'idle'; if (G.react > 0) G.react--;
       if (G.eat > 0) { G.eat--; mode = 'eat'; }
       if (G.mode === 'bed') { mode = 'sleep'; G.sleepT++; if (G.sleepT > 300) finish({ energy: 40, happy: 5 }, 8, p.name + ' had a cozy nap!'); }
       if (G.shake > 0) { G.shake--; mode = 'shake'; if (G.shake % 6 === 0) fx.add(G.palX + (Math.random() - 0.5) * 60, PY - 60, 'drop', 3); if (G.shake === 1) { snd('sparkle'); fx.add(G.palX, PY - 80, 'star', 14); finish({ clean: 100, happy: 8 }, 15, p.name + ' is squeaky clean and sparkly!'); } }
@@ -195,8 +232,9 @@ export function createPals(ctx) {
           c.fillStyle = '#c0c8e0'; c.strokeStyle = '#6a6a90'; c.lineWidth = 1.5; c.beginPath(); c.roundRect(hx - 18, hy - 8, 36, 12, 6); c.fill(); c.stroke(); c.fillRect(hx - 3, 0, 6, hy - 8);
           if (t % 2 === 0) for (let i = 0; i < 3; i++) G.drops.push({ x: hx - 14 + Math.random() * 28, y: hy + 4, vy: 3 + Math.random() * 2 });
           if (t % 20 === 0) snd('splash');
+          if (SPEC[p.species] && SPEC[p.species].react === 'spray' && t % 3 === 0) G.drops.push({ x: G.palX + 14 + Math.random() * 10, y: PY - SIZE * 0.42, vy: 2 + Math.random() * 2, vx: 1.5 + Math.random() * 1.5 });
         }
-        for (const d of G.drops) { d.y += d.vy; c.fillStyle = '#6fb8ff'; c.beginPath(); c.ellipse(d.x, d.y, 1.4, 3, 0, 0, 7); c.fill();
+        for (const d of G.drops) { d.y += d.vy; d.x += d.vx || 0; c.fillStyle = '#6fb8ff'; c.beginPath(); c.ellipse(d.x, d.y, 1.4, 3, 0, 0, 7); c.fill();
           for (let i = G.bubbles.length - 1; i >= 0; i--) { const bb = G.bubbles[i]; if (Math.hypot(d.x - bb.x, d.y - bb.y) < bb.r + 2) { G.bubbles.splice(i, 1); d.y = H + 10; if (Math.random() < 0.4) snd('pop'); } } }
         G.drops = G.drops.filter((d) => d.y < H - 30);
         if (G.rinse === true && G.bubbles.length === 0) { G.rinse = 'done'; G.drops = []; G.shake = 80; hint(p.name + ' shakes dry!'); }
@@ -218,7 +256,7 @@ export function createPals(ctx) {
     const chips = (key, list, lab) => list.map((v) => `<button type="button" class="pal-chip ${d[key] === v ? 'on' : ''}" data-${key}="${v}">${esc(lab[v])}</button>`).join('');
     openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="pal-creator" id="pal-form"><h2>${pal ? 'Style ' + esc(pal.name) : first ? 'Meet your Pal!' : 'New Pal'}</h2>
       <div class="pal-prev"></div>
-      ${pal ? '' : `<div class="pal-sp" role="radiogroup" aria-label="Species">${SPECIES.map((s) => `<button type="button" class="pal-chip sp ${d.species === s.id ? 'on' : ''}" data-species="${s.id}" title="${esc(s.blurb)}"><b>${esc(s.name)}</b><small style="color:${VIBES[s.vibe].c}">${VIBES[s.vibe].name}</small></button>`).join('')}</div>`}
+      ${pal ? '' : `<div class="pal-l">Pick a Pal <small class="muted">(${SPECIES.length} to choose from)</small></div><div class="pal-sp" role="radiogroup" aria-label="Species"><button type="button" class="pal-chip sp mystery" data-species="mystery" title="A surprise Pal!"><span class="pal-q">?</span><b>Mystery egg</b></button>${SPECIES.map((s) => `<button type="button" class="pal-chip sp ${d.species === s.id ? 'on' : ''}" data-species="${s.id}" title="${esc(s.blurb)}"><i class="pal-th" data-th="${s.id}"></i><b>${esc(s.name)}</b><small style="color:${VIBES[s.vibe].c}">${VIBES[s.vibe].name}</small></button>`).join('')}</div>`}
       <label class="pal-l">Name<input id="pal-name" maxlength="20" required placeholder="Give your Pal a name" value="${esc(d.name)}"></label>
       <div class="pal-l">Body<div class="pal-sw">${BODY_PRESETS.map((c) => `<button type="button" style="--c:${c}" data-body="${c}" aria-label="Body color ${c}"></button>`).join('')}</div><input type="range" min="0" max="359" value="290" id="pal-hue" aria-label="Body hue"></div>
       <div class="pal-l">Ears, gills &amp; fins<div class="pal-sw">${ACC_PRESETS.map((c) => `<button type="button" style="--c:${c}" data-accent="${c}" aria-label="Accent color ${c}"></button>`).join('')}</div></div>
@@ -227,12 +265,14 @@ export function createPals(ctx) {
       <div class="pal-l">Outfit<div class="pal-chips">${chips('acc', ACCESSORIES, ACC_LABEL)}</div></div>
       <button class="btn" type="submit">${pal ? 'Save look' : 'Hatch!'}</button></form>`);
     const f = document.getElementById('pal-form'); const s = stage(f.querySelector('.pal-prev'), 220, 150);
-    const draw = (t) => { s.c.clearRect(0, 0, 220, 150); drawPal(s.c, 110, 140, 120, { ...d, level: pal ? pal.level : 1 }, { t, mode: t % 300 < 60 ? 'happy' : 'idle' }); }; draw.el = s.cv; loop(draw);
+    f.querySelectorAll('[data-th]').forEach((el) => { const q = stage(el, 44, 40); drawPal(q.c, 22, 38, 34, { species: el.dataset.th, level: 1 }, { t: 30, mode: 'idle' }); });
+    const draw = (t) => { s.c.clearRect(0, 0, 220, 150); if (d.species === 'mystery') { drawEgg(s.c, 110, 145, 120, RM() ? 0 : t); return; } drawPal(s.c, 110, 140, 120, { ...d, level: pal ? pal.level : 1 }, { t, mode: t % 300 < 90 ? 'react' : 'idle' }); }; draw.el = s.cv; loop(draw);
     f.addEventListener('click', (e) => { const b = e.target.closest('button[type=button]'); if (!b) return;
-      for (const k of ['species', 'pattern', 'acc']) if (b.dataset[k]) { d[k] = b.dataset[k]; f.querySelectorAll(`[data-${k}]`).forEach((x) => x.classList.toggle('on', x === b)); if (k === 'species') { d.colors.body = SPEC[d.species].body; d.colors.accent = SPEC[d.species].acc; } }
+      for (const k of ['species', 'pattern', 'acc']) if (b.dataset[k]) { d[k] = b.dataset[k]; f.querySelectorAll(`[data-${k}]`).forEach((x) => x.classList.toggle('on', x === b)); if (k === 'species' && SPEC[d.species]) { d.colors.body = SPEC[d.species].body; d.colors.accent = SPEC[d.species].acc; } }
       for (const k of ['body', 'accent', 'eye']) if (b.dataset[k]) d.colors[k] = b.dataset[k]; snd('pop'); });
     f.querySelector('#pal-hue').oninput = (e) => { d.colors.body = hueHex(+e.target.value); };
     f.onsubmit = async (e) => { e.preventDefault(); d.name = f.querySelector('#pal-name').value.trim().slice(0, 20); if (!d.name) return;
+      if (d.species === 'mystery') { const r = SPECIES[Math.floor(Math.random() * SPECIES.length)]; d.species = r.id; d.colors.body = r.body; d.colors.accent = r.acc; toast(`Your mystery egg hatched into a ${r.name}!`); }
       const btn = f.querySelector('[type=submit]'); btn.disabled = true;
       try { const m = await myPals(); let p;
         if (pal) { p = m.list.find((x) => x.id === pal.id); await m.store.save(p, { name: d.name, colors: d.colors, pattern: d.pattern, acc: d.acc }); }
@@ -263,10 +303,11 @@ export function createPals(ctx) {
     localStorage.setItem(k, '1'); myPals().then((m) => { if (m && !m.list.length) intro(false); }).catch(() => {});
   }
   // ---------------------------------------------------------------- Pal Box page
-  async function page(main, token, stale) {
+  async function page(main, token, stale, sub) {
+    if (sub === 'gallery') return gallery(main);
     if (!requireAuth()) return; const m = await myPals(true); if (stale && stale(token)) return;
     const n = slots(m); const act = activeOf(m); const firstEmpty = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].find((id) => !m.list.some((p) => p.id === id));
-    main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Box</h1><span class="muted small">${m.list.length}/${MAX_PALS} Pals · ${n} unlocked</span></div>
+    main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Box</h1><span class="muted small">${m.list.length}/${MAX_PALS} Pals · ${n} unlocked · <a href="#/pals/gallery">Pal Gallery (${collected().size}/${SPECIES.length})</a></span></div>
       <p class="muted small">${esc(PALS_SHORT)} New eggs unlock as your Pals level up and with daily visit streaks.</p>
       <div class="pal-grid">${['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => { const p = m.list.find((x) => x.id === id);
         if (p) return `<div class="pal-card ${act && act.id === id ? 'active' : ''}" data-id="${id}"><div class="pal-thumb"></div><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv ${p.level}</small>
@@ -280,7 +321,19 @@ export function createPals(ctx) {
         if (c === 'show') { try { await m.store.setActive(p.id); S.profile.activePet = p.id; toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } } }); });
     main.querySelectorAll('[data-hatch]').forEach((b) => { const s = stage(b.querySelector('.pal-thumb'), 110, 90); const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawEgg(s.c, 55, 86, 76, RM() ? 0 : t); }; f.el = s.cv; loop(f); b.onclick = () => creator({ slot: b.dataset.hatch, onDone: () => page(main) }); });
   }
+  function collected() {
+    const k = 'kemy-pals-collected-' + (S.user ? S.user.uid : ''); const set = new Set(JSON.parse(localStorage.getItem(k) || '[]'));
+    if (mine) mine.list.forEach((p) => set.add(SPEC[p.species] ? SPEC[p.species].id : p.species)); localStorage.setItem(k, JSON.stringify([...set])); return set;
+  }
+  async function gallery(main) {
+    if (S.user && S.profile) await myPals(); const got = collected();
+    main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Gallery</h1><span class="pal-count">${got.size}/${SPECIES.length} collected</span></div>
+      <p class="muted small">Every Pal has a baby, kid and grown-up glow-up form. Hatch one to add it to your collection.</p>
+      <div class="pal-gal">${SPECIES.map((s) => `<div class="pal-gcard ${got.has(s.id) ? 'got' : ''}"><div class="pal-thumb" data-g="${s.id}"></div><b>${esc(s.name)}</b><small style="color:${VIBES[s.vibe].c}">${VIBES[s.vibe].name}</small><small>${esc(s.forms.join(' → '))}</small>${got.has(s.id) ? '<span class="pal-got">Collected</span>' : ''}</div>`).join('')}</div>
+      <a class="btn btn-sm btn-ghost" href="#/pals">← Pal Box</a></section>`;
+    main.querySelectorAll('[data-g]').forEach((el) => { const sp = el.dataset.g; const q = stage(el, 96, 84); let lv = 1; const fn = (t) => { if (t % 180 === 0) lv = lv === 1 ? 5 : lv === 5 ? 12 : 1; q.c.clearRect(0, 0, 96, 84); drawPal(q.c, 48, 80, 64, { species: sp, level: lv }, { t, mode: t % 180 > 130 ? 'react' : 'idle' }); if (!got.has(sp)) { q.c.globalCompositeOperation = 'source-atop'; q.c.fillStyle = 'rgba(40,20,80,.55)'; q.c.fillRect(0, 0, 96, 84); q.c.globalCompositeOperation = 'source-over'; } }; fn.el = q.cv; if (RM()) fn(1); else loop(fn); });
+  }
   // XP from activity elsewhere in the app: dispatchEvent(new CustomEvent('kemy:xp', { detail: { n } }))
   addEventListener('kemy:xp', async (e) => { try { const m = await myPals(); if (!m) return; const p = activeOf(m); if (!p) return; await commit(p, { xpGain: Math.min(60, (e.detail && e.detail.n) || 10) }); } catch {} });
-  return { renderProfile, onRoute, page, intro, openSheet };
+  return { renderProfile, onRoute, page, intro, openSheet, gallery };
 }

@@ -39,7 +39,7 @@ export function createStore(db, uid) {
       lastWrite = Date.now(); await updateDoc(ref(p.id), data);
       Object.assign(p, data, { at: Date.now() }); return p;
     },
-    async remove(id) { const pats = await getDocs(collection(db, 'users', uid, 'pets', id, 'pats')); const b = writeBatch(db); pats.docs.forEach((d) => b.delete(d.ref)); b.delete(ref(id)); await b.commit(); },
+    async remove(id) { const pats = await getDocs(collection(db, 'users', uid, 'pets', id, 'pats')); const pd = await getDocs(collection(db, 'users', uid, 'pets', id, 'playdates')); const b = writeBatch(db); pats.docs.forEach((d) => b.delete(d.ref)); pd.docs.forEach((d) => b.delete(d.ref)); b.delete(ref(id)); await b.commit(); },
     async setActive(id) { await updateDoc(doc(db, 'users', uid), { activePet: id }); }
   };
 }
@@ -53,3 +53,20 @@ export async function readPet(db, uid, id) { const s = await getDoc(doc(db, 'use
 export async function firstPet(db, uid) { const s = await getDocs(collection(db, 'users', uid, 'pets')); const l = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); return l[0] || null; }
 export const formName = (p) => { const sp = SPEC[p.species]; return sp ? sp.forms[p.level >= 12 ? 2 : p.level >= 5 ? 1 : 0] : ''; };
 export { deleteDoc };
+// ---- public read API (also for Phase 2: Pal vs Pal games and the Pal Park)
+import { query, where, limit } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+export async function listPals(db, uid) { const s = await getDocs(collection(db, 'users', uid, 'pets')); return s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); }
+// a user's active Pal (users/{uid}.activePet, else their first Pal), readable by anyone
+export async function getActivePal(db, uid) {
+  const u = await getDoc(doc(db, 'users', uid)); const id = u.exists() ? u.data().activePet : '';
+  return (id && await readPet(db, uid, id)) || firstPet(db, uid);
+}
+// play date: visitor's Pal visits ownerUid's Pal; the rules allow one per visitor per owner Pal per 20 h
+export async function playdate(db, ownerUid, petId, me, myPetId) {
+  const r = doc(db, 'users', ownerUid, 'pets', petId, 'playdates', me);
+  const old = await getDoc(r); if (old.exists() && Date.now() - tsMs(old.data().at) < 20 * 3600000) return false;
+  await setDoc(r, { uid: me, pet: myPetId, at: serverTimestamp() }); return true;
+}
+export async function newPlaydates(db, uid, petId, sinceMs) {
+  const s = await getDocs(query(collection(db, 'users', uid, 'pets', petId, 'playdates'), where('at', '>', new Date(sinceMs || 0)), limit(20))); return s.size;
+}

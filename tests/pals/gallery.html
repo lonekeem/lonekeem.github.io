@@ -1,0 +1,8 @@
+<!doctype html><body style="margin:0;background:#2a1458"><canvas id="c"></canvas><script type="module">
+import { SPECIES, drawPal } from '../../js/pals/art.js';
+const cols = 10, W = 110, H = 120, rows = Math.ceil(SPECIES.length / cols) * 1; const cv = document.getElementById('c'); const lv = +(new URLSearchParams(location.search).get('lv') || 1); const mode = new URLSearchParams(location.search).get('mode') || 'idle';
+cv.width = cols * W * 2; cv.height = rows * H * 2; const c = cv.getContext('2d'); c.scale(2, 2);
+SPECIES.forEach((s, i) => { const x = (i % cols) * W + W / 2, y = Math.floor(i / cols) * H + H - 22; c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(x - W / 2 + 3, y - H + 25, W - 6, H - 6);
+  drawPal(c, x, y, 70, { species: s.id, level: lv, pattern: 'none', acc: 'none' }, { t: 30, mode, face: 1 }); c.fillStyle = '#fff'; c.font = '11px sans-serif'; c.textAlign = 'center'; c.fillText(s.name, x, y + 16); });
+window.done = true;
+</script></body>
