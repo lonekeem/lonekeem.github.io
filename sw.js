@@ -1,4 +1,4 @@
-const CACHE = 'lks-v1';
+const CACHE = 'lks-v2';
 const CORE = ['./', 'index.html', 'logo.png', 'icon-192.png', 'icon-512.png', 'favicon.ico'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
