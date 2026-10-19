@@ -213,6 +213,19 @@ export function createSearch(ctx) {
   }
 
   // ------------------------------------------------------------ full-screen search page
+  // Apple Music results via the free iTunes Search API (no key): clean versions only, kid-safe text filter.
+  const appleCache = new Map();
+  async function appleSearch(q, n) {
+    const k = q.toLowerCase() + '|' + n; if (appleCache.has(k)) return appleCache.get(k);
+    let out = [];
+    try {
+      const u = `https://itunes.apple.com/search?term=${encodeURIComponent(q.replace(/^[#@]+/, ''))}&media=music&entity=song&limit=${Math.min(50, n * 2)}&explicit=No&country=US`;
+      const d = await (await fetch(u)).json();
+      out = (d.results || []).filter((t) => t.previewUrl && t.trackViewUrl && t.trackExplicitness !== 'explicit' && t.collectionExplicitness !== 'explicit' && !blockedQuery(`${t.trackName} ${t.artistName} ${t.collectionName || ''}`))
+        .slice(0, n).map((t) => ({ title: t.trackName, artist: t.artistName, art: (t.artworkUrl100 || '').replace('100x100', '120x120'), preview: t.previewUrl, url: t.trackViewUrl }));
+    } catch { /* offline or blocked */ }
+    appleCache.set(k, out); return out;
+  }
   async function render(qs, token) {
     const params = new URLSearchParams(qs || '');
     let q = params.get('q') || '';
@@ -305,7 +318,20 @@ export function createSearch(ctx) {
       else if (tab === 'pals') html = r.pals.length ? cat(r.pals) : none('Pals');
       else if (tab === 'games') html = r.games.length ? cat(r.games) : none('games');
       else if (tab === 'hashtags') html = r.tags.length ? tagRows(r.tags) : none('hashtags');
+      if ((tab === 'top' || tab === 'music') && !r.isTag) html += `<section class="ssec" id="s-apple"><div class="row"><h2>Apple Music previews</h2></div><div class="apple-row"><div class="spinner sm"></div></div></section>`;
       res.innerHTML = html;
+      if (res.querySelector('#s-apple')) appleSearch(r.q, tab === 'music' ? 20 : 6).then((list) => {
+        const box = res.querySelector('#s-apple .apple-row'); if (!box || !last || last.q !== r.q) return;
+        if (!list.length) { res.querySelector('#s-apple').remove(); return; }
+        box.innerHTML = list.map((t) => `<div class="apple-item"><img src="${esc(t.art)}" alt="" loading="lazy"><div class="am"><b>${esc(t.title)}</b><small>${esc(t.artist)} · 30-second preview</small>
+          <audio controls preload="none" src="${esc(t.preview)}" data-apple-preview></audio></div><a class="am-open" href="${esc(t.url)}" target="_blank" rel="noopener">Open in Apple Music ↗</a></div>`).join('') + '<p class="mx-credit">Previews provided courtesy of Apple Music (iTunes Search).</p>';
+        box.querySelectorAll('audio').forEach((a) => {
+          a.addEventListener('play', () => { box.querySelectorAll('audio').forEach((o) => o !== a && o.pause()); dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'apple-preview' } })); dispatchEvent(new CustomEvent('kemy:music', { detail: { source: 'apple-preview', state: 'play' } })); });
+          a.addEventListener('pause', () => { dispatchEvent(new CustomEvent('kemy:media-stop', { detail: { source: 'apple-preview' } })); dispatchEvent(new CustomEvent('kemy:music', { detail: { source: 'apple-preview', state: 'stop' } })); });
+        });
+        const off = (e) => { if (e.detail?.source !== 'apple-preview') box.querySelectorAll('audio').forEach((o) => o.pause()); };
+        addEventListener('kemy:media-play', off); S.unsubs.push(() => removeEventListener('kemy:media-play', off));
+      });
       const tb = $('#s-texts', res);
       if (tb) G.posts.slice(0, 5).forEach((p) => tb.appendChild(postCard(p)));
       fillFollowerCounts(res);

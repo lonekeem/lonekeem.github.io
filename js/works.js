@@ -1,6 +1,7 @@
 // Kemy community Movies + Songs. Stored as posts (type 'movie' | 'song') with a validated `work`
 // map, so stars, comments + replies, saves, views/plays, reports, search, feeds, profiles and
 // account deletion all reuse the post system. Uploads go straight to Cloudinary (unsigned presets).
+import { musicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
 import { createSeries } from './series.js';
@@ -125,10 +126,12 @@ export function createWorks(ctx) {
       <form class="card pad wform" id="wform" novalidate>
         <fieldset class="wsrc"><legend>Source</legend>
           <label><input type="radio" name="src" value="youtube" ${isSong ? '' : 'checked'}> <span><b>YouTube link</b><small>${isSong ? 'Any length' : 'Recommended for full-length films · any length'}</small></span></label>
+          ${isSong ? `<label><input type="radio" name="src" value="mlink"> <span><b>Apple Music or Spotify link</b><small>Plays with the official player · we don’t copy the song</small></span></label>` : ''}
           <label><input type="radio" name="src" value="upload" ${isSong ? 'checked' : ''}> <span><b>${isSong ? 'Upload a file' : 'Made it in another app? Upload it here'}</b><small>${isSong ? 'MP3, M4A/AAC, WAV or OGG · up to 10 min / 100 MB' : 'From CapCut, InShot, your gallery or any editor · MP4, MOV or WebM · up to 10 min / 100 MB'}</small></span></label>
         </fieldset>
         <div class="field" data-src="youtube"><label for="w-yt">YouTube link</label><input id="w-yt" type="text" inputmode="url" placeholder="https://youtube.com/watch?v=…" autocomplete="off"></div>
         <div class="field" data-src="youtube"><label for="w-rt">Runtime (minutes)</label><input id="w-rt" type="number" min="0" max="1440" step="1" placeholder="e.g. ${isSong ? '3' : '12'}"></div>
+        ${isSong ? `<div class="field" data-src="mlink"><label for="w-ml">Apple Music or Spotify link</label><input id="w-ml" type="text" inputmode="url" placeholder="https://music.apple.com/… or https://open.spotify.com/…" autocomplete="off"></div>` : ''}
         <div class="field" data-src="upload"><label for="w-file">${isSong ? 'Audio file' : 'Movie file'}</label><input id="w-file" type="file" accept="${isSong ? 'audio/*,.mp3,.m4a,.aac,.wav,.ogg' : 'video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm'}"><p class="small muted" id="w-fileinfo"></p></div>
         <div class="field"><div class="row"><label for="w-title">Title</label><span class="spacer"></span><span class="small muted counter" id="w-title-n"></span></div><input id="w-title" type="text" maxlength="80" required></div>
         ${isSong ? `<div class="field"><label for="w-artist">Artist name</label><input id="w-artist" type="text" maxlength="50" value="${esc(S.profile.displayName)}"></div>` : ''}
@@ -189,6 +192,23 @@ export function createWorks(ctx) {
       if (!title) { err.textContent = 'Add a title.'; return; }
       if (!$('#w-rights').checked) { err.textContent = 'Please confirm you made this or have the rights to share it.'; return; }
       let yt = '', runtime = 0, file = null;
+      if (src() === 'mlink') {
+        const raw = $('#w-ml').value.trim(); const me = musicEmbed(raw);
+        if (!me) { err.textContent = 'Paste an Apple Music or Spotify song, album or playlist link.'; return; }
+        const go = $('#w-go'); go.disabled = true;
+        try {
+          const { authorId, author } = await postAuthor(false);
+          const artist = ($('#w-artist').value.trim() || author.displayName).slice(0, 50);
+          const text = `🎵 ${title.slice(0, 80)} — ${artist}${desc ? '\n' + desc.slice(0, 800) : ''}\n${me.url}`;
+          const ref = doc(collection(db, 'posts')); const b = writeBatch(db);
+          b.set(ref, { authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color, type: 'text', text, linkUrl: '', mediaUrl: '', mediaType: '', poster: '',
+            cat: 'music', ...searchFields({ text: [title, desc, genre, artist].join(' '), authorName: author.displayName, authorUsername: author.username }),
+            createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false });
+          b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
+          await b.commit(); toast('Song shared!'); location.hash = '#/post/' + ref.id;
+        } catch (e) { go.disabled = false; err.textContent = e && e.code === 'permission-denied' ? 'You can post once every 20 seconds. Wait a moment and try again.' : friendlyError(e); }
+        return;
+      }
       if (src() === 'youtube') {
         yt = ytIdFrom($('#w-yt').value); if (!yt) { err.textContent = 'Paste a valid YouTube link.'; return; }
         runtime = Math.max(0, Math.min(1440, Math.round(Number($('#w-rt').value) || 0))) * 60;

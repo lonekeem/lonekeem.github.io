@@ -1,6 +1,8 @@
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetectWifi } from './autoplay.js';
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
+import { mountGameMusic, hideGameMusic } from './gamemusic.js';
+import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
 import { createComposer } from './create.js';
@@ -319,8 +321,17 @@ function mediaHtml(p) {
     if (tt) return `<div class="post-media"><div class="embed tall"><iframe src="https://www.tiktok.com/embed/v2/${esc(tt)}" title="TikTok video" loading="lazy" allowfullscreen allow="encrypted-media"></iframe></div></div>`;
     return `<a class="link-card" href="${esc(p.linkUrl)}" target="_blank" rel="noopener nofollow ugc">${esc(p.linkUrl)}</a>`;
   }
+  // Apple Music / Spotify link in the text: tap to load the official player (opening it counts as a play).
+  const mx = findMusicLink(p.text);
+  if (mx) return `<div class="post-media post-mx" data-mx="${esc(mx.url)}"><button type="button" class="btn btn-sm mx-open">▶ Play on ${mx.service === 'apple' ? 'Apple Music' : 'Spotify'}</button><p class="mx-credit">${mx.service === 'apple' ? 'Apple Music' : 'Spotify'} ${esc(mx.kind)} · official player</p></div>`;
   return '';
 }
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.post-mx .mx-open'); if (!b) return;
+  const box = b.closest('.post-mx'); const m = musicEmbed(box.dataset.mx); if (!m) return;
+  e.preventDefault(); e.stopPropagation(); box._mx = mountMusicEmbed(box, m, { source: m.service === 'apple' ? 'apple-music' : 'spotify' });
+  S.unsubs.push(() => { try { box._mx?.destroy(); } catch { /* */ } });
+});
 
 // ---------------------------------------------------------------- post card
 function postCard(p, { detail = false } = {}) {
@@ -582,6 +593,16 @@ const routes = [
   [/^#\/onboard$/, pageOnboard, 'me']
 ];
 let routeToken = 0, navCount = 0;
+// In-game music player: shown on every game screen (#/games…, #/game/…, Pal games), hidden elsewhere.
+const kemySongsForGames = async () => {
+  const snap = await getDocs(query(collection(db, 'posts'), where('type', '==', 'song'), orderBy('createdAt', 'desc'), limit(25)));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.mediaUrl && !(p.work && p.work.explicit) && !S.blocked.has(p.authorId))
+    .map((p) => ({ title: (p.work && p.work.title) || 'Song', artist: (p.work && p.work.artist) || p.authorName || 'Kemy', url: p.mediaUrl }));
+};
+function gameMusicFor(hash) {
+  if (/^#\/games?(\/|\?|$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
+  else hideGameMusic();
+}
 async function route() {
   navCount++;
   if (!S.ready) return;
@@ -598,6 +619,7 @@ async function route() {
       document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
       document.body.classList.remove('live-mode');
       window.scrollTo(0, 0);
+      gameMusicFor(hash);
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
       if (token === routeToken && S.profile && S.profile.welcomed === false && !/onboard|login|signup/.test(hash)) showWelcome();

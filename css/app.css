@@ -1522,3 +1522,8 @@ body.kb-open .theme-fab { display: none; }
 .theme-seg span { display: inline-block; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); cursor: pointer; font-weight: 500; }
 .theme-seg input:checked + span { background: linear-gradient(135deg, var(--purple), #6a3df0); color: #fff; border-color: transparent; }
 .theme-seg input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
+.mx-embed iframe { width: 100%; border: 0; border-radius: 12px; overflow: hidden; background: transparent; display: block; }
+.mx-credit { font-size: 12px; opacity: .8; margin: 4px 0 8px; } .mx-credit a { color: inherit; text-decoration: underline; }
+.apple-row { display: grid; gap: 8px; } .apple-item { display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.05); border-radius: 12px; padding: 8px; }
+.apple-item img { width: 56px; height: 56px; border-radius: 8px; flex: none; } .apple-item .am { min-width: 0; flex: 1; } .apple-item b, .apple-item small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.apple-item audio { width: 100%; height: 32px; margin-top: 4px; } .apple-item a.am-open { font-size: 12px; white-space: nowrap; }

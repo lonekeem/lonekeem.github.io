@@ -1,0 +1,148 @@
+{
+ "_readme": "In-game music. Every track here is CC0 (public domain dedication): free for commercial use, no attribution required (credited anyway). Files are self-hosted in assets/audio/game/ (AAC 72 kbps). Do not add copyrighted songs.",
+ "defaultVolume": 0.35,
+ "stations": [
+  {
+   "id": "chill",
+   "name": "Chill",
+   "emoji": "🌙",
+   "tracks": [
+    {
+     "file": "assets/audio/game/chill-synthwave-4k.m4a",
+     "title": "Calm Ambient 1 (Synthwave 4k)",
+     "artist": "cynicmusic",
+     "duration": 157.9,
+     "source": "https://opengameart.org/content/calm-ambient-1-synthwave-4k",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/chill-another-august.m4a",
+     "title": "Another August",
+     "artist": "cynicmusic",
+     "duration": 206.6,
+     "source": "https://opengameart.org/content/another-august",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/chill-ambient-loop.m4a",
+     "title": "Ambient Relaxing Loop",
+     "artist": "isaiah658",
+     "duration": 24.5,
+     "source": "https://opengameart.org/content/ambient-relaxing-loop",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    }
+   ]
+  },
+  {
+   "id": "hype",
+   "name": "Hype",
+   "emoji": "⚡",
+   "tracks": [
+    {
+     "file": "assets/audio/game/hype-level-1.m4a",
+     "title": "Level 1 (5 Chiptunes - Action)",
+     "artist": "Juhani Junkala",
+     "duration": 80.4,
+     "source": "https://opengameart.org/content/5-chiptunes-action",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/hype-level-2.m4a",
+     "title": "Level 2 (5 Chiptunes - Action)",
+     "artist": "Juhani Junkala",
+     "duration": 80.4,
+     "source": "https://opengameart.org/content/5-chiptunes-action",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/hype-level-3.m4a",
+     "title": "Level 3 (5 Chiptunes - Action)",
+     "artist": "Juhani Junkala",
+     "duration": 91.1,
+     "source": "https://opengameart.org/content/5-chiptunes-action",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    }
+   ]
+  },
+  {
+   "id": "lofi",
+   "name": "Lo-fi",
+   "emoji": "🎧",
+   "tracks": [
+    {
+     "file": "assets/audio/game/lofi-chill-lofi.m4a",
+     "title": "Chill Lofi Inspired",
+     "artist": "omfgdude",
+     "duration": 123.2,
+     "source": "https://opengameart.org/content/chill-lofi-inspired",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/lofi-apple-cider.m4a",
+     "title": "Apple Cider",
+     "artist": "Zane Little Music",
+     "duration": 199.9,
+     "source": "https://opengameart.org/content/apple-cider",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/lofi-8bit-bossa.m4a",
+     "title": "8-bit Bossa Nova",
+     "artist": "Joth",
+     "duration": 59.6,
+     "source": "https://opengameart.org/content/bossa-nova",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    }
+   ]
+  },
+  {
+   "id": "adventure",
+   "name": "Adventure",
+   "emoji": "🗺️",
+   "tracks": [
+    {
+     "file": "assets/audio/game/adv-stage-1.m4a",
+     "title": "Stage 1 (Chiptune Adventures)",
+     "artist": "Juhani Junkala",
+     "duration": 41.1,
+     "source": "https://opengameart.org/content/4-chiptunes-adventure",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/adv-stage-2.m4a",
+     "title": "Stage 2 (Chiptune Adventures)",
+     "artist": "Juhani Junkala",
+     "duration": 56.1,
+     "source": "https://opengameart.org/content/4-chiptunes-adventure",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+     "file": "assets/audio/game/adv-stage-select.m4a",
+     "title": "Stage Select (Chiptune Adventures)",
+     "artist": "Juhani Junkala",
+     "duration": 21.3,
+     "source": "https://opengameart.org/content/4-chiptunes-adventure",
+     "license": "CC0 1.0 (public domain dedication)",
+     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    }
+   ]
+  }
+ ],
+ "kemy": {
+  "id": "kemy",
+  "name": "Kemy",
+  "emoji": "⭐",
+  "note": "Kemy on Screen by Keem (theme, skipped when the theme is set to Off) + Kemy community songs."
+ }
+}

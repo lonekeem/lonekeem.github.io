@@ -79,6 +79,8 @@
 <p><a href="app.html#/games" style="color:#e2d0ff">More free games in Kemy</a>: Star Pool, Chess, Ludo, Checkers and more.</p>
 </section></main>
 <script type="module">
+import { mountGameMusic } from './js/gamemusic.js'; mountGameMusic({ corner: 'top-right' }).catch(() => {});
+
 import { boot } from './js/games/kemy-quest/main.js?v=2';
 boot(document.getElementById('kq')).catch((e) => { console.error(e); document.getElementById('kq').textContent = 'Could not start the game. Please reload.'; });
 </script>
