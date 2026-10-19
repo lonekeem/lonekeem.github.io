@@ -56,23 +56,39 @@ for (let i = 0; i < 9 && !(await A.p.$('.pal-glow')); i++) { await A.p.click('[d
 const glow = await A.p.$('.pal-glow'); if (glow) { await A.p.waitForTimeout(1800); await A.p.screenshot({ path: shot + 'glowup.png' }); }
 ok('evolution (glow up) via test XP grant', !!glow);
 const pet2 = await (await fetch(`${FS}/users/${A.uid}/pets/p1`)).json(); ok('level stored', +pet2.fields.level.integerValue >= 5, 'level ' + pet2.fields.level.integerValue);
-// visitor pat
+// gallery + mystery/species count
+await A.p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/pals/gallery'; }); await A.p.waitForSelector('.pal-gal'); await A.p.waitForTimeout(1200);
+const gc = await A.p.textContent('.pal-count'); ok('Pal Gallery with collected count', /1\/30/.test(gc), gc); await A.p.screenshot({ path: shot + 'gallery.png', fullPage: false });
+// pop-up test
+await A.p.evaluate(() => { location.hash = '#/pals'; }); await A.p.waitForSelector('#pal-poptest'); await A.p.click('#pal-poptest'); await A.p.waitForSelector('.pal-pop', { timeout: 8000 }); await A.p.waitForTimeout(900);
+await A.p.screenshot({ path: shot + 'popup.png' }); await A.p.click('.pal-pop'); await A.p.waitForTimeout(900); ok('scroll pop-up shows and poofs away on tap', !(await A.p.$('.pal-pop')));
+// A goes live (YouTube big live) -> Pal overlay
+await A.p.evaluate(() => { location.hash = '#/live/new'; }); await A.p.waitForSelector('[data-mode=yt]', { timeout: 15000 }); await A.p.click('[data-mode=yt]');
+await A.p.fill('#lv-yt', 'https://youtu.be/jNQXAC9IVRw'); await A.p.click('#lv-yt-start');
+let liveId = null; try { await A.p.waitForSelector('.pal-live canvas', { timeout: 20000 }); liveId = (await A.p.evaluate(() => location.hash)).split('/').pop(); await A.p.waitForTimeout(1500); await A.p.screenshot({ path: shot + 'live-host.png' }); } catch {}
+ok('host Pal appears on the live screen', !!liveId, liveId || '');
+// visitor B: hatch own Pal, then visit A's profile
 const B = await account('b');
-await B.p.waitForTimeout(500); if (await B.p.$('#pal-skip')) await B.p.click('#pal-skip');
+await B.p.waitForSelector('#pal-crack', { timeout: 15000 }).catch(() => {}); await B.p.evaluate(() => { location.hash = '#/me'; }); await B.p.waitForSelector('#pal-crack', { timeout: 15000 });
+for (let i = 0; i < 3; i++) { await B.p.click('#pal-crack'); await B.p.waitForTimeout(250); }
+await B.p.waitForSelector('#pal-form'); await B.p.click('[data-species="elephant"]'); await B.p.fill('#pal-name', 'Toots'); await B.p.click('#pal-form [type=submit]'); await B.p.waitForTimeout(2500);
+if (liveId) { await B.p.evaluate((id) => { location.hash = '#/live/' + id; }, liveId); const seen = await B.p.waitForSelector('.pal-live canvas', { timeout: 20000 }).then(() => true).catch(() => false); ok('viewers see the host Pal on the live', seen); if (seen) { await B.p.waitForTimeout(1200); await B.p.screenshot({ path: shot + 'live-viewer.png' }); } }
 await B.p.evaluate((u) => { location.hash = '#/u/' + u; }, A.user); await B.p.waitForSelector('.pal-strip [data-pa=pat]', { timeout: 15000 });
-await B.p.waitForTimeout(2500); if (await B.p.$('#pal-skip')) { await B.p.click('#pal-skip'); ok('existing visitor sees the one-time Pals card and can skip it', true); }
+await B.p.waitForTimeout(1500); if (await B.p.$('#pal-skip')) await B.p.click('#pal-skip');
 await B.p.click('[data-pa=pat]'); await B.p.waitForTimeout(2500);
 const pats = await B.p.textContent('.pal-pats b'); ok('visitor pat counted', pats === '1', 'pats=' + pats);
 await B.p.click('[data-pa=pat]'); await B.p.waitForTimeout(2000);
 const pats2 = (await (await fetch(`${FS}/users/${A.uid}/pets/p1`)).json()).fields.pats.integerValue; ok('second pat same day is refused', pats2 === '1', 'pats=' + pats2);
-await B.p.screenshot({ path: shot + 'visitor.png' });
-// delete both accounts
-async function del(X) {
-  await X.p.evaluate(() => { location.hash = '#/settings'; }); await X.p.waitForSelector('#s-delete', { timeout: 15000 }); await X.p.click('#s-delete');
-  await X.p.fill('#del-confirm', 'DELETE'); await X.p.fill('#del-pass', pass); await X.p.click('#del-go'); await X.p.waitForURL(/index\.html/, { timeout: 60000 });
-}
-await del(B); await del(A);
-const left = await (await fetch(`${FS}/users/${A.uid}/pets`)).json(); const leftP = await (await fetch(`${FS}/users/${A.uid}/pets/p1/pats`)).json();
-ok('account deletion removed pets and pats', !left.documents && !leftP.documents, JSON.stringify(left).slice(0, 120));
+await B.p.click('[data-pa=bring]'); await B.p.waitForTimeout(3500); await B.p.screenshot({ path: shot + 'playdate.png' });
+await B.p.waitForTimeout(3500);
+const pd = await (await fetch(`${FS}/users/${A.uid}/pets/p1/playdates/${B.uid}`)).json(); ok('play date recorded (once per pair per day)', !!pd.fields, pd.fields ? pd.fields.pet.stringValue : JSON.stringify(pd).slice(0, 100));
+const notes = await A.p.evaluate(async (uid) => { const fs = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js'); const { db } = await import('/js/firebase-init.js'); const s = await fs.getDocs(fs.collection(db, 'users', uid, 'notifications')); return s.docs.map((d) => d.data().type); }, A.uid);
+ok('owner notified of pat and play date', notes.includes('pal_pat') && notes.includes('pal_play'), notes.join(','));
+await A.ctx.close(); await B.ctx.close();
+// delete both accounts (desktop viewport; uses the app's own delete flow)
+const { execFileSync } = await import('node:child_process');
+const out = execFileSync('node', [new URL('./cleanup.mjs', import.meta.url).pathname, base], { env: process.env }).toString(); console.log(out.trim());
+const left = await (await fetch(`${FS}/users/${A.uid}/pets`)).json(); const leftP = await (await fetch(`${FS}/users/${A.uid}/pets/p1/pats`)).json(); const leftD = await (await fetch(`${FS}/users/${A.uid}/pets/p1/playdates`)).json();
+ok('account deletion removed pets, pats and play dates', !left.documents && !leftP.documents && !leftD.documents);
 ok('no console errors', errors.length === 0, errors.slice(0, 4).join(' | '));
 await browser.close(); console.log(R.every(Boolean) ? `ALL ${R.length} PASSED` : `${R.filter((x) => !x).length} FAILED`);
