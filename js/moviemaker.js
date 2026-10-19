@@ -7,7 +7,7 @@
 // Free Pollinations calls are rate limited per IP (≈1 image / 45 s, 1 text / 30 s); a queue waits for
 // Retry-After and retries. See docs/ai-movie-maker.md.
 import * as AN from './animator.js';
-import { THEME_SRC, THEME_TITLE, STAND_UP_STRONG_SRC } from './theme.js';
+import { THEME_SRC, THEME_TITLE, THEME_ARTIST } from './theme.js';
 const TEXT_API = 'https://text.pollinations.ai/openai';
 const IMG_API = 'https://image.pollinations.ai/prompt/';
 const W = 1280, H = 720, FPS = 30;
@@ -18,7 +18,7 @@ export const STYLES = {
   comic: { name: 'Comic', genre: 'Action', prompt: 'comic book panel art, halftone dots, bold ink lines, dynamic composition, vivid colors' },
   claymation: { name: 'Claymation', genre: 'Animation', prompt: 'claymation stop motion still, handmade plasticine characters, soft studio lighting, miniature set' }
 };
-const MOODS = { theme: `Kemy theme: ${THEME_TITLE} (Lone Keem)`, sus: 'Stand Up Strong (Instrumental) · Lone Keem', upbeat: 'Upbeat', calm: 'Calm', epic: 'Epic', spooky: 'Spooky', none: 'No music' };
+const MOODS = { theme: `Kemy theme: ${THEME_TITLE} (${THEME_ARTIST})`, upbeat: 'Upbeat', calm: 'Calm', epic: 'Epic', spooky: 'Spooky', none: 'No music' };
 
 // ---------------------------------------------------------------- safety
 const BLOCK = [
@@ -165,7 +165,7 @@ function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = 
 function wrap(g, text, maxW) { const words = String(text).split(/\s+/); const lines = []; let cur = ''; for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur); return lines; }
 
 // ---------------------------------------------------------------- music
-// Kemy's theme song (default): "Stand Up Strong" (Instrumental), written by Lone Keem. Loops to fit the movie.
+// Kemy's theme song (default): see THEME_TITLE in theme.js. Loops to fit the movie.
 const themeBufs = {};
 function themeMusic(ac, dest, seconds, url = THEME_SRC) {
   const out = ac.createGain(); out.gain.value = 0.0001; out.connect(dest);
@@ -188,7 +188,7 @@ const ROOT = { upbeat: 60, calm: 57, epic: 50, spooky: 52 }, BPM = { upbeat: 112
 export function startMusic(ac, dest, mood, seconds) {
   if (mood === 'none') return () => {};
   if (mood === 'theme') return themeMusic(ac, dest, seconds);
-  if (mood === 'sus') return themeMusic(ac, dest, seconds, STAND_UP_STRONG_SRC);
+  if (mood === 'sus') return themeMusic(ac, dest, seconds); // old saved projects: Stand Up Strong was removed
   const out = ac.createGain(); out.gain.value = 0.0001; out.connect(dest);
   const t0 = ac.currentTime + 0.05; out.gain.exponentialRampToValueAtTime(0.32, t0 + 1.5); out.gain.setValueAtTime(0.32, t0 + Math.max(2, seconds - 2.5)); out.gain.exponentialRampToValueAtTime(0.0001, t0 + seconds);
   const beat = 60 / BPM[mood], bar = beat * 4, nodes = [];

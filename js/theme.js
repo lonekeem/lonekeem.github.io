@@ -3,11 +3,11 @@
 // iPhone (iOS ignores audio.volume), fades in/out over ~1.5 s, never plays over videos, lives, songs, Movie Maker
 // previews or games (kemy:media-play / any other unmuted media stops it), pauses while the tab is hidden.
 // The user picks Play / Mute / Off (one-time prompt, floating 🎵 button, Settings > Sound); stored on this device.
-export const THEME_FILE = 'kemy-theme.mp3'; // currently "Stand Up Strong" (Instrumental)
-export const THEME_TITLE = 'Stand Up Strong (Instrumental)';
-export const THEME_CREDIT = `Theme song: ${THEME_TITLE} — Lone Keem`;
+export const THEME_FILE = 'kemy-theme.m4a'; // "Kemy on Screen" by Keem, the original Suno song file, unchanged (AAC, 124.8 s)
+export const THEME_TITLE = 'Kemy on Screen';
+export const THEME_ARTIST = 'Keem';
+export const THEME_CREDIT = `Theme song: ${THEME_TITLE} by ${THEME_ARTIST} — Lone Keem Studios`;
 export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
-export const STAND_UP_STRONG_SRC = new URL('../assets/audio/stand-up-strong-instrumental.mp3', import.meta.url).href;
 
 const MODE = 'kemy-theme-mode', VOLK = 'kemy-theme-vol', OLD = 'kemy-theme-bgm';
 export const DEFAULT_VOL = 0.2, FADE = 1.5;
@@ -68,7 +68,7 @@ export const silence = () => stop(0.25);
 // Welcome screen / egg hatch: play the full song from the start (asks first if never asked).
 export function playIntro() { const m = getMode(); if (m === '') { ask(); return Promise.resolve(false); } return m === 'play' ? play({ fromStart: true }) : Promise.resolve(false); }
 export const playShort = playIntro;
-export function gainInfo() { return { webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume() }; }
+export function gainInfo() { return { webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume(), duration: el ? el.duration : null, src: el ? el.currentSrc : null }; }
 
 // ---- UI: floating button + first-run prompt ----
 let fab = null;

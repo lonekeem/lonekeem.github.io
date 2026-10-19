@@ -73,7 +73,7 @@ export const PAGES = [
   { id: 'movies', name: 'Community Movies', href: '#/explore/movies', kw: 'movies films series episodes', kind: 'page', cat: 'movies', emoji: '🎞️' },
   { id: 'songs', name: 'Community Songs', href: '#/explore/songs', kw: 'songs music tracks', kind: 'page', cat: 'music', emoji: '🎶' },
   { id: 'live', name: 'Go live', href: '#/live/new', kw: 'live stream broadcast', kind: 'page', cat: 'other', emoji: '🔴' },
-  { id: 'theme', name: 'Kemy’s theme: Stand Up Strong', href: '#/settings', kw: 'stand up strong theme song lone keem instrumental', kind: 'page', cat: 'music', emoji: '🎵' }
+  { id: 'theme', name: 'Kemy’s theme: Kemy on Screen', href: '#/settings', kw: 'kemy on screen theme song keem lone keem music', kind: 'page', cat: 'music', emoji: '🎵' }
 ];
 // Pals come from js/pals/species.js (lazy, so search doesn't load the Pals art up front).
 let palCache = null;

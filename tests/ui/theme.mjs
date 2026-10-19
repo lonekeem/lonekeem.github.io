@@ -29,6 +29,7 @@ for (const [tag, dev] of [['a', 'iPhone 13'], ['b', 'Pixel 7']]) {
   await X.p.click('#theme-ask [data-m=play]'); await X.p.waitForTimeout(200);
   const g0 = await T(X); await X.p.waitForTimeout(1700); const g1 = await T(X);
   ok(N('plays through Web Audio gain, fades in to ~20%'), g1.webAudio && g1.playing && g0.gain < 0.15 && Math.abs(g1.gain - 0.2) < 0.02 && g1.elVolume === 1, JSON.stringify({ g0: g0.gain, g1: g1.gain, el: g1.elVolume }));
+  ok(N('theme file is the m4a, duration ~124.8 s'), /kemy-theme\.m4a$/.test(g1.src || '') && Math.abs(g1.duration - 124.8) < 0.3, `${g1.src} ${g1.duration}`);
   await X.p.click('#modal-root [data-close]').catch(() => {}); await X.p.evaluate(() => { location.hash = '#/me'; }); await X.p.waitForTimeout(2500); await X.p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; }); await X.p.waitForTimeout(300);
   const f1 = await fab(X); ok(N('floating button shows 🎵 on profile'), f1 && !f1.hidden && f1.text === '🎵', JSON.stringify(f1));
   if (tag === 'a') await X.p.screenshot({ path: shot + 'button-playing.png' });
