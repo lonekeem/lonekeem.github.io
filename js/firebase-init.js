@@ -17,16 +17,7 @@ export const firebaseConfig = {
 export const ADMIN_EMAIL = 'lillykemoy1@gmail.com';
 export const STUDIO_UID = 'studio';
 
-// Photo / video uploads. Firebase Storage needs the paid Blaze plan, so uploads are OFF for now.
-// To turn them on with a free Cloudinary account: create an *unsigned* upload preset, then set
-//   provider: 'cloudinary', cloudName: '<your cloud name>', uploadPreset: '<your preset name>'
-export const UPLOADS = {
-  provider: 'none', // 'none' | 'cloudinary'
-  cloudName: '',
-  uploadPreset: '',
-  maxImageMB: 10,
-  maxVideoMB: 100
-};
+// Photo / video uploads use Cloudinary (free plan); config lives in js/media-config.js.
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

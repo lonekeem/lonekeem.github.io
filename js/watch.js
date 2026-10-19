@@ -1,8 +1,10 @@
 // Lone Keem Studios - "For You" vertical video feed (TikTok / Reels style).
 // One video per screen, CSS scroll-snap, autoplay-in-view via IntersectionObserver.
-// Every video post in Firestore shows up here automatically: studio posts with an mp4
-// (mediaType 'video'), plus any post with a YouTube or TikTok link (shown as a poster
-// card with a Watch button, because third-party embeds can't autoplay or swipe well).
+// Every video post in Firestore shows up here automatically: studio + community uploads
+// (mediaType 'video', e.g. Cloudinary H.264 MP4 with a so_1 jpg poster), photo posts
+// (mediaType 'image', shown as full-screen image slides), plus any post with a YouTube or
+// TikTok link (shown as a poster card with a Watch button, because third-party embeds can't
+// autoplay or swipe well).
 // All likes / comments / saves / follows go through the shared actions in app.js.
 
 const IC = {
@@ -13,12 +15,14 @@ const IC = {
   play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>',
   muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="m16 9 5 6M21 9l-5 6"/></svg>',
   sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>'
 };
 
 export function createWatch(ctx) {
   const { S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, isAdmin, stale,
-    isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, commentsQuery } = ctx;
+    isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, commentsQuery,
+    blockUser, deletePost, canDeletePost } = ctx;
   const { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot } = ctx.fs;
   let muted = true; // stays the same while scrolling between videos
   let session = null;
@@ -27,6 +31,7 @@ export function createWatch(ctx) {
   const fmt = (n) => { n = Number(n) || 0; return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n); };
   function kindOf(p) {
     if (p.mediaType === 'video' && p.mediaUrl) return 'video';
+    if (p.mediaType === 'image' && p.mediaUrl) return 'image';
     if (p.linkUrl) {
       const yt = youTubeId(p.linkUrl);
       if (yt && /^[\w-]+$/.test(yt)) return 'youtube';
@@ -36,12 +41,13 @@ export function createWatch(ctx) {
   }
   async function loadPosts() {
     const posts = collection(db, 'posts');
-    const [v, l] = await Promise.all([
+    const [v, im, l] = await Promise.all([
       getDocs(query(posts, where('mediaType', '==', 'video'), limit(60))),
+      getDocs(query(posts, where('mediaType', '==', 'image'), limit(60))),
       getDocs(query(posts, where('type', '==', 'link'), limit(60)))
     ]);
     const seen = new Map();
-    [...v.docs, ...l.docs].forEach((d) => seen.set(d.id, { id: d.id, ...d.data() }));
+    [...v.docs, ...im.docs, ...l.docs].forEach((d) => seen.set(d.id, { id: d.id, ...d.data() }));
     return [...seen.values()].filter((p) => kindOf(p) && !S.blocked.has(p.authorId)).sort((a, b) => ms(b) - ms(a));
   }
 
@@ -50,13 +56,17 @@ export function createWatch(ctx) {
     const kind = kindOf(p);
     const mine = S.user && p.authorId === S.user.uid;
     const following = S.following.has(p.authorId);
-    let poster = p.poster || '';
+    let poster = p.poster || p.posterUrl || '';
     if (kind === 'youtube') poster = `https://i.ytimg.com/vi/${youTubeId(p.linkUrl)}/hqdefault.jpg`;
-    const media = kind === 'video'
+    const media = kind === 'image'
+      ? `<img class="vimage" src="${esc(p.mediaUrl)}" alt="${esc(p.text ? p.text.slice(0, 120) : 'Photo by ' + p.authorName)}" ${i > 1 ? 'loading="lazy"' : ''} decoding="async" draggable="false">
+         <div class="vfail" hidden><p>This photo couldn’t load.</p></div>`
+      : kind === 'video'
       ? `<video class="vvideo" playsinline webkit-playsinline loop muted preload="none" disablepictureinpicture controlslist="nodownload noplaybackrate"
            ${poster ? `poster="${esc(poster)}"` : ''} data-src="${esc(p.mediaUrl)}" aria-label="${esc(p.text || 'Video')}" oncontextmenu="return false;"></video>
          <div class="vstate" aria-hidden="true">${IC.play}</div><div class="vspin" aria-hidden="true"></div>
-         <div class="vprogress" aria-hidden="true"><span></span></div>`
+         <div class="vprogress" aria-hidden="true"><span></span></div>
+         <div class="vfail" hidden><p>This video is still processing. It’ll play in a moment…</p></div>`
       : `<div class="vcard">
            ${poster ? `<img class="vthumb" src="${esc(poster)}" alt="" loading="lazy">` : `<div class="vthumb vthumb-tt" aria-hidden="true">TikTok</div>`}
            <button class="btn vwatch" data-a="watch">${IC.play}Watch</button>
@@ -64,7 +74,7 @@ export function createWatch(ctx) {
          </div>
          <div class="vembed" hidden></div>`;
     return `
-      <section class="vslide" data-i="${i}" data-id="${esc(p.id)}" data-kind="${kind}" aria-roledescription="video" aria-label="${esc(p.authorName)}: ${esc((p.text || '').slice(0, 80))}">
+      <section class="vslide" data-i="${i}" data-id="${esc(p.id)}" data-kind="${kind}" aria-roledescription="${kind === 'image' ? 'photo' : 'video'}" aria-label="${esc(p.authorName)}: ${esc((p.text || '').slice(0, 80))}">
         <div class="vbg" ${poster ? `style="background-image:url('${esc(poster)}')"` : ''} aria-hidden="true"></div>
         ${media}
         <div class="vgrad" aria-hidden="true"></div>
@@ -82,6 +92,7 @@ export function createWatch(ctx) {
           <button class="vact" data-a="comment" aria-label="Comments">${IC.comment}<span class="c">${fmt(p.commentCount)}</span></button>
           <button class="vact save" data-a="save" aria-pressed="${S.saved.has(p.id)}" aria-label="Save">${IC.save}<span>${S.saved.has(p.id) ? 'Saved' : 'Save'}</span></button>
           <button class="vact" data-a="share" aria-label="Share">${IC.share}<span>Share</span></button>
+          ${S.user ? `<button class="vact vmore" data-a="menu" aria-label="More options" aria-haspopup="dialog">${IC.more}</button>` : ''}
         </div>
       </section>`;
   }
@@ -98,7 +109,7 @@ export function createWatch(ctx) {
             ${count ? `<button class="btn btn-ghost btn-sm" data-a="replay">Watch again</button>` : ''}
             <a class="btn btn-ghost btn-sm" href="#/feed">Browse posts</a>
           </div>
-          ${count ? `<p class="small muted">${count} video${count === 1 ? '' : 's'} in the feed so far</p>` : ''}
+          ${count ? `<p class="small muted">${count} post${count === 1 ? '' : 's'} in the feed so far</p>` : ''}
         </div>
       </section>`;
   }
@@ -184,6 +195,7 @@ export function createWatch(ctx) {
       const prev = slides[active];
       if (prev) { vid(active)?.pause(); closeEmbed(prev); }
       active = i;
+      wrap.dataset.kind = slides[i].dataset.kind || '';
       // Preload only the current and the next video; free anything far away.
       slides.forEach((sl, j) => {
         const v = sl.querySelector('video'); if (!v) return;
@@ -194,7 +206,7 @@ export function createWatch(ctx) {
         }
       });
       const id = slides[i].dataset.id;
-      if (id) history.replaceState(null, '', '#/watch/' + id);
+      if (id && location.hash.startsWith('#/watch')) history.replaceState(null, '', '#/watch/' + id);
       playActive();
     }
 
@@ -224,6 +236,29 @@ export function createWatch(ctx) {
       });
     });
 
+    // Photos: cover the screen when the shape is close to the screen's, otherwise letterbox.
+    slides.forEach((sl) => {
+      const img = sl.querySelector('.vimage'); if (!img) return;
+      const fit = () => { const r = img.naturalWidth / img.naturalHeight, sr = sl.clientWidth / sl.clientHeight; sl.classList.toggle('fit-cover', Math.abs(r - sr) / sr < 0.2); };
+      if (img.complete && img.naturalWidth) fit(); else img.addEventListener('load', fit);
+      img.addEventListener('error', () => { sl.querySelector('.vfail').hidden = false; });
+    });
+    // Fresh Cloudinary uploads: the eager H.264 version can take a moment; retry a few times.
+    slides.forEach((sl) => {
+      const v = sl.querySelector('video'); if (!v) return;
+      let tries = 0;
+      v.addEventListener('error', () => {
+        if (!v.getAttribute('src') || !/res\.cloudinary\.com/.test(v.dataset.src) || tries >= 6) return;
+        tries++; sl.querySelector('.vfail').hidden = false;
+        setTimeout(() => {
+          if (!v.getAttribute('src')) return;
+          v.src = v.dataset.src + (v.dataset.src.includes('?') ? '&' : '?') + 'r=' + tries; v.load();
+          if (slides[active] === sl) playActive();
+        }, 6000);
+      });
+      v.addEventListener('playing', () => { sl.querySelector('.vfail').hidden = true; });
+    });
+
     // Likes: show the current user's state.
     posts.forEach((p, i) => isLiked(p.id).then((on) => paintLike(slides[i], on)).catch(() => {}));
     function paintLike(sl, on) { const b = sl.querySelector('[data-a=like]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Unlike' : 'Like'); }
@@ -247,6 +282,7 @@ export function createWatch(ctx) {
       if (a === 'share') return share(p);
       if (a === 'comment') return openComments(p, sl);
       if (a === 'watch') return openEmbed(p, sl);
+      if (a === 'menu') return openMenu(p, sl);
       if (a === 'like') {
         if (needAuth(p.id, 'like videos')) return;
         const on = !btn.classList.contains('on'); const n = btn.querySelector('.n');
@@ -299,6 +335,45 @@ export function createWatch(ctx) {
         <div class="vembed-frame ${kind === 'tiktok' || p.linkUrl.includes('/shorts/') ? 'tall' : ''}"><iframe src="${esc(src)}" title="${kind === 'youtube' ? 'YouTube' : 'TikTok'} video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
       box.hidden = false; sl.querySelector('.vcard').hidden = true;
       box.querySelector('.vembed-close').onclick = (e) => { e.stopPropagation(); closeEmbed(sl); };
+    }
+
+    // ---------------------------------------------------------- more menu (copy / report / block / delete)
+    function openMenu(p, sl) {
+      closeSheet();
+      const mine = S.user && p.authorId === S.user.uid;
+      sheetRoot.innerHTML = `
+        <div class="vsheet-backdrop" data-close-sheet></div>
+        <section class="vsheet vmenu" role="dialog" aria-modal="true" aria-label="Post options">
+          <div class="vsheet-grab" aria-hidden="true"></div>
+          <button data-m="copy">Copy link</button>
+          <button data-m="open">Open post page</button>
+          ${S.user && !mine ? '<button data-m="report">Report post</button>' : ''}
+          ${S.user && !mine && p.authorId !== STUDIO_UID ? `<button data-m="block" class="danger">Block @${esc(p.authorUsername)}</button>` : ''}
+          ${canDeletePost(p) ? '<button data-m="delete" class="danger">Delete post</button>' : ''}
+          <button data-close-sheet class="vmenu-cancel">Cancel</button>
+        </section>`;
+      requestAnimationFrame(() => sheetRoot.classList.add('open'));
+      sheetRoot.querySelectorAll('[data-close-sheet]').forEach((b) => (b.onclick = closeSheet));
+      sheetRoot.querySelector('.vmenu').addEventListener('click', async (e) => {
+        const m = e.target.closest('[data-m]')?.dataset.m; if (!m) return;
+        closeSheet();
+        if (m === 'copy') {
+          const url = location.origin + location.pathname + '#/watch/' + p.id;
+          try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { prompt('Copy this link:', url); }
+        }
+        if (m === 'open') location.hash = '#/post/' + p.id;
+        if (m === 'report') reportDialog('post', p.id, p.id, p.text || (p.mediaType ? p.mediaType + ' post' : ''));
+        if (m === 'block') blockUser(p.authorId, p.authorUsername);
+        if (m === 'delete') {
+          if (!confirm('Delete this post? This can’t be undone.')) return;
+          try {
+            await deletePost(p); toast('Post deleted');
+            const v = sl.querySelector('video'); if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+            sl.classList.add('vremoved');
+            sl.innerHTML = '<div class="vend-inner"><h2>Post deleted</h2><p>Swipe for the next one.</p></div>';
+          } catch (err) { toast(friendlyError(err)); }
+        }
+      });
     }
 
     // ---------------------------------------------------------- comment bottom sheet

@@ -1,6 +1,8 @@
 // Lone Keem Studios community app (plain ES modules, no build step).
-import { auth, db, ADMIN_EMAIL, STUDIO_UID, UPLOADS } from './firebase-init.js';
+import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { createWatch } from './watch.js';
+import { createComposer } from './create.js';
+import { deliveryUrls, LIMITS } from './media-config.js';
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   sendPasswordResetEmail, sendEmailVerification, updateProfile, GoogleAuthProvider,
@@ -158,6 +160,12 @@ async function deleteComment(postId, cid) {
   b.update(doc(db, 'posts', postId), { commentCount: increment(-1), lastCommentId: cid });
   await b.commit();
 }
+// Owner or admin. Removes the Firestore doc; the Cloudinary file stays until an admin cleans it
+// up (unsigned browser uploads can't delete; see scripts/cloudinary-setup.mjs notes).
+async function deletePost(p) {
+  await deleteDoc(doc(db, 'posts', p.id));
+}
+const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
 const watchCommentsQuery = (postId) => query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(200));
 
 // ---------------------------------------------------------------- embeds
@@ -172,10 +180,12 @@ function youTubeId(url) {
 }
 const tikTokId = (url) => { const m = String(url).match(/\/video\/(\d{6,})/); return m ? m[1] : null; };
 function mediaHtml(p) {
+  const poster = p.poster || p.posterUrl || '';
+  const dims = Number(p.width) > 0 && Number(p.height) > 0 ? `width="${Number(p.width)}" height="${Number(p.height)}"` : '';
   if (p.mediaUrl && p.mediaType === 'video') {
-    return `<div class="post-media"><video controls playsinline preload="metadata" controlsList="nodownload" ${p.poster ? `poster="${esc(p.poster)}"` : ''} src="${esc(p.mediaUrl)}"></video></div>`;
+    return `<div class="post-media"><video controls playsinline preload="metadata" controlsList="nodownload" ${dims} ${poster ? `poster="${esc(poster)}"` : ''} src="${esc(p.mediaUrl)}"></video></div>`;
   }
-  if (p.mediaUrl && p.mediaType === 'image') return `<div class="post-media"><img src="${esc(p.mediaUrl)}" alt="Photo posted by ${esc(p.authorName)}" loading="lazy"></div>`;
+  if (p.mediaUrl && p.mediaType === 'image') return `<div class="post-media"><img src="${esc(p.mediaUrl)}" ${dims} alt="Photo posted by ${esc(p.authorName)}" loading="lazy"></div>`;
   if (p.linkUrl) {
     const yt = youTubeId(p.linkUrl);
     if (yt && /^[\w-]+$/.test(yt)) {
@@ -260,7 +270,7 @@ function postCard(p, { detail = false } = {}) {
     if (a === 'block') blockUser(p.authorId, p.authorUsername);
     if (a === 'delete') {
       if (!confirm('Delete this post? This can’t be undone.')) return;
-      try { await deleteDoc(doc(db, 'posts', p.id)); el.remove(); toast('Post deleted'); if (detail) location.hash = '#/feed'; }
+      try { await deletePost(p); el.remove(); toast('Post deleted'); if (detail) location.hash = '#/feed'; }
       catch (e) { toast(friendlyError(e)); }
     }
   };
@@ -377,7 +387,7 @@ const routes = [
   [/^#\/watch(?:\/([\w-]+))?$/, pageWatch, 'watch'],
   [/^#\/feed$/, pageFeed, 'feed'],
   [/^#\/explore$/, pageExplore, 'explore'],
-  [/^#\/new$/, pageCompose, 'new'],
+  [/^#\/new(?:\/(text))?$/, pageCompose, 'new'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
   [/^#\/me$/, pageMe, 'me'],
@@ -423,7 +433,7 @@ const stale = (t) => t !== routeToken;
 const watch = createWatch({
   S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, closeModal, isAdmin, stale,
   isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId,
-  commentsQuery: watchCommentsQuery,
+  blockUser, deletePost, canDeletePost, commentsQuery: watchCommentsQuery,
   fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot }
 });
 async function pageWatch(postId, token) { return watch.render(postId, token); }
@@ -489,29 +499,34 @@ async function searchUsers(q) {
 }
 const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${avatar(u, '', false)}<div class="meta"><b>${esc(u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${u.bio ? ' · ' + esc(u.bio) : ''}</p></div></a>`;
 
-// ---------------------------------------------------------------- compose
-async function pageCompose() {
+// ---------------------------------------------------------------- compose (Post tab)
+// Camera / photo / library flow lives in js/create.js; the text + link form stays here.
+const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost });
+async function pageCompose(sub, token) {
   if (!requireAuth()) return;
-  const uploadsOn = UPLOADS.provider === 'cloudinary' && UPLOADS.cloudName && UPLOADS.uploadPreset;
-  main.innerHTML = `
-    <h1 class="page-title">New post</h1>
-    <form id="compose" class="card pad">
-      ${isAdmin() ? `<label class="check" style="margin-bottom:14px"><input type="checkbox" id="as-studio"> <span>Post as <b>Lone Keem Studios</b> (official studio post)</span></label>` : ''}
-      <div class="field"><label for="post-text">What do you want to share?</label>
-        <textarea id="post-text" maxlength="2000" placeholder="Share an idea, a creation, or what you thought of the latest drop…"></textarea>
-        <div class="small muted" style="text-align:right"><span id="count">0</span>/2000</div></div>
-      <div class="field"><label for="post-link">YouTube or TikTok link <span class="muted">(optional)</span></label>
-        <input id="post-link" type="url" inputmode="url" placeholder="https://youtube.com/watch?v=…"></div>
-      <div class="field">
-        <label>Photo or video</label>
-        ${uploadsOn
-          ? `<input id="post-file" type="file" accept="image/*,video/*"><p class="small muted">Images up to ${UPLOADS.maxImageMB} MB, videos up to ${UPLOADS.maxVideoMB} MB.</p>`
-          : `<div class="notice">${ICON.upload}<div><b style="color:var(--text)">Uploads are coming soon</b><br>Photo and video uploads aren’t switched on yet. For now, post text or share a YouTube or TikTok link.</div></div>`}
-      </div>
-      <p class="small muted">By posting you agree to the <a href="guidelines.html">Community Guidelines</a>. Only share things you made or have the right to share.</p>
-      <p class="form-error" id="compose-err"></p>
-      <button class="btn btn-block" type="submit" id="compose-btn">Post</button>
-    </form>`;
+  composer.render(token, { textForm: (slot) => textComposeForm(slot, sub === 'text') });
+}
+async function postAuthor(asStudio) {
+  const authorId = asStudio ? STUDIO_UID : S.user.uid;
+  profileCache.delete(STUDIO_UID);
+  return { authorId, author: asStudio ? await getProfile(STUDIO_UID) : S.profile };
+}
+function textComposeForm(slot, open) {
+  slot.innerHTML = `
+    <details class="card pad text-compose" id="text-compose" ${open ? 'open' : ''}>
+      <summary><b>Write a text post or share a link</b><span class="muted small">YouTube or TikTok links show up in For You</span></summary>
+      <form id="compose" style="margin-top:14px">
+        ${isAdmin() ? `<label class="check" style="margin-bottom:14px"><input type="checkbox" id="as-studio"> <span>Post as <b>Lone Keem Studios</b> (official studio post)</span></label>` : ''}
+        <div class="field"><label for="post-text">What do you want to share?</label>
+          <textarea id="post-text" maxlength="${LIMITS.captionMax}" placeholder="Share an idea, a creation, or what you thought of the latest drop…"></textarea>
+          <div class="small muted" style="text-align:right"><span id="count">0</span>/${LIMITS.captionMax}</div></div>
+        <div class="field"><label for="post-link">YouTube or TikTok link <span class="muted">(optional)</span></label>
+          <input id="post-link" type="url" inputmode="url" placeholder="https://youtube.com/watch?v=…"></div>
+        <p class="small muted">By posting you agree to the <a href="guidelines.html">Community Guidelines</a>. Only share things you made or have the right to share.</p>
+        <p class="form-error" id="compose-err"></p>
+        <button class="btn btn-block" type="submit" id="compose-btn">Post</button>
+      </form>
+    </details>`;
   $('#post-text').oninput = (e) => ($('#count').textContent = e.target.value.length);
   $('#compose').onsubmit = async (ev) => {
     ev.preventDefault();
@@ -520,20 +535,15 @@ async function pageCompose() {
     const linkUrl = $('#post-link').value.trim();
     const asStudio = isAdmin() && !!$('#as-studio')?.checked;
     if (linkUrl && !LINK_RE.test(linkUrl)) { err.textContent = 'Links must be a YouTube or TikTok URL starting with https://'; return; }
-    const file = $('#post-file')?.files?.[0];
-    if (!text && !linkUrl && !file) { err.textContent = 'Write something, add a link, or pick a file.'; return; }
+    if (!text && !linkUrl) { err.textContent = 'Write something or add a link.'; return; }
     const btn = $('#compose-btn'); btn.disabled = true; btn.textContent = 'Posting…';
     try {
-      let mediaUrl = '', mediaType = '';
-      if (file) ({ mediaUrl, mediaType } = await uploadMedia(file));
-      const authorId = asStudio ? STUDIO_UID : S.user.uid;
-      profileCache.delete(STUDIO_UID);
-      const author = asStudio ? await getProfile(STUDIO_UID) : S.profile;
+      const { authorId, author } = await postAuthor(asStudio);
       const ref = doc(collection(db, 'posts'));
       const b = writeBatch(db);
       b.set(ref, {
         authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
-        type: mediaUrl ? 'media' : linkUrl ? 'link' : 'text', text, linkUrl, mediaUrl, mediaType, poster: '',
+        type: linkUrl ? 'link' : 'text', text, linkUrl, mediaUrl: '', mediaType: '', poster: '',
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
       });
       b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
@@ -546,18 +556,26 @@ async function pageCompose() {
     }
   };
 }
-// Upload backend switch. Only Cloudinary (unsigned preset) is wired up; see js/firebase-init.js.
-async function uploadMedia(file) {
-  const isVideo = file.type.startsWith('video/'), isImage = file.type.startsWith('image/');
-  if (!isVideo && !isImage) throw new Error('Please choose a photo or video file.');
-  const maxMB = isVideo ? UPLOADS.maxVideoMB : UPLOADS.maxImageMB;
-  if (file.size > maxMB * 1024 * 1024) throw new Error(`That file is too big (max ${maxMB} MB).`);
-  if (UPLOADS.provider !== 'cloudinary') throw new Error('Uploads are coming soon.');
-  const fd = new FormData(); fd.append('file', file); fd.append('upload_preset', UPLOADS.uploadPreset);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(UPLOADS.cloudName)}/auto/upload`, { method: 'POST', body: fd });
-  if (!res.ok) throw new Error('Upload failed. Please try again.');
-  const j = await res.json();
-  return { mediaUrl: j.secure_url, mediaType: j.resource_type === 'video' ? 'video' : 'image' };
+// Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
+// posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
+async function saveMediaPost({ upload, info, caption, asStudio }) {
+  const urls = deliveryUrls(upload);
+  const { authorId, author } = await postAuthor(asStudio);
+  const ref = doc(collection(db, 'posts'));
+  const b = writeBatch(db);
+  const n = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+  const duration = urls.mediaType === 'video' ? Math.min(LIMITS.maxVideoSeconds + 1, Math.round((Number(upload.duration) || Number(info.duration) || 0) * 10) / 10) : 0;
+  b.set(ref, {
+    authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
+    type: 'media', text: caption.slice(0, LIMITS.captionMax), linkUrl: '',
+    mediaUrl: urls.mediaUrl, mediaType: urls.mediaType, poster: urls.posterUrl, posterUrl: urls.posterUrl,
+    width: n(upload.width || info.width, 20000), height: n(upload.height || info.height, 20000), duration,
+    cloudinaryPublicId: String(upload.public_id).slice(0, 255),
+    createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
+  });
+  b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
+  await b.commit();
+  return ref.id;
 }
 
 // ---------------------------------------------------------------- post detail + comments
@@ -685,12 +703,36 @@ async function pageProfile(username, tab, token) {
     const sv = await getDocs(query(collection(db, 'users', uid, 'saved'), orderBy('createdAt', 'desc'), limit(60)));
     const posts = (await Promise.all(sv.docs.map((d) => getDoc(doc(db, 'posts', d.id))))).filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }));
     if (stale(token)) return;
-    renderPosts($('#posts'), posts, 'Nothing saved yet. Tap the bookmark on any post to save it here.');
+    renderGrid($('#posts'), posts, 'Nothing saved yet. Tap the bookmark on any post to save it here.');
   } else {
     const ps = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(40)));
     if (stale(token)) return;
-    renderPosts($('#posts'), ps.docs.map((d) => ({ id: d.id, ...d.data() })), mine ? 'You haven’t posted yet. <a href="#/new">Make your first post</a>.' : 'No posts yet.');
+    renderGrid($('#posts'), ps.docs.map((d) => ({ id: d.id, ...d.data() })), mine ? 'You haven’t posted yet. <a href="#/new">Make your first post</a>.' : 'No posts yet.');
   }
+}
+// Instagram / TikTok style 3-column grid of a user's posts. Media opens in the For You player.
+const GRID_IC = {
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>',
+  photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>',
+  text: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg>'
+};
+function gridTile(p) {
+  const yt = p.linkUrl ? youTubeId(p.linkUrl) : null;
+  const kind = p.mediaUrl && p.mediaType === 'video' ? 'video' : p.mediaUrl && p.mediaType === 'image' ? 'image'
+    : yt && /^[\w-]+$/.test(yt) ? 'youtube' : p.linkUrl && tikTokId(p.linkUrl) ? 'tiktok' : 'text';
+  const thumb = kind === 'video' ? (p.posterUrl || p.poster) : kind === 'image' ? (p.posterUrl || p.mediaUrl) : kind === 'youtube' ? `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` : '';
+  const href = kind === 'text' ? `#/post/${esc(p.id)}` : `#/watch/${esc(p.id)}`;
+  const label = `${kind === 'video' ? 'Video' : kind === 'image' ? 'Photo' : kind === 'text' ? 'Post' : 'Video link'}${p.text ? ': ' + p.text.slice(0, 60) : ''}`;
+  const inner = thumb ? `<img src="${esc(thumb)}" alt="" loading="lazy" decoding="async">`
+    : kind === 'video' ? `<video src="${esc(p.mediaUrl)}#t=0.5" preload="metadata" muted playsinline tabindex="-1" aria-hidden="true"></video>`
+    : `<span class="gtext">${esc((p.text || p.linkUrl || '').slice(0, 120))}</span>`;
+  return `<a class="gtile k-${kind}" href="${href}" aria-label="${esc(label)}">${inner}
+    <span class="gicon">${kind === 'image' ? GRID_IC.photo : kind === 'text' ? GRID_IC.text : GRID_IC.play}</span>
+    <span class="glikes">${ICON.heart}${Number(p.likeCount) || 0}</span></a>`;
+}
+function renderGrid(container, posts, emptyMsg) {
+  const visible = posts.filter((p) => !S.blocked.has(p.authorId));
+  container.innerHTML = visible.length ? `<div class="pgrid">${visible.map(gridTile).join('')}</div>` : `<div class="empty">${emptyMsg}</div>`;
 }
 async function pageFollowList(kind, uid, token) {
   const u = await getProfile(uid);

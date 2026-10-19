@@ -107,11 +107,36 @@ service cloud.firestore {
     }
 
     // ---------- Posts ----------
+    // Cloudinary cloud name for photo/video posts. PLACEHOLDER until the real account exists:
+    // this is the ONLY line to change (scripts/set-cloud-name.sh <cloud_name> updates it and
+    // js/media-config.js together). Media URLs must start with https://res.cloudinary.com/<cloud>/.
+    function cloudinaryCloud() { return 'REPLACE_WITH_CLOUD_NAME'; }
+    function cloudinaryUrl(u) {
+      return u is string && u.size() <= 500
+        && u.matches('^https://res[.]cloudinary[.]com/' + cloudinaryCloud() + '/(image|video)/upload/[^?#]+$');
+    }
+    // Extra fields on camera / library posts (all-or-nothing).
+    function validMediaExtras(d) {
+      return !d.keys().hasAny(['posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId'])
+        || (d.keys().hasAll(['posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId'])
+            && d.type == 'media'
+            && d.mediaType in ['image', 'video']
+            && cloudinaryUrl(d.mediaUrl)
+            && cloudinaryUrl(d.posterUrl)
+            && d.poster == d.posterUrl
+            && d.width is int && d.width >= 0 && d.width <= 20000
+            && d.height is int && d.height >= 0 && d.height <= 20000
+            && d.duration is number && d.duration >= 0 && d.duration <= 61
+            && (d.mediaType == 'video' || d.duration == 0)
+            && isStr(d.cloudinaryPublicId, 1, 255)
+            && d.cloudinaryPublicId.matches('^[A-Za-z0-9_./-]+$'));
+    }
     function validNewPost(d) {
       let u = get(userPath(d.authorId)).data;
       return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                                'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
-                               'commentCount', 'lastCommentId', 'studio'])
+                               'commentCount', 'lastCommentId', 'studio',
+                               'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId'])
         && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                             'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                             'commentCount', 'lastCommentId', 'studio'])
@@ -125,8 +150,10 @@ service cloud.firestore {
         && d.mediaType in ['', 'image', 'video']
         && isStr(d.poster, 0, 500)
         && (d.linkUrl == '' || d.linkUrl.matches('^https://([a-z0-9-]+[.])*(youtube[.]com|youtu[.]be|tiktok[.]com)/.*$'))
-        && (d.authorId == 'studio' || d.mediaUrl == ''
-            || d.mediaUrl.matches('^https://(res[.]cloudinary[.]com|firebasestorage[.]googleapis[.]com)/.*$'))
+        && (d.authorId == 'studio' || d.mediaUrl == '' || cloudinaryUrl(d.mediaUrl))
+        && (d.authorId == 'studio' || d.poster == '' || cloudinaryUrl(d.poster))
+        && (d.mediaUrl == '' || d.mediaType in ['image', 'video'])
+        && validMediaExtras(d)
         && (d.text.size() > 0 || d.linkUrl != '' || d.mediaUrl != '')
         && d.createdAt == request.time
         && d.likeCount == 0 && d.commentCount == 0 && d.lastCommentId == ''
