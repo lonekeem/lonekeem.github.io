@@ -219,7 +219,7 @@ export function createSearch(ctx) {
     const k = q.toLowerCase() + '|' + n; if (appleCache.has(k)) return appleCache.get(k);
     let out = [];
     try {
-      const u = `https://itunes.apple.com/search?term=${encodeURIComponent(q.replace(/^[#@]+/, ''))}&media=music&entity=song&limit=${Math.min(50, n * 2)}&explicit=No&country=US`;
+      const u = `https://itunes.apple.com/search?term=${encodeURIComponent(q.replace(/^[#@]+/, ''))}&entity=song&limit=${Math.min(50, n * 2)}&explicit=No&country=us&lang=en_us`;
       const d = await (await fetch(u)).json();
       out = (d.results || []).filter((t) => t.previewUrl && t.trackViewUrl && t.trackExplicitness !== 'explicit' && t.collectionExplicitness !== 'explicit' && !blockedQuery(`${t.trackName} ${t.artistName} ${t.collectionName || ''}`))
         .slice(0, n).map((t) => ({ title: t.trackName, artist: t.artistName, art: (t.artworkUrl100 || '').replace('100x100', '120x120'), preview: t.previewUrl, url: t.trackViewUrl }));
