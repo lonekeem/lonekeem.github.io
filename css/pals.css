@@ -1,0 +1,30 @@
+/* Kemy Pals */
+.pal-strip { position: relative; margin: 12px 0 4px; border-radius: 18px; background: linear-gradient(180deg, rgba(138,43,226,.10), rgba(138,43,226,.04)); border: 1px solid rgba(170,120,255,.25); overflow: hidden; }
+.pal-cv { width: 100%; height: 92px; } .pal-cv canvas { display: block; cursor: pointer; }
+.pal-tag { position: absolute; top: 8px; left: 12px; display: grid; gap: 1px; pointer-events: none; text-align: left; } .pal-tag b { font-family: "Space Grotesk", sans-serif; } .pal-tag small { color: var(--muted, #a39bb6); font-size: .74rem; }
+.pal-vibe { color: var(--v); font-weight: 600; } .pal-pats b { color: #ffd34d; }
+.pal-btns { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
+.pal-hatch-cta { display: flex; gap: 10px; align-items: center; width: 100%; margin: 12px 0 4px; padding: 10px 12px; border-radius: 18px; border: 1px dashed rgba(190,140,255,.6); background: rgba(138,43,226,.08); color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.pal-hatch-cta span:last-child { display: grid; } .pal-hatch-cta small { color: var(--muted, #a39bb6); } .pal-egg-ic { width: 40px; height: 40px; flex: none; }
+.pal-sheet { display: grid; gap: 10px; text-align: left; } .pal-head { display: grid; gap: 2px; padding-right: 30px; } .pal-head b { font: 700 1.25rem "Space Grotesk", sans-serif; } .pal-head small { color: var(--muted); }
+.pal-xp { height: 6px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; } .pal-xp i { display: block; height: 100%; background: linear-gradient(90deg, #ffd34d, #b47cf0); }
+.pal-scene { display: grid; place-items: center; } .pal-scene canvas { border-radius: 18px; max-width: 100%; }
+.pal-meters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; } .pal-m { display: grid; justify-items: center; gap: 2px; font-size: .9rem; } .pal-m i { width: 100%; height: 7px; border-radius: 7px; background: rgba(255,255,255,.12); overflow: hidden; } .pal-m i b { display: block; height: 100%; background: linear-gradient(90deg, #8fe3b0, #6fd39a); }
+.pal-m.low i b { background: linear-gradient(90deg, #ff9fc8, #ff7ab8); } .pal-m small { color: var(--muted); font-size: .7rem; }
+.pal-hint { margin: 0 !important; font-size: .85rem; min-height: 1.2em; text-align: center; }
+.pal-acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; } .pal-acts button { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border-radius: 14px; border: 1px solid rgba(190,140,255,.35); background: rgba(138,43,226,.12); color: inherit; font-size: 1.3rem; cursor: pointer; } .pal-acts span { font-size: .78rem; font-weight: 600; }
+.pal-acts button.glow { box-shadow: 0 0 0 2px #ff9fc8, 0 0 14px rgba(255,120,190,.5); }
+.pal-about summary { cursor: pointer; color: var(--muted); font-size: .85rem; } .pal-about p { margin: 6px 0 !important; font-size: .85rem; }
+.pal-creator { display: grid; gap: 10px; text-align: left; } .pal-creator h2 { text-align: center; } .pal-prev { display: grid; place-items: center; }
+.pal-sp { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; } .pal-chip { border: 1px solid rgba(190,140,255,.35); background: rgba(138,43,226,.10); color: inherit; border-radius: 12px; padding: 6px 8px; font: 600 .8rem Inter, sans-serif; cursor: pointer; }
+.pal-chip.sp { display: grid; padding: 6px 2px; text-align: center; } .pal-chip.sp b { font-size: .7rem; overflow: hidden; text-overflow: ellipsis; } .pal-chip.sp small { font-size: .62rem; }
+.pal-chip.on { background: linear-gradient(180deg, #b47cf0, #7a3fd0); border-color: #ffd34d; color: #fff; }
+.pal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; } .pal-l { display: grid; gap: 4px; font-weight: 600; font-size: .85rem; } .pal-l input:not([type=range]) { width: 100%; box-sizing: border-box; }
+.pal-sw { display: flex; flex-wrap: wrap; gap: 6px; } .pal-sw button { width: 28px; height: 28px; border-radius: 50%; background: var(--c); border: 2px solid rgba(255,255,255,.6); cursor: pointer; }
+.pal-intro .pal-eggbox, .pal-glow-stage { display: grid; place-items: center; } .pal-intro canvas { cursor: pointer; }
+.pal-new { display: inline-block; background: linear-gradient(90deg, #ffd34d, #ff9fd6); color: #2a1458; font-weight: 700; font-size: .75rem; border-radius: 999px; padding: 3px 10px; }
+.pal-box-head { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; }
+.pal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; } @media (min-width: 640px) { .pal-grid { grid-template-columns: repeat(3, 1fr); } }
+.pal-card { display: grid; justify-items: center; gap: 2px; padding: 10px; border-radius: 18px; border: 1px solid rgba(170,120,255,.3); background: rgba(138,43,226,.07); color: inherit; font: inherit; text-align: center; }
+.pal-card.active { box-shadow: 0 0 0 2px #ffd34d; } .pal-card small { color: var(--muted); font-size: .75rem; } .pal-card.egg { cursor: pointer; border-style: dashed; } .pal-card.locked { opacity: .55; min-height: 140px; align-content: center; } .pal-lock { font-size: 1.6rem; }
+.pal-card-b { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px; } .pal-on { font-size: .72rem; color: #ffd34d; font-weight: 700; align-self: center; }

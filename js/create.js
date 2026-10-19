@@ -646,6 +646,7 @@ export function createComposer(ctx) {
         status.textContent = 'Saving your post…';
         const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio });
         closeOverlay();
+        dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 30 } }));
         toast(isVideo && file.size > LIMITS.eagerOnlyMB * 1048576 ? 'Posted! Long videos can take a few minutes to finish processing.' : 'Posted!');
         location.hash = '#/watch/' + id;
       } catch (e) {

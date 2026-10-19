@@ -37,7 +37,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
-                               'pronouns', 'website'])
+                               'pronouns', 'website', 'activePet'])
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
         && isStr(d.displayName, 1, 50)
@@ -47,6 +47,7 @@ service cloud.firestore {
         && (!('website' in d) || d.website == ''
             || (isStr(d.website, 12, 100) && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
         && isStr(d.color, 1, 20)
+        && (!('activePet' in d) || (d.activePet is string && d.activePet.matches('^(p[1-6])?$')))
         && d.welcomed is bool
         && d.createdAt is timestamp;
     }
@@ -900,6 +901,51 @@ service cloud.firestore {
       allow create: if kqValid();
       allow update: if kqValid() && kq().time <= resource.data.time && kq().stars >= resource.data.stars && kq().big >= resource.data.big;
       allow delete: if signedIn() && uid == me();
+    }
+      // Kemy Pals: up to 6 virtual pets per user (ids p1..p6), owner-written; visitors add one pat a day.
+    match /users/{uid}/pets/{pid} {
+      function pd() { return request.resource.data; }
+      function hex(v) { return v is string && v.matches('^#[0-9a-fA-F]{6}$'); }
+      function stat(v) { return v is int && v >= 0 && v <= 100; }
+      function palValid() {
+        return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt'])
+          && pd().species in ['kemy', 'twinkbun', 'nimbo', 'ember', 'mossy', 'jelly', 'prism', 'zap', 'luno', 'petal']
+          && isStr(pd().name, 1, 20)
+          && pd().colors is map && pd().colors.keys().hasOnly(['body', 'accent', 'eye']) && hex(pd().colors.body) && hex(pd().colors.accent) && hex(pd().colors.eye)
+          && pd().pattern in ['none', 'spots', 'stripes', 'sparkle']
+          && pd().acc in ['none', 'bow', 'crown', 'shades', 'scarf', 'hat', 'badge']
+          && pd().xp is int && pd().xp >= 0 && pd().xp <= 4900
+          && pd().level == math.floor(pd().xp / 100) + 1
+          && pd().pats is int
+          && pd().stats is map && pd().stats.keys().hasOnly(['happy', 'hunger', 'energy', 'clean'])
+          && stat(pd().stats.happy) && stat(pd().stats.hunger) && stat(pd().stats.energy) && stat(pd().stats.clean)
+          && pd().at == request.time && pd().updatedAt == request.time;
+      }
+      function patPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid)/pats/$(me()); }
+      allow read: if true;
+      allow create: if signedIn() && uid == me() && pid.matches('^p[1-6]$') && palValid()
+        && pd().xp == 0 && pd().pats == 0 && pd().createdAt == request.time;
+      allow update: if signedIn() && uid == me() && palValid()
+        && pd().createdAt == resource.data.createdAt && pd().pats == resource.data.pats
+        && pd().xp >= resource.data.xp && pd().xp <= resource.data.xp + 60
+        && resource.data.updatedAt + duration.value(1, 's') < request.time;
+      // a visitor's pat: +1 on the counter, only together with a fresh pat doc (once per 20 hours)
+      allow update: if signedIn() && uid != me()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pats'])
+        && pd().pats == resource.data.pats + 1
+        && getAfter(patPath()).data.at == request.time
+        && (!exists(patPath()) || get(patPath()).data.at + duration.value(20, 'h') < request.time);
+      allow delete: if signedIn() && uid == me();
+      match /pats/{vid} {
+        function petPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid); }
+        allow read: if true;
+        allow create, update: if signedIn() && vid == me() && uid != me()
+          && request.resource.data.keys().hasOnly(['uid', 'at']) && request.resource.data.uid == vid
+          && request.resource.data.at == request.time
+          && (resource == null || resource.data.at + duration.value(20, 'h') < request.time)
+          && getAfter(petPath()).data.pats == get(petPath()).data.pats + 1;
+        allow delete: if signedIn() && (vid == me() || uid == me());
+      }
     }
   }
 }

@@ -68,7 +68,7 @@ export function createGames(ctx) {
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
     const m = document.querySelector('.modal');
     buttons.forEach((b, i) => { if (b.onClick) { const el = m.querySelector(`[data-i="${i}"]`); if (el) el.onclick = () => { closeModal(); b.onClick(); }; } });
-    if (win) { burst(m, 18); sfx.play('win'); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
+    if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 25 } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
   }
   const ui = { shell, chip, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
   const trivia = createTrivia({ ...ctx, ui });

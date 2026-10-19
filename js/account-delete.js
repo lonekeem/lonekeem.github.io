@@ -111,6 +111,9 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       await drain(query(collection(db, 'follows'), where('follower', '==', uid)), (docs) => deleteRefs(docs.map((d) => d.ref)));
       await drain(query(collection(db, 'follows'), where('followee', '==', uid)), (docs) => deleteRefs(docs.map((d) => d.ref)));
     });
+    await step('Removing your Pals…', async () => {
+      for (const pet of await sub(['users', uid, 'pets']).catch(() => [])) await deleteRefs(await sub(['users', uid, 'pets', pet.id, 'pats']).catch(() => []), (b) => b.delete(pet));
+    });
     await step('Clearing saved posts, blocks and notifications…', async () => {
       for (const c of ['saved', 'blocks', 'notifications']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
     });
@@ -150,6 +153,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
         <li>Your posts and stories, with their comments, stars and views</li>
         <li>Your comments on other people’s posts</li>
         <li>Your follows and followers, saved posts, blocks and notifications</li>
+        <li>Your Pals and their pats</li>
         <li>Your live sessions and your message threads</li>
         <li>Your login</li>
       </ul>

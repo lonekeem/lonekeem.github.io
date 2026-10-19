@@ -25,6 +25,7 @@ import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
 import { createGames, CONTROLLER as GAMES_ICON } from './games/index.js';
+import { createPals } from './pals/index.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -534,6 +535,7 @@ const routes = [
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
   [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
+  [/^#\/pals$/, (t) => pals.page(main, t, stale), 'me'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/settings$/, pageSettings, 'me'],
@@ -564,6 +566,7 @@ async function route() {
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
       if (token === routeToken && S.profile && S.profile.welcomed === false && !/onboard|login|signup/.test(hash)) showWelcome();
+      else if (token === routeToken) pals.onRoute(hash);
       return;
     }
   }
@@ -605,6 +608,7 @@ const live = createLive({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal,
   fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
 });
+const pals = createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth });
 const games = createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile });
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
@@ -857,6 +861,7 @@ async function pageProfile(username, tab, token) {
           </div>
         </div>
       </div>
+      <div id="ppal"></div>
       ${u.bio ? `<p class="bio">${bioHtml(u.bio)}</p>` : mine ? `<a class="btn btn-sm btn-ghost add-bio" href="#/settings" id="add-bio">✍️ Add a bio</a>` : ''}
       ${safeWebsite(u.website) ? `<a class="pweb" href="${esc(u.website)}" target="_blank" rel="nofollow noopener noreferrer ugc">🔗 ${esc(prettyUrl(u.website))}</a>` : ''}
       <div id="pstories"></div>
@@ -875,6 +880,7 @@ async function pageProfile(username, tab, token) {
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
   if (!blocked) stories.renderProfile($('#pav'), $('#pstories'), uid, u, token, stale);
   if (!blocked) games.renderProfile($('#pgames'), uid);
+  if (!blocked) pals.renderProfile($('#ppal'), uid, u, mine);
   if (!blocked) live.renderProfile($('#pav'), $('.profile-actions'), uid, mine || (uid === STUDIO_UID && isAdmin()), token);
   $('#report-user')?.addEventListener('click', () => reportDialog('user', uid, '', '@' + u.username));
   $('#block')?.addEventListener('click', () => blockUser(uid, u.username));
