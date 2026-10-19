@@ -17,16 +17,16 @@ try {
   await p.evaluate(() => document.getElementById('theme-ask')?.querySelector('button:last-child')?.click()); await p.waitForTimeout(400);
   for (let i = 0; i < 3; i++) { await p.evaluate(() => document.getElementById('pal-crack')?.click()); await p.waitForTimeout(250); }
   await p.waitForSelector('#pal-form'); await p.waitForTimeout(1500); await p.screenshot({ path: shot + 'hatch.png' });
-  await p.click('[data-species="puppy"]'); await p.fill('#pal-name', 'Bloop'); await p.click('#pal-form [type=submit]'); await p.waitForTimeout(3000);
-  await p.evaluate(() => { location.hash = '#/me'; }); await p.waitForSelector('[data-pa=care]'); await p.click('[data-pa=care]'); await p.waitForSelector('[data-dbg]');
+  await p.evaluate(() => document.querySelector('[data-species="tiger"]').click()); await p.fill('#pal-name', 'Bloop'); await p.evaluate(() => document.querySelector('#pal-form [type=submit]').click()); await p.waitForTimeout(3000);
+  await p.evaluate(() => { location.hash = '#/me'; }); await p.waitForSelector('[data-pa=care]'); await p.evaluate(() => document.querySelector('[data-pa=care]').click()); await p.waitForSelector('[data-dbg]');
   for (let i = 0; i < 7; i++) { await p.evaluate(() => document.querySelector('[data-dbg]')?.click()); await p.waitForTimeout(1300); }
   await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/pals'; }); await p.waitForSelector('.pal-box'); await p.waitForTimeout(800);
-  const egg = await p.$('[data-hatch]'); if (egg) { await egg.click(); await p.waitForSelector('#pal-form'); await p.click('[data-species="elephant"]'); await p.fill('#pal-name', 'Toots'); await p.click('#pal-form [type=submit]'); await p.waitForTimeout(3000); }
+  const egg = await p.$('[data-hatch]'); if (egg) { await egg.click(); await p.waitForSelector('#pal-form'); await p.evaluate(() => document.querySelector('[data-species="elephant"]').click()); await p.fill('#pal-name', 'Toots'); await p.evaluate(() => document.querySelector('#pal-form [type=submit]').click()); await p.waitForTimeout(3000); }
   await p.waitForTimeout(1500); await p.screenshot({ path: shot + 'pals.png' });
   await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/me'; }); await p.waitForTimeout(3500); await p.screenshot({ path: shot + 'profile.png' });
   await p.evaluate(() => { location.hash = '#/park'; }); await p.waitForSelector('#park-cv', { timeout: 20000 }); await p.waitForTimeout(3500); await p.screenshot({ path: shot + 'park.png' });
-  await p.evaluate(() => { location.hash = '#/games/pals'; }); await p.waitForSelector('.pg-lobby', { timeout: 15000 }); await p.click('[data-g=stars]'); await p.click('[data-m=cpu]'); await p.waitForSelector('.pg-cv'); await p.waitForTimeout(2500); await p.screenshot({ path: shot + 'game.png' });
-  await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/pals'; }); await p.waitForSelector('[data-c=talk]', { timeout: 15000 }); await p.click('[data-c=talk]'); await p.waitForSelector('#tk-in'); await p.waitForTimeout(1500); await p.screenshot({ path: shot + 'chat.png' });
+  await p.evaluate(() => { location.hash = '#/games/pals'; }); await p.waitForSelector('.pg-lobby', { timeout: 15000 }); await p.evaluate(() => document.querySelector('[data-g=stars]').click()); await p.evaluate(() => document.querySelector('[data-m=cpu]').click()); await p.waitForSelector('.pg-cv'); await p.waitForTimeout(2500); await p.screenshot({ path: shot + 'game.png' });
+  await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/pals'; }); await p.waitForSelector('[data-c=talk]', { timeout: 15000 }); await p.evaluate(() => document.querySelector('[data-c=talk]').click()); await p.waitForSelector('#tk-in'); await p.waitForTimeout(1500); await p.screenshot({ path: shot + 'chat.png' });
   // dancing: start the theme, measure FPS on the profile
   await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/me'; }); await p.waitForTimeout(2000);
   await p.evaluate(async () => { const t = await import('/js/theme.js'); t.setMode && t.setMode('play', { start: true }); });

@@ -41,7 +41,22 @@ export function drawBubble(c, x, y, r) { ell(c, x, y, r, r); const g = c.createR
 // drawPal(ctx, x, y, size, pal, st): renders ANY Pal at any size. (x, y) = feet centre; size ~ height in px.
 // pal = { species, colors: { body, accent, eye }, pattern, acc, level }
 // st  = { t (frame), face (1|-1), mode: idle|walk|hop|happy|sleep|eat|shake|react, mood: { dirty, sad, bandage } }
+// One look everywhere: when the 3D renderer is loaded (js/pals/dance.js -> pal3d.js) every drawPal() call renders the
+// 3D model; the 2D art below is only the fallback (no WebGL / low-end / over the per-frame budget). st.flat forces 2D.
+let R3 = null;
+export const setPal3D = (fn) => { R3 = fn; };
+export const pal3DOn = () => !!R3;
+const thumbs = new Map();
+// Cached still image of a Pal (3D when available). Returns a canvas; re-renders once 3D becomes available.
+export function getPalThumbnail(pal, px = 128) {
+  const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.level >= 12 ? 2 : pal.level >= 5 ? 1 : 0, px, !!R3]);
+  let cv = thumbs.get(key); if (cv) return cv;
+  cv = document.createElement('canvas'); cv.width = cv.height = px; const c = cv.getContext('2d');
+  drawPal(c, px / 2, px * 0.92, px * 0.62, pal, { t: 30, mode: 'idle' });
+  thumbs.set(key, cv); if (thumbs.size > 60) thumbs.delete(thumbs.keys().next().value); return cv;
+}
 export function drawPal(c, x, y, size, pal, st = {}) {
+  if (R3 && !st.flat) { try { if (R3(c, x, y, size, pal, st)) return; } catch (e) { console.warn('3D Pal off:', e); R3 = null; } }
   const sp = SPEC[pal.species] || SPECIES[0]; const col = pal.colors || {};
   const B = col.body || sp.body, A = col.accent || sp.acc, E = col.eye || '#24133f';
   const stage = stageOf(pal.level || 1); const t = st.t || 0; const face = st.face || 1; const mood = st.mood || {};
@@ -244,3 +259,4 @@ function drawLegs(c, R, { B, dark, line, light, feet, bodyG, legH }) {
   }
   c.lineWidth = 1; c.strokeStyle = line; return out;
 }
+if (typeof window !== 'undefined') setTimeout(() => { import('./dance.js').catch(() => {}); }, 800); // loads the 3D renderer on capable devices

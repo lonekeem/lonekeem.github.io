@@ -1,6 +1,6 @@
 // Pal dances: a music bus (is anything playing? where is the beat?), the dance moves, and drawDancer(),
 // a drop-in wrapper around drawPal() that makes a Pal dance while music plays (drawPal's API is unchanged).
-import { drawPal, SPEC, SPECIES, stageOf } from './art.js';
+import { drawPal, SPEC, SPECIES, stageOf, setPal3D } from './art.js';
 import { themeAnalyser, themeEl } from '../theme.js';
 
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -154,7 +154,7 @@ function sparkle(c, x, y, s, t) {
 // 3D Pals: lazy-load three.js only on capable devices (see js/pals/pal3d.js)
 let P3 = null;
 export const pal3dReady = () => !!P3;
-export function load3D() { return import('./pal3d.js').then((m) => { if (m.webglOK()) P3 = m; return !!P3; }).catch(() => false); }
+export function load3D() { return import('./pal3d.js').then((m) => { if (m.webglOK()) { P3 = m; setPal3D(m.drawPal3D); } return !!P3; }).catch(() => false); }
 if (typeof window !== 'undefined') setTimeout(load3D, 600);
 export function drawDancer(c, x, y, size, pal, st = {}) {
   const b = tickBus(); const amt = st.dance ? 1 : b.amt;
@@ -169,7 +169,7 @@ export function drawDancer(c, x, y, size, pal, st = {}) {
       return;
     }
   }
-  if (amt <= 0.001 || (!st.dance && !danceEnabled())) return drawPal(c, x, y, size, pal, st);
+  if (amt <= 0.001 || (!st.dance && !danceEnabled())) return drawPal(c, x, y, size, pal, { ...st, flat: !!P3 });
   const gentle = RM(); const beat = st.beat ?? (b.beat + (pal._off || 0));
   const d = danceFor(pal, beat, st.dance); const p = poseAt(d, beat);
   const A = amt * (gentle ? 0.4 : 1) * (0.75 + Math.min(0.5, b.energy) * 0.5); const k = size / 40;
@@ -182,7 +182,7 @@ export function drawDancer(c, x, y, size, pal, st = {}) {
   // the dance drives the Pal's own rig (shoulders/elbows, hips/knees) instead of an overlay
   const aL = lerp(14, p.aL ?? 14, amt), aR = lerp(14, p.aR ?? 14, amt), bend = Math.max(0, p.y || 0) * 9 * A;
   const rig = { aL: face < 0 ? aR : aL, aR: face < 0 ? aL : aR, eL: p.eL ?? 16, eR: p.eR ?? 16, kL: 4 + bend + (p.kL || 0) * A, kR: 4 + bend + (p.kR || 0) * A, hL: bend * 0.5 + (p.hL || 0) * A, hR: bend * 0.5 + (p.hR || 0) * A };
-  drawPal(c, 0, 0, size, pal, { ...st, t: st.t, face, mode: amt > 0.5 ? (p.m || 'idle') : st.mode, rig });
+  drawPal(c, 0, 0, size, pal, { ...st, t: st.t, face, mode: amt > 0.5 ? (p.m || 'idle') : st.mode, rig, flat: !!P3 });
   c.restore();
   if (!gentle && amt > 0.6) {
     if (p.star) { const t = st.t || 0; sparkle(c, x - size * 0.42, y - size * 0.9, size * 0.09, t); sparkle(c, x + size * 0.45, y - size * 0.75, size * 0.07, t + 20); }
