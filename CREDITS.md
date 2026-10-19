@@ -21,7 +21,7 @@ All tracks below are released under **CC0 1.0** (public domain dedication, https
 
 ## Theme
 
-"Kemy on Screen" by Keem (Lone Keem Studios), `assets/audio/kemy-theme.m4a`.
+"Kemy on the Screen" by Keem (Lone Keem Studios), `assets/audio/kemy-theme.m4a`.
 
 ## Outside players
 
