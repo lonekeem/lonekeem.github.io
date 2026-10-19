@@ -1,12 +1,12 @@
 {
  "v": 1,
  "updated": "2026-10-19",
- "about": "New on TikTok Pal dances. Add a trend by adding an entry: keys are poses, one every (beats / keys.length) beats. Pose fields (all optional): x,y (body units, y<0 = up), r (tilt deg), sx, sy (squash), k (lean/skew), aL/aR (arm angle deg: 0 down, 90 out to the side, 180 up, negative = across the body), m (idle|walk|hop|happy), f (1 face right, -1 face left), tx (short text pop), star (1 = gold sparkle). ease: smooth|snap|linear. id: 2-13 lowercase letters (shop item dn_<id>). r: c|r|l rarity.",
+ "about": "Trend Pal dances (Trending, Classics, Hip-Hop & Footwork, Country & Line). Add a trend by adding an entry: keys are poses, one every (beats / keys.length) beats. Pose fields (all optional): x,y (body units, y<0 = up), r (tilt deg), sx, sy (squash), k (lean/skew), aL/aR (arm angle deg: 0 down, 90 out to the side, 180 up, negative = across the body), m (idle|walk|hop|happy), f (1 face right, -1 face left), tx (short text pop), star (1 = gold sparkle). ease: smooth|snap|linear. id: 2-13 lowercase letters (shop item dn_<id>). r: c|r|l rarity. k3 = 3D keyframes (see js/pals/dances3d.js pose format), m3 = mirror, free = no coin price, group = trending|classic|hiphop|line, credit = shop credit text. Song audio is never played.",
  "dances": [
   {
    "id": "countshrug",
    "name": "Count & Shrug",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "r",
    "beats": 4,
    "ease": "snap",
@@ -56,12 +56,13 @@
      "aR": 30,
      "y": 0
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "knockhop",
    "name": "Door-Knock Hop",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "r",
    "beats": 4,
    "ease": "snap",
@@ -115,12 +116,13 @@
      "aR": 70,
      "star": 1
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "powerhits",
    "name": "Power Hits",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "l",
    "beats": 4,
    "ease": "snap",
@@ -172,12 +174,13 @@
      "aL": 30,
      "aR": 30
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "linestep",
    "name": "Line Dance Step",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "c",
    "beats": 4,
    "ease": "smooth",
@@ -228,12 +231,13 @@
      "aR": 160,
      "tx": "clap"
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "posesway",
    "name": "Retro Pose & Sway",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "c",
    "beats": 4,
    "ease": "smooth",
@@ -263,12 +267,13 @@
      "aR": 110,
      "star": 1
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "thumbsup",
    "name": "Thumbs-Up Cheer",
-   "tag": "New on TikTok",
+   "tag": "Trend: Pikki Pikki Dance",
    "r": "r",
    "beats": 2,
    "ease": "smooth",
@@ -284,12 +289,15 @@
      "aR": 110,
      "r": 4
     }
-   ]
+   ],
+   "group": "trending",
+   "trendName": "Pikki Pikki Dance",
+   "credit": "Inspired by the viral “Pikki Pikki” cheer trend (Kia Tigers cheer squad)"
   },
   {
    "id": "funkstep",
    "name": "Funk Footwork",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "r",
    "beats": 2,
    "ease": "smooth",
@@ -309,12 +317,13 @@
      "aR": 50,
      "m": "walk"
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "backstage",
    "name": "Loose Backstage Bop",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "c",
    "beats": 2,
    "ease": "smooth",
@@ -332,12 +341,13 @@
      "aL": 25,
      "aR": 40
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "happyshimmy",
    "name": "Happy-Go-Lucky Shimmy",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "c",
    "beats": 2,
    "ease": "smooth",
@@ -355,12 +365,13 @@
      "k": -0.1,
      "y": 1
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "slowmo",
    "name": "Slow-Mo Entrance",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "l",
    "beats": 4,
    "ease": "smooth",
@@ -390,12 +401,13 @@
      "aL": 120,
      "aR": 20
     }
-   ]
+   ],
+   "group": "trending"
   },
   {
    "id": "clappop",
    "name": "Clap & Pop",
-   "tag": "New on TikTok",
+   "tag": "Trend",
    "r": "c",
    "beats": 2,
    "ease": "smooth",
@@ -412,7 +424,3704 @@
      "y": -2,
      "star": 1
     }
+   ],
+   "group": "trending"
+  },
+  {
+   "id": "trapstairs",
+   "name": "Stair Step Glide",
+   "tag": "Trend: Trap Door / Stairs / Escalator",
+   "trendName": "Trap Door / Stairs / Escalator",
+   "credit": "Inspired by the viral “Trap Door / Stairs / Escalator” trend",
+   "group": "trending",
+   "r": "c",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Walking down invisible stairs (sinking lower each step), then gliding off on an invisible escalator",
+   "k3": [
+    {
+     "hy": 0,
+     "lL": [
+      25,
+      0,
+      40
+     ],
+     "aL": [
+      25,
+      30,
+      60,
+      0
+     ],
+     "aR": [
+      25,
+      -25,
+      50,
+      0
+     ]
+    },
+    {
+     "hy": -0.1,
+     "lR": [
+      25,
+      0,
+      40
+     ],
+     "aL": [
+      25,
+      -25,
+      50,
+      0
+     ],
+     "aR": [
+      25,
+      30,
+      60,
+      0
+     ]
+    },
+    {
+     "hy": -0.2,
+     "lL": [
+      25,
+      0,
+      40
+     ],
+     "aL": [
+      25,
+      30,
+      60,
+      0
+     ],
+     "aR": [
+      25,
+      -25,
+      50,
+      0
+     ]
+    },
+    {
+     "hy": -0.08,
+     "hx": 0.15,
+     "aL": [
+      30,
+      10,
+      70,
+      0
+     ],
+     "aR": [
+      30,
+      10,
+      70,
+      0
+     ]
+    }
+   ],
+   "free": true,
+   "keys": [
+    {
+     "aL": 25,
+     "aR": 25,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 25,
+     "aR": 25,
+     "y": 2.0,
+     "r": 0
+    },
+    {
+     "aL": 25,
+     "aR": 25,
+     "y": 4.0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 1.6,
+     "r": 0
+    }
    ]
+  },
+  {
+   "id": "dlowshuffle",
+   "name": "D-Shuffle",
+   "tag": "Trend: Dlow Shuffle",
+   "trendName": "Dlow Shuffle",
+   "credit": "Inspired by the viral “Dlow Shuffle” trend (choreo: St. Louis dance scene)",
+   "group": "trending",
+   "r": "r",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Bounce, slide a foot out and back, small kick forward then cross it behind, loose arm swings",
+   "k3": [
+    {
+     "hx": 0.06,
+     "lR": [
+      5,
+      22,
+      20
+     ],
+     "hy": -0.08,
+     "aL": [
+      30,
+      30,
+      60,
+      0
+     ],
+     "aR": [
+      25,
+      -20,
+      50,
+      0
+     ]
+    },
+    {
+     "lR": [
+      35,
+      0,
+      30
+     ],
+     "hy": -0.04
+    },
+    {
+     "hx": -0.04,
+     "lR": [
+      -15,
+      -10,
+      50
+     ],
+     "hy": -0.1,
+     "aL": [
+      25,
+      -20,
+      50,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      60,
+      0
+     ]
+    },
+    {
+     "hy": -0.06
+    }
+   ],
+   "m3": 1,
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 25,
+     "y": 1.6,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 0.8,
+     "r": 0
+    },
+    {
+     "aL": 25,
+     "aR": 30,
+     "y": 2.0,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 1.2,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "dangerduo",
+   "name": "Danger Duo Bop",
+   "tag": "Trend: We Dangerous Couple Challenge",
+   "trendName": "We Dangerous Couple Challenge",
+   "credit": "Inspired by the viral “We Dangerous Couple Challenge” trend",
+   "group": "trending",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Solo Pal version of the duo challenge: lean and point, bounce down with hands to knees, switch sides",
+   "k3": [
+    {
+     "hx": -0.06,
+     "hrz": 0.08,
+     "aR": [
+      120,
+      20,
+      40,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      90,
+      0
+     ],
+     "ny": 0.3
+    },
+    {
+     "hy": -0.12,
+     "aL": [
+      30,
+      60,
+      100,
+      0
+     ],
+     "aR": [
+      30,
+      60,
+      100,
+      0
+     ],
+     "cx": 0.15
+    },
+    {
+     "hx": 0.06,
+     "hrz": -0.08,
+     "aL": [
+      120,
+      20,
+      40,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      90,
+      0
+     ],
+     "ny": -0.3
+    },
+    {
+     "hy": -0.05
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 120,
+     "y": 0,
+     "r": -4.8
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 2.4,
+     "r": 0
+    },
+    {
+     "aL": 120,
+     "aR": 30,
+     "y": 0,
+     "r": 4.8
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 1.0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "twinsync",
+   "name": "Twin Sync",
+   "tag": "Trend: Twin Dance Challenge",
+   "trendName": "Twin Dance Challenge",
+   "credit": "Inspired by the viral “Twin Dance Challenge” trend",
+   "group": "trending",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Perfectly matched twin moves; two Pals dance it in sync when both are on screen",
+   "k3": [
+    {
+     "aL": [
+      90,
+      0,
+      90,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      60,
+      0
+     ],
+     "hrz": 0.06,
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      150,
+      10,
+      30,
+      0
+     ],
+     "aR": [
+      150,
+      10,
+      30,
+      0
+     ],
+     "hy": 0.05
+    },
+    {
+     "aL": [
+      30,
+      30,
+      60,
+      0
+     ],
+     "aR": [
+      90,
+      0,
+      90,
+      0
+     ],
+     "hrz": -0.06,
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      40,
+      70,
+      110,
+      0
+     ],
+     "aR": [
+      40,
+      70,
+      110,
+      0
+     ],
+     "hy": -0.1
+    }
+   ],
+   "keys": [
+    {
+     "aL": 90,
+     "aR": 30,
+     "y": 1.0,
+     "r": -3.6
+    },
+    {
+     "aL": 150,
+     "aR": 150,
+     "y": -1.0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 90,
+     "y": 1.0,
+     "r": 3.6
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 2.0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "poseshaka",
+   "name": "Pose & Shaka",
+   "tag": "Trend: Pose + Shaka",
+   "trendName": "Pose + Shaka",
+   "credit": "Inspired by the viral “Pose + Shaka” trend",
+   "group": "trending",
+   "r": "c",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Strike a pose, then a hang-loose shaka by the face with a head tilt",
+   "k3": [
+    {
+     "hrz": 0.1,
+     "hx": -0.05,
+     "aL": [
+      50,
+      0,
+      120,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      60,
+      0
+     ]
+    },
+    {
+     "aR": [
+      120,
+      40,
+      130,
+      40
+     ],
+     "aL": [
+      50,
+      0,
+      120,
+      0
+     ],
+     "ny": 0.25,
+     "nz": -0.12,
+     "hy": -0.04
+    },
+    {
+     "aR": [
+      120,
+      40,
+      130,
+      40
+     ],
+     "aL": [
+      50,
+      0,
+      120,
+      0
+     ],
+     "ny": 0.25,
+     "nz": -0.12
+    }
+   ],
+   "free": true,
+   "keys": [
+    {
+     "aL": 50,
+     "aR": 30,
+     "y": 0,
+     "r": -6.0
+    },
+    {
+     "aL": 50,
+     "aR": 120,
+     "y": 0.8,
+     "r": 0
+    },
+    {
+     "aL": 50,
+     "aR": 120,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "mapsdance",
+   "name": "Map Hands",
+   "tag": "Trend: Maps Dance",
+   "trendName": "Maps Dance",
+   "credit": "Inspired by the viral “Maps Dance” trend",
+   "group": "trending",
+   "r": "c",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Read an invisible map, point one way then the other, then throw hands up",
+   "k3": [
+    {
+     "aL": [
+      35,
+      70,
+      90,
+      0
+     ],
+     "aR": [
+      35,
+      70,
+      90,
+      0
+     ],
+     "nx": 0.2
+    },
+    {
+     "aR": [
+      100,
+      30,
+      30,
+      0
+     ],
+     "aL": [
+      30,
+      40,
+      90,
+      0
+     ],
+     "ny": -0.4,
+     "hry": -0.15
+    },
+    {
+     "aL": [
+      100,
+      30,
+      30,
+      0
+     ],
+     "aR": [
+      30,
+      40,
+      90,
+      0
+     ],
+     "ny": 0.4,
+     "hry": 0.15
+    },
+    {
+     "aL": [
+      150,
+      10,
+      40,
+      0
+     ],
+     "aR": [
+      150,
+      10,
+      40,
+      0
+     ],
+     "hy": 0.04
+    }
+   ],
+   "keys": [
+    {
+     "aL": 35,
+     "aR": 35,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 100,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 100,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 150,
+     "aR": 150,
+     "y": -0.8,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "espresso",
+   "name": "Coffee Cup Groove",
+   "tag": "Trend: Espresso Dance",
+   "trendName": "Espresso Dance",
+   "credit": "Inspired by the viral “Espresso Dance” trend",
+   "group": "trending",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Sip from an invisible coffee cup, point, shoulder shimmy (kid-friendly adaptation)",
+   "k3": [
+    {
+     "aR": [
+      40,
+      60,
+      125,
+      0
+     ],
+     "aL": [
+      30,
+      10,
+      60,
+      0
+     ],
+     "hrz": 0.08,
+     "nz": -0.1
+    },
+    {
+     "aR": [
+      40,
+      60,
+      140,
+      0
+     ],
+     "aL": [
+      30,
+      10,
+      60,
+      0
+     ],
+     "hrz": -0.06,
+     "nx": -0.1
+    },
+    {
+     "aR": [
+      110,
+      40,
+      40,
+      0
+     ],
+     "aL": [
+      55,
+      -10,
+      120,
+      0
+     ],
+     "hx": 0.05,
+     "hrz": -0.1
+    },
+    {
+     "aL": [
+      40,
+      30,
+      90,
+      0
+     ],
+     "aR": [
+      40,
+      30,
+      90,
+      0
+     ],
+     "cz": 0.12
+    }
+   ],
+   "gentle": 1,
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 40,
+     "y": 0,
+     "r": -4.8
+    },
+    {
+     "aL": 30,
+     "aR": 40,
+     "y": 0,
+     "r": 3.6
+    },
+    {
+     "aL": 55,
+     "aR": 110,
+     "y": 0,
+     "r": 6.0
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "holdem",
+   "name": "Card Shuffle Two-Step",
+   "tag": "Trend: Texas Hold ’Em",
+   "trendName": "Texas Hold ’Em",
+   "credit": "Inspired by the viral “Texas Hold ’Em” trend",
+   "group": "trending",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Country line-dance heel taps and side steps with a card-dealing hand move",
+   "k3": [
+    {
+     "lR": [
+      10,
+      10,
+      10
+     ],
+     "hx": -0.06,
+     "aL": [
+      40,
+      60,
+      100,
+      0
+     ],
+     "aR": [
+      40,
+      60,
+      100,
+      0
+     ]
+    },
+    {
+     "lL": [
+      10,
+      10,
+      10
+     ],
+     "hx": 0.06,
+     "aL": [
+      30,
+      40,
+      80,
+      0
+     ],
+     "aR": [
+      70,
+      60,
+      60,
+      0
+     ],
+     "hy": -0.05
+    },
+    {
+     "lR": [
+      -10,
+      0,
+      40
+     ],
+     "aL": [
+      35,
+      75,
+      95,
+      0
+     ],
+     "aR": [
+      35,
+      75,
+      95,
+      0
+     ]
+    },
+    {
+     "hy": -0.08,
+     "aL": [
+      60,
+      20,
+      60,
+      0
+     ],
+     "aR": [
+      30,
+      10,
+      40,
+      0
+     ]
+    }
+   ],
+   "m3": 1,
+   "keys": [
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 70,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 35,
+     "aR": 35,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 60,
+     "aR": 30,
+     "y": 1.6,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "appledance",
+   "name": "Apple Heart",
+   "tag": "Trend: Apple Dance",
+   "trendName": "Apple Dance",
+   "credit": "Inspired by the viral “Apple Dance” trend (choreo: Kelley Heyer)",
+   "group": "trending",
+   "r": "l",
+   "beats": 5,
+   "ease": "smooth",
+   "trend": "Hand over the heart, both hands sweep from beside the head down to the hip, heart shape above the head, then a steering-wheel \"drive\" (kid-safe adaptation)",
+   "k3": [
+    {
+     "aL": [
+      30,
+      60,
+      130,
+      0
+     ],
+     "aR": [
+      25,
+      30,
+      70,
+      0
+     ],
+     "hy": -0.04
+    },
+    {
+     "aL": [
+      120,
+      10,
+      100,
+      0
+     ],
+     "aR": [
+      110,
+      10,
+      110,
+      0
+     ],
+     "hrz": 0.1,
+     "nz": 0.15
+    },
+    {
+     "aL": [
+      40,
+      40,
+      110,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      80,
+      0
+     ],
+     "hrz": -0.1,
+     "hx": 0.06,
+     "hy": -0.06
+    },
+    {
+     "aL": [
+      150,
+      15,
+      100,
+      0
+     ],
+     "aR": [
+      150,
+      15,
+      100,
+      0
+     ],
+     "hy": 0.04
+    },
+    {
+     "aL": [
+      30,
+      60,
+      90,
+      0
+     ],
+     "aR": [
+      60,
+      70,
+      100,
+      30
+     ],
+     "hy": -0.04,
+     "nz": -0.1
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 25,
+     "y": 0.8,
+     "r": 0
+    },
+    {
+     "aL": 120,
+     "aR": 110,
+     "y": 0,
+     "r": -6.0
+    },
+    {
+     "aL": 40,
+     "aR": 30,
+     "y": 1.2,
+     "r": 6.0
+    },
+    {
+     "aL": 150,
+     "aR": 150,
+     "y": -0.8,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 60,
+     "y": 0.8,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "gataonly",
+   "name": "Cat Paw Groove",
+   "tag": "Trend: Gata Only",
+   "trendName": "Gata Only",
+   "credit": "Inspired by the viral “Gata Only” trend",
+   "group": "trending",
+   "r": "r",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Cat-paw hand claws by the face with a relaxed side sway",
+   "k3": [
+    {
+     "aL": [
+      70,
+      40,
+      130,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      60,
+      0
+     ],
+     "hx": -0.05,
+     "hrz": 0.08
+    },
+    {
+     "aR": [
+      70,
+      40,
+      130,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      60,
+      0
+     ],
+     "hx": 0.05,
+     "hrz": -0.08
+    }
+   ],
+   "gentle": 1,
+   "keys": [
+    {
+     "aL": 70,
+     "aR": 30,
+     "y": 0,
+     "r": -4.8
+    },
+    {
+     "aL": 30,
+     "aR": 70,
+     "y": 0,
+     "r": 4.8
+    }
+   ]
+  },
+  {
+   "id": "pleaseplz",
+   "name": "Pretty Please Pose",
+   "tag": "Trend: Please Please Please",
+   "trendName": "Please Please Please",
+   "credit": "Inspired by the viral “Please Please Please” trend",
+   "group": "trending",
+   "r": "c",
+   "beats": 3,
+   "ease": "smooth",
+   "trend": "Hands pressed together pleading with a head tilt, sway, then a point",
+   "k3": [
+    {
+     "aL": [
+      30,
+      70,
+      125,
+      0
+     ],
+     "aR": [
+      30,
+      70,
+      125,
+      0
+     ],
+     "nz": 0.15,
+     "hy": -0.03
+    },
+    {
+     "aL": [
+      30,
+      70,
+      125,
+      0
+     ],
+     "aR": [
+      30,
+      70,
+      125,
+      0
+     ],
+     "nz": -0.15
+    },
+    {
+     "aR": [
+      100,
+      40,
+      30,
+      0
+     ],
+     "aL": [
+      40,
+      20,
+      90,
+      0
+     ],
+     "hx": 0.05
+    }
+   ],
+   "gentle": 1,
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 0.6,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 100,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "renegroove",
+   "name": "Rene Groove",
+   "tag": "Trend: Renegade",
+   "trendName": "Renegade",
+   "credit": "Inspired by the viral “Renegade” trend (choreo: Jalaiah Harmon)",
+   "group": "classic",
+   "r": "l",
+   "beats": 6,
+   "ease": "smooth",
+   "trend": "Fast arm swings, a wave, a quick dab and hand rolls",
+   "k3": [
+    {
+     "aL": [
+      60,
+      30,
+      100,
+      0
+     ],
+     "aR": [
+      40,
+      60,
+      60,
+      0
+     ],
+     "hrz": 0.08,
+     "hy": -0.06
+    },
+    {
+     "aL": [
+      110,
+      0,
+      40,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      110,
+      0
+     ],
+     "hx": 0.05
+    },
+    {
+     "aL": [
+      40,
+      60,
+      60,
+      0
+     ],
+     "aR": [
+      60,
+      30,
+      100,
+      0
+     ],
+     "hrz": -0.08,
+     "hy": -0.06
+    },
+    {
+     "aR": [
+      135,
+      70,
+      125,
+      0
+     ],
+     "aL": [
+      150,
+      -10,
+      30,
+      0
+     ],
+     "nx": 0.4,
+     "nz": -0.3
+    },
+    {
+     "aL": [
+      50,
+      80,
+      40,
+      0
+     ],
+     "aR": [
+      50,
+      80,
+      40,
+      0
+     ],
+     "hy": -0.1,
+     "cx": 0.1
+    },
+    {
+     "aL": [
+      30,
+      20,
+      90,
+      0
+     ],
+     "aR": [
+      120,
+      10,
+      40,
+      0
+     ],
+     "hrz": 0.1
+    }
+   ],
+   "keys": [
+    {
+     "aL": 60,
+     "aR": 40,
+     "y": 1.2,
+     "r": -4.8
+    },
+    {
+     "aL": 110,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 60,
+     "y": 1.2,
+     "r": 4.8
+    },
+    {
+     "aL": 150,
+     "aR": 135,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 50,
+     "aR": 50,
+     "y": 2.0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 120,
+     "y": 0,
+     "r": -6.0
+    }
+   ]
+  },
+  {
+   "id": "saysosway",
+   "name": "Say-So Sway",
+   "tag": "Trend: Say So",
+   "trendName": "Say So",
+   "credit": "Inspired by the viral “Say So” trend (choreo: Haley Sharpe)",
+   "group": "classic",
+   "r": "r",
+   "beats": 3,
+   "ease": "smooth",
+   "trend": "Hand gestures, a point and shoulder rolls with a gentle sway",
+   "k3": [
+    {
+     "aL": [
+      40,
+      60,
+      110,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      60,
+      0
+     ],
+     "hrz": 0.1,
+     "hx": -0.05
+    },
+    {
+     "aR": [
+      110,
+      30,
+      60,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      60,
+      0
+     ],
+     "hrz": -0.1,
+     "hx": 0.05,
+     "nz": -0.12
+    },
+    {
+     "aL": [
+      45,
+      40,
+      120,
+      0
+     ],
+     "aR": [
+      45,
+      40,
+      120,
+      0
+     ],
+     "cz": 0.12,
+     "hy": -0.05
+    }
+   ],
+   "gentle": 1,
+   "keys": [
+    {
+     "aL": 40,
+     "aR": 30,
+     "y": 0,
+     "r": -6.0
+    },
+    {
+     "aL": 30,
+     "aR": 110,
+     "y": 0,
+     "r": 6.0
+    },
+    {
+     "aL": 45,
+     "aR": 45,
+     "y": 1.0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "neonrun",
+   "name": "Neon Night Run",
+   "tag": "Trend: Blinding Lights",
+   "trendName": "Blinding Lights",
+   "credit": "Inspired by the viral “Blinding Lights” trend",
+   "group": "classic",
+   "r": "r",
+   "beats": 1,
+   "ease": "smooth",
+   "trend": "Bouncy jog-in-place step with pumping arms",
+   "k3": [
+    {
+     "lL": [
+      40,
+      0,
+      60
+     ],
+     "hy": 0.02,
+     "aL": [
+      20,
+      -40,
+      90,
+      0
+     ],
+     "aR": [
+      20,
+      50,
+      90,
+      0
+     ]
+    },
+    {
+     "lR": [
+      40,
+      0,
+      60
+     ],
+     "hy": 0.02,
+     "aL": [
+      20,
+      50,
+      90,
+      0
+     ],
+     "aR": [
+      20,
+      -40,
+      90,
+      0
+     ]
+    }
+   ],
+   "keys": [
+    {
+     "aL": 20,
+     "aR": 20,
+     "y": -0.4,
+     "r": 0
+    },
+    {
+     "aL": 20,
+     "aR": 20,
+     "y": -0.4,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "toeslide",
+   "name": "Toe Slide",
+   "tag": "Trend: Toosie Slide",
+   "trendName": "Toosie Slide",
+   "credit": "Inspired by the viral “Toosie Slide” trend (choreo: Toosie)",
+   "group": "classic",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Right foot slide, left foot slide, criss-cross, then a backwards glide",
+   "k3": [
+    {
+     "hx": 0.1,
+     "lR": [
+      10,
+      15,
+      20
+     ],
+     "aL": [
+      30,
+      40,
+      100,
+      0
+     ],
+     "aR": [
+      30,
+      40,
+      100,
+      0
+     ]
+    },
+    {
+     "hx": -0.1,
+     "lL": [
+      10,
+      15,
+      20
+     ]
+    },
+    {
+     "lL": [
+      0,
+      -12,
+      25
+     ],
+     "lR": [
+      0,
+      -12,
+      25
+     ],
+     "hy": -0.08,
+     "aL": [
+      40,
+      60,
+      110,
+      0
+     ],
+     "aR": [
+      40,
+      60,
+      110,
+      0
+     ]
+    },
+    {
+     "hx": 0.12,
+     "lL": [
+      0,
+      0,
+      45
+     ],
+     "ry": -0.5
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 1.6,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "lonelybop",
+   "name": "Lonely Bop",
+   "tag": "Trend: Supalonely",
+   "trendName": "Supalonely",
+   "credit": "Inspired by the viral “Supalonely” trend",
+   "group": "classic",
+   "r": "c",
+   "beats": 1,
+   "ease": "smooth",
+   "trend": "Bouncy side-to-side finger points",
+   "k3": [
+    {
+     "aR": [
+      80,
+      40,
+      40,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      80,
+      0
+     ],
+     "hx": 0.05,
+     "hy": -0.06
+    },
+    {
+     "aL": [
+      80,
+      40,
+      40,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      80,
+      0
+     ],
+     "hx": -0.05,
+     "hy": -0.06
+    }
+   ],
+   "free": true,
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 80,
+     "y": 1.2,
+     "r": 0
+    },
+    {
+     "aL": 80,
+     "aR": 30,
+     "y": 1.2,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "giddyup",
+   "name": "Giddy Up Line",
+   "tag": "Trend: The Git Up",
+   "trendName": "The Git Up",
+   "credit": "Inspired by the viral “The Git Up” trend (choreo: Blanco Brown)",
+   "group": "line",
+   "r": "c",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Side to side, heel-toe, slide, then ride the horse with a lasso hand",
+   "k3": [
+    {
+     "hx": 0.1,
+     "lR": [
+      5,
+      15,
+      15
+     ],
+     "aL": [
+      30,
+      30,
+      70,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      70,
+      0
+     ]
+    },
+    {
+     "hx": -0.1,
+     "lL": [
+      5,
+      15,
+      15
+     ]
+    },
+    {
+     "lR": [
+      25,
+      0,
+      10
+     ],
+     "hy": -0.04
+    },
+    {
+     "aL": [
+      40,
+      70,
+      100,
+      0
+     ],
+     "aR": [
+      120,
+      10,
+      60,
+      40
+     ],
+     "hy": -0.1,
+     "hrz": 0.08,
+     "star": 1
+    }
+   ],
+   "free": true,
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 0.8,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 120,
+     "y": 2.0,
+     "r": -4.8
+    }
+   ]
+  },
+  {
+   "id": "gothgroove",
+   "name": "Gloomy Gothic Groove",
+   "tag": "Trend: Wednesday Dance",
+   "trendName": "Wednesday Dance",
+   "credit": "Inspired by the viral “Wednesday Dance” trend",
+   "group": "classic",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Stiff, spooky arm angles, head tilts and a sharp point",
+   "k3": [
+    {
+     "aL": [
+      60,
+      40,
+      110,
+      0
+     ],
+     "aR": [
+      25,
+      10,
+      40,
+      0
+     ],
+     "nz": 0.25,
+     "hy": -0.04
+    },
+    {
+     "aR": [
+      100,
+      50,
+      20,
+      0
+     ],
+     "aL": [
+      30,
+      0,
+      60,
+      0
+     ],
+     "ny": 0.3
+    },
+    {
+     "aL": [
+      90,
+      20,
+      140,
+      0
+     ],
+     "aR": [
+      90,
+      20,
+      140,
+      0
+     ],
+     "hy": -0.08,
+     "cx": 0.1
+    },
+    {
+     "aL": [
+      20,
+      -20,
+      30,
+      0
+     ],
+     "aR": [
+      20,
+      -20,
+      30,
+      0
+     ],
+     "nx": 0.2
+    }
+   ],
+   "keys": [
+    {
+     "aL": 60,
+     "aR": 25,
+     "y": 0.8,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 100,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 90,
+     "aR": 90,
+     "y": 1.6,
+     "r": 0
+    },
+    {
+     "aL": 20,
+     "aR": 20,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "calmsway",
+   "name": "Calm Wave Sway",
+   "tag": "Trend: Calm Down",
+   "trendName": "Calm Down",
+   "credit": "Inspired by the viral “Calm Down” trend",
+   "group": "classic",
+   "r": "c",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Gentle sway with soft hand waves",
+   "k3": [
+    {
+     "hx": -0.07,
+     "hrz": 0.08,
+     "aL": [
+      60,
+      30,
+      80,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      60,
+      0
+     ]
+    },
+    {
+     "hx": 0.07,
+     "hrz": -0.08,
+     "aR": [
+      60,
+      30,
+      80,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      60,
+      0
+     ]
+    }
+   ],
+   "gentle": 1,
+   "keys": [
+    {
+     "aL": 60,
+     "aR": 30,
+     "y": 0,
+     "r": -4.8
+    },
+    {
+     "aL": 30,
+     "aR": 60,
+     "y": 0,
+     "r": 4.8
+    }
+   ]
+  },
+  {
+   "id": "fancystep",
+   "name": "Fancy Two-Step",
+   "tag": "Trend: Fancy Like",
+   "trendName": "Fancy Like",
+   "credit": "Inspired by the viral “Fancy Like” trend (choreo: Walker Hayes & Lela Hayes)",
+   "group": "classic",
+   "r": "c",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Arm waves, a point, heel tap and a little celebration",
+   "k3": [
+    {
+     "aR": [
+      110,
+      20,
+      50,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      80,
+      0
+     ],
+     "hx": 0.05
+    },
+    {
+     "aL": [
+      110,
+      20,
+      50,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      80,
+      0
+     ],
+     "hx": -0.05
+    },
+    {
+     "aL": [
+      40,
+      70,
+      100,
+      0
+     ],
+     "aR": [
+      40,
+      70,
+      100,
+      0
+     ],
+     "lR": [
+      15,
+      0,
+      20
+     ],
+     "hy": -0.06
+    },
+    {
+     "aR": [
+      140,
+      10,
+      40,
+      0
+     ],
+     "hy": 0.02
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 110,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 110,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 1.2,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 140,
+     "y": -0.4,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "goodtime",
+   "name": "Good Time Strut",
+   "tag": "Trend: About Damn Time",
+   "trendName": "About Damn Time",
+   "credit": "Inspired by the viral “About Damn Time” trend",
+   "group": "classic",
+   "r": "r",
+   "beats": 3,
+   "ease": "smooth",
+   "trend": "Confident strut with hands on hips and a shoulder pop",
+   "k3": [
+    {
+     "lL": [
+      20,
+      0,
+      30
+     ],
+     "aL": [
+      30,
+      -20,
+      70,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      90,
+      0
+     ],
+     "hrz": 0.08,
+     "cx": -0.08
+    },
+    {
+     "lR": [
+      20,
+      0,
+      30
+     ],
+     "aL": [
+      30,
+      30,
+      90,
+      0
+     ],
+     "aR": [
+      30,
+      -20,
+      70,
+      0
+     ],
+     "hrz": -0.08,
+     "cx": -0.08
+    },
+    {
+     "aL": [
+      60,
+      10,
+      130,
+      0
+     ],
+     "aR": [
+      60,
+      10,
+      130,
+      0
+     ],
+     "hy": -0.06,
+     "cz": 0.1
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 0,
+     "r": -4.8
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 0,
+     "r": 4.8
+    },
+    {
+     "aL": 60,
+     "aR": 60,
+     "y": 1.2,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "wigglewalk",
+   "name": "Wiggle Walk",
+   "tag": "Trend: Jiggle Jiggle",
+   "trendName": "Jiggle Jiggle",
+   "credit": "Inspired by the viral “Jiggle Jiggle” trend (choreo: Jess Qualter & Jasmine Chiswell)",
+   "group": "classic",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Turn an invisible steering wheel, then roll the arms and shimmy the shoulders",
+   "k3": [
+    {
+     "aL": [
+      40,
+      70,
+      100,
+      0
+     ],
+     "aR": [
+      40,
+      70,
+      100,
+      20
+     ],
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      45,
+      70,
+      100,
+      -20
+     ],
+     "aR": [
+      40,
+      70,
+      100,
+      0
+     ],
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      60,
+      50,
+      120,
+      0
+     ],
+     "aR": [
+      60,
+      50,
+      120,
+      0
+     ],
+     "cz": 0.15
+    },
+    {
+     "aL": [
+      60,
+      50,
+      120,
+      0
+     ],
+     "aR": [
+      60,
+      50,
+      120,
+      0
+     ],
+     "cz": -0.15
+    }
+   ],
+   "keys": [
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 45,
+     "aR": 40,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 60,
+     "aR": 60,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 60,
+     "aR": 60,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "lookatme",
+   "name": "Look-At-Me Strut",
+   "tag": "Trend: Made You Look",
+   "trendName": "Made You Look",
+   "credit": "Inspired by the viral “Made You Look” trend",
+   "group": "classic",
+   "r": "c",
+   "beats": 3,
+   "ease": "smooth",
+   "trend": "Point, a flip of the hair, and a proud little pose",
+   "k3": [
+    {
+     "aR": [
+      100,
+      40,
+      30,
+      0
+     ],
+     "aL": [
+      55,
+      -10,
+      120,
+      0
+     ],
+     "hx": 0.05
+    },
+    {
+     "aR": [
+      150,
+      10,
+      80,
+      0
+     ],
+     "aL": [
+      55,
+      -10,
+      120,
+      0
+     ],
+     "nz": 0.2
+    },
+    {
+     "aL": [
+      30,
+      30,
+      70,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      70,
+      0
+     ],
+     "hy": -0.05,
+     "lL": [
+      15,
+      0,
+      25
+     ]
+    }
+   ],
+   "keys": [
+    {
+     "aL": 55,
+     "aR": 100,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 55,
+     "aR": 150,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 1.0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "cuffgroove",
+   "name": "Cuff Groove",
+   "tag": "Trend: Cuff It",
+   "trendName": "Cuff It",
+   "credit": "Inspired by the viral “Cuff It” trend",
+   "group": "classic",
+   "r": "c",
+   "beats": 3,
+   "ease": "smooth",
+   "trend": "Shoulder bounces and hand rolls (kid-friendly version, no hip wiggles)",
+   "k3": [
+    {
+     "aL": [
+      40,
+      40,
+      110,
+      0
+     ],
+     "aR": [
+      40,
+      40,
+      110,
+      0
+     ],
+     "cz": 0.12,
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      40,
+      40,
+      110,
+      0
+     ],
+     "aR": [
+      40,
+      40,
+      110,
+      0
+     ],
+     "cz": -0.12,
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      70,
+      60,
+      90,
+      30
+     ],
+     "aR": [
+      70,
+      60,
+      90,
+      -30
+     ]
+    }
+   ],
+   "gentle": 1,
+   "keys": [
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 70,
+     "aR": 70,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "breakupbop",
+   "name": "Breakup Bounce",
+   "tag": "Trend: If We Ever Broke Up",
+   "trendName": "If We Ever Broke Up",
+   "credit": "Inspired by the viral “If We Ever Broke Up” trend",
+   "group": "classic",
+   "r": "c",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Bouncy little jumps side to side with arm pumps",
+   "k3": [
+    {
+     "hy": 0.06,
+     "aL": [
+      60,
+      20,
+      100,
+      0
+     ],
+     "aR": [
+      60,
+      20,
+      100,
+      0
+     ],
+     "hx": -0.05
+    },
+    {
+     "hy": -0.08,
+     "aL": [
+      30,
+      40,
+      80,
+      0
+     ],
+     "aR": [
+      30,
+      40,
+      80,
+      0
+     ]
+    },
+    {
+     "hy": 0.06,
+     "hx": 0.05,
+     "aL": [
+      60,
+      20,
+      100,
+      0
+     ],
+     "aR": [
+      60,
+      20,
+      100,
+      0
+     ]
+    },
+    {
+     "hy": -0.08
+    }
+   ],
+   "keys": [
+    {
+     "aL": 60,
+     "aR": 60,
+     "y": -1.2,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 1.6,
+     "r": 0
+    },
+    {
+     "aL": 60,
+     "aR": 60,
+     "y": -1.2,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 1.6,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "paintroller",
+   "name": "Paint Roller Groove",
+   "tag": "Trend: Paint The Town Red",
+   "trendName": "Paint The Town Red",
+   "credit": "Inspired by the viral “Paint The Town Red” trend",
+   "group": "classic",
+   "r": "r",
+   "beats": 3,
+   "ease": "smooth",
+   "trend": "Paint-roller arms up and down, then strike a pose",
+   "k3": [
+    {
+     "aL": [
+      40,
+      70,
+      60,
+      0
+     ],
+     "aR": [
+      40,
+      70,
+      60,
+      0
+     ],
+     "hy": 0.0
+    },
+    {
+     "aL": [
+      40,
+      70,
+      110,
+      0
+     ],
+     "aR": [
+      40,
+      70,
+      110,
+      0
+     ],
+     "hy": -0.12,
+     "cx": 0.1
+    },
+    {
+     "aR": [
+      120,
+      30,
+      50,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      80,
+      0
+     ],
+     "hrz": -0.08
+    }
+   ],
+   "keys": [
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": -0.0,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 2.4,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 120,
+     "y": 0,
+     "r": 4.8
+    }
+   ]
+  },
+  {
+   "id": "diceroll",
+   "name": "Dice Roll",
+   "tag": "Trend: The Dice Roll",
+   "trendName": "The Dice Roll",
+   "credit": "Inspired by the viral “The Dice Roll” trend",
+   "group": "hiphop",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Shake the dice in both hands, throw them, then slide",
+   "k3": [
+    {
+     "aL": [
+      35,
+      70,
+      120,
+      0
+     ],
+     "aR": [
+      35,
+      70,
+      120,
+      0
+     ],
+     "hy": -0.06
+    },
+    {
+     "aL": [
+      35,
+      70,
+      110,
+      20
+     ],
+     "aR": [
+      35,
+      70,
+      110,
+      -20
+     ],
+     "hy": -0.08
+    },
+    {
+     "aR": [
+      70,
+      80,
+      20,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      60,
+      0
+     ],
+     "hry": -0.2,
+     "lR": [
+      15,
+      10,
+      20
+     ]
+    },
+    {
+     "hx": 0.1,
+     "lL": [
+      0,
+      0,
+      40
+     ]
+    }
+   ],
+   "keys": [
+    {
+     "aL": 35,
+     "aR": 35,
+     "y": 1.2,
+     "r": 0
+    },
+    {
+     "aL": 35,
+     "aR": 35,
+     "y": 1.6,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 70,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "mopglide",
+   "name": "Mop Glide",
+   "tag": "Trend: The Mop",
+   "trendName": "The Mop",
+   "credit": "Inspired by the viral “The Mop” trend",
+   "group": "hiphop",
+   "r": "c",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Hands on an invisible mop, swishing side to side with bent knees",
+   "k3": [
+    {
+     "aL": [
+      30,
+      50,
+      80,
+      0
+     ],
+     "aR": [
+      30,
+      60,
+      100,
+      0
+     ],
+     "hx": -0.1,
+     "hrz": 0.08,
+     "hy": -0.08
+    },
+    {
+     "aL": [
+      30,
+      50,
+      80,
+      0
+     ],
+     "aR": [
+      30,
+      60,
+      100,
+      0
+     ],
+     "hx": 0.1,
+     "hrz": -0.08,
+     "hy": -0.08
+    }
+   ],
+   "free": true,
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 1.6,
+     "r": -4.8
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 1.6,
+     "r": 4.8
+    }
+   ]
+  },
+  {
+   "id": "cornyhop",
+   "name": "Corny Hop",
+   "tag": "Trend: Corny",
+   "trendName": "Corny",
+   "credit": "Inspired by the viral “Corny” trend",
+   "group": "hiphop",
+   "r": "c",
+   "beats": 1,
+   "ease": "smooth",
+   "trend": "Goofy knee-up hops with flapping elbows",
+   "k3": [
+    {
+     "lL": [
+      45,
+      0,
+      70
+     ],
+     "hy": 0.04,
+     "aL": [
+      70,
+      0,
+      90,
+      0
+     ],
+     "aR": [
+      70,
+      0,
+      90,
+      0
+     ]
+    },
+    {
+     "hy": -0.08,
+     "aL": [
+      50,
+      0,
+      110,
+      0
+     ],
+     "aR": [
+      50,
+      0,
+      110,
+      0
+     ]
+    }
+   ],
+   "m3": 1,
+   "keys": [
+    {
+     "aL": 70,
+     "aR": 70,
+     "y": -0.8,
+     "r": 0
+    },
+    {
+     "aL": 50,
+     "aR": 50,
+     "y": 1.6,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "getuphop",
+   "name": "Get Up Hop",
+   "tag": "Trend: Get Up",
+   "trendName": "Get Up",
+   "credit": "Inspired by the viral “Get Up” trend",
+   "group": "hiphop",
+   "r": "c",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Crouch low, then spring up with arms high",
+   "k3": [
+    {
+     "hy": -0.2,
+     "aL": [
+      30,
+      60,
+      100,
+      0
+     ],
+     "aR": [
+      30,
+      60,
+      100,
+      0
+     ],
+     "cx": 0.2
+    },
+    {
+     "hy": 0.2,
+     "aL": [
+      160,
+      10,
+      30,
+      0
+     ],
+     "aR": [
+      160,
+      10,
+      30,
+      0
+     ],
+     "lL": [
+      20,
+      5,
+      40
+     ],
+     "lR": [
+      20,
+      5,
+      40
+     ],
+     "star": 1
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 4.0,
+     "r": 0
+    },
+    {
+     "aL": 160,
+     "aR": 160,
+     "y": -4.0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "loveycombo",
+   "name": "Lovey Combo",
+   "tag": "Trend: Savage Love",
+   "trendName": "Savage Love",
+   "credit": "Inspired by the viral “Savage Love” trend",
+   "group": "hiphop",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Heart hands, shoulder pops, then a slide",
+   "k3": [
+    {
+     "aL": [
+      40,
+      70,
+      130,
+      0
+     ],
+     "aR": [
+      40,
+      70,
+      130,
+      0
+     ],
+     "hy": -0.04
+    },
+    {
+     "cz": 0.15,
+     "aL": [
+      50,
+      30,
+      100,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      70,
+      0
+     ]
+    },
+    {
+     "cz": -0.15,
+     "aR": [
+      50,
+      30,
+      100,
+      0
+     ],
+     "aL": [
+      30,
+      20,
+      70,
+      0
+     ]
+    },
+    {
+     "hx": 0.12,
+     "lL": [
+      0,
+      0,
+      40
+     ],
+     "aL": [
+      30,
+      20,
+      60,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      60,
+      0
+     ]
+    }
+   ],
+   "keys": [
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 0.8,
+     "r": 0
+    },
+    {
+     "aL": 50,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 50,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 30,
+     "aR": 30,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "anniversway",
+   "name": "Anniversary Sway",
+   "tag": "Trend: Heartbreak Anniversary",
+   "trendName": "Heartbreak Anniversary",
+   "credit": "Inspired by the viral “Heartbreak Anniversary” trend",
+   "group": "hiphop",
+   "r": "c",
+   "beats": 2,
+   "ease": "smooth",
+   "trend": "Slow, smooth arm waves with a gentle sway",
+   "k3": [
+    {
+     "aL": [
+      90,
+      20,
+      40,
+      0
+     ],
+     "aR": [
+      40,
+      30,
+      80,
+      0
+     ],
+     "hrz": 0.06,
+     "hx": -0.05
+    },
+    {
+     "aR": [
+      90,
+      20,
+      40,
+      0
+     ],
+     "aL": [
+      40,
+      30,
+      80,
+      0
+     ],
+     "hrz": -0.06,
+     "hx": 0.05
+    }
+   ],
+   "gentle": 1,
+   "keys": [
+    {
+     "aL": 90,
+     "aR": 40,
+     "y": 0,
+     "r": -3.6
+    },
+    {
+     "aL": 40,
+     "aR": 90,
+     "y": 0,
+     "r": 3.6
+    }
+   ]
+  },
+  {
+   "id": "staygroove",
+   "name": "Stay Groove",
+   "tag": "Trend: Stay",
+   "trendName": "Stay",
+   "credit": "Inspired by the viral “Stay” trend",
+   "group": "hiphop",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Quick points, arm rolls and an arm raise",
+   "k3": [
+    {
+     "aR": [
+      100,
+      40,
+      30,
+      0
+     ],
+     "aL": [
+      30,
+      30,
+      90,
+      0
+     ],
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      100,
+      40,
+      30,
+      0
+     ],
+     "aR": [
+      30,
+      30,
+      90,
+      0
+     ],
+     "hy": -0.05
+    },
+    {
+     "aL": [
+      60,
+      60,
+      100,
+      30
+     ],
+     "aR": [
+      60,
+      60,
+      100,
+      -30
+     ],
+     "cx": 0.1
+    },
+    {
+     "aL": [
+      140,
+      10,
+      40,
+      0
+     ],
+     "aR": [
+      30,
+      20,
+      60,
+      0
+     ],
+     "hy": 0.03
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 100,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 100,
+     "aR": 30,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 60,
+     "aR": 60,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 140,
+     "aR": 30,
+     "y": -0.6,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "footfree",
+   "name": "Footfree Kick",
+   "tag": "Trend: Footloose",
+   "trendName": "Footloose",
+   "credit": "Inspired by the viral “Footloose” trend",
+   "group": "line",
+   "r": "c",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Kicks and heel taps finished with a spin",
+   "k3": [
+    {
+     "lL": [
+      35,
+      0,
+      20
+     ],
+     "aL": [
+      40,
+      -20,
+      70,
+      0
+     ],
+     "aR": [
+      40,
+      30,
+      70,
+      0
+     ],
+     "hy": 0.02
+    },
+    {
+     "lL": [
+      -10,
+      0,
+      40
+     ],
+     "hy": -0.06
+    },
+    {
+     "lR": [
+      35,
+      0,
+      20
+     ],
+     "aR": [
+      40,
+      -20,
+      70,
+      0
+     ],
+     "aL": [
+      40,
+      30,
+      70,
+      0
+     ],
+     "hy": 0.02
+    },
+    {
+     "ry": 6.28,
+     "aL": [
+      90,
+      0,
+      60,
+      0
+     ],
+     "aR": [
+      90,
+      0,
+      60,
+      0
+     ]
+    }
+   ],
+   "free": true,
+   "keys": [
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": -0.4,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 1.2,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": -0.4,
+     "r": 0
+    },
+    {
+     "aL": 90,
+     "aR": 90,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "shiverstep",
+   "name": "Shiver Step",
+   "tag": "Trend: Shivers",
+   "trendName": "Shivers",
+   "credit": "Inspired by the viral “Shivers” trend",
+   "group": "line",
+   "r": "c",
+   "beats": 1,
+   "ease": "smooth",
+   "trend": "Hug yourself and shiver while side-stepping",
+   "k3": [
+    {
+     "aL": [
+      20,
+      70,
+      140,
+      0
+     ],
+     "aR": [
+      20,
+      70,
+      140,
+      0
+     ],
+     "cz": 0.08,
+     "hx": 0.06,
+     "lR": [
+      5,
+      15,
+      15
+     ]
+    },
+    {
+     "cz": -0.08,
+     "hx": -0.06,
+     "lL": [
+      5,
+      15,
+      15
+     ],
+     "aL": [
+      20,
+      70,
+      140,
+      0
+     ],
+     "aR": [
+      20,
+      70,
+      140,
+      0
+     ]
+    }
+   ],
+   "keys": [
+    {
+     "aL": 20,
+     "aR": 20,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 20,
+     "aR": 20,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  },
+  {
+   "id": "countryshake",
+   "name": "Country Shake Line",
+   "tag": "Trend: Country Girl (Shake It for Me)",
+   "trendName": "Country Girl (Shake It for Me)",
+   "credit": "Inspired by the viral “Country Girl (Shake It for Me)” trend",
+   "group": "line",
+   "r": "r",
+   "beats": 4,
+   "ease": "smooth",
+   "trend": "Heel-toe line steps, a clap and a hat tip (no twerking)",
+   "k3": [
+    {
+     "lR": [
+      15,
+      0,
+      10
+     ],
+     "aL": [
+      30,
+      30,
+      80,
+      0
+     ],
+     "aR": [
+      130,
+      20,
+      60,
+      0
+     ]
+    },
+    {
+     "lR": [
+      -12,
+      0,
+      40
+     ],
+     "hy": -0.05
+    },
+    {
+     "hx": 0.1,
+     "lL": [
+      5,
+      15,
+      15
+     ],
+     "aL": [
+      40,
+      60,
+      100,
+      0
+     ],
+     "aR": [
+      40,
+      60,
+      100,
+      0
+     ]
+    },
+    {
+     "hx": -0.1,
+     "lR": [
+      5,
+      15,
+      15
+     ],
+     "aR": [
+      120,
+      40,
+      120,
+      30
+     ]
+    }
+   ],
+   "keys": [
+    {
+     "aL": 30,
+     "aR": 130,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 24,
+     "y": 1.0,
+     "r": 0
+    },
+    {
+     "aL": 40,
+     "aR": 40,
+     "y": 0,
+     "r": 0
+    },
+    {
+     "aL": 24,
+     "aR": 120,
+     "y": 0,
+     "r": 0
+    }
+   ]
+  }
+ ],
+ "mapping": [
+  {
+   "trend": "Count & Shrug",
+   "kemy": "Count & Shrug",
+   "id": "countshrug",
+   "credit": "",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Door-Knock Hop",
+   "kemy": "Door-Knock Hop",
+   "id": "knockhop",
+   "credit": "",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Power Hits",
+   "kemy": "Power Hits",
+   "id": "powerhits",
+   "credit": "",
+   "price": 320,
+   "free": false
+  },
+  {
+   "trend": "Line Dance Step",
+   "kemy": "Line Dance Step",
+   "id": "linestep",
+   "credit": "",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Retro Pose & Sway",
+   "kemy": "Retro Pose & Sway",
+   "id": "posesway",
+   "credit": "",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Pikki Pikki Dance",
+   "kemy": "Thumbs-Up Cheer",
+   "id": "thumbsup",
+   "credit": "Inspired by the viral “Pikki Pikki” cheer trend (Kia Tigers cheer squad)",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Funk Footwork",
+   "kemy": "Funk Footwork",
+   "id": "funkstep",
+   "credit": "",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Loose Backstage Bop",
+   "kemy": "Loose Backstage Bop",
+   "id": "backstage",
+   "credit": "",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Happy-Go-Lucky Shimmy",
+   "kemy": "Happy-Go-Lucky Shimmy",
+   "id": "happyshimmy",
+   "credit": "",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Slow-Mo Entrance",
+   "kemy": "Slow-Mo Entrance",
+   "id": "slowmo",
+   "credit": "",
+   "price": 320,
+   "free": false
+  },
+  {
+   "trend": "Clap & Pop",
+   "kemy": "Clap & Pop",
+   "id": "clappop",
+   "credit": "",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Trap Door / Stairs / Escalator",
+   "kemy": "Stair Step Glide",
+   "id": "trapstairs",
+   "credit": "Inspired by the viral “Trap Door / Stairs / Escalator” trend",
+   "price": 0,
+   "free": true
+  },
+  {
+   "trend": "Dlow Shuffle",
+   "kemy": "D-Shuffle",
+   "id": "dlowshuffle",
+   "credit": "Inspired by the viral “Dlow Shuffle” trend (choreo: St. Louis dance scene)",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "We Dangerous Couple Challenge",
+   "kemy": "Danger Duo Bop",
+   "id": "dangerduo",
+   "credit": "Inspired by the viral “We Dangerous Couple Challenge” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Twin Dance Challenge",
+   "kemy": "Twin Sync",
+   "id": "twinsync",
+   "credit": "Inspired by the viral “Twin Dance Challenge” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Pose + Shaka",
+   "kemy": "Pose & Shaka",
+   "id": "poseshaka",
+   "credit": "Inspired by the viral “Pose + Shaka” trend",
+   "price": 0,
+   "free": true
+  },
+  {
+   "trend": "Maps Dance",
+   "kemy": "Map Hands",
+   "id": "mapsdance",
+   "credit": "Inspired by the viral “Maps Dance” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Espresso Dance",
+   "kemy": "Coffee Cup Groove",
+   "id": "espresso",
+   "credit": "Inspired by the viral “Espresso Dance” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Texas Hold ’Em",
+   "kemy": "Card Shuffle Two-Step",
+   "id": "holdem",
+   "credit": "Inspired by the viral “Texas Hold ’Em” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Apple Dance",
+   "kemy": "Apple Heart",
+   "id": "appledance",
+   "credit": "Inspired by the viral “Apple Dance” trend (choreo: Kelley Heyer)",
+   "price": 320,
+   "free": false
+  },
+  {
+   "trend": "Gata Only",
+   "kemy": "Cat Paw Groove",
+   "id": "gataonly",
+   "credit": "Inspired by the viral “Gata Only” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Please Please Please",
+   "kemy": "Pretty Please Pose",
+   "id": "pleaseplz",
+   "credit": "Inspired by the viral “Please Please Please” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Renegade",
+   "kemy": "Rene Groove",
+   "id": "renegroove",
+   "credit": "Inspired by the viral “Renegade” trend (choreo: Jalaiah Harmon)",
+   "price": 320,
+   "free": false
+  },
+  {
+   "trend": "Say So",
+   "kemy": "Say-So Sway",
+   "id": "saysosway",
+   "credit": "Inspired by the viral “Say So” trend (choreo: Haley Sharpe)",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Blinding Lights",
+   "kemy": "Neon Night Run",
+   "id": "neonrun",
+   "credit": "Inspired by the viral “Blinding Lights” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Toosie Slide",
+   "kemy": "Toe Slide",
+   "id": "toeslide",
+   "credit": "Inspired by the viral “Toosie Slide” trend (choreo: Toosie)",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Supalonely",
+   "kemy": "Lonely Bop",
+   "id": "lonelybop",
+   "credit": "Inspired by the viral “Supalonely” trend",
+   "price": 0,
+   "free": true
+  },
+  {
+   "trend": "The Git Up",
+   "kemy": "Giddy Up Line",
+   "id": "giddyup",
+   "credit": "Inspired by the viral “The Git Up” trend (choreo: Blanco Brown)",
+   "price": 0,
+   "free": true
+  },
+  {
+   "trend": "Wednesday Dance",
+   "kemy": "Gloomy Gothic Groove",
+   "id": "gothgroove",
+   "credit": "Inspired by the viral “Wednesday Dance” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Calm Down",
+   "kemy": "Calm Wave Sway",
+   "id": "calmsway",
+   "credit": "Inspired by the viral “Calm Down” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Fancy Like",
+   "kemy": "Fancy Two-Step",
+   "id": "fancystep",
+   "credit": "Inspired by the viral “Fancy Like” trend (choreo: Walker Hayes & Lela Hayes)",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "About Damn Time",
+   "kemy": "Good Time Strut",
+   "id": "goodtime",
+   "credit": "Inspired by the viral “About Damn Time” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Jiggle Jiggle",
+   "kemy": "Wiggle Walk",
+   "id": "wigglewalk",
+   "credit": "Inspired by the viral “Jiggle Jiggle” trend (choreo: Jess Qualter & Jasmine Chiswell)",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Made You Look",
+   "kemy": "Look-At-Me Strut",
+   "id": "lookatme",
+   "credit": "Inspired by the viral “Made You Look” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Cuff It",
+   "kemy": "Cuff Groove",
+   "id": "cuffgroove",
+   "credit": "Inspired by the viral “Cuff It” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "If We Ever Broke Up",
+   "kemy": "Breakup Bounce",
+   "id": "breakupbop",
+   "credit": "Inspired by the viral “If We Ever Broke Up” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Paint The Town Red",
+   "kemy": "Paint Roller Groove",
+   "id": "paintroller",
+   "credit": "Inspired by the viral “Paint The Town Red” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "The Dice Roll",
+   "kemy": "Dice Roll",
+   "id": "diceroll",
+   "credit": "Inspired by the viral “The Dice Roll” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "The Mop",
+   "kemy": "Mop Glide",
+   "id": "mopglide",
+   "credit": "Inspired by the viral “The Mop” trend",
+   "price": 0,
+   "free": true
+  },
+  {
+   "trend": "Corny",
+   "kemy": "Corny Hop",
+   "id": "cornyhop",
+   "credit": "Inspired by the viral “Corny” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Get Up",
+   "kemy": "Get Up Hop",
+   "id": "getuphop",
+   "credit": "Inspired by the viral “Get Up” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Savage Love",
+   "kemy": "Lovey Combo",
+   "id": "loveycombo",
+   "credit": "Inspired by the viral “Savage Love” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Heartbreak Anniversary",
+   "kemy": "Anniversary Sway",
+   "id": "anniversway",
+   "credit": "Inspired by the viral “Heartbreak Anniversary” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Stay",
+   "kemy": "Stay Groove",
+   "id": "staygroove",
+   "credit": "Inspired by the viral “Stay” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "Footloose",
+   "kemy": "Footfree Kick",
+   "id": "footfree",
+   "credit": "Inspired by the viral “Footloose” trend",
+   "price": 0,
+   "free": true
+  },
+  {
+   "trend": "Shivers",
+   "kemy": "Shiver Step",
+   "id": "shiverstep",
+   "credit": "Inspired by the viral “Shivers” trend",
+   "price": 80,
+   "free": false
+  },
+  {
+   "trend": "Country Girl (Shake It for Me)",
+   "kemy": "Country Shake Line",
+   "id": "countryshake",
+   "credit": "Inspired by the viral “Country Girl (Shake It for Me)” trend",
+   "price": 160,
+   "free": false
+  },
+  {
+   "trend": "The Woah",
+   "kemy": "the Woah",
+   "id": "woah",
+   "credit": "",
+   "price": 80,
+   "free": false,
+   "note": "already in the built-in Trending list"
+  }
+ ],
+ "skipped": [
+  {
+   "trend": "WAP",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Throat Baby",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Buss It",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Body",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Savage",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Up",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Tap In",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Captain Hook",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Cannibal",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Mamushi",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Out West",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
+  },
+  {
+   "trend": "Tears in the Club",
+   "reason": "Not kid-appropriate: sexual choreography and/or explicit song"
   }
  ]
 }

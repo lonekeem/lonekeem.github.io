@@ -2,6 +2,7 @@
 // a drop-in wrapper around drawPal() that makes a Pal dance while music plays (drawPal's API is unchanged).
 import { drawPal, SPEC, SPECIES, stageOf, setPal3D } from './art.js';
 import { themeAnalyser, themeEl } from '../theme.js';
+import { register3D } from './dances3d.js';
 
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } } };
@@ -53,11 +54,12 @@ export const tiktok = () => TIKTOK;
 export const allDances = () => [...BASIC, ...TRENDING, ...TIKTOK];
 export const danceById = (id) => allDances().find((d) => d.id === id);
 export const itemId = (id) => 'dn_' + id;
-export const isFree = (d) => BASIC.includes(d);
+export const isFree = (d) => BASIC.includes(d) || !!d.free;
 let loadP = null;
 export function loadTrends() {
   if (!loadP) loadP = fetch(new URL('../../data/pal-dances.json', import.meta.url)).then((r) => r.json()).then((j) => {
-    TIKTOK = (j.dances || []).filter((d) => /^[a-z]{2,13}$/.test(d.id) && Array.isArray(d.keys) && d.keys.length).map((d) => ({ ...d, group: 'tiktok', r: d.r || 'r' }));
+    TIKTOK = (j.dances || []).filter((d) => /^[a-z]{2,13}$/.test(d.id) && Array.isArray(d.keys) && d.keys.length).map((d) => ({ ...d, group: d.group || 'trending', r: d.r || 'r' }));
+    for (const d of TIKTOK) if (d.k3) register3D(d.id, { beats: d.beats || 2, keys: d.k3, mirror: d.m3, gentle: d.gentle });
     return TIKTOK;
   }).catch(() => []);
   return loadP;

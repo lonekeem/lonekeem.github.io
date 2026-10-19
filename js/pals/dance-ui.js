@@ -7,7 +7,7 @@ const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const R2 = { c: 'c', r: 'r', l: 'l' };
 export async function registerDanceItems() {
   await loadTrends();
-  addItems([...TRENDING, ...tiktok()].map((d) => ({ id: itemId(d.id), name: d.name, kind: 'dance', p: PRICE[d.r] || PRICE.r, r: R2[d.r] || 'r', dance: d.id })));
+  addItems([...TRENDING, ...tiktok()].filter((d) => !isFree(d)).map((d) => ({ id: itemId(d.id), name: d.name, kind: 'dance', p: PRICE[d.r] || PRICE.r, r: R2[d.r] || 'r', dance: d.id })));
 }
 // Payment methods. Only 'coins' (free Star Coins) exists; a real-money method could be added here later
 // (it would grant the same inv item after a verified receipt). No real-money code is shipped.
@@ -41,10 +41,11 @@ export function createDanceUI(ctx) {
       requestAnimationFrame(frame); };
     requestAnimationFrame(frame);
     const tile = (d) => { const own = ownsDance(d); const price = PRICE[d.r] || PRICE.r; const picked = sel === d.id;
-      return `<div class="pal-dtile ${own ? 'own' : 'lock'} ${picked ? 'on' : ''} r-${d.r || 'c'}"><b>${esc(d.name)}</b>${d.tag ? `<small class="pal-tt">${esc(d.tag)}</small>` : ''}${!isFree(d) ? `<small class="rar r-${d.r}">${RARITY_NAME[d.r]}</small>` : ''}
+      return `<div class="pal-dtile ${own ? 'own' : 'lock'} ${picked ? 'on' : ''} r-${d.r || 'c'}"><b>${esc(d.name)}</b>${d.tag ? `<small class="pal-tt">${esc(d.tag)}</small>` : ''}${d.credit ? `<small class="muted pal-credit">${esc(d.credit)}</small>` : ''}${!isFree(d) ? `<small class="rar r-${d.r}">${RARITY_NAME[d.r]}</small>` : ''}
         <span class="pal-dbtns"><button class="btn btn-sm btn-ghost" data-pv="${d.id}" aria-label="Preview ${esc(d.name)}">▶</button>${own ? `<button class="btn btn-sm" data-pick="${d.id}">${picked ? '✓ Picked' : 'Pick'}</button>` : `<button class="btn btn-sm" data-ask="${d.id}">🔒 ★${price}</button>`}</span></div>`; };
     function render(which) { tab = which; root.querySelectorAll('[data-dt]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.dt === tab)));
       const tt = tiktok();
+      const TR = () => tt.filter((d) => d.group === 'trending'), HH = () => [...TRENDING.filter((d) => d.group !== 'classic'), ...tt.filter((d) => d.group === 'hiphop')], CL = () => [...TRENDING.filter((d) => d.group === 'classic'), ...tt.filter((d) => d.group === 'classic')], LN = () => tt.filter((d) => d.group === 'line');
       if (confirm) { const d = danceById(confirm); const price = PRICE[d.r] || PRICE.r;
         body.innerHTML = `<div class="pal-confirm"><p><b>Unlock ${esc(d.name)}</b> for <span class="coin">★</span>${price}?</p><p class="small muted">You have ★${coins.toLocaleString()}. Star Coins are free and can’t be bought. ${esc(pal.name)} can do it right away.</p>
           <div class="btns"><button class="btn" id="dc-yes" ${coins < price ? 'disabled' : ''}>${coins < price ? 'Not enough Star Coins yet' : 'Unlock'}</button><button class="btn btn-ghost" id="dc-no">Cancel</button></div></div>`;
@@ -55,15 +56,17 @@ export function createDanceUI(ctx) {
           catch (er) { ev.target.disabled = false; toast(er.code ? friendlyError(er) : er.message); } };
         return; }
       if (tab === 'pick') body.innerHTML = `<div class="pal-dtile free ${sel === 'free' ? 'on' : ''}"><b>🎲 Freestyle</b><small>Mixes your moves to the beat</small><span class="pal-dbtns"><button class="btn btn-sm" data-pick="free">${sel === 'free' ? '✓ Picked' : 'Pick'}</button></span></div>
-        <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group !== 'classic').map(tile).join('')}</div>
-        <h3 class="pal-sub">✨ New on TikTok</h3><div class="pal-dgrid">${tt.map(tile).join('')}</div>
-        <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group === 'classic').map(tile).join('')}</div>
+        <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TR().map(tile).join('')}</div>
+        <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${CL().map(tile).join('')}</div>
+        <h3 class="pal-sub">👟 Hip-Hop &amp; Footwork</h3><div class="pal-dgrid">${HH().map(tile).join('')}</div>
+        <h3 class="pal-sub">🤠 Country &amp; Line</h3><div class="pal-dgrid">${LN().map(tile).join('')}</div>
         <h3 class="pal-sub">💜 Pal Originals</h3><div class="pal-dgrid">${BASIC.map(tile).join('')}</div>
         <p class="small muted">Pals dance whenever music plays: the theme song, songs, music videos. ${danceEnabled() ? '' : '<b>Dancing is off in Settings.</b>'}</p>`;
       else body.innerHTML = `<p class="small muted">Unlock famous moves with free Star Coins. Tap ▶ to preview first.</p>
-        <h3 class="pal-sub">✨ New on TikTok</h3><div class="pal-dgrid">${tt.map(tile).join('')}</div>
-        <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group !== 'classic').map(tile).join('')}</div>
-        <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${TRENDING.filter((d) => d.group === 'classic').map(tile).join('')}</div>
+        <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TR().map(tile).join('')}</div>
+        <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${CL().map(tile).join('')}</div>
+        <h3 class="pal-sub">👟 Hip-Hop &amp; Footwork</h3><div class="pal-dgrid">${HH().map(tile).join('')}</div>
+        <h3 class="pal-sub">🤠 Country &amp; Line</h3><div class="pal-dgrid">${LN().map(tile).join('')}</div>
         ${isAdmin && isAdmin() ? '<p class="small"><button class="btn btn-sm btn-ghost" id="dc-sync">Admin: publish dance prices</button></p>' : ''}`;
       body.querySelectorAll('[data-pv]').forEach((b) => b.onclick = () => { prev = b.dataset.pv; });
       body.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { sel = b.dataset.pick; prev = null; setFav(pal, sel); render(tab); toast(sel === 'free' ? 'Freestyle on' : `${pal.name}’s favourite: ${danceById(sel).name}`); });

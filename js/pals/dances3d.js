@@ -38,14 +38,14 @@ export const DANCES3D = {
   discopoint: K(4, [{ hrz: 0.1, hx: -0.06, aR: [150, 20, 30], aL: [30, 30, 100], nz: 0.15, ny: 0.3 }, { hrz: -0.06, hx: 0.06, aR: [25, 45, 45, 20], aL: [30, 30, 100], nz: -0.1, ny: -0.3 }], { mirror: 1 }),
   charleston: K(2, [{ lL: [40, 0, 55], hx: 0.05, aL: [60, -35, 50], aR: [60, 40, 50], hy: -0.05 }, { lL: [-22, 0, 55], hx: 0.04, aL: [60, 40, 50], aR: [60, -35, 50], hy: -0.08, cx: 0.12 }], { mirror: 1 }),
   handjive: K(4, [{ aL: [30, 55, 110], aR: [30, 55, 110], hy: -0.1, cx: 0.15 }, { aL: [35, 75, 95], aR: [35, 75, 95], hy: -0.06 }, { aL: [40, 70, 120, 30], aR: [30, 60, 90], hy: -0.08 }, { aL: [30, 60, 90], aR: [40, 70, 120, 30], hy: -0.06 }]),
-  // ---------- New on TikTok (more)
+  // ---------- Trending (more)
   thumbsup: K(2, [{ aL: [55, 65, 120, 20], aR: [40, 40, 110], hx: -0.04, hrz: 0.05, ny: -0.15 }, { aL: [40, 40, 110], aR: [55, 65, 120, 20], hx: 0.04, hrz: -0.05, ny: 0.15 }]),
   funkstep: K(1, [{ lL: [32, 0, 50], hy: -0.08, cz: 0.12, aL: [45, 20, 95], aR: [35, 10, 80] }, { lR: [32, 0, 50], hy: -0.08, cz: -0.12, aL: [35, 10, 80], aR: [45, 20, 95] }]),
   backstage: K(2, [{ hx: -0.08, hrz: 0.1, aL: [32, 25, 65], aR: [26, 10, 50], nz: 0.1, hy: -0.07 }, { hx: 0.08, hrz: -0.1, aL: [26, 10, 50], aR: [32, 25, 65], nz: -0.1, hy: -0.07 }], { gentle: 1 }),
   happyshimmy: K(1, [{ cz: 0.14, cy: 0.2, aL: [60, 40, 100], aR: [55, 35, 105], hy: -0.06, nz: -0.12 }, { cz: -0.14, cy: -0.2, aL: [55, 35, 105], aR: [60, 40, 100], hy: -0.04, nz: 0.12 }]),
   slowmo: K(4, [{ lL: [38, 0, 45], aL: [25, -40, 40], aR: [25, 45, 50], cx: -0.08, nx: -0.1, hy: -0.03 }, { lR: [38, 0, 45], aL: [25, 45, 50], aR: [25, -40, 40], cx: -0.08, hy: -0.03 }], { ease: 'smooth', mirror: 0 }),
   clappop: K(2, [{ aL: [38, 80, 95], aR: [38, 80, 95], hy: -0.08 }, { aL: [150, 5, 35], aR: [60, -15, 75], hy: 0.04, hrz: -0.1, nz: -0.15, star: 1 }]),
-  // ---------- New on TikTok (Oct 2026), signature moves simplified
+  // ---------- Trending (Oct 2026), signature moves simplified
   countshrug: K(2, [{ aL: [30, 60, 95, 40], aR: [25, 55, 85, 40], hy: -0.04, cz: 0.08, nz: -0.1 }, { aL: [25, 55, 85, 40], aR: [30, 60, 95, 40], hy: -0.04, cz: -0.08, nz: 0.1 }, { aL: [45, 40, 100, 60], aR: [45, 40, 100, 60], hy: 0.02, cx: -0.05 }, { aL: [30, 60, 90, 40], aR: [30, 60, 90, 40] }]),
   knockhop: K(2, [{ aR: [35, 80, 120], aL: [20, 10, 30], hy: -0.05 }, { aR: [35, 80, 80], hy: -0.03 }, { aR: [35, 80, 120], hy: 0.15, lL: [25, 0, 40], lR: [25, 0, 40] }, { aR: [35, 80, 80], hy: -0.08 }]),
   powerhits: K(2, [{ aL: [170, 10, 5], aR: [40, 20, 120], hy: -0.08, hrz: 0.08 }, { aL: [40, 20, 120], aR: [170, 10, 5], hy: -0.08, hrz: -0.08 }, { aL: [90, 60, 0], aR: [90, 60, 0], hy: 0, cx: -0.1, star: 1 }, { ...N, hy: -0.1 }], { ease: 'snap' }),
@@ -76,6 +76,7 @@ function compile(id) {
   if (d.mirror) keys = [...keys, ...keys.map(M)];
   return { ...d, keys: keys.map((k) => natural({ ...N, ...k })), beats: d.mirror ? d.beats * 2 : d.beats };
 }
+export function register3D(id, d) { if (!DANCES3D[id]) DANCES3D[id] = { ease: 'smooth', ...d }; delete compiled[id]; }
 export const has3D = (id) => !!DANCES3D[id];
 // returns (beat) -> pose. Keys flow through a Catmull-Rom curve (no snapping); `linear` clips (spins/glides) stay linear.
 export function clipFor(id) {
