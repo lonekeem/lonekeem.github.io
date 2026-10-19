@@ -28,3 +28,6 @@
 .pal-card { display: grid; justify-items: center; gap: 2px; padding: 10px; border-radius: 18px; border: 1px solid rgba(170,120,255,.3); background: rgba(138,43,226,.07); color: inherit; font: inherit; text-align: center; }
 .pal-card.active { box-shadow: 0 0 0 2px #ffd34d; } .pal-card small { color: var(--muted); font-size: .75rem; } .pal-card.egg { cursor: pointer; border-style: dashed; } .pal-card.locked { opacity: .55; min-height: 140px; align-content: center; } .pal-lock { font-size: 1.6rem; }
 .pal-card-b { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px; } .pal-on { font-size: .72rem; color: #ffd34d; font-weight: 700; align-self: center; }
+/* tall Pal sheets scroll inside the modal on small phones */
+.modal:has(.pal-creator), .modal:has(.pal-sheet), .modal:has(.pal-intro) { max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 22px 16px 18px; }
+.modal-backdrop:has(.pal-creator), .modal-backdrop:has(.pal-sheet) { padding: 12px; }
