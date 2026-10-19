@@ -70,7 +70,7 @@ export function createGames(ctx) {
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
     const m = document.querySelector('.modal');
     buttons.forEach((b, i) => { if (b.onClick) { const el = m.querySelector(`[data-i="${i}"]`); if (el) el.onclick = () => { closeModal(); b.onClick(); }; } });
-    if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 25 } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
+    if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 25 } })); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: 20, why: 'for winning' } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
   }
   const ui = { shell, chip, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
   const trivia = createTrivia({ ...ctx, ui });
@@ -90,6 +90,7 @@ export function createGames(ctx) {
         <a class="g-qbtn" href="#/games/pick/cpu"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01M9.6 15.6h4.8"/></svg></span>Play the computer</a>
       </div>
       <form class="g-code" id="g-code"><label for="g-code-in" class="sr-only">Room code</label><input id="g-code-in" maxlength="6" placeholder="Have a room code?" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Join</button></form>
+      <a class="g-palgames" href="#/games/pals"><span>🐾</span><div><b>Pal Games</b><small>Your Pal vs friends in real time: Pal Race, Bubble Pop Battle, Star Catch and Dance-Off</small></div><span class="g-tag">New</span></a>
       <div class="g-cards">${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}<a class="g-card" href="kemy-quest.html" data-game="kemy-quest"><img src="assets/kemy-quest/cover.svg" alt="" width="120" height="90" style="width:100%;height:auto;border-radius:14px"><div class="g-card-t"><b>Kemy's Bubble Quest</b><span class="muted small">Hop, swim and blow bubbles with Kemy the axolotl.</span><span class="g-tag">1 player</span></div></a></div>
       <h2 class="g-h2">Your record</h2>
       <div class="card g-record" id="g-record">${signedIn() ? '<div class="spinner"></div>' : '<p class="muted small" style="margin:0">Your vs-computer record is saved on this device. <a href="#/login?next=%23%2Fgames">Sign in</a> to play online and get on the leaderboard.</p>'}</div>
@@ -436,7 +437,7 @@ export function createGames(ctx) {
   async function open(gid, token) {
     const snap = await net.fs.getDoc(net.fs.doc(db, 'games', gid));
     if (stale(token)) return;
-    if (!snap.exists()) { main.innerHTML = `<div class="empty">No game or room called “${esc(gid)}”. <a href="#/games">Games</a></div>`; return; }
+    if (!snap.exists()) { const pg = await net.fs.getDoc(net.fs.doc(db, 'palGames', gid)).catch(() => null); if (pg && pg.exists()) { location.replace('#/games/pals/' + gid); return; } main.innerHTML = `<div class="empty">No game or room called “${esc(gid)}”. <a href="#/games">Games</a></div>`; return; }
     const g = { id: snap.id, ...snap.data() };
     if (BOARD_TYPES.includes(g.type)) return onlineBoard(g, token);
     if (g.type === 'trivia') return trivia.online(g, token);

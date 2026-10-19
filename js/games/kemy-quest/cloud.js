@@ -17,6 +17,7 @@ async function awardPal(f, n) {
     const u = await f.S.getDoc(f.S.doc(f.db, 'users', f.user.uid)); const act = u.exists() && u.data().activePet;
     const p = (act && await readPet(f.db, f.user.uid, act)) || await firstPet(f.db, f.user.uid);
     if (p) await createStore(f.db, f.user.uid).save(p, { xpGain: n });
+    if (f.stars) { const { createEconomy } = await import('../../pals/economy.js'); await createEconomy(f.db, f.user.uid).earn('quest', Math.min(10, f.stars * 2)); }
   } catch {}
 }
 export const cloud = {
@@ -29,7 +30,7 @@ export const cloud = {
     const next = { uid: f.user.uid, level, name: String((f.profile && f.profile.displayName) || 'Player').slice(0, 40), uname: String((f.profile && f.profile.username) || '').slice(0, 30),
       time: o ? Math.min(o.time, t) : t, stars: o ? Math.max(o.stars, stars) : stars, big: o ? Math.max(o.big, big) : big, updatedAt: S.serverTimestamp() };
     if (o && next.time === o.time && next.stars === o.stars && next.big === o.big) return { saved: false, reason: 'no-improvement', best: o.time };
-    await S.setDoc(ref, next).finally(() => awardPal(f, 20)); return { saved: true, best: next.time, improved: !o || t < o.time };
+    f.stars = stars; await S.setDoc(ref, next).finally(() => awardPal(f, 20)); return { saved: true, best: next.time, improved: !o || t < o.time };
   },
   async top(level, n = 10) {
     const { S, db } = await load();

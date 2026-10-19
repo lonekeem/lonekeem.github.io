@@ -26,6 +26,8 @@ import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
 import { createGames, CONTROLLER as GAMES_ICON } from './games/index.js';
 import { createPals } from './pals/index.js';
+import { createPalGames } from './pals/games.js';
+import { createPark } from './pals/park.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -550,7 +552,9 @@ const routes = [
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
   [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
-  [/^#\/pals(?:\/(gallery))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
+  [/^#\/pals(?:\/(gallery|shop))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
+  [/^#\/park$/, () => park.page(), 'me'],
+  [/^#\/games\/pals(?:\/([\w-]+))?(?:\?(.*))?$/, (b, q) => palGames.page(b, Object.fromEntries(new URLSearchParams(q || ''))), 'games'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/settings$/, pageSettings, 'me'],
@@ -624,6 +628,8 @@ const live = createLive({ palLive: (root, o) => pals.liveOverlay(root, o),
   fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
 });
 const pals = createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth, notify });
+const palGames = createPalGames({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal });
+const park = createPark({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal });
 const games = createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile });
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),

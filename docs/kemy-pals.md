@@ -60,3 +60,39 @@ liveStats(pal) -> { happy, hunger, energy, clean }; moodOf(stats) -> { dirty, sa
 ## Overlays (`js/pals/overlays.js`)
 - `liveOverlay(ctx, root, { liveId, hostId, isHost })`: the host's active Pal bounces onto live screens (in-app WebRTC and YouTube big live) as a DOM canvas overlay (never in the video). Draggable (position saved per device), catches/wiggles when `.lstar` stars float, waves when the viewer count rises, viewers tap to pet (2.5 s local cooldown + one counted pat per day via the pats rules). The host's "Hide Pal" sets `lives/{id}.palHidden` (whitelisted in the host live-update rule).
 - `popups({ S, db })`: occasional pop-ups of your own Pal while scrolling video screens (For You, Following, Explore, Movies/Songs, profiles, stories, posts): at most once per 4 minutes, mid-height screen edge (clear of bottom video controls), mood lines ("Feed me!"), tap = bubble poof. Toggle in Pal Box (`localStorage['kemy-pals-popups']`). Reduced motion: fade only.
+
+## Phase 2 (shipped): Closet & Shop, Talk to your Pal, Pal Games, Pal Park
+
+### Outfits (`js/pals/wear.js`, `js/pals/catalog.js`)
+- Pet docs have an optional `outfit` map `{ head, face, neck, body, feet, back }` of item ids. `drawPal()` draws them in three passes (back, body+feet, neck/face/head) anchored to the shared head/body layout, so every item fits every species at any size. Outfits therefore show everywhere `drawPal` is used: profile, live overlay, pop-ups, Pal Park and Pal Games (the Park/Games presence snapshot includes `outfit`).
+- The rules only accept outfit items the owner has in `users/{uid}/inv/{item}`.
+- Saved outfits: `users/{uid}/looks/l1..l6` `{ name, outfit }`.
+- Pet `voice`: a preset id from `js/pals/voice.js`; `vx_*` voices must be owned (bought in the shop).
+
+### Star Coins economy (cheat-resistant, no Cloud Functions)
+- Wallet `users/{uid}/pal/wallet` `{ coins, total, day, earned{src:n}, src, last, lastBuy, paid, buyAt, room[] }`, public read.
+- Earning: each write adds `coins` from one `src` with a per-write max and per-day cap enforced in the rules (`daily 50/50, care 5/60, win 25/150, quest 10/60, stars 5/50, park 10/100, chat 2/20`), at least 1 s apart. `total` (lifetime) can only grow with coins.
+- Buying: one batch = wallet (`coins -= paid`, `lastBuy`, `buyAt = now`) + `inv/{item}` (`n + 1`). The rules check `paid` against `config/palShop.prices[item]` or today's deal (`deals[dayNumber % deals.length]`), keep `coins >= 0`, and only allow the inventory +1 with a matching wallet purchase in the same batch. Wearables/decor/toys/voices can only be owned once; snacks stack.
+- `config/palShop` is the price catalog, admin-write only. `shopDoc()` in catalog.js builds it (keep both in sync).
+- Achievement items (`ach_*`) are created by the owner only when the rules can verify the goal (level 12 Pal, 1,000 coins earned, 3 Pals, 5 Pal Games wins).
+- Decor in `wallet.room` (up to 3, must be owned) is drawn in the profile Pal strip.
+
+### Talk to your Pal (`js/pals/talk.js`, `js/pals/voice.js`)
+- AI: `POST https://text.pollinations.ai/openai` (free, keyless, ~1 request/30 s per IP). The client waits 31 s between AI calls and uses a scripted personality (species vibe, name, level, stats, owner handle, facts) the rest of the time or on any error.
+- Safety: input filter (self-harm → gentle "talk to a trusted adult" + 988; sexual, violent and personal-info topics → safe redirect, never sent to the AI), strict kid-safe system prompt, output filter (same checks, profanity mask, no links, ≤220 chars), "AI can make mistakes" note.
+- Memory: `users/{uid}/pal/chat` `{ msgs (≤12), facts (≤6) }`, owner-only; "Forget our chat" deletes it.
+- Visitors get preset lines unless the owner turns on `users/{uid}/pal/settings.visitorChat`.
+- Voices: 24 presets (4 unlockable). Each picks the best natural/neural device voice for its language and adds pitch/rate plus code-made giggles, squeaks and species sounds (trunk toot, purr, chirp…). Browsers don't let speech synthesis go through Web Audio, so echo/tremolo/ring-mod effects apply to the generated sound layers, not the spoken words.
+
+### Pal Games (`js/pals/games.js`)
+- `palGames/{id}` `{ game, status, players[2], names, unames, pals[2] (snapshots), seed, startAt }`; both clients play the same seeded 30 s course.
+- `palGames/{id}/live/{uid}` `{ p, s, fin }`: progress/score written about twice a second (≥300 ms apart, score can't go down, frozen once `fin`).
+- `palStats/{uid}` `{ wins, games }`: the rules only count a win if both players finished and your score beats theirs, once per game (`rec/{uid}` marker).
+- Quick match uses `gameQueue/pal-{game}`. Friend invites reuse `type: 'game'` notifications (and `#/game/{id}` redirects to Pal Games).
+- `playGame(host, game, seed, opts)` is reusable (e.g. for Pal Park mini-events).
+
+### Pal Park (`js/pals/park.js`)
+- World 3200×2400 with 4 zones (Lily Pond, Meadow, Candy Plaza, Beach), a fountain plaza with 4 Pal Games portals, and 16 daily treasures (same for everyone, seeded by date; each pays 10 coins, capped at 100/day).
+- Presence `parkRooms/r{1..20}/p/{uid}` `{ x, y, d, e, eAt, say, sayAt, tgt, name, uname, color, pal, at }`. You join the first room with fewer than 20 fresh players. Writes only while moving, at most 4/s (rules: ≥200 ms apart), plus a 15 s heartbeat. Remote players are interpolated. Anyone may delete presence older than 2 min. Docs are deleted when leaving.
+- Spark budget note: Firestore Spark allows 20k writes/day. One player walking non-stop for an hour is about 14k writes, so heavy use will hit the free quota. Moving the Park presence to Realtime Database (free tier, `onDisconnect`) is the recommended upgrade once a database instance is created in the Firebase console.
+- Chat: preset phrases or ≤40 chars, run through the same filter as the AI chat. Tap a player for profile, pet, Report (`reports`, `targetType: 'user'`) or Block (`users/{me}/blocks`).
