@@ -311,6 +311,7 @@ export function createPool(ctx) {
       const callMode = mine && P.needsCall(st, side, balls);
       table.set(balls, { canShoot: mine, placing: mine && st.bih, kitchen: st.brk, callMode, call: callMode ? localCall : -1 });
       table.hint(g.status === 'active' ? turnHint(st, side, balls, mine) : '');
+      const ctl = document.querySelector('.pl-ctrl'); if (ctl) ctl.style.display = side < 0 ? 'none' : '';
       if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
       header(); actions();
     }
