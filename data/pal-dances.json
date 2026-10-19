@@ -1,0 +1,31 @@
+{
+  "v": 1,
+  "updated": "2026-10-19",
+  "about": "New on TikTok Pal dances. Add a trend by adding an entry: keys are poses, one every (beats / keys.length) beats. Pose fields (all optional): x,y (body units, y<0 = up), r (tilt deg), sx, sy (squash), k (lean/skew), aL/aR (arm angle deg: 0 down, 90 out to the side, 180 up, negative = across the body), m (idle|walk|hop|happy), f (1 face right, -1 face left), tx (short text pop), star (1 = gold sparkle). ease: smooth|snap|linear. id: 2-13 lowercase letters (shop item dn_<id>). r: c|r|l rarity.",
+  "dances": [
+    { "id": "countshrug", "name": "Count & Shrug", "tag": "New on TikTok", "r": "r", "beats": 4, "ease": "snap",
+      "trend": "Finger-counting along to a Brazilian funk chant, then a deadpan shrug on the drop (Oct 2026)",
+      "keys": [
+        { "aL": 150, "aR": 40, "tx": "2" }, { "aL": 40, "aR": 150, "tx": "4" }, { "aL": 155, "aR": 155, "tx": "6" }, { "aL": 160, "aR": 160, "tx": "7", "star": 1 },
+        { "aL": 100, "aR": 100, "y": -2, "sy": 1.05 }, { "aL": 100, "aR": 100, "y": -3, "r": -4 }, { "aL": 105, "aR": 105, "y": -3, "r": 4 }, { "aL": 30, "aR": 30, "y": 0 } ] },
+    { "id": "knockhop", "name": "Door-Knock Hop", "tag": "New on TikTok", "r": "r", "beats": 4, "ease": "snap",
+      "trend": "One-foot hops with a knee up, then knocking twice on an invisible door, palms-up and a spin to finish (Sept-Oct 2026)",
+      "keys": [
+        { "y": -5, "m": "hop", "aL": 20, "aR": 150 }, { "y": 0, "aL": 20, "aR": 150 }, { "y": -5, "aL": 100, "aR": 100 }, { "y": 0, "aL": 100, "aR": 100 },
+        { "y": -4, "aL": 20, "aR": 120, "x": 1, "tx": "knock" }, { "y": 0, "aL": 20, "aR": 95, "x": 2, "tx": "knock" }, { "y": -5, "sx": -1, "f": -1, "aL": 60, "aR": 60 }, { "y": 0, "aL": 70, "aR": 70, "star": 1 } ] },
+    { "id": "powerhits", "name": "Power Hits", "tag": "New on TikTok", "r": "l", "beats": 4, "ease": "snap",
+      "trend": "Fast, sharp studio choreography: hip pops and arm hits landing hard on every beat (Sept-Oct 2026)",
+      "keys": [
+        { "x": -3, "r": -10, "aL": 170, "aR": 20 }, { "x": 3, "r": 10, "aL": 20, "aR": 170 }, { "x": -2, "k": -0.2, "aL": -60, "aR": 120 }, { "x": 2, "k": 0.2, "aL": 120, "aR": -60 },
+        { "y": 2, "sy": 0.9, "aL": 90, "aR": 90 }, { "y": -6, "aL": 175, "aR": 175, "star": 1 }, { "x": -3, "r": -14, "aL": 135, "aR": -135 }, { "aL": 30, "aR": 30 } ] },
+    { "id": "linestep", "name": "Line Dance Step", "tag": "New on TikTok", "r": "c", "beats": 4, "ease": "smooth",
+      "trend": "Line dances are back: grapevine to the side, step back, clap and quarter-turn (search interest up 241% in Oct 2026)",
+      "keys": [
+        { "x": -2, "m": "walk", "aL": 40, "aR": 40 }, { "x": -5, "m": "walk", "aL": 40, "aR": 40 }, { "x": -2, "m": "walk" }, { "x": 1, "aL": 160, "aR": 160, "tx": "clap" },
+        { "x": 3, "m": "walk", "aL": 40, "aR": 40 }, { "x": 6, "m": "walk", "aL": 40, "aR": 40 }, { "x": 3, "f": -1, "sx": 0.3 }, { "x": 0, "aL": 160, "aR": 160, "tx": "clap" } ] },
+    { "id": "posesway", "name": "Retro Pose & Sway", "tag": "New on TikTok", "r": "c", "beats": 4, "ease": "smooth",
+      "trend": "Pose-and-sway dance: strike a pose, then slow rhythmic swaying instead of big footwork (Oct 2026)",
+      "keys": [
+        { "r": -8, "x": -2, "aL": 150, "aR": 60 }, { "r": 8, "x": 2, "aL": 60, "aR": 150 }, { "r": -6, "k": -0.12, "aL": 170, "aR": -40 }, { "r": 0, "aL": 110, "aR": 110, "star": 1 } ] }
+  ]
+}

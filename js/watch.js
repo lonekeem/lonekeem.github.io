@@ -125,7 +125,7 @@ export function createWatch(ctx) {
            <a class="btn vnews-go" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" data-a="outlink">Read on ${esc(p.source)} ↗</a>
          </div>`;
     return `
-      <section class="vslide vext${yt && p.short ? ' vshort' : ''}" data-i="${i}" data-id="${esc(p.id)}" data-kind="${yt ? 'youtube' : 'news'}" aria-roledescription="${yt ? 'video' : 'news story'}" aria-label="${esc(label)} · ${esc(p.source)}: ${esc(p.text.slice(0, 80))}">
+      <section class="vslide vext${yt && p.short ? ' vshort' : ''}" data-i="${i}" data-id="${esc(p.id)}" data-kind="${yt ? 'youtube' : 'news'}" data-cat="${esc(p.cat || '')}" aria-roledescription="${yt ? 'video' : 'news story'}" aria-label="${esc(label)} · ${esc(p.source)}: ${esc(p.text.slice(0, 80))}">
         <div class="vbg" ${poster ? `style="background-image:url('${esc(poster)}')"` : ''} aria-hidden="true"></div>
         ${media}
         <div class="vgrad" aria-hidden="true"></div>
@@ -320,6 +320,7 @@ export function createWatch(ctx) {
           onStateChange: (e) => {
             if (e.data === 1) { sl._ytOk = true; clearTimeout(sl._ytTimer); if (!muted) claimAudio('feed'); }
             else if ((e.data === -1 || e.data === 5) && slides[active] === sl && !blocked()) setTimeout(tryPlay, 300);
+            try { const f = sl._yt.getIframe(); f.dataset.kemyUnmuted = e.data === 1 && /music|dance/.test(sl.dataset.cat || '') && !sl._yt.isMuted() ? '1' : '0'; } catch { /* */ }
           },
           onError: () => fallback()
         } });
@@ -435,6 +436,8 @@ export function createWatch(ctx) {
         } : null,
         double: (e) => {
           const btn = sl.querySelector('[data-a=like]'); if (!btn) return;
+          // a hidden floating Pal is summoned with a triple-tap: wait a moment so taps 1-2 don't also like
+          const ps = window.__kemyPalSummon; if (ps && ps.armed() && !e._palOk) { const ev = { clientX: e.clientX, clientY: e.clientY, _palOk: true }; ps.deferLike(() => { if (S.user && S.profile) burstStar(sl, ev.clientX, ev.clientY); if (!btn.classList.contains('on') && !btn.disabled) btn.click(); }); return; }
           if (S.user && S.profile) burstStar(sl, e.clientX, e.clientY);
           if (!btn.classList.contains('on') && !btn.disabled) btn.click();   // signed out: shows the sign-in prompt
         }

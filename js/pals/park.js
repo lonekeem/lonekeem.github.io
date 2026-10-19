@@ -8,6 +8,7 @@ import { drawPal, star, heart, drawBubble } from './art.js';
 import { getActivePal } from './core.js';
 import { clean, checkInput } from './talk.js';
 import { DECOR } from './wear.js';
+import { drawDancer } from './dance.js';
 export const WORLD = { w: 3200, h: 2400 };
 export const ZONES = [
   { id: 'pond', name: 'Lily Pond', x: 0, y: 0, w: 1600, h: 1200, col: '#bfe9d0' },
@@ -163,7 +164,7 @@ export function createPark(ctx) {
       if (x < cam.x - 80 || x > cam.x + VW + 80 || y < cam.y - 80 || y > cam.y + VH + 80) return;
       // pal
       const happy = (st.happy || st.hearts || st.petted) ? 'happy' : null; if (st.happy) st.happy--; if (st.hearts) st.hearts--; if (st.petted) st.petted--;
-      drawPal(c, px, py, 44, ps || { species: 'kemy' }, { t, mode: happy || (mv ? 'walk' : 'idle'), face: d });
+      drawDancer(c, px, py, 44, ps || { species: 'kemy' }, { t, mode: happy || (mv ? 'walk' : 'idle'), face: d });
       if (st.hearts || st.petted) { c.fillStyle = '#ff6fae'; heart(c, px, py - 50 - ((t % 40) / 2), 5); c.fill(); }
       // little avatar
       const b = mv ? Math.abs(Math.sin(t * 0.3)) * 3 : 0; c.fillStyle = 'rgba(30,10,60,.2)'; c.beginPath(); c.ellipse(x, y, 12, 4, 0, 0, 7); c.fill();

@@ -35,6 +35,8 @@ import { createPark } from './pals/park.js';
 import { initInterests, interestsPage, learnTap, pickTopics, topicChips } from './interests.js';
 import { createMusic } from './music.js';
 import { loadDiscover } from './discover.js';
+import { danceEnabled, setDanceEnabled } from './pals/dance.js';
+import { keepOn as palKeepOn, setKeep as setPalKeep } from './pals/dance-ui.js';
 import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, getMode as themeMode, setMode as setThemeMode, getVolume as themeVol, setVolume as setThemeVol, THEME_CREDIT, THEME_TITLE } from './theme.js';
 
 // ---------------------------------------------------------------- state
@@ -1066,6 +1068,12 @@ async function pageSettings() {
       <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn btn-sm btn-ghost" type="button" id="s-theme" data-theme-ctl>🎵 Play theme</button></div>
       <p class="muted small" style="margin:10px 0 0" id="s-theme-credit"><b>${esc(THEME_TITLE)}</b><br>${esc(THEME_CREDIT)}. Written by Lone Keem.</p>
     </section>
+    <section class="card pad" style="margin-top:16px" aria-labelledby="spals-h">
+      <h2 id="spals-h" style="font-size:1.05rem">Pals</h2>
+      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-dance" ${danceEnabled() ? 'checked' : ''}> <span>Pals dance to music<br><span class="muted small">When the theme song, a song or a music video plays.</span></span></label>
+      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-keep" ${palKeepOn() ? 'checked' : ''}> <span>Keep Pal on screen while scrolling<br><span class="muted small">A small Pal in the corner. Double-tap it to hide, triple-tap the screen to bring it back, drag to move.</span></span></label>
+      <p class="small" style="margin:8px 0 0"><button type="button" class="btn btn-sm btn-ghost" id="s-dance-shop">💃 Dances &amp; Dance Shop</button></p>
+    </section>
     <section class="card pad" style="margin-top:16px">
       <h2 style="font-size:1.05rem">Account</h2>
       <p class="muted small">Signed in as ${esc(S.user.email || '')}</p>
@@ -1082,6 +1090,9 @@ async function pageSettings() {
   wireCounter($('#s-pro'), $('#s-pro-n'), 20); wireCounter($('#s-web'), $('#s-web-n'), 100);
   if (sessionStorage.getItem('lks-focus-bio')) { sessionStorage.removeItem('lks-focus-bio'); setTimeout(() => { const t = $('#s-bio'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); } }, 60); }
   document.querySelectorAll('[name=s-theme-mode]').forEach((r) => { r.onchange = () => { setThemeMode(r.value, { start: r.value === 'play' }); toast(r.value === 'play' ? 'Theme song on' : r.value === 'mute' ? 'Theme song muted' : 'Theme song off'); }; });
+  $('#s-pal-dance').onchange = (e) => { setDanceEnabled(e.target.checked); toast(e.target.checked ? 'Pals will dance to music 💃' : 'Pal dancing off'); };
+  $('#s-pal-keep').onchange = (e) => { setPalKeep(e.target.checked); toast(e.target.checked ? 'Your Pal will stay on screen' : 'Floating Pal off'); };
+  $('#s-dance-shop').onclick = () => dispatchEvent(new Event('kemy:dance-shop'));
   $('#s-theme-vol').oninput = (e) => { const v = +e.target.value / 100; setThemeVol(v); $('#s-theme-vol-n').textContent = e.target.value + '%'; };
   { const b = $('#s-theme'); const paint = () => { b.textContent = themePlaying() ? '⏸ Stop theme' : '🎵 Play theme'; };
     b.onclick = async () => { if (themePlaying()) stopTheme(); else await playTheme({ force: true }); paint(); };

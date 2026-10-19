@@ -7,6 +7,8 @@ import { openTalk } from './talk.js';
 import { doc as fdoc, getDoc as fget, setDoc as fset, serverTimestamp as fts } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { roomOf } from './economy.js';
 import { DECOR } from './wear.js';
+import { drawDancer } from './dance.js';
+import { createDanceUI, initFloat, registerDanceItems } from './dance-ui.js';
 import { ITEM } from './catalog.js';
 import { createStore, liveStats, moodOf, patPal, readPet, firstPet, formName, isNight, xpToLevel, MAX_PALS, tsMs, listPals, getActivePal, playdate, newPlaydates } from './core.js';
 
@@ -38,10 +40,13 @@ function particles() {
 }
 export function createPals(ctx) {
   const { S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth } = ctx; const notify = ctx.notify || (() => {});
-  if (!document.getElementById('pals-css')) { const l = document.createElement('link'); l.id = 'pals-css'; l.rel = 'stylesheet'; l.href = 'css/pals.css?v=2'; document.head.appendChild(l); }
+  if (!document.getElementById('pals-css')) { const l = document.createElement('link'); l.id = 'pals-css'; l.rel = 'stylesheet'; l.href = 'css/pals.css?v=3'; document.head.appendChild(l); }
   let mine = null; // { uid, list, store }
   const pop = popups({ S, db });
   const shop = createShopUI(ctx);
+  const dances = createDanceUI(ctx); registerDanceItems();
+  const danceOpen = (p, tab) => { if (!S.user) return; dances.open(p, { tab, econOf: shop.econ }); };
+  addEventListener('kemy:dance-shop', async () => { const m = await myPals(); const a = m && activeOf(m); if (a) danceOpen(a, 'shop'); else toast('Hatch a Pal first'); });
   const debug = () => localStorage.getItem('kemy-pals-debug') === '1';
   async function myPals(force) {
     if (!S.user || !S.profile) return null;
@@ -105,7 +110,7 @@ export function createPals(ctx) {
     const sp = SPEC[act.species] || SPECIES[0];
     el.innerHTML = `<div class="pal-strip" data-pals="1" aria-label="${esc(u.displayName)}'s Pals"><div class="pal-cv"></div>
       <div class="pal-tag"><b>${esc(act.name)}</b><small>${esc(formName(act))} · Lv ${act.level || 1} · <span class="pal-vibe" style="--v:${VIBES[sp.vibe].c}">${VIBES[sp.vibe].name}</span></small><small class="pal-pats">🐾 <b>${act.pats || 0}</b> pats</small></div>
-      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Talk</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Say hi</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
+      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-pa="dance">💃 Dance</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Say hi</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
     const host = el.querySelector('.pal-cv'); const W = Math.max(160, Math.min(host.clientWidth || 300, 560)), H = 104; const s = stage(host, W, H);
     const fx = particles();
     const actors = shown.map((p, i) => ({ p, x: W * (0.5 - i * 0.22) + (i ? 0 : 10), tx: 0, face: i % 2 ? 1 : -1, mode: 'idle', until: i * 60, react: 0, mood: moodOf(liveStats(p)), size: i ? 52 : 66 }));
@@ -127,7 +132,7 @@ export function createPals(ctx) {
         if (A.mode === 'walk') { const d = A.tx - A.x; A.face = Math.sign(d) || A.face; A.x += Math.sign(d) * Math.min(Math.abs(d), A.mood.tired ? 0.35 : 0.7); if (Math.abs(d) < 1) { A.mode = 'idle'; A.until = t + 100; } }
       }
       if (play) stepPlay(t, c);
-      for (const A of [...all].sort((a, b) => a.size - b.size)) drawPal(c, A.x, H - 8, A.size, A.p, { t, face: A.face, mode: A.mode, mood: { ...A.mood, sad: A.mood.sad && A.mode !== 'react' } });
+      for (const A of [...all].sort((a, b) => a.size - b.size)) drawDancer(c, A.x, H - 8, A.size, A.guest ? { ...A.p, _others: 1, _off: 0.5 } : (isMine ? A.p : { ...A.p, _others: 1 }), { t, face: A.face, mode: A.mode, mood: { ...A.mood, sad: A.mood.sad && A.mode !== 'react' } });
       if (guest) { c.fillStyle = 'rgba(255,255,255,.85)'; c.font = '600 10px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(guest.p.name, guest.x, H - 8 - guest.size - 4); c.textAlign = 'left'; }
       fx.draw(c);
     };
@@ -149,7 +154,7 @@ export function createPals(ctx) {
     s.cv.addEventListener('pointerup', (e) => { if (isMine && !longT) return; clearTimeout(longT); longT = null;
       const r = s.cv.getBoundingClientRect(); const A = hit((e.clientX - r.left) * W / r.width); if (!A) return;
       A.react = 90; fx.add(A.x, 30, 'heart', 6); fx.add(A.x, 30, 'star', 5); snd('happy'); if (!isMine && A !== guest) doPat(A.p); });
-    el.querySelectorAll('[data-pa]').forEach((b) => b.onclick = () => { const k = b.dataset.pa; if (k === 'care') openSheet(act); if (k === 'talk') talk(act, isMine, u.username, uid); if (k === 'pat') { actors[0].react = 90; fx.add(actors[0].x, 30, 'star', 10); snd('pat'); doPat(act); } if (k === 'bring') bring(b); });
+    el.querySelectorAll('[data-pa]').forEach((b) => b.onclick = () => { const k = b.dataset.pa; if (k === 'care') openSheet(act); if (k === 'talk') talk(act, isMine, u.username, uid); if (k === 'dance') danceOpen(act); if (k === 'pat') { actors[0].react = 90; fx.add(actors[0].x, 30, 'star', 10); snd('pat'); doPat(act); } if (k === 'bring') bring(b); });
     async function doPat(p) {
       if (!S.user || !S.profile) { toast('Sign in to pat Pals'); return; }
       try { const ok = await patPal(db, uid, p.id, S.user.uid); if (ok) { p.pats = (p.pats || 0) + 1; if (p === act) el.querySelector('.pal-pats b').textContent = p.pats; toast(`You patted ${p.name}! 🐾`); notify(uid, 'pal_pat', { text: `@${S.profile.username} patted ${p.name}` }); } else toast(`${p.name} already got your pat today. Come back tomorrow!`); }
@@ -304,7 +309,7 @@ export function createPals(ctx) {
       const btn = f.querySelector('[type=submit]'); btn.disabled = true;
       try { const m = await myPals(); let p;
         if (pal) { p = m.list.find((x) => x.id === pal.id); await m.store.save(p, { name: d.name, colors: d.colors, pattern: d.pattern, acc: d.acc }); }
-        else { p = await m.store.create(slot, d); m.list.push(p); m.list.sort((a, b) => a.id.localeCompare(b.id)); if (first || !S.profile.activePet) { await m.store.setActive(p.id); S.profile.activePet = p.id; } }
+        else { p = await m.store.create(slot, d); m.list.push(p); m.list.sort((a, b) => a.id.localeCompare(b.id)); if (first || !S.profile.activePet) { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); } }
         snd('hatch'); closeModal(); toast(pal ? 'Looking good!' : `Say hi to ${p.name}! 🐾`); onDone && onDone(p);
       } catch (err) { btn.disabled = false; toast(friendlyError(err)); } };
   }
@@ -319,13 +324,15 @@ export function createPals(ctx) {
       <div class="pal-eggbox"></div><h2>Meet your Kemy Pal 🐾</h2><p>${esc(PALS_COPY.replace('Meet your Kemy Pal 🐾 ', ''))}</p>
       <div class="btns"><button class="btn" id="pal-crack">${m.list.length ? 'Hatch a new egg' : 'Tap the egg to hatch!'}</button><button class="btn btn-ghost" data-close id="pal-skip">Maybe later</button></div></div>`);
     const box = document.querySelector('.pal-eggbox'); const s = stage(box, 200, 150); let cracks = 0, hatched = 0; const fx = particles();
-    const f = (t) => { s.c.clearRect(0, 0, 200, 150); if (!hatched) drawEgg(s.c, 100, 140, 120, RM() ? 0 : t * (1 + cracks), cracks); else { hatched++; drawPal(s.c, 100, 140, 110, { species: 'kemy', level: 1 }, { t, mode: 'happy' }); s.c.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - hatched / 30)})`; s.c.fillRect(0, 0, 200, 150); } fx.draw(s.c); };
+    const f = (t) => { s.c.clearRect(0, 0, 200, 150); if (!hatched) drawEgg(s.c, 100, 140, 120, RM() ? 0 : t * (1 + cracks), cracks); else { hatched++; drawDancer(s.c, 100, 140, 110, { species: 'kemy', level: 1 }, { t, mode: 'happy' }); s.c.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - hatched / 30)})`; s.c.fillRect(0, 0, 200, 150); } fx.draw(s.c); };
     f.el = s.cv; loop(f);
     const crack = () => { cracks++; if (cracks === 1) playIntro(); snd('pop'); fx.add(100, 80, 'star', 4); if (cracks >= 3) { hatched = 1; snd('hatch'); fx.add(100, 70, 'star', 18); setTimeout(() => creator({ slot: freeSlot, first: !m.list.length, onDone: () => { if (location.hash.startsWith('#/u/') || location.hash.startsWith('#/pals')) dispatchEvent(new HashChangeEvent('hashchange')); } }), 900); } };
     s.cv.onclick = crack; document.getElementById('pal-crack').onclick = crack;
   }
+  let floatUid = '';
   function onRoute(hash) {
     if (!S.user || !S.profile || S.profile.welcomed === false) return; trackStreak(); shop.daily();
+    if (floatUid !== S.user.uid) { floatUid = S.user.uid; dances.setEcon(shop.econ()); dispatchEvent(new Event('kemy:pal-float')); }
     const k = 'kemy-pals-intro-' + S.user.uid; if (localStorage.getItem(k) || /login|signup|onboard|settings|live/.test(hash || '')) return;
     if (document.querySelector('#modal-root .modal')) return;
     localStorage.setItem(k, '1'); myPals().then((m) => { if (m && !m.list.length) intro(false); }).catch(() => {});
@@ -342,22 +349,22 @@ export function createPals(ctx) {
       <p class="muted small">${esc(PALS_SHORT)} New eggs unlock as your Pals level up and with daily visit streaks.</p>
       <div class="pal-grid">${['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => { const p = m.list.find((x) => x.id === id);
         if (p) return `<div class="pal-card ${act && act.id === id ? 'active' : ''}" data-id="${id}"><div class="pal-thumb"></div><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv ${p.level}</small>
-          <div class="pal-card-b"><button class="btn btn-sm" data-c="care">Care</button><button class="btn btn-sm btn-ghost" data-c="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-c="closet">Closet</button><button class="btn btn-sm btn-ghost" data-c="style">Colors</button>${act && act.id === id ? '<span class="pal-on">On profile</span>' : '<button class="btn btn-sm btn-ghost" data-c="show">Show on profile</button>'}</div></div>`;
+          <div class="pal-card-b"><button class="btn btn-sm" data-c="care">Care</button><button class="btn btn-sm btn-ghost" data-c="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-c="dance">💃 Dance</button><button class="btn btn-sm btn-ghost" data-c="closet">Closet</button><button class="btn btn-sm btn-ghost" data-c="style">Colors</button>${act && act.id === id ? '<span class="pal-on">On profile</span>' : '<button class="btn btn-sm btn-ghost" data-c="show">Show on profile</button>'}</div></div>`;
         return id === firstEmpty && m.list.length < n ? `<button class="pal-card egg" data-hatch="${id}"><div class="pal-thumb"></div><b>Egg ready!</b><small>Tap to hatch</small></button>` : `<div class="pal-card locked"><div class="pal-lock">🔒</div><small>Level up your Pals to unlock</small></div>`; }).join('')}</div>
       <label class="check small pal-popset"><input type="checkbox" id="pal-vchat"> Let visitors chat with my Pal (AI)</label>
       <label class="check small pal-popset"><input type="checkbox" id="pal-pops" ${pop.enabled() ? 'checked' : ''}> Pal pop-ups while I scroll videos</label>
       ${debug() ? '<p class="small muted">Test mode is on (debug XP button in the care sheet). <button class="btn btn-sm btn-ghost" id="pal-poptest">Test pop-up</button></p>' : ''}</section>`;
     shop.econ().wallet().then((w) => { const el = main.querySelector('#pal-coins'); if (el) el.innerHTML = shop.coinTxt(w.coins); }).catch(() => {});
     main.querySelectorAll('[data-swc]').forEach((el) => { const p = m.list.find((x) => x.id === el.dataset.swc); const q = stage(el, 56, 50); drawPal(q.c, 28, 47, 40, p, { t: 20, mode: 'idle' }); });
-    main.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => { const p = m.list.find((x) => x.id === b.dataset.act); if (act && p.id === act.id) return; try { await m.store.setActive(p.id); S.profile.activePet = p.id; snd('pop'); toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } });
+    main.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => { const p = m.list.find((x) => x.id === b.dataset.act); if (act && p.id === act.id) return; try { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); snd('pop'); toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } });
     visitorSetting(main.querySelector('#pal-vchat'));
     main.querySelector('#pal-pops').onchange = (e) => { pop.set(e.target.checked); toast(e.target.checked ? 'Pal pop-ups on' : 'Pal pop-ups off'); };
     const pt = main.querySelector('#pal-poptest'); if (pt) pt.onclick = () => pop.show(true);
     main.querySelectorAll('.pal-card[data-id]').forEach((card) => { const p = m.list.find((x) => x.id === card.dataset.id); const s = stage(card.querySelector('.pal-thumb'), 110, 90);
-      const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawPal(s.c, 55, 84, 74, p, { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
+      const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawDancer(s.c, 55, 84, 74, p, { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
       card.querySelectorAll('[data-c]').forEach((b) => b.onclick = async () => { const c = b.dataset.c;
-        if (c === 'talk') talk(p, true, S.profile.username, S.user.uid); if (c === 'care') openSheet(p); if (c === 'closet') shop.closet(p, async (outfit) => { await m.store.save(p, { outfit }); page(main); }); if (c === 'style') creator({ pal: p, onDone: () => page(main) });
-        if (c === 'show') { try { await m.store.setActive(p.id); S.profile.activePet = p.id; toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } } }); });
+        if (c === 'talk') talk(p, true, S.profile.username, S.user.uid); if (c === 'dance') danceOpen(p); if (c === 'care') openSheet(p); if (c === 'closet') shop.closet(p, async (outfit) => { await m.store.save(p, { outfit }); page(main); }); if (c === 'style') creator({ pal: p, onDone: () => page(main) });
+        if (c === 'show') { try { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } } }); });
     main.querySelectorAll('[data-hatch]').forEach((b) => { const s = stage(b.querySelector('.pal-thumb'), 110, 90); const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawEgg(s.c, 55, 86, 76, RM() ? 0 : t); }; f.el = s.cv; loop(f); b.onclick = () => creator({ slot: b.dataset.hatch, onDone: () => page(main) }); });
   }
   function collected() {
@@ -375,5 +382,7 @@ export function createPals(ctx) {
   addEventListener('kemy:coins', (e) => { const d = e.detail || {}; if (S.user && d.src) shop.earn(d.src, d.n || 1, d.why); });
   // XP from activity elsewhere in the app: dispatchEvent(new CustomEvent('kemy:xp', { detail: { n } }))
   addEventListener('kemy:xp', async (e) => { try { const m = await myPals(); if (!m) return; const p = activeOf(m); if (!p) return; await commit(p, { xpGain: Math.min(60, (e.detail && e.detail.n) || 10) }); } catch {} });
+  // floating companion (keep-on-screen setting / dancing while music plays elsewhere)
+  initFloat({ toast, getPal: async () => { if (!S.user) return null; const m = await myPals(); return m ? activeOf(m) : null; } });
   return { renderProfile, onRoute, page, intro, openSheet, gallery, shop, myPals, activeOf, commit, liveOverlay: (root, o) => liveOverlay({ S, db, toast }, root, o), popups: pop };
 }

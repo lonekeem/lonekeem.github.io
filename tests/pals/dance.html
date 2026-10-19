@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458;color:#fff;font:12px sans-serif"><canvas id="c" width="1400" height="1500"></canvas>
+<script type="module">
+import { allDances, loadTrends, drawDancer } from '../../js/pals/dance.js';
+await loadTrends();
+const c = document.getElementById('c').getContext('2d'); const L = allDances(); const sp = ['kemy','elephant','kitten','puppy','panda','dragon','axolotl','bunny'];
+const cols = 4; // 4 beat samples per dance, 2 dances per row
+L.forEach((d, i) => { const row = Math.floor(i / 2), col0 = (i % 2) * 5;
+  c.fillStyle = '#fff'; c.fillText(d.name, col0 * 140 + 8, row * 52 * 1 + 14 + row * 0);
+});
+let y = 0; c.clearRect(0,0,1400,1500);
+L.forEach((d, i) => { const row = Math.floor(i / 2), x0 = (i % 2) * 700; const yy = 20 + row * 105;
+  c.fillStyle = '#ffd34d'; c.fillText(d.name + (d.tag ? ' · ' + d.tag : ''), x0 + 6, yy + 10);
+  for (let k = 0; k < 5; k++) { const beat = (d.beats / 5) * k + 0.01; drawDancer(c, x0 + 70 + k * 130, yy + 95, 60, { species: sp[i % sp.length], level: 5, id: 'p1', name: 'x', _dance: d.id }, { t: 30, dance: d, beat: beat });
+  } });
+window.done = true;
+</script>

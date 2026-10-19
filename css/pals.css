@@ -134,3 +134,31 @@
 .pal-talk.kb .pal-talk-head { font-size: .9rem; }
 body.typing .pal-pop { display: none !important; }
 .pal-talk-head { padding-right: 34px; }
+
+/* Dances: picker + Dance Shop */
+.pal-dance { display: grid; gap: 8px; text-align: left; }
+.pal-dance h2 { text-align: center; }
+.pal-dance-stage { display: grid; place-items: center; background: radial-gradient(circle at 50% 85%, rgba(255,211,77,.18), transparent 65%); border-radius: 18px; }
+.pal-dance-now { text-align: center; margin: 0; min-height: 1.2em; }
+.pal-dance .pal-tabs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pal-dance .pal-tabs .pal-coins { margin-left: auto; }
+.pal-dance-body { max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 8px; padding-right: 2px; }
+.pal-dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.pal-dtile { display: grid; gap: 2px; padding: 8px 10px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,.03); }
+.pal-dtile.on { border-color: #ffd34d; box-shadow: 0 0 0 2px rgba(255,211,77,.3); }
+.pal-dtile.lock b { opacity: .85; }
+.pal-dtile small { color: var(--muted); font-size: .72rem; }
+.pal-dtile .pal-tt { color: #ff6fae; font-weight: 600; }
+.pal-dtile .rar.r-c { color: #9aa3b5; } .pal-dtile .rar.r-r { color: #4aa8ff; } .pal-dtile .rar.r-l { color: #ffd34d; }
+.pal-dtile.r-l { background: linear-gradient(135deg, rgba(255,211,77,.10), rgba(255,255,255,.02)); }
+.pal-dbtns { display: flex; gap: 6px; margin-top: 4px; }
+.pal-confirm { text-align: center; padding: 8px; }
+.pal-confirm .btns { display: grid; gap: 8px; }
+/* floating companion Pal */
+.pal-float { position: fixed; left: 10px; bottom: calc(var(--bottom-h, 64px) + 16px + env(safe-area-inset-bottom)); z-index: 85; width: 84px; height: 84px; touch-action: none; cursor: grab; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); -webkit-tap-highlight-color: transparent; user-select: none; }
+body.feed-mode .pal-float:not(.moved) { bottom: calc(var(--bottom-h, 64px) + 230px + env(safe-area-inset-bottom)); }
+.pal-float.moved { bottom: auto; }
+.pal-float[hidden] { display: none; }
+.pal-float canvas { pointer-events: none; }
+@media (min-width: 900px) { .pal-float:not(.moved) { bottom: 24px; left: 24px; } body.feed-mode .pal-float:not(.moved) { bottom: 24px; } }
+body.kb-open .pal-float { display: none; }

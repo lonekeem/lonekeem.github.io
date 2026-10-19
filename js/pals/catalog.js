@@ -69,3 +69,5 @@ export function shopDoc() {
   for (const i of ITEMS) if (!i.ach) { prices[i.id] = i.p; kinds[i.id] = i.kind; }
   return { prices, kinds, deals: DEALS, v: 1 };
 }
+// Items registered at runtime (dances from js/pals/dance.js + data/pal-dances.json). They join shopDoc() too.
+export function addItems(list) { for (const it of list) if (!ITEM[it.id]) { ITEMS.push(it); ITEM[it.id] = it; } }

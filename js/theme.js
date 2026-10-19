@@ -31,13 +31,15 @@ const CALM = /^(#\/(me|home|u\/[^/]+|pals(?:\/(?:gallery|shop))?|settings|notifi
 const LOUD = /^#\/(watch|feed|post|live|game|games|park|new|explore|series|chat|messages|movie|create|songs|music)/i;
 const calmNow = () => CALM.test(location.hash || '') || !!document.querySelector('.welcome-modal, #welcome-title');
 
-let el = null, actx = null, gain = null, stopT = 0, wasPlaying = false, iosVol = false;
+let el = null, actx = null, gain = null, analyser = null, stopT = 0, wasPlaying = false, iosVol = false;
+export const themeAnalyser = () => analyser;
+export const themeEl = () => el;
 export function isPlaying() { return !!el && !el.paused && !el.dataset.stopping; }
 function otherMediaPlaying() { return [...document.querySelectorAll('video, audio')].some((m) => m !== el && !m.paused && !m.ended && !m.muted && m.volume > 0); }
 function ensureEl() {
   if (el) return el;
   el = new Audio(); el.preload = 'auto'; el.loop = true; el.dataset.kemyTheme = '1'; el.src = THEME_SRC; el.setAttribute('playsinline', '');
-  try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { actx = new AC(); gain = actx.createGain(); gain.gain.value = 0; actx.createMediaElementSource(el).connect(gain); gain.connect(actx.destination); } } catch { actx = null; gain = null; }
+  try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { actx = new AC(); gain = actx.createGain(); gain.gain.value = 0; const srcN = actx.createMediaElementSource(el); srcN.connect(gain); gain.connect(actx.destination); analyser = actx.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.5; srcN.connect(analyser); /* analyser is a dead end: it never changes loudness */ } } catch { actx = null; gain = null; }
   el.addEventListener('play', emit); el.addEventListener('pause', () => { emit(); paintFab(); });
   return el;
 }

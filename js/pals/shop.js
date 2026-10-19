@@ -72,7 +72,7 @@ export function createShopUI(ctx) {
       main.innerHTML = `<section class="card pad pal-box pal-shop"><div class="pal-box-head"><h1>Pal Shop</h1><span class="pal-coins" title="Star Coins">${coinTxt(w.coins)}</span></div>
         <p class="muted small">Star Coins are free: daily bonus, caring for your Pal, winning games, Bubble Quest stars, gold stars on your posts and Pal Park treasures. They can’t be bought.</p>
         <h2 class="pal-sub">🔥 Daily Deals <small class="muted">new every day</small></h2><div class="pal-deals">${Object.entries(deals).map(([id, pr]) => card(ITEM[id], pr)).join('')}</div>
-        <div class="pal-tabs">${[['wear', '👒 Clothes'], ['decor', '🏡 Decor'], ['toy', '🧸 Toys'], ['snack', '🍓 Snacks'], ['voice', '🎤 Voices'], ['ach', '🏆 Achievements']].map(([k, l]) => `<button data-cat="${k}" aria-selected="${cat === k}">${l}</button>`).join('')}</div>
+        <p><button class="btn btn-sm" type="button" id="dance-shop-link">💃 Dance Shop: Trending &amp; New on TikTok moves</button></p><div class="pal-tabs">${[['wear', '👒 Clothes'], ['decor', '🏡 Decor'], ['toy', '🧸 Toys'], ['snack', '🍓 Snacks'], ['voice', '🎤 Voices'], ['ach', '🏆 Achievements']].map(([k, l]) => `<button data-cat="${k}" aria-selected="${cat === k}">${l}</button>`).join('')}</div>
         ${cat === 'ach' ? `<div class="pal-shopgrid">${achs.map((i) => `<div class="pal-shopitem r-${i.r}"><i class="pal-ic" data-ic="${i.id}"></i><b>${esc(i.name)}</b><small class="rar" style="color:${RARITY[i.r].col}">${RARITY[i.r].name} · achievement</small><small>${esc(i.how)}</small>${inv[i.id] ? '<span class="pal-owned">Earned</span>' : `<button class="btn btn-sm btn-ghost" data-claim="${i.ach}">Claim</button>`}</div>`).join('')}</div>`
           : `<div class="pal-shopgrid">${list.map((i) => card(i)).join('')}</div>`}
         ${cat === 'decor' ? `<p class="small muted">Decor you own shows in your Pal’s corner on your profile (up to 3). <button class="btn btn-sm btn-ghost" id="room-edit">Arrange room</button></p>` : ''}
@@ -81,6 +81,7 @@ export function createShopUI(ctx) {
         <a class="btn btn-sm btn-ghost" href="#/pals">← Pal Box</a></section>`;
       main.querySelectorAll('[data-ic]').forEach((el) => icon(el, ITEM[el.dataset.ic], 64));
       main.querySelectorAll('[data-cat]').forEach((b) => b.onclick = () => { cat = b.dataset.cat; render(); });
+      main.querySelector('#dance-shop-link').onclick = () => dispatchEvent(new Event('kemy:dance-shop'));
       main.querySelectorAll('[data-buy]').forEach((b) => b.onclick = async () => { const it = ITEM[b.dataset.buy]; b.disabled = true;
         try { const paid = await e.buy(it.id); w = e.w; toast(`You got ${it.name}! −${paid} ★`); if (it.kind === 'wear' && act) setTimeout(() => toast('Open the Closet in your Pal Box to wear it'), 1200); render(); }
         catch (er) { b.disabled = false; toast(er.code ? friendlyError(er) : er.message); } });
