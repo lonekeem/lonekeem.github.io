@@ -1,16 +1,28 @@
 // Kemy's Bubble Quest - game shell: screens, loop (fixed 60 Hz), saving, leaderboard, share.
-import { parseLevel, newWorld, step, totals, T } from './sim.js';
-import { createRenderer, VW, VH } from './render.js';
-import { createAudio } from './audio.js';
-import { createInput } from './input.js';
-import { starPath } from './art.js';
+import { parseLevel, newWorld, step, totals, T, BOSSES } from './sim.js?v=2';
+import { createRenderer, VW, VH } from './render.js?v=2';
+import { createAudio } from './audio.js?v=2';
+import { createInput } from './input.js?v=2';
+import { starPath } from './art.js?v=2';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (ms) => { const s = ms / 1000; return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}.${Math.floor((s % 1) * 10)}`; };
 const SKEY = 'kq-settings', PKEY = 'kq-progress';
 const load = (k, d) => { try { return { ...d, ...JSON.parse(localStorage.getItem(k) || '{}') }; } catch { return d; } };
-const WORLDS = [{ id: 'pond', name: 'Lily Pond' }, { id: 'cave', name: 'Crystal Caves' }, { id: 'reef', name: 'Neon Reef' }];
+const WORLDS = [
+  { id: 'pond', name: 'Lily Pond', blurb: 'Hop across lily pads, reeds and ripples.', tags: ['Swimming', 'Springs'] },
+  { id: 'cave', name: 'Crystal Caves', blurb: 'Glittering tunnels, lifts and spikes.', tags: ['Lifts', 'Low tunnels'] },
+  { id: 'reef', name: 'Neon Reef', blurb: 'Swim through glowing coral mazes.', tags: ['Deep water', 'Puffer fish'] },
+  { id: 'meadow', name: 'Sunny Meadow', blurb: 'Boing off giant mushrooms and dodge bumblebees.', tags: ['Bouncy mushrooms', 'Bumblebees'] },
+  { id: 'sky', name: 'Cloud Kingdom', blurb: 'Puffy clouds crumble and the wind loves to push.', tags: ['Crumbling clouds', 'Wind & updrafts'] },
+  { id: 'frost', name: 'Frosty Peaks', blurb: 'Slippery ice, wobbly icicles and sliding penguins.', tags: ['Slippery ice', 'Icicles', 'Penguins'] },
+  { id: 'volcano', name: 'Volcano Glow', blurb: 'Time your jumps over lava tides and steam geysers.', tags: ['Lava tides', 'Geysers', 'Rising lava'] },
+  { id: 'castle', name: 'Starlight Castle', blurb: 'Flip star switches, outsmart wisps and ride belts.', tags: ['Switch blocks', 'Wisps', 'Conveyor belts'] },
+  { id: 'candy', name: 'Candy Falls', blurb: 'Secret sugary levels. Unlock them with Big Stars!', tags: ['Gumball poppers', 'Secret'], bonus: true }
+];
+const LEGACY = { '2-1': '1-2', '3-1': '2-2' }; // saves from the 6-level version keep their unlocks
+const BOSS_LABEL = { bullfrog: 'Bramble', geode: 'Quartzback', jelly: 'Lumajelly', bee: 'Buzzbelle', cloud: 'Nimbo', walrus: 'Tusky', moth: 'Moltara', owl: 'Noctra' };
 const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.8 6 6.5.7-4.9 4.4 1.4 6.4L12 16.9 6.2 20.1l1.4-6.4L2.7 9.3l6.5-.7z"/></svg>';
 
 export async function boot(root, opts = {}) {
@@ -18,7 +30,7 @@ export async function boot(root, opts = {}) {
   const prog = load(PKEY, { levels: {} });
   const saveS = () => localStorage.setItem(SKEY, JSON.stringify(settings));
   const saveP = () => localStorage.setItem(PKEY, JSON.stringify(prog));
-  const data = await (await fetch(new URL('../../../assets/kemy-quest/levels.json', import.meta.url))).json();
+  const data = await (await fetch(new URL('../../../assets/kemy-quest/levels.json?v=2', import.meta.url))).json();
   const LEVELS = data.levels.map(parseLevel);
   root.innerHTML = `
     <div class="kq-stage"><canvas class="kq-canvas" aria-label="Kemy's Bubble Quest game"></canvas></div>
@@ -31,7 +43,9 @@ export async function boot(root, opts = {}) {
   const canvas = $('.kq-canvas', root), ui = $('.kq-ui', root), touchEl = $('.kq-touch', root);
   const R = createRenderer(canvas); const audio = createAudio(settings); const input = createInput(touchEl);
   R.opts = settings;
-  const G = { screen: 'title', L: null, w: null, idx: 0, t: 0, label: '', labelT: 0, acc: 0, last: 0, cloud: null, user: null };
+  const G = { screen: 'title', L: null, w: null, idx: 0, t: 0, label: '', labelT: 0, acc: 0, last: 0, cloud: null, user: null, speed: 1, page: 0, mapTheme: 'pond' };
+  const worldOf = (l) => Math.max(0, WORLDS.findIndex((x) => x.id === l.theme));
+  const bossOf = (l) => (l.ents.find((e) => e.t === 'boss') || {}).k;
   const toast = (m) => { const t = $('.kq-toast', root); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2400); };
   const showTouch = () => settings.touch === 'on' || (settings.touch === 'auto' && (matchMedia('(pointer: coarse)').matches || /[?&]touch=1/.test(location.search)));
   function layout() {
@@ -51,24 +65,53 @@ export async function boot(root, opts = {}) {
     ui.querySelectorAll('button,a').forEach((b) => b.addEventListener('click', () => audio.play('tap')));
     const first = ui.querySelector('[autofocus],button'); if (first && !matchMedia('(pointer: coarse)').matches) first.focus({ preventScroll: true });
   }
-  const unlocked = (i) => i === 0 || !!(prog.levels[LEVELS[i - 1].id] || {}).done;
+  const done = (id) => !!(prog.levels[id] || {}).done;
   const bigCount = (id) => ((prog.levels[id] || {}).big || []).filter(Boolean).length;
+  const totalBig = () => LEVELS.reduce((a, l) => a + bigCount(l.id), 0);
+  function unlocked(i) {
+    const l = LEVELS[i]; if (!l) return false; if (done(l.id)) return true;
+    if (l.need) return totalBig() >= l.need;
+    if (i === 0) return true;
+    return done(LEVELS[i - 1].id) || !!(LEGACY[l.id] && done(LEGACY[l.id]));
+  }
   function renderTitle() {
-    setScreen('title', `<div class="kq-title"><h1><span>Kemy's</span> Bubble Quest</h1><p>Hop, swim and blow bubbles across three glowing worlds.</p>
+    setScreen('title', `<div class="kq-title"><h1><span>Kemy's</span> Bubble Quest</h1><p>Hop, swim and blow bubbles across eight glowing worlds.</p>
       <div class="kq-row"><button class="kq-btn big" data-go="map" autofocus>Play</button><button class="kq-btn ghost" data-go="settings">Settings</button></div>
       <p class="kq-small">${G.user ? `Signed in as ${esc(G.user.name)}. Your best times go on the leaderboard.` : `<a href="app.html#/login?next=${encodeURIComponent('kemy-quest.html')}">Sign in</a> to post best times to the leaderboard.`}</p>
       <p class="kq-keys">Move <kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> · Jump <kbd>Space</kbd>/<kbd>Z</kbd> (hold = higher) · Run &amp; bubble <kbd>X</kbd>/<kbd>Shift</kbd> · Pause <kbd>Esc</kbd></p></div>`);
     wire();
   }
   function renderMap() {
-    const total = LEVELS.reduce((a, l) => a + bigCount(l.id), 0);
-    setScreen('map', `<div class="kq-panel kq-map"><div class="kq-bar"><button class="kq-ib" data-go="title" aria-label="Back">←</button><h2>World map</h2><span class="kq-pill">${STAR_SVG} ${total}/${LEVELS.length * 3}</span></div>
-      ${WORLDS.map((wd) => `<section class="kq-world kq-w-${wd.id}"><h3>${wd.name}</h3><div class="kq-levels">${LEVELS.map((l, i) => l.theme !== wd.id ? '' : `
-        <div class="kq-lvl ${unlocked(i) ? '' : 'locked'}"><button class="kq-lvl-b" data-play="${i}" ${unlocked(i) ? '' : 'disabled aria-disabled="true"'}><b>${l.id}</b><span>${esc(l.name)}</span>
-          <span class="kq-bigs" aria-label="${bigCount(l.id)} of 3 big stars">${[0, 1, 2].map((k) => `<i class="${((prog.levels[l.id] || {}).big || [])[k] ? 'got' : ''}">${STAR_SVG}</i>`).join('')}</span>
-          <small>${unlocked(i) ? ((prog.levels[l.id] || {}).best ? 'Best ' + fmt(prog.levels[l.id].best) : 'New!') : 'Locked'}</small></button>
-          <button class="kq-lb-b" data-lb="${i}" aria-label="Leaderboard for ${l.id}">🏆</button></div>`).join('')}</div></section>`).join('')}</div>`);
+    const total = totalBig(); const rm = settings.rm;
+    const pages = WORLDS.map((wd, wi) => {
+      const lv = LEVELS.map((l, i) => [l, i]).filter(([l]) => l.theme === wd.id); if (!lv.length) return '';
+      const open = lv.some(([, i]) => unlocked(i)); const got = lv.reduce((a, [l]) => a + bigCount(l.id), 0);
+      const need = wd.bonus ? Math.min(...lv.map(([l]) => l.need || 0)) : 0;
+      return `<section class="kq-page kq-world kq-w-${wd.id} ${open ? '' : 'locked'}" data-page="${wi}" aria-label="${wd.bonus ? 'Secret world' : 'World ' + (wi + 1)}: ${esc(wd.name)}">
+        <header class="kq-whead"><span class="kq-wn">${wd.bonus ? 'Secret world' : 'World ' + (wi + 1)}</span><h3>${esc(wd.name)}</h3><span class="kq-pill kq-wbig">${STAR_SVG} ${got}/${lv.length * 3}</span>
+          <p>${esc(wd.blurb)}</p><div class="kq-tags">${wd.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</div></header>
+        ${open ? '' : `<p class="kq-lockmsg">${wd.bonus ? `Collect ${need} Big Stars to open the first secret level.` : `Beat the boss of ${esc(WORLDS[wi - 1].name)} to unlock.`}</p>`}
+        <div class="kq-levels">${lv.map(([l, i]) => { const u = unlocked(i), bk = bossOf(l), r = prog.levels[l.id] || {};
+          return `<div class="kq-lvl ${u ? '' : 'locked'} ${bk ? 'boss' : ''}"><button class="kq-lvl-b" data-play="${i}" ${u ? '' : 'disabled aria-disabled="true"'}><b>${esc(l.id)}${bk ? ' <em>Boss</em>' : ''}</b><span>${esc(l.name)}</span>
+            <span class="kq-bigs" aria-label="${bigCount(l.id)} of 3 big stars">${[0, 1, 2].map((k) => `<i class="${(r.big || [])[k] ? 'got' : ''}">${STAR_SVG}</i>`).join('')}</span>
+            <small>${u ? (r.best ? 'Best ' + fmt(r.best) : bk ? esc(BOSSES[bk].name) : 'New!') : l.need ? `Needs ${l.need} Big Stars` : 'Locked'}</small></button>
+            <button class="kq-lb-b" data-lb="${i}" aria-label="Leaderboard for ${esc(l.id)}">🏆</button></div>`; }).join('')}</div></section>`; }).join('');
+    setScreen('map', `<div class="kq-panel kq-map"><div class="kq-bar"><button class="kq-ib" data-go="title" aria-label="Back">←</button><h2>World map</h2><span class="kq-pill" title="Big Stars collected">${STAR_SVG} ${total}/${LEVELS.length * 3}</span></div>
+      <div class="kq-pages" tabindex="0" aria-label="Worlds (swipe or use the arrows)">${pages}</div>
+      <div class="kq-pager"><button class="kq-ib" data-pg="-1" aria-label="Previous world">‹</button><div class="kq-dots">${WORLDS.map((wd, wi) => `<button data-dot="${wi}" aria-label="${esc(wd.name)}"></button>`).join('')}</div><button class="kq-ib" data-pg="1" aria-label="Next world">›</button></div></div>`);
     wire();
+    const box = $('.kq-pages', ui); const n = WORLDS.length;
+    const setDots = (pg) => { G.page = pg; G.mapTheme = WORLDS[pg].id; ui.querySelectorAll('[data-dot]').forEach((d, k) => { d.classList.toggle('on', k === pg); d.setAttribute('aria-current', k === pg ? 'true' : 'false'); });
+      ui.querySelector('[data-pg="-1"]').disabled = pg === 0; ui.querySelector('[data-pg="1"]').disabled = pg === n - 1; if (prog.page !== pg) { prog.page = pg; saveP(); } };
+    const go = (pg, smooth = true) => { pg = Math.max(0, Math.min(n - 1, pg)); box.scrollTo({ left: pg * box.clientWidth, behavior: smooth && !rm ? 'smooth' : 'auto' }); setDots(pg); };
+    let st = 0; box.addEventListener('scroll', () => { clearTimeout(st); st = setTimeout(() => { const pg = Math.round(box.scrollLeft / Math.max(1, box.clientWidth)); if (pg !== G.page) setDots(pg); }, 80); }, { passive: true });
+    ui.querySelectorAll('[data-pg]').forEach((b) => b.onclick = () => go(G.page + +b.dataset.pg));
+    ui.querySelectorAll('[data-dot]').forEach((b) => b.onclick = () => go(+b.dataset.dot));
+    box.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') { go(G.page + 1); e.preventDefault(); } if (e.key === 'ArrowLeft') { go(G.page - 1); e.preventDefault(); } });
+    // open on the saved page, or the newest world with something to play
+    let pg = prog.page ?? -1; if (!(pg >= 0 && pg < n)) { pg = 0; WORLDS.forEach((wd, wi) => { if (!wd.bonus && LEVELS.some((l, i) => l.theme === wd.id && unlocked(i))) pg = wi; }); }
+    G.renderPage = (k) => go(k, false);
+    requestAnimationFrame(() => go(pg, false));
   }
   function renderSettings(back) {
     const tg = (k, label) => `<label class="kq-tg"><input type="checkbox" data-s="${k}" ${settings[k] ? 'checked' : ''}><span>${label}</span></label>`;
@@ -99,9 +142,9 @@ export async function boot(root, opts = {}) {
     ui.querySelectorAll('[data-lb]').forEach((b) => b.onclick = () => renderLB(+b.dataset.lb, renderMap));
   }
   // -------------------------------------------------- play
-  function start(i) {
-    G.idx = i; G.L = LEVELS[i]; G.w = newWorld(G.L); R.resetCam(G.w, G.L); G.label = `${G.L.id}  ${G.L.name}`; G.labelT = 150; G.saved = null;
-    input.clear(); setScreen('play'); audio.music(WORLDS.findIndex((x) => x.id === G.L.theme)); if (!settings.music) audio.apply();
+  function start(i, speed = 1) {
+    G.idx = i; G.L = LEVELS[i]; G.w = newWorld(G.L); R.resetCam(G.w, G.L); G.label = `${G.L.id}  ${G.L.name}`; G.labelT = 150; G.saved = null; G.speed = speed; G.acc = 0;
+    input.clear(); setScreen('play'); audio.music(G.L.music ?? worldOf(G.L)); if (!settings.music) audio.apply();
     if (location.hash !== '#lvl=' + G.L.id) history.replaceState(null, '', '#lvl=' + G.L.id);
   }
   function pause() {
@@ -124,6 +167,11 @@ export async function boot(root, opts = {}) {
       if (e === 'hurt') R.shake = 12;
       if (e === 'check') { G.label = 'Checkpoint!'; G.labelT = 80; R.burst(p.x + 6, p.y, '#ffb3de', 10); }
       if (e === 'power') { G.label = 'Bubble power! Press X / RUN'; G.labelT = 150; }
+      if (e === 'boss') { G.label = G.w.boss.name + '!'; G.labelT = 150; }
+      if (e === 'bosshit') { const B = G.w.boss; R.shake = 10; R.burst(B.x + B.w / 2, B.y + 4, '#ffd34d', 12); if (B.hp > 0) { G.label = `${BOSS_LABEL[B.k] || 'Boss'}: ${B.hp} more!`; G.labelT = 70; } }
+      if (e === 'bossdown') { const B = G.w.boss; R.burst(B.x + B.w / 2, B.y + B.h / 2, '#ffb3de', 16); G.label = `${BOSS_LABEL[B.k] || 'Boss'} calmed down! Gate open`; G.labelT = 160; }
+      if (e === 'switch') R.burst(p.x + 6, p.y + 14, G.w.sw ? '#6fc8ff' : '#ff7fc8', 8);
+      if (e === 'crumble' && !settings.rm) R.shake = Math.max(R.shake, 3);
       if (e === 'clear') { audio.stopMusic(); }
       if (e === 'dead') { audio.stopMusic(); setTimeout(died, 900); }
     }
@@ -134,19 +182,21 @@ export async function boot(root, opts = {}) {
     ui.querySelector('[data-d=retry]').onclick = () => start(G.idx); ui.querySelector('[data-d=map]').onclick = renderMap;
   }
   async function cleared() {
-    const L = G.L, w = G.w; const ms = Math.round(w.frame * 1000 / 60); const tot = totals(L);
+    const L = G.L, w = G.w; const ms = Math.round(w.frame * 1000 / 60); const tot = totals(L); const bigBefore = totalBig();
     const rec = prog.levels[L.id] || { done: false, best: 0, stars: 0, big: [false, false, false] };
     const newBest = !rec.best || ms < rec.best;
     rec.done = true; rec.best = newBest ? ms : rec.best; rec.stars = Math.max(rec.stars || 0, w.stars); rec.big = [0, 1, 2].map((k) => !!(rec.big[k] || w.big[k]));
     prog.levels[L.id] = rec; saveP();
-    const nBig = w.big.filter(Boolean).length; const next = G.idx + 1 < LEVELS.length;
-    setScreen('clear', `<div class="kq-panel kq-clear"><div class="kq-cstar">${STAR_SVG}</div><h2>Level clear!</h2><p class="kq-sub">${L.id} ${esc(L.name)}</p>
+    const nBig = w.big.filter(Boolean).length; const next = G.idx + 1 < LEVELS.length && unlocked(G.idx + 1) && !(L.id === '8-5' && LEVELS[G.idx + 1].need);
+    const opened = LEVELS.filter((l) => l.need && l.need > bigBefore && l.need <= totalBig()); if (opened.length) setTimeout(() => toast(`Secret level ${opened.map((l) => l.id + ' ' + l.name).join(', ')} unlocked!`), 600);
+    const finale = L.id === '8-5';
+    setScreen('clear', `<div class="kq-panel kq-clear"><div class="kq-cstar">${STAR_SVG}</div><h2>${finale ? 'Starlight Castle is saved!' : bossOf(L) ? 'Boss cleared!' : 'Level clear!'}</h2><p class="kq-sub">${L.id} ${esc(L.name)}</p>
       <div class="kq-stats"><div><small>Time</small><b>${fmt(ms)}</b>${newBest ? '<em>New best!</em>' : `<em>Best ${fmt(rec.best)}</em>`}</div><div><small>Stars</small><b>${w.stars}/${tot.stars}</b></div><div><small>Big Stars</small><b class="kq-bigs">${[0, 1, 2].map((k) => `<i class="${w.big[k] ? 'got' : ''}">${STAR_SVG}</i>`).join('')}</b></div></div>
       <p class="kq-small kq-cloud">${G.user ? 'Saving to leaderboard…' : `<a href="app.html#/login?next=${encodeURIComponent('kemy-quest.html')}">Sign in</a> to post this time.`}</p>
-      <div class="kq-col">${next ? '<button class="kq-btn" data-c="next" autofocus>Next level</button>' : '<button class="kq-btn" data-c="map" autofocus>You beat every level! Map</button>'}
+      <div class="kq-col">${finale ? '<p class="kq-small">Kemy calmed Noctra and every world glows again. Hunt Big Stars to open the secret Candy Falls levels!</p>' : ''}${next ? '<button class="kq-btn" data-c="next" autofocus>Next level</button>' : `<button class="kq-btn" data-c="map" autofocus>${finale || L.need ? 'World map' : 'Back to the map'}</button>`}
       <div class="kq-row"><button class="kq-btn ghost" data-c="replay">Replay</button><button class="kq-btn ghost" data-c="lb">Leaderboard</button><button class="kq-btn ghost" data-c="share">Share my score</button><button class="kq-btn ghost" data-c="map">Map</button></div></div></div>`);
     const on = (k, f) => ui.querySelectorAll(`[data-c=${k}]`).forEach((b) => b.onclick = f);
-    on('next', () => start(G.idx + 1)); on('replay', () => start(G.idx)); on('map', renderMap); on('lb', () => renderLB(G.idx, () => { G.screen = 'clear'; renderMap(); }));
+    on('next', () => { prog.page = worldOf(LEVELS[G.idx + 1]); start(G.idx + 1); }); on('replay', () => start(G.idx)); on('map', renderMap); on('lb', () => renderLB(G.idx, () => { G.screen = 'clear'; renderMap(); }));
     on('share', () => share(L, ms, w.stars, nBig));
     if (G.user && !opts.noCloud) {
       try { const c = await cloud(); const r = await c.save(L.id, ms, w.stars, nBig); const el = $('.kq-cloud', ui); if (el) el.textContent = r.saved ? (r.improved ? 'New personal best posted to the leaderboard!' : 'Stars updated on the leaderboard.') : `Your leaderboard best is ${fmt(r.best || ms)}.`; }
@@ -163,29 +213,29 @@ export async function boot(root, opts = {}) {
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(100, now - (G.last || now)); G.last = now; G.t++;
-    if (G.screen === 'title' || (G.screen === 'map' || G.screen === 'settings' || G.screen === 'lb') && !G.w) { R.drawTitle(G.t); return; }
+    if (G.screen === 'title' || (G.screen === 'map' || G.screen === 'settings' || G.screen === 'lb') && !G.w) { R.drawTitle(G.t, G.screen === 'map' ? G.mapTheme : 'pond'); return; }
     if (!G.w) return;
     if (G.screen === 'play') {
-      G.acc += dt; let n = 0;
-      while (G.acc >= 1000 / 60 && n < 5) {
+      G.acc += dt * G.speed; let n = 0; const cap = 5 * G.speed;
+      while (G.acc >= 1000 / 60 && n < cap) {
         G.acc -= 1000 / 60; n++;
         step(G.w, G.L, input.read()); onEvents(G.w.events); R.update(G.w, G.L); if (G.labelT > 0) G.labelT--;
         if (G.w.over === 'clear' && G.w.clearT === 100) { cleared(); break; }
       }
-      if (n === 5) G.acc = 0;
+      if (n === cap) G.acc = 0;
     }
-    if (G.screen === 'map' || G.screen === 'title') { R.drawTitle(G.t); return; }
+    if (G.screen === 'map' || G.screen === 'title') { R.drawTitle(G.t, G.screen === 'map' ? G.mapTheme : 'pond'); return; }
     R.draw(G.w, G.L, G.t, { label: G.labelT > 0 ? G.label : '', labelT: G.labelT });
   }
   layout(); renderTitle(); requestAnimationFrame(frame);
-  const m = /lvl=(\d-\d)/.exec(location.hash); if (m) { const i = LEVELS.findIndex((l) => l.id === m[1]); if (i >= 0 && unlocked(i)) start(i); }
+  const m = /lvl=([\w-]+)/.exec(location.hash); if (m) { const i = LEVELS.findIndex((l) => l.id === m[1]); if (i >= 0 && unlocked(i)) start(i); }
   // test / automation hook (read-only state + scripted replays)
   const api = {
-    get screen() { return G.screen; }, get world() { return G.w; }, levels: LEVELS.map((l) => l.id), start, pause, renderMap,
+    get screen() { return G.screen; }, get world() { return G.w; }, get page() { return G.page; }, levels: LEVELS.map((l) => l.id), start, pause, renderMap, unlocked,
     async replay(i, speed = 1) {
-      const sol = (await (await fetch(new URL('../../../assets/kemy-quest/solutions.json', import.meta.url))).json())[LEVELS[i].id];
+      const sol = (await (await fetch(new URL('../../../assets/kemy-quest/solutions.json?v=2', import.meta.url))).json())[LEVELS[i].id];
       const path = [...sol.path].map((ch) => parseInt(ch, 36)); let f = 0;
-      start(i); input.script = () => { const k = Math.floor(f / sol.macro); const a = sol.acts[path[k]] || [0, 0, 0]; const r = { left: a[0] < 0, right: a[0] > 0, jump: (f % sol.macro) < a[1], run: !!a[2], up: false, down: false }; f++; return r; };
+      start(i, speed); input.script = () => { const k = Math.floor(f / sol.macro); const a = sol.acts[path[k]] || [0, 0, 0]; const r = { left: a[0] < 0, right: a[0] > 0, jump: (f % sol.macro) < a[1], run: !!a[2], up: false, down: false }; f++; return r; };
       return new Promise((res) => { const iv = setInterval(() => { if (G.w.over) { clearInterval(iv); input.script = null; res({ over: G.w.over, frames: G.w.frame, stars: G.w.stars }); } }, 50); });
     },
     hold(k, v) { input.script = null; const s = api._s ||= { left: false, right: false, up: false, down: false, jump: false, run: false }; s[k] = v; input.script = () => ({ ...s }); },
