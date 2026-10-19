@@ -1074,7 +1074,8 @@ async function pageSettings() {
       <h2 id="spals-h" style="font-size:1.05rem">Pals</h2>
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-dance" ${danceEnabled() ? 'checked' : ''}> <span>Pals dance to music<br><span class="muted small">When the theme song, a song or a music video plays.</span></span></label>
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-keep" ${palKeepOn() ? 'checked' : ''}> <span>Keep Pal on screen while scrolling<br><span class="muted small">A small Pal in the corner. Double-tap it to hide, triple-tap the screen to bring it back, drag to move.</span></span></label>
-      <p class="small" style="margin:8px 0 0"><button type="button" class="btn btn-sm btn-ghost" id="s-dance-shop">💃 Dances &amp; Dance Shop</button></p>
+      <label for="s-pal-gfx" style="margin-top:8px">Pal graphics</label><select id="s-pal-gfx" style="width:100%"><option value="ultra">Ultra (best 3D, steps down if slow)</option><option value="high">High (3D)</option><option value="low">Low (2D, saves battery)</option></select>
+         <p class="small" style="margin:8px 0 0"><button type="button" class="btn btn-sm btn-ghost" id="s-dance-shop">💃 Dances &amp; Dance Shop</button></p>
     </section>
     <section class="card pad" style="margin-top:16px">
       <h2 style="font-size:1.05rem">Account</h2>
@@ -1094,6 +1095,7 @@ async function pageSettings() {
   document.querySelectorAll('[name=s-theme-mode]').forEach((r) => { r.onchange = () => { setThemeMode(r.value, { start: r.value === 'play' }); toast(r.value === 'play' ? 'Theme song on' : r.value === 'mute' ? 'Theme song muted' : 'Theme song off'); }; });
   $('#s-pal-dance').onchange = (e) => { setDanceEnabled(e.target.checked); toast(e.target.checked ? 'Pals will dance to music 💃' : 'Pal dancing off'); };
   $('#s-pal-keep').onchange = (e) => { setPalKeep(e.target.checked); toast(e.target.checked ? 'Your Pal will stay on screen' : 'Floating Pal off'); };
+  { const g = $('#s-pal-gfx'); import('./pals/pal3d.js').then((m) => { g.value = m.gfxLevel(); g.onchange = () => { m.setGfx(g.value); toast(g.value === 'low' ? 'Pals use 2D art (reload to apply)' : 'Pal graphics: ' + g.value); }; }).catch(() => { g.value = 'low'; g.disabled = true; }); }
   $('#s-dance-shop').onclick = () => dispatchEvent(new Event('kemy:dance-shop'));
   $('#s-theme-vol').oninput = (e) => { const v = +e.target.value / 100; setThemeVol(v); $('#s-theme-vol-n').textContent = e.target.value + '%'; };
   { const b = $('#s-theme'); const paint = () => { b.textContent = themePlaying() ? '⏸ Stop theme' : '🎵 Play theme'; };

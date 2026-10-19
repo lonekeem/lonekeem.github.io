@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="1000" height="6000"></canvas>
+<script type="module">
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { SPECIES } from '../../js/pals/art.js';
+const c = document.getElementById('c').getContext('2d'); c.fillStyle = '#2a1458'; c.fillRect(0, 0, 1000, 6000); c.font = '600 14px sans-serif';
+const V = [[0, 'idle'], [0.75, 'idle'], [1.5708, 'idle'], [0.5, 'dance']];
+SPECIES.forEach((sp, i) => { const y0 = i * 200; c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(0, y0, 1000, 196); c.fillStyle = '#ffd34d'; c.fillText(sp.id, 6, y0 + 16);
+  V.forEach(([yaw, m], j) => { let tries = 0; const go = () => { if (!drawPal3D(c, 125 + j * 250, y0 + 190, 110, { species: sp.id, level: 6 }, { t: 37, mode: 'idle', yaw, dance3d: m === 'dance' ? 'renegroove' : null, beat: 2.3, amt: 1 }) && tries++ < 50) setTimeout(go, 20); }; setTimeout(go, (i * 4 + j) * 20); }); });
+setTimeout(() => (window.ready = true), 30 * 4 * 20 + 1500);
+</script>
