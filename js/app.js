@@ -763,8 +763,10 @@ async function pageProfile(username, tab, token) {
     getCountFromServer(query(collection(db, 'follows'), where('follower', '==', uid))),
     getCountFromServer(query(collection(db, 'posts'), where('authorId', '==', uid))),
     // Total stars (likeCount) + views across all of their posts (server-side sums, one cheap aggregate read).
-    getAggregateFromServer(query(collection(db, 'posts'), where('authorId', '==', uid)), { likes: sum('likeCount'), views: sum('viewCount') })
-      .then((a) => a.data()).catch(() => ({ likes: 0, views: 0 }))
+    // (Two separate sums: each needs its own authorId+field index, and a doc missing one field
+    // must still count toward the other.)
+    Promise.all(['likeCount', 'viewCount'].map((f) => getAggregateFromServer(query(collection(db, 'posts'), where('authorId', '==', uid)), { n: sum(f) })
+      .then((a) => Number(a.data().n) || 0).catch(() => 0))).then(([likes, views]) => ({ likes, views }))
   ]);
   if (stale(token)) return;
   const isFollowing = S.following.has(uid);
