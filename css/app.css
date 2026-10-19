@@ -704,7 +704,7 @@ body.story-open { overflow: hidden; }
 /* ---------------------------------------------------------------- views + stars */
 .views { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .views svg.views-ic, .gviews svg.views-ic { color: inherit; }
-.views-ic path:last-child { fill: #ffc83d; }
+.views-ic .ks { fill: #c9a6ff; }
 .act.views { margin-left: auto; cursor: default; font-size: .9rem; }
 .act.views:hover { background: none; color: var(--muted); }
 .act.views svg { width: 20px; height: 20px; }
@@ -718,3 +718,24 @@ body.story-open { overflow: hidden; }
 /* Stars (UI name for likes): gold outline, solid gold with a studio-purple glow when starred */
 svg.star-ic { color: #ffc83d; }
 .act.like:not(.on) svg.star-ic, .vact.like:not(.on) svg.star-ic { filter: drop-shadow(0 0 3px rgba(138,43,226,.55)); }
+
+/* ---------------------------------------------------------------- Lone Keem icon set (js/icons.js) */
+.ki .ks, .ki .kf { stroke: none; fill: currentColor; }
+.ki .ks { fill: #c9a6ff; }
+/* Purple-gradient strokes on the app chrome and on card actions */
+.icon-btn .ki, .act .ki, .bottom-nav a.active .ki { stroke: url(#lks-g); }
+.icon-btn .ki .kf, .act .ki .kf, .bottom-nav a.active .ki .kf, .bottom-nav a.active .ki .ks { fill: url(#lks-g); }
+.bottom-nav a.active .ki { filter: drop-shadow(0 0 6px rgba(138,43,226,.6)); }
+.bottom-nav a:not(.active) .ki .ks { fill: currentColor; opacity: .75; }
+/* Create button: purple gradient tile with one clipped (notched) corner, white plus + spark */
+.bottom-nav a.post-btn svg.ki-create {
+  width: 46px; height: 32px; padding: 4px; border-radius: 12px 4px 12px 12px; color: #fff !important; stroke: #fff;
+  background: linear-gradient(135deg, #b57bff, #8a2be2 55%, #5b1aa8); box-shadow: 0 4px 14px rgba(138,43,226,.45), inset 0 1px 0 rgba(255,255,255,.25);
+  filter: none;
+}
+.bottom-nav a.post-btn svg.ki-create .ks { fill: #fff; opacity: 1; }
+.bottom-nav a.post-btn.active svg.ki-create { box-shadow: 0 0 0 2px rgba(201,166,255,.55), 0 4px 16px rgba(138,43,226,.6); }
+/* On top of videos: white strokes for contrast, purple sparks */
+.vact .ki { stroke: #fff; }
+.vact .ki .ks { fill: #d9bfff; }
+.vsearch .ki { stroke: #fff; }

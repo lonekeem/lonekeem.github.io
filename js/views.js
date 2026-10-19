@@ -8,7 +8,7 @@ import { doc, writeBatch, updateDoc, serverTimestamp, increment } from 'https://
 
 export const VIDEO_VIEW_SECONDS = 2.5;
 export const PHOTO_VIEW_MS = 2000;
-export const EYE = '<svg class="views-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 5.2v13.6L17.5 12z"/><path d="M19.6 2.4l.75 1.75 1.75.75-1.75.75-.75 1.75-.75-1.75-1.75-.75 1.75-.75z" fill="currentColor" stroke="none"/></svg>';
+export const EYE = '<svg class="ki ki-views views-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6.6 6.2a1.4 1.4 0 0 1 2.1-1.2l9.4 5.8a1.4 1.4 0 0 1 0 2.4l-9.4 5.8a1.4 1.4 0 0 1-2.1-1.2z"/><path class="ks" d="M19.6 2.4l.75 1.75 1.75.75-1.75.75-.75 1.75-.75-1.75-1.75-.75 1.75-.75z" fill="currentColor" stroke="none"/></svg>';
 
 // 999 · 1.2K · 12K · 3.4M
 export function fmtCount(n) {

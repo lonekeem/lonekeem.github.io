@@ -1,6 +1,7 @@
 // Homepage add-ons: header account button + star (like) / comment / save bar on studio videos.
 import { auth, db } from './firebase-init.js';
 import { safePhotoURL } from './media-config.js';
+import { ICONS } from './icons.js';
 import { viewsHtml, setCounters, trackVideo, trackVisible } from './views.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
@@ -20,13 +21,13 @@ function renderAccount() {
   } else if (me) {
     slot.innerHTML = `<a class="acct-pill" href="app.html#/onboard">Finish sign-up</a>`;
   } else {
-    slot.innerHTML = `<a class="acct-pill" href="app.html#/login"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Sign in</a>`;
+    slot.innerHTML = `<a class="acct-pill" href="app.html#/login">${ICONS.profile}Sign in</a>`;
   }
 }
 
 const HEART = '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>';
-const BUBBLE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>';
-const MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h12a1 1 0 0 1 1 1v16l-7-4.5-7 4.5v-16a1 1 0 0 1 1-1z"/></svg>';
+const BUBBLE = ICONS.comment;
+const MARK = ICONS.save;
 
 const bars = [];
 document.querySelectorAll('[data-post-id]').forEach((card) => {

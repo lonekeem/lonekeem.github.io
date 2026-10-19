@@ -3,10 +3,11 @@
 // keywords / hashtags array-contains) merged with a client-side scan of the newest posts and
 // profiles, so content that hasn't been re-indexed yet is still found in a small community.
 import { fold, words, parseHashtags } from './search-index.js';
+import { ICONS } from './icons.js';
 
 const RECENT_KEY = 'lks-recent-searches';
 const TABS = [['top', 'Top'], ['users', 'Users'], ['videos', 'Videos'], ['photos', 'Photos'], ['posts', 'Posts'], ['hashtags', 'Hashtags']];
-export const SEARCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+export const SEARCH_ICON = ICONS.search;
 const IC = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
