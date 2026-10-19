@@ -82,6 +82,15 @@ for (const f of cfg.news || []) {
     console.log(`news ${f.name}: ${n}`);
   } catch (e) { console.log(`news ${f.name}: FAILED ${e.message}`); }
 }
+// Drop videos whose owners turned off embedding (they'd show "Video unavailable" instead of autoplaying).
+{
+  const keep = [];
+  for (const v of out.videos) {
+    try { const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + v.id)}`); if (r.ok) keep.push(v); else skipped++; }
+    catch { keep.push(v); }
+  }
+  console.log(`embeddable: ${keep.length}/${out.videos.length}`); out.videos = keep;
+}
 out.videos.sort((a, b) => b.published.localeCompare(a.published));
 out.news.sort((a, b) => b.published.localeCompare(a.published));
 console.log(`total: ${out.videos.length} videos (${shortsN} Shorts), ${out.news.length} headlines, ${skipped} skipped by the kid-safe filter`);
