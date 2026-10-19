@@ -68,7 +68,7 @@ await A.p.waitForSelector('.g-result', { timeout: 40000 }).then(() => ok('Pal Ga
 await clearModal(A);
 // online Pal Game: A creates a link game, B joins
 const B = await account('b'); await hatch(B, 'Puff', 'kitten');
-await A.p.evaluate(() => { location.hash = '#/games/pals'; }); await A.p.waitForSelector('[data-m=friend]'); await A.p.click('[data-g=bubbles]'); await A.p.click('[data-m=friend]'); await A.p.click('#pg-friend [type=submit]');
+await A.p.evaluate(() => { location.hash = '#/pals'; }); await A.p.waitForTimeout(800); await A.p.evaluate(() => { location.hash = '#/games/pals'; }); await A.p.waitForSelector('[data-m=friend]'); await A.p.click('[data-g=bubbles]'); await A.p.click('[data-m=friend]'); await A.p.click('#pg-friend [type=submit]');
 await A.p.waitForSelector('.pg-wait input', { timeout: 15000 }); const link = await A.p.inputValue('.pg-wait input');
 await B.p.evaluate((h) => { location.hash = h; }, '#' + link.split('#')[1]);
 await Promise.all([A.p.waitForSelector('.pg-cv', { timeout: 20000 }), B.p.waitForSelector('.pg-cv', { timeout: 20000 })]).then(() => ok('friend match starts for both', true)).catch(() => ok('friend match starts for both', false));
