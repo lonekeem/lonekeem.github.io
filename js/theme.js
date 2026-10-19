@@ -1,91 +1,105 @@
-// Kemy's theme song: "Stand Up Strong" (Instrumental), written by Lone Keem.
-// Rules: only ever starts after a user tap (no autoplay with sound), never plays over videos, lives,
-// songs, Movie Maker previews or games (any other unmuted <video>/<audio> playing stops it), pauses
-// while the tab is hidden, and the optional home background music is OFF unless the user turns it on.
+// Kemy's theme song. To swap the song, change THEME_FILE + THEME_TITLE (one place; kemy/index.html reads these too).
+// Rules: only ever starts after a user tap, plays LOW (default 20%) through Web Audio so the volume also works on
+// iPhone (iOS ignores audio.volume), fades in/out over ~1.5 s, never plays over videos, lives, songs, Movie Maker
+// previews or games (kemy:media-play / any other unmuted media stops it), pauses while the tab is hidden.
+// The user picks Play / Mute / Off (one-time prompt, floating 🎵 button, Settings > Sound); stored on this device.
+export const THEME_FILE = 'kemy-theme.mp3'; // currently "Stand Up Strong" (Instrumental)
 export const THEME_TITLE = 'Stand Up Strong (Instrumental)';
-export const THEME_CREDIT = 'Theme song: Stand Up Strong (Instrumental) — Lone Keem';
-const BASE = new URL('../assets/audio/', import.meta.url).href;
-const pick = (name) => { const a = document.createElement('audio');
-  return BASE + name + (a.canPlayType('audio/ogg; codecs="opus"') ? '.ogg' : '.mp3'); };
-export const THEME_SRC = { full: BASE + 'kemy-theme.mp3', short: BASE + 'kemy-theme-short.mp3' };
-const KEY = 'kemy-theme-bgm';
-// Routes where the optional background music may play: calm screens without their own sound.
-const CALM = /^#\/(me|u\/[^/]+|pals(?:\/(?:gallery|shop))?|settings|notifications)$/i;
-// Routes that always silence the theme (their own sound or media).
-const LOUD = /^#\/(watch|feed|post|live|game|games|park|new|explore|series|chat|messages)/i;
+export const THEME_CREDIT = `Theme song: ${THEME_TITLE} — Lone Keem`;
+export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
+export const STAND_UP_STRONG_SRC = new URL('../assets/audio/stand-up-strong-instrumental.mp3', import.meta.url).href;
 
-let el = null, kind = '', fadeT = 0, wasPlayingBeforeHide = false;
-const VOL = { short: 0.55, full: 0.32 };
-export const bgmOn = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
-export function setBgm(on) {
-  try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* */ }
-  if (on) startBgm(); else if (kind === 'full') stop();
+const MODE = 'kemy-theme-mode', VOLK = 'kemy-theme-vol', OLD = 'kemy-theme-bgm';
+export const DEFAULT_VOL = 0.2, FADE = 1.5;
+const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } } };
+// '' = not asked yet, 'play', 'mute' (paused, tap to resume), 'off' (never starts, button hidden)
+export function getMode() { const m = ls.get(MODE); if (m === 'play' || m === 'mute' || m === 'off') return m; if (ls.get(OLD) === '1') return 'play'; return ''; }
+export function getVolume() { const v = parseFloat(ls.get(VOLK)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : DEFAULT_VOL; }
+const emit = () => document.dispatchEvent(new CustomEvent('kemy-theme', { detail: { playing: isPlaying(), mode: getMode() } }));
+export function setMode(m, { start = true } = {}) {
+  ls.set(MODE, m);
+  if (m === 'play') { if (start) play(); } else stop();
+  emit(); paintFab();
 }
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const saveData = () => !!(navigator.connection && navigator.connection.saveData);
-function otherMediaPlaying() {
-  return [...document.querySelectorAll('video, audio')].some((m) => m !== el && !m.paused && !m.ended && !m.muted && m.volume > 0);
+export function setVolume(v) { ls.set(VOLK, String(v)); if (gain && actx && el && !el.paused) { const g = gain.gain; g.cancelScheduledValues(actx.currentTime); g.setTargetAtTime(v, actx.currentTime, 0.05); } else if (el && !actx) el.volume = v; }
+// legacy API (old Settings checkbox)
+export const bgmOn = () => getMode() === 'play';
+export const setBgm = (on) => setMode(on ? 'play' : 'mute');
+
+// Calm screens where the theme may play and the floating button shows.
+const CALM = /^(#\/(me|home|u\/[^/]+|pals(?:\/(?:gallery|shop))?|settings|notifications))$/i;
+const LOUD = /^#\/(watch|feed|post|live|game|games|park|new|explore|series|chat|messages|movie|create|songs|music)/i;
+const calmNow = () => CALM.test(location.hash || '') || !!document.querySelector('.welcome-modal, #welcome-title');
+
+let el = null, actx = null, gain = null, stopT = 0, wasPlaying = false, iosVol = false;
+export function isPlaying() { return !!el && !el.paused && !el.dataset.stopping; }
+function otherMediaPlaying() { return [...document.querySelectorAll('video, audio')].some((m) => m !== el && !m.paused && !m.ended && !m.muted && m.volume > 0); }
+function ensureEl() {
+  if (el) return el;
+  el = new Audio(); el.preload = 'auto'; el.loop = true; el.dataset.kemyTheme = '1'; el.src = THEME_SRC; el.setAttribute('playsinline', '');
+  try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { actx = new AC(); gain = actx.createGain(); gain.gain.value = 0; actx.createMediaElementSource(el).connect(gain); gain.connect(actx.destination); } } catch { actx = null; gain = null; }
+  el.addEventListener('play', emit); el.addEventListener('pause', () => { emit(); paintFab(); });
+  return el;
 }
-function fadeTo(v, ms, done) {
-  clearInterval(fadeT); if (!el) return done && done();
-  const a = el, from = a.volume, t0 = performance.now();
-  fadeT = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / ms); a.volume = Math.max(0, Math.min(1, from + (v - from) * k)); if (k >= 1) { clearInterval(fadeT); done && done(); } }, 40);
+function ramp(to, sec) {
+  if (actx && gain) { const g = gain.gain, t = actx.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(to, t + sec); return; }
+  // fallback (no Web Audio): element volume
+  const a = el, from = a.volume, t0 = performance.now(); clearInterval(a._f);
+  a._f = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / (sec * 1000)); a.volume = from + (to - from) * k; if (k >= 1) clearInterval(a._f); }, 40);
 }
-export function isPlaying() { return !!el && !el.paused; }
-export function stop(ms = 400) {
-  if (!el) return; const a = el; el = null; kind = '';
-  const v0 = a.volume, t0 = performance.now(); clearInterval(fadeT);
-  const t = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / ms); a.volume = v0 * (1 - k); if (k >= 1) { clearInterval(t); a.pause(); a.removeAttribute('src'); a.load(); } }, 40);
-  document.dispatchEvent(new CustomEvent('kemy-theme', { detail: { playing: false } }));
-}
-// Play the theme. Call from a click/tap handler. Returns a promise resolving true if it is playing.
-export async function play(which = 'short', { loop = false } = {}) {
+// Start (or resume) the theme. Call from a tap. fromStart: welcome screen / egg hatch play the song from the top.
+export async function play({ fromStart = false, force = false } = {}) {
   if (document.hidden || otherMediaPlaying()) return false;
-  if (LOUD.test(location.hash || '') && location.pathname.endsWith('app.html') && which === 'full') return false;
-  if (el && kind === which) return true;
-  if (el) stop(200);
-  const a = new Audio(); a.preload = 'auto'; a.loop = loop; a.volume = 0; a.dataset.kemyTheme = '1';
-  a.src = which === 'full' ? pick('kemy-theme') : pick('kemy-theme-short');
-  el = a; kind = which;
-  a.onended = () => { if (el === a) { el = null; kind = ''; document.dispatchEvent(new CustomEvent('kemy-theme', { detail: { playing: false } })); } };
-  try { await a.play(); } catch { if (el === a) { el = null; kind = ''; } return false; }
-  if (el !== a) { a.pause(); return false; }
-  fadeTo(VOL[which], 900);
-  document.dispatchEvent(new CustomEvent('kemy-theme', { detail: { playing: true, which } }));
-  return true;
+  if (!force && getMode() !== 'play') return false;
+  const a = ensureEl(); clearTimeout(stopT); delete a.dataset.stopping;
+  if (fromStart || a.ended) { try { a.currentTime = 0; } catch { /* */ } }
+  try { if (actx && actx.state !== 'running') await actx.resume(); } catch { /* */ }
+  if (!actx) a.volume = 0; else gain.gain.value = Math.min(gain.gain.value, 0.0001);
+  try { await a.play(); } catch { return false; }
+  ramp(getVolume(), FADE); emit(); paintFab(); return true;
 }
-export const playShort = () => play('short');
-// Splash / onboarding: play the short theme once on the user's tap, unless the user prefers less motion
-// or is saving data (they can still press the play button).
-export function playIntro() { if (reduced() || saveData()) return Promise.resolve(false); return playShort(); }
-function startBgm() {
-  if (!bgmOn() || !CALM.test(location.hash || '')) return;
-  play('full', { loop: true });
+// Fade out and pause (keeps the position so Mute -> Play resumes).
+export function stop(sec = FADE) {
+  if (!el || el.paused) return; const a = el; a.dataset.stopping = '1'; ramp(0, sec);
+  clearTimeout(stopT); stopT = setTimeout(() => { if (a.dataset.stopping) { a.pause(); delete a.dataset.stopping; emit(); paintFab(); } }, sec * 1000 + 60);
+  emit(); paintFab();
 }
-// Background music hooks (app only).
+export const silence = () => stop(0.25);
+// Welcome screen / egg hatch: play the full song from the start (asks first if never asked).
+export function playIntro() { const m = getMode(); if (m === '') { ask(); return Promise.resolve(false); } return m === 'play' ? play({ fromStart: true }) : Promise.resolve(false); }
+export const playShort = playIntro;
+export function gainInfo() { return { webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume() }; }
+
+// ---- UI: floating button + first-run prompt ----
+let fab = null;
+function paintFab() {
+  if (!fab) return; const m = getMode(); const show = calmNow() && (m === 'play' || m === 'mute');
+  fab.hidden = !show; const on = isPlaying();
+  fab.textContent = on ? '🎵' : '🔇'; fab.classList.toggle('on', on);
+  fab.setAttribute('aria-label', on ? `Kemy's theme is playing. Tap to mute` : `Kemy's theme is muted. Tap to play`); fab.setAttribute('aria-pressed', String(on));
+}
+export function ask() {
+  if (getMode() !== '' || document.getElementById('theme-ask')) return;
+  const d = document.createElement('div'); d.id = 'theme-ask'; d.className = 'theme-ask'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Theme song');
+  d.innerHTML = `<p><b>Play Kemy’s theme song?</b><small>${THEME_TITLE} · plays softly, stops for videos</small></p><div><button type="button" class="btn btn-sm" data-m="play">🎵 Play</button><button type="button" class="btn btn-sm btn-ghost" data-m="mute">🔇 Mute</button><button type="button" class="btn btn-sm btn-ghost" data-m="off">Turn off</button></div>`;
+  d.addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (!b) return; d.remove(); setMode(b.dataset.m, { start: false }); if (b.dataset.m === 'play') play({ fromStart: true }); });
+  document.body.appendChild(d);
+}
 let armed = false;
 export function initThemeMusic() {
   if (armed) return; armed = true;
-  // Any other media with sound starts -> theme stops (videos, lives, songs, Movie Maker previews).
-  document.addEventListener('play', (e) => { const m = e.target; if (m === el || (m.dataset && m.dataset.kemyTheme)) return; if (!m.muted && m.volume > 0) stop(250); }, true);
-  document.addEventListener('volumechange', (e) => { const m = e.target; if (m !== el && !m.paused && !m.muted && m.volume > 0) stop(250); }, true);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { wasPlayingBeforeHide = isPlaying() && kind === 'full'; if (el) el.pause(); }
-    else if (el && el.paused) { if (wasPlayingBeforeHide && !otherMediaPlaying()) el.play().catch(() => {}); else stop(0); }
-  });
-  addEventListener('pagehide', () => stop(0));
-  // Feed autoplay announces videos that start with sound.
-  addEventListener('kemy:media-play', () => stop(250));
-  addEventListener('hashchange', () => {
-    const h = location.hash || '';
-    if (kind === 'full' && !CALM.test(h)) stop();
-    else if (kind === 'short' && LOUD.test(h)) stop();
-    else if (!el && bgmOn()) setTimeout(startBgm, 300);
-  });
-  // Browsers need a tap before music: start the background music on the first tap on a calm screen.
-  const kick = () => { if (!el && bgmOn()) startBgm(); };
-  document.addEventListener('pointerdown', kick, true);
-  document.addEventListener('keydown', kick, true);
+  fab = document.createElement('button'); fab.type = 'button'; fab.className = 'theme-fab'; fab.hidden = true; document.body.appendChild(fab);
+  fab.addEventListener('click', (e) => { e.stopPropagation(); if (isPlaying()) setMode('mute'); else { ls.set(MODE, 'play'); play(); } });
+  document.addEventListener('play', (e) => { const m = e.target; if (m === el || m.dataset?.kemyTheme) return; if (!m.muted && m.volume > 0) stop(0.25); }, true);
+  document.addEventListener('volumechange', (e) => { const m = e.target; if (m !== el && m.tagName && !m.paused && !m.muted && m.volume > 0) stop(0.25); }, true);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { wasPlaying = isPlaying(); if (el) el.pause(); } else if (wasPlaying && getMode() === 'play' && calmNow()) play(); });
+  addEventListener('pagehide', () => { if (el) el.pause(); });
+  addEventListener('kemy:media-play', (e) => { if (e.detail?.source !== 'kemy-theme') stop(0.25); });
+  const route = () => { if (!calmNow() || LOUD.test(location.hash || '')) stop(0.6); paintFab(); if (calmNow() && getMode() === '') setTimeout(() => { if (calmNow()) ask(); }, 1200); };
+  addEventListener('hashchange', route);
+  new MutationObserver(() => paintFab()).observe(document.getElementById('modal-root') || document.body, { childList: true });
+  // Browsers need a tap before sound: resume on the first tap on a calm screen when the choice is Play.
+  const kick = (e) => { if (e.target.closest?.('.theme-fab, #theme-ask, [data-theme-ctl]')) return; if (getMode() === 'play' && !isPlaying() && calmNow() && !otherMediaPlaying()) play(); };
+  document.addEventListener('pointerdown', kick, true); document.addEventListener('keydown', kick, true);
+  route();
 }
-// Silence the theme (e.g. a game or Movie Maker preview with WebAudio sound starts).
-export const silence = () => stop(200);

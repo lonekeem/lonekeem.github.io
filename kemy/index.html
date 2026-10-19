@@ -498,7 +498,7 @@ footer{margin-top:48px;padding-bottom:40px;border-top:1px solid #33215a;font-siz
 <h1>Kemy by Lone Keem Studios</h1>
 <p><strong>Kemy</strong> is the free app from <a href="/">Lone Keem Studios</a>. Hatch and raise your own <strong>Kemy Pals virtual pet</strong> that talks back in cute voices, turn your ideas into short films with the <strong>AI Movie Maker</strong>, play <strong>free games</strong> like Kemy's Bubble Quest, Star Pool, Chess and Ludo, and watch and share <strong>community movies and songs</strong>.</p>
 <a class="btn" href="/app.html">Open Kemy, it's free</a><a class="btn ghost" href="/app.html#/signup">Create an account</a>
-<div class="theme"><button type="button" id="theme-btn" aria-label="Play Kemy's theme song" aria-pressed="false">▶</button><span>Kemy's theme song: <strong>Stand Up Strong</strong> (Instrumental)<br><span class="muted">Written by Lone Keem</span></span><audio id="theme-audio" preload="none"><source src="/assets/audio/kemy-theme-short.ogg" type="audio/ogg; codecs=opus"><source src="/assets/audio/kemy-theme-short.mp3" type="audio/mpeg"></audio></div>
+<div class="theme"><button type="button" id="theme-btn" aria-label="Play Kemy's theme song" aria-pressed="false">▶</button><span>Kemy's theme song: <strong id="theme-title">Stand Up Strong (Instrumental)</strong><br><span class="muted">Written by Lone Keem</span></span></div>
 <!-- PLAY_STORE_LINK: when Kemy is live on Google Play, add here:
 <a class="btn ghost" href="https://play.google.com/store/apps/details?id=com.lonekeemstudios.kemy">Get it on Google Play</a> -->
 </div>
@@ -545,10 +545,10 @@ footer{margin-top:48px;padding-bottom:40px;border-top:1px solid #33215a;font-siz
 <p class="muted">Kemy by Lone Keem Studios. Songs and music videos written by Lone Keem.</p>
 </footer>
 <script>
-(function(){var b=document.getElementById('theme-btn'),a=document.getElementById('theme-audio');a.volume=.6;
-function p(){var on=!a.paused;b.textContent=on?'❚❚':'▶';b.setAttribute('aria-pressed',on);b.setAttribute('aria-label',on?"Pause Kemy's theme song":"Play Kemy's theme song");}
-b.onclick=function(){if(a.paused)a.play().catch(function(){});else a.pause();};
-a.onplay=a.onpause=a.onended=p;document.addEventListener('visibilitychange',function(){if(document.hidden)a.pause();});})();
+(function(){var b=document.getElementById('theme-btn');
+function p(on){b.textContent=on?'❚❚':'▶';b.setAttribute('aria-pressed',on);b.setAttribute('aria-label',on?"Pause Kemy's theme song":"Play Kemy's theme song");}
+var T=null;import('/js/theme.js').then(function(m){T=m;document.getElementById('theme-title').textContent=m.THEME_TITLE;document.addEventListener('kemy-theme',function(){p(m.isPlaying());});document.addEventListener('visibilitychange',function(){if(document.hidden)m.silence();});});
+b.onclick=function(){if(!T)return;if(T.isPlaying()){T.stop();p(false);}else{T.play({force:true,fromStart:true}).then(p);}};})();
 </script>
 </body>
 </html>

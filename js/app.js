@@ -33,7 +33,7 @@ import { createPark } from './pals/park.js';
 import { initInterests, interestsPage, learnTap, pickTopics, topicChips } from './interests.js';
 import { createMusic } from './music.js';
 import { loadDiscover } from './discover.js';
-import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, bgmOn, setBgm, THEME_CREDIT } from './theme.js';
+import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, getMode as themeMode, setMode as setThemeMode, getVolume as themeVol, setVolume as setThemeVol, THEME_CREDIT, THEME_TITLE } from './theme.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -510,7 +510,7 @@ async function showWelcome() {
         Watch now</a>
       <a class="btn btn-ghost" href="#/settings" data-close>Set up my profile</a>
     </div>
-    <p class="small muted" style="margin:10px 0 0"><button type="button" class="link-btn" id="welcome-theme" aria-pressed="false">🎵 Play Kemy’s theme</button> · Stand Up Strong (Instrumental) by Lone Keem</p>
+    <p class="small muted" style="margin:10px 0 0"><button type="button" class="link-btn" id="welcome-theme" data-theme-ctl aria-pressed="false">🎵 Play Kemy’s theme</button> · ${esc(THEME_TITLE)} by Lone Keem</p>
     <form class="welcome-bio" id="welcome-bio">
       <div class="row"><label for="w-bio"><b>Add a bio</b> <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="w-bio-n"></span></div>
       <textarea id="w-bio" maxlength="160" rows="3" placeholder="Who are you? What do you make? ✨"></textarea>
@@ -521,8 +521,8 @@ async function showWelcome() {
       try { await updateDoc(doc(db, 'users', S.user.uid), { bio }); S.profile.bio = bio; profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile }); $('#welcome-bio').innerHTML = '<p class="small" style="margin:0">✅ Bio saved. Change it any time in Edit profile.</p>'; }
       catch (e) { toast(friendlyError(e)); } }; } }
   { const tb = $('#welcome-theme'); const paint = () => { const on = themePlaying(); tb.textContent = on ? '⏸ Pause Kemy’s theme' : '🎵 Play Kemy’s theme'; tb.setAttribute('aria-pressed', on); };
-    tb.onclick = async () => { if (themePlaying()) stopTheme(); else await playTheme('short'); paint(); };
-    document.addEventListener('kemy-theme', paint); $('#welcome-watch').addEventListener('click', () => stopTheme(150));
+    tb.onclick = async () => { if (themePlaying()) setThemeMode('mute'); else { setThemeMode('play', { start: false }); await playTheme({ fromStart: true }); } paint(); };
+    document.addEventListener('kemy-theme', paint); $('#welcome-watch').addEventListener('click', () => stopTheme(0.4));
     playIntro().then(paint); }
   newestStudioVideo().then((id) => { const a = $('#welcome-watch'); if (a) a.href = '#/watch/' + id; });
   try { await updateDoc(doc(db, 'users', S.user.uid), { welcomed: true }); } catch (e) { console.warn(e); }
@@ -1037,9 +1037,12 @@ async function pageSettings() {
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
     <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
       <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>
-      <label class="row" style="gap:10px;cursor:pointer"><input type="checkbox" id="s-bgm" ${bgmOn() ? 'checked' : ''}><span>Background music on home screens<br><span class="muted small">Plays Kemy’s theme softly on your profile, Pals and settings. Never plays over videos, lives, songs or games.</span></span></label>
-      <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn btn-sm btn-ghost" type="button" id="s-theme">🎵 Play theme</button></div>
-      <p class="muted small" style="margin:10px 0 0" id="s-theme-credit">${esc(THEME_CREDIT)}. Written by Lone Keem.</p>
+      <p class="muted small" style="margin:0 0 8px">Kemy’s theme plays softly on your profile, Pals and settings, and stops for videos, lives and games.</p>
+      <div class="seg theme-seg" role="radiogroup" aria-label="Theme song">${[['play', '🎵 Play'], ['mute', '🔇 Mute'], ['off', 'Off']].map(([k, l]) => `<label><input type="radio" name="s-theme-mode" value="${k}" ${themeMode() === k || (k === 'mute' && !themeMode()) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
+      <label for="s-theme-vol" style="margin-top:12px">Volume <span class="muted small" id="s-theme-vol-n">${Math.round(themeVol() * 100)}%</span></label>
+      <input type="range" id="s-theme-vol" min="0" max="100" step="5" value="${Math.round(themeVol() * 100)}" style="width:100%">
+      <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn btn-sm btn-ghost" type="button" id="s-theme" data-theme-ctl>🎵 Play theme</button></div>
+      <p class="muted small" style="margin:10px 0 0" id="s-theme-credit"><b>${esc(THEME_TITLE)}</b><br>${esc(THEME_CREDIT)}. Written by Lone Keem.</p>
     </section>
     <section class="card pad" style="margin-top:16px">
       <h2 style="font-size:1.05rem">Account</h2>
@@ -1056,9 +1059,10 @@ async function pageSettings() {
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
   wireCounter($('#s-pro'), $('#s-pro-n'), 20); wireCounter($('#s-web'), $('#s-web-n'), 100);
   if (sessionStorage.getItem('lks-focus-bio')) { sessionStorage.removeItem('lks-focus-bio'); setTimeout(() => { const t = $('#s-bio'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); } }, 60); }
-  $('#s-bgm').onchange = (e) => { setBgm(e.target.checked); toast(e.target.checked ? 'Background music on' : 'Background music off'); };
+  document.querySelectorAll('[name=s-theme-mode]').forEach((r) => { r.onchange = () => { setThemeMode(r.value, { start: r.value === 'play' }); toast(r.value === 'play' ? 'Theme song on' : r.value === 'mute' ? 'Theme song muted' : 'Theme song off'); }; });
+  $('#s-theme-vol').oninput = (e) => { const v = +e.target.value / 100; setThemeVol(v); $('#s-theme-vol-n').textContent = e.target.value + '%'; };
   { const b = $('#s-theme'); const paint = () => { b.textContent = themePlaying() ? '⏸ Stop theme' : '🎵 Play theme'; };
-    b.onclick = async () => { if (themePlaying()) stopTheme(); else await playTheme(bgmOn() ? 'full' : 'short', { loop: bgmOn() }); paint(); };
+    b.onclick = async () => { if (themePlaying()) stopTheme(); else await playTheme({ force: true }); paint(); };
     document.addEventListener('kemy-theme', paint); S.unsubs.push(() => document.removeEventListener('kemy-theme', paint)); }
   $('#s-out').onclick = async () => { await signOut(auth); location.hash = '#/feed'; };
   const del = $('#s-delete');

@@ -3,7 +3,7 @@
 // public RSS by scripts/discover-fetch.mjs; shown as youtube-nocookie embeds, never re-uploaded).
 // Songs play in the persistent mini player (js/works.js), which keeps playing while you browse.
 import { loadDiscover } from './discover.js';
-import { play as playTheme, stop as stopTheme, isPlaying as themePlaying } from './theme.js';
+import { play as playTheme, stop as stopTheme, isPlaying as themePlaying, THEME_TITLE } from './theme.js';
 
 const ytThumb = (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 // Tile for a curated outside music video (opens the YouTube player sheet).
@@ -44,14 +44,14 @@ export function createMusic(ctx) {
     main.innerHTML = `<h1 class="page-title">Music</h1>
       <p class="muted" style="margin-top:-6px">Songs and music videos from Lone Keem Studios, the Kemy community and family-friendly music channels. Songs keep playing while you browse.</p>
       <a class="search-launch" href="#/search?q=music" role="search" aria-label="Search music">🔎<span>Search songs, music videos, artists</span></a>
-      <section class="card pad mus-theme"><div class="row" style="gap:12px;align-items:center"><button class="btn btn-sm" type="button" id="mus-theme">🎵 Play</button><div><b>Kemy’s theme: Stand Up Strong (Instrumental)</b><br><span class="muted small">Written by Lone Keem</span></div></div></section>
+      <section class="card pad mus-theme"><div class="row" style="gap:12px;align-items:center"><button class="btn btn-sm" type="button" id="mus-theme" data-theme-ctl>🎵 Play</button><div><b>Kemy’s theme: ${THEME_TITLE}</b><br><span class="muted small">Written by Lone Keem</span></div></div></section>
       <section class="ex-sec"><div class="row"><h2>Lone Keem Studios</h2></div><div class="wrow" id="mus-studio-songs"><div class="spinner sm"></div></div><div id="mus-studio-vids"></div></section>
       <section class="ex-sec"><div class="row"><h2>Kemy Community Songs</h2><span class="spacer"></span><a class="small" href="#/explore/songs">See all</a></div><div class="wrow" id="mus-songs"><div class="spinner sm"></div></div></section>
       <section class="ex-sec"><div class="row"><h2>Music videos</h2><span class="spacer"></span><span class="muted small">Curated from YouTube</span></div><div class="yt-row" id="mus-yt"><div class="spinner sm"></div></div></section>
       <p class="muted small">Want to share your own song? <a href="#/new/song">Post a song</a> · <a href="#/watch/music">Music in the video feed</a></p>`;
     const tb = main.querySelector('#mus-theme');
     const paint = () => { tb.textContent = themePlaying() ? '⏸ Stop' : '🎵 Play'; };
-    tb.onclick = async () => { if (themePlaying()) stopTheme(); else { try { window.__kemyPlayer?.audio?.pause(); } catch { /* */ } await playTheme('full'); } paint(); };
+    tb.onclick = async () => { if (themePlaying()) stopTheme(); else { try { window.__kemyPlayer?.audio?.pause(); } catch { /* */ } await playTheme({ force: true }); } paint(); };
     document.addEventListener('kemy-theme', paint);
     S.unsubs.push(() => document.removeEventListener('kemy-theme', paint));
     const W = getWorks();
