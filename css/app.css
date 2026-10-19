@@ -1443,4 +1443,13 @@ body.cam-open .mini-player { display: none; }
 .catchip input:checked + span { background: linear-gradient(90deg, #8a2be2, #4da3ff); border-color: transparent; color: #fff; }
 .catchip input:focus-visible + span { outline: 2px solid #c9a8ff; outline-offset: 2px; }
 .vunmute-hint { top: calc(env(safe-area-inset-top) + 100px); }
-.vwrap[data-kind=youtube] .vunmute-hint, .vwrap[data-kind=news] .vunmute-hint, .vwrap[data-kind=news] .vmute { display: none; }
+.vwrap[data-kind=news] .vunmute-hint, .vwrap[data-kind=news] .vmute { display: none; }
+
+/* Autoplay: long movies show a preview + "Watch full movie"; keep Pal pop-ups clear of mute/rail controls */
+.vfull { position: absolute; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(var(--bottom-h, 0px) + 120px); display: inline-flex; gap: 6px; align-items: center; }
+.vfull svg { width: 16px; height: 16px; }
+body:has(.vwrap) .pal-pop { top: 24%; }
+.vwrap[data-kind=youtube] .vunmute-hint { pointer-events: auto; }
+/* the action rail sits on the right in the feed: Pal pop-ups peek from the left there */
+body:has(.vwrap) .pal-pop.right { right: auto; left: 0; --from: -100px; }
+body:has(.vwrap) .pal-pop.right .pal-pop-say { right: auto; left: 10px; }

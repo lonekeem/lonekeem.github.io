@@ -13,6 +13,7 @@ import { ICONS } from './icons.js';
 import { rankForYou, rankTrending, mixIn, createPrefsStore } from './feedrank.js';
 import { catOf, CATS } from './feed-cats.js';
 import { loadDiscover } from './discover.js';
+import { canAutoplay, soundOn, setSoundOn, claimAudio } from './autoplay.js';
 export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['trending', 'Trending']];
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
@@ -39,7 +40,7 @@ export function createWatch(ctx) {
   };
   const catChip = (p) => { const c = CATS.find((x) => x.id === catOf(p)); return c ? ` · <span class="vcat">${c.emoji} ${c.label}</span>` : ''; };
   const ago = (iso) => { const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000); return s < 3600 ? Math.max(1, Math.round(s / 60)) + 'm' : s < 86400 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd'; };
-  let muted = true; // stays the same while scrolling between videos
+  let muted = !soundOn(); // stays the same while scrolling; an unmute is remembered for this session
   let session = null;
 
   const ms = (p) => p.createdAt?.toMillis?.() || 0;
@@ -147,7 +148,8 @@ export function createWatch(ctx) {
          <div class="vstate" aria-hidden="true">${IC.play}</div><div class="vspin" aria-hidden="true"></div>
          <div class="vprogress" aria-hidden="true"><span></span></div>
          <div class="vscrub" hidden><input type="range" min="0" max="1000" step="1" value="0" aria-label="Seek in video"><span class="vtime" aria-hidden="true">0:00 / 0:00</span></div>
-         <div class="vfail" hidden><p>This video is still processing. It’ll play in a moment…</p></div>`
+         <div class="vfail" hidden><p>This video is still processing. It’ll play in a moment…</p></div>
+         <a class="btn btn-sm vfull" href="#/post/${esc(p.id)}" hidden>${IC.play}Watch full movie</a>`
       : `<div class="vcard">
            ${poster ? `<img class="vthumb" src="${esc(poster)}" alt="" loading="lazy">` : `<div class="vthumb vthumb-tt" aria-hidden="true">TikTok</div>`}
            <button class="btn vwatch" data-a="watch">${IC.play}Watch</button>
@@ -265,8 +267,13 @@ export function createWatch(ctx) {
     };
     paintMute();
     const vid = (i) => slides[i]?.querySelector('video');
-    function playActive() {
+    const blocked = () => document.hidden || sheetRoot.classList.contains('open') || !!document.querySelector('.modal-backdrop, .pal-chat, .pal-talk, .mm-root, .live-room');
+    function playActive(force) {
+      const sl0 = slides[active];
+      if (sl0?.dataset.kind === 'youtube') { if (force || (canAutoplay() && !blocked())) autoEmbed(sl0); return; }
       const v = vid(active); if (!v) return;
+      if (!force && (!canAutoplay() || blocked())) { if (!v.getAttribute('src')) { v.preload = 'metadata'; v.src = v.dataset.src; } slides[active].classList.add('paused'); return; }
+      if (!muted) claimAudio('feed');
       if (!v.getAttribute('src')) { v.src = v.dataset.src; v.preload = 'auto'; }
       v.muted = muted;
       const sl = slides[active];
@@ -277,7 +284,41 @@ export function createWatch(ctx) {
     }
     function closeEmbed(sl) {
       const box = sl?.querySelector('.vembed'); if (!box || box.hidden) return;
-      box.innerHTML = ''; box.hidden = true; sl.querySelector('.vcard').hidden = false;
+      const fr = box.querySelector('iframe'); ytCmd(fr, 'pauseVideo');
+      box.innerHTML = ''; box.hidden = true; sl.querySelector('.vcard').hidden = false;   // destroy the player
+      clearTimeout(sl._ytTimer);
+    }
+    // YouTube: lazily create a muted autoplaying youtube-nocookie player for the slide in view.
+    const ytCmd = (fr, func, args = []) => { try { fr?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*'); } catch { /* gone */ } };
+    function autoEmbed(sl) {
+      const p = byId.get(sl.dataset.id); if (!p) return;
+      const box = sl.querySelector('.vembed'); if (!box || !box.hidden) return;
+      if (sl.dataset.ytBlocked) return;   // autoplay failed before: keep thumbnail + Watch
+      openEmbed(p, sl, true);
+      const fr = box.querySelector('iframe'); let ok = false;
+      const onMsg = (e) => {
+        if (e.source !== fr.contentWindow) return;
+        let d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+        if (d.event === 'onReady' || d.event === 'initialDelivery') { if (!muted) ytCmd(fr, 'unMute'); }
+        const ps = d.info && d.info.playerState;
+        if (ps === 1) { ok = true; if (!muted) claimAudio('feed'); }
+        if (d.event === 'onError') fail();
+      };
+      const fail = () => { if (ok) return; sl.dataset.ytBlocked = '1'; window.removeEventListener('message', onMsg); closeEmbed(sl); };
+      window.addEventListener('message', onMsg);
+      fr.addEventListener('load', () => { try { fr.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: sl.dataset.id }), '*'); } catch { /* ignore */ } });
+      sl._ytTimer = setTimeout(fail, 9000);
+      const obs = new MutationObserver(() => { if (!box.contains(fr)) { window.removeEventListener('message', onMsg); obs.disconnect(); } });
+      obs.observe(box, { childList: true, subtree: true });
+    }
+    function pauseActive() {
+      vid(active)?.pause();
+      const fr = slides[active]?.querySelector('.vembed iframe'); if (fr) ytCmd(fr, 'pauseVideo');
+    }
+    function resumeActive() {
+      if (active < 0 || blocked()) return;
+      const fr = slides[active]?.querySelector('.vembed iframe');
+      if (fr) ytCmd(fr, 'playVideo'); else playActive();
     }
     // Learning: how long you stayed on the slide you just left, and how much of it you watched.
     let enteredAt = 0;
@@ -302,7 +343,8 @@ export function createWatch(ctx) {
       // Preload only the current and the next video; free anything far away.
       slides.forEach((sl, j) => {
         const v = sl.querySelector('video'); if (!v) return;
-        if (j === i || j === i + 1) { if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = v.dataset.src; } }
+        if (j === i) { if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = v.dataset.src; } }
+        else if (j === i + 1) { if (!v.getAttribute('src')) { v.preload = 'metadata'; v.src = v.dataset.src; } }   // only metadata for the next one
         else {
           v.pause();
           if (Math.abs(j - i) > 2 && v.getAttribute('src')) { v.removeAttribute('src'); v.preload = 'none'; v.load(); }
@@ -341,7 +383,11 @@ export function createWatch(ctx) {
       v.addEventListener('durationchange', () => {
         const long = Number.isFinite(v.duration) && v.duration > 60;
         scrub.hidden = !long; sl.classList.toggle('long', long); if (long) paintTime();
+        const movie = Number.isFinite(v.duration) && v.duration > 180;   // full movies: muted preview + "Watch full movie"
+        sl.classList.toggle('movie', movie); const fb = sl.querySelector('.vfull'); if (fb) fb.hidden = !movie;
       });
+      v.addEventListener('timeupdate', () => { if (sl.classList.contains('movie') && !sl.dataset.full && v.currentTime > 30) v.currentTime = 0; });
+      sl.querySelector('.vfull')?.addEventListener('click', (e) => e.stopPropagation());
       range.addEventListener('pointerdown', () => { dragging = true; });
       range.addEventListener('input', () => { dragging = true; if (v.duration) { v.currentTime = (range.value / 1000) * v.duration; paintTime(); } });
       range.addEventListener('change', () => { dragging = false; });
@@ -362,7 +408,7 @@ export function createWatch(ctx) {
       onDoubleTap(sl, {
         ignore: (e) => !!e.target.closest('button, a, input, textarea, iframe, [data-a], .vrail, .vmeta, .vembed, .vcard, .vscrub'),
         single: v ? () => {
-          if (v.paused) { v.muted = muted; v.play().catch(() => {}); sl.classList.remove('paused'); }
+          if (v.paused) { if (sl.classList.contains('movie')) sl.dataset.full = '1'; v.muted = muted; if (!muted) claimAudio('feed'); if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); sl.classList.remove('paused'); }
           else { v.pause(); sl.classList.add('paused'); }
         } : null,
         double: (e) => {
@@ -454,9 +500,11 @@ export function createWatch(ctx) {
 
     hint.onclick = () => muteBtn.click();
     muteBtn.onclick = () => {
-      muted = !muted; paintMute();
+      muted = !muted; paintMute(); setSoundOn(!muted);
       const v = vid(active);
-      if (v) { v.muted = muted; if (v.paused) playActive(); }
+      if (v) { v.muted = muted; if (!muted) claimAudio('feed'); if (v.paused) playActive(true); }
+      const fr = slides[active]?.querySelector('.vembed iframe');
+      if (fr) { ytCmd(fr, muted ? 'mute' : 'unMute'); if (!muted) claimAudio('feed'); }
     };
 
     // Shares count once per account (posts/{id}/shares/{uid} + shareCount) and teach the ranking.
@@ -483,10 +531,12 @@ export function createWatch(ctx) {
       catch { prompt('Copy this link:', url); }
     }
 
-    function openEmbed(p, sl) {
+    function openEmbed(p, sl, auto) {
       const box = sl.querySelector('.vembed'); const kind = sl.dataset.kind;
+      if (!auto) { clearTimeout(sl._ytTimer); claimAudio('feed'); }
+      const yid = encodeURIComponent(p.ytId || youTubeId(p.linkUrl));
       const src = kind === 'youtube'
-        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(p.ytId || youTubeId(p.linkUrl))}?autoplay=1&playsinline=1&rel=0`
+        ? `https://www.youtube-nocookie.com/embed/${yid}?enablejsapi=1&autoplay=1&mute=${auto ? 1 : 0}&playsinline=1&rel=0&loop=1&playlist=${yid}&origin=${encodeURIComponent(location.origin)}`
         : `https://www.tiktok.com/player/v1/${encodeURIComponent(tikTokId(p.linkUrl))}?autoplay=1&rel=0`;
       box.innerHTML = `<button class="vembed-close" data-a="close-embed" aria-label="Close player">${IC.close}</button>
         <div class="vembed-frame ${kind === 'tiktok' || p.short || p.linkUrl.includes('/shorts/') ? 'tall' : ''}"><iframe src="${esc(src)}" title="${kind === 'youtube' ? 'YouTube' : 'TikTok'} video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
@@ -538,11 +588,11 @@ export function createWatch(ctx) {
       if (sheetUnsub) { sheetUnsub(); sheetUnsub = null; }
       const s = sheetRoot.querySelector('.vsheet');
       if (!s) return;
-      sheetRoot.classList.remove('open');
+      sheetRoot.classList.remove('open'); setTimeout(resumeActive, 240);
       setTimeout(() => { if (!sheetRoot.classList.contains('open')) sheetRoot.innerHTML = ''; }, 220);
     }
     function openComments(p, sl) {
-      closeSheet();
+      closeSheet(); pauseActive();
       const signedIn = S.user && S.profile;
       sheetRoot.innerHTML = `
         <div class="vsheet-backdrop" data-close-sheet></div>
@@ -581,8 +631,14 @@ export function createWatch(ctx) {
       else if (e.key === 'm') muteBtn.click();
     };
     document.addEventListener('keydown', onKey);
-    const onVis = () => { if (document.hidden) { vid(active)?.pause(); st.flush(true); } else if (active >= 0 && !sheetRoot.classList.contains('open')) playActive(); };
+    const onVis = () => { if (document.hidden) { pauseActive(); st.flush(true); } else resumeActive(); };
     document.addEventListener('visibilitychange', onVis);
+    // Overlays opened on top of the feed (Pal chat, live, Movie Maker, dialogs) pause it; closing resumes.
+    let wasBlocked = false;
+    const overlayObs = new MutationObserver(() => { const b = blocked(); if (b === wasBlocked) return; wasBlocked = b; if (b) pauseActive(); else resumeActive(); });
+    overlayObs.observe(document.body, { childList: true });
+    const onOtherMedia = (e) => { if (e.detail?.source !== 'feed') pauseActive(); };
+    window.addEventListener('kemy:pause-feed', pauseActive); window.addEventListener('kemy:media-play', onOtherMedia);
 
     // Start at the deep-linked video (if any), then begin observing.
     const startIndex = Math.max(0, startId ? posts.findIndex((p) => p.id === startId) : 0);
@@ -597,6 +653,7 @@ export function createWatch(ctx) {
       io.disconnect();
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVis);
+      overlayObs.disconnect(); window.removeEventListener('kemy:pause-feed', pauseActive); window.removeEventListener('kemy:media-play', onOtherMedia);
       if (sheetUnsub) sheetUnsub();
       slides.forEach((sl) => { const v = sl.querySelector('video'); if (v) { v.pause(); v.removeAttribute('src'); v.load(); } });
       session = null;

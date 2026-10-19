@@ -1,4 +1,5 @@
 // Lone Keem Studios community app (plain ES modules, no build step).
+import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetectWifi } from './autoplay.js';
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
@@ -1012,6 +1013,12 @@ async function pageSettings() {
       <p class="form-error" id="s-err"></p>
       <button class="btn btn-block" type="submit">Save changes</button>
     </form>
+    <section class="card pad" style="margin-top:16px" aria-labelledby="pb-h">
+      <h2 id="pb-h" style="font-size:1.05rem">Playback</h2>
+      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-autoplay" ${autoplayEnabled() ? 'checked' : ''}> <span>Autoplay videos</span></label>
+      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-autoplay-wifi" ${wifiOnly() ? 'checked' : ''} ${autoplayEnabled() ? '' : 'disabled'}> <span>Autoplay on Wi-Fi only</span></label>
+      <p class="muted small" id="s-ap-note">Videos start muted as you scroll. ${saveData() ? 'Data Saver is on, so videos wait for a tap.' : ''}${canDetectWifi() ? '' : ' (This browser can’t tell Wi-Fi from mobile data, so Wi-Fi only has no effect here.)'}</p>
+    </section>
     <section class="card pad" style="margin-top:16px">
       <h2 style="font-size:1.05rem">Account</h2>
       <p class="muted small">Signed in as ${esc(S.user.email || '')}</p>
@@ -1022,6 +1029,8 @@ async function pageSettings() {
       <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
     </section>`}`;
+  $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
+  $('#s-autoplay-wifi').onchange = (e) => { setWifiOnly(e.target.checked); };
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
   wireCounter($('#s-pro'), $('#s-pro-n'), 20); wireCounter($('#s-web'), $('#s-web-n'), 100);
   if (sessionStorage.getItem('lks-focus-bio')) { sessionStorage.removeItem('lks-focus-bio'); setTimeout(() => { const t = $('#s-bio'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); } }, 60); }
