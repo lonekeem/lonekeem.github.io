@@ -19,7 +19,8 @@ export const CLOUDINARY = {
   // Separate unsigned presets so avatars and stories land in their own folders
   // (created by scripts/cloudinary-setup.mjs together with the posts preset).
   avatarPreset: 'lks_avatars',         // folder lks/avatars, jpg/png/webp only
-  storyPreset: 'lks_stories'           // folder lks/stories, same formats/eager as posts
+  storyPreset: 'lks_stories',          // folder lks/stories, same formats/eager as posts
+  snapPreset: 'lks_snaps'              // folder lks/snaps, view-once snaps sent to friends
 };
 
 // Client-side limits (Cloudinary free plan caps: images 10 MB, videos 100 MB).

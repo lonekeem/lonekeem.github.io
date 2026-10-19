@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Creates (or updates) the UNSIGNED Cloudinary upload presets used by the app:
-//   lks_user_uploads (posts), lks_stories (24h stories), lks_avatars (profile pictures).
+//   lks_user_uploads (posts), lks_stories (24h stories), lks_snaps (view-once snaps), lks_avatars (profile pictures).
 // Run on the box only. Credentials come from the environment and are never written anywhere:
 //   CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=... node scripts/cloudinary-setup.mjs <cloud_name> [--dry-run]
 // The preset:
@@ -34,6 +34,9 @@ const PRESETS = [
   // Stories: same formats + eager versions as posts, own folder (old ones can be bulk-deleted by folder).
   { name: 'lks_stories', ...base, folder: 'lks/stories', allowed_formats: 'mp4,mov,webm,jpg,jpeg,png,heic,webp',
     eager: `${VIDEO_T}/mp4|${POSTER_T}/jpg`, eager_async: 'true', tags: 'lks_story' },
+  // Snaps: view-once photos/videos sent to friends in Messages (own folder for easy cleanup).
+  { name: 'lks_snaps', ...base, folder: 'lks/snaps', allowed_formats: 'mp4,mov,webm,jpg,jpeg,png,heic,webp',
+    eager: `${VIDEO_T}/mp4|${POSTER_T}/jpg`, eager_async: 'true', tags: 'lks_snap' },
   // Avatars: the app already crops + resizes to a 512px JPEG; images only, small files.
   { name: 'lks_avatars', ...base, folder: 'lks/avatars', allowed_formats: 'jpg,jpeg,png,webp',
     eager: 'c_fill,h_512,w_512/f_auto,q_auto', eager_async: 'true', tags: 'lks_avatar' }

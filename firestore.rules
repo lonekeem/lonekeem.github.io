@@ -36,12 +36,16 @@ service cloud.firestore {
     function validProfile(d) {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
-                               'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil'])
+                               'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
+                               'pronouns', 'website'])
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
         && isStr(d.displayName, 1, 50)
         && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
         && isStr(d.bio, 0, 160)
+        && (!('pronouns' in d) || isStr(d.pronouns, 0, 20))
+        && (!('website' in d) || d.website == ''
+            || (isStr(d.website, 12, 100) && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
         && isStr(d.color, 1, 20)
         && d.welcomed is bool
         && d.createdAt is timestamp;
@@ -594,7 +598,9 @@ service cloud.firestore {
       match /messages/{mid} {
         allow read: if inChat();
         allow create: if inChat()
-          && request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt', 'snap', 'viewed'])
+          && (!('snap' in request.resource.data) || snapOk(request.resource.data))
+          && (!('viewed' in request.resource.data) || ('snap' in request.resource.data && request.resource.data.viewed == false))
           && request.resource.data.senderId in parts()
           && actingAs(request.resource.data.senderId)
           && isStr(request.resource.data.text, 1, 1000)
@@ -602,7 +608,21 @@ service cloud.firestore {
           && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
           && getAfter(chatPath()).data.lastAt == request.time
           && getAfter(userPath(request.resource.data.senderId)).data.lastMessageAt == request.time;
+        // View-once snap: only the recipient can open it, which removes the media link for good.
+        allow update: if inChat()
+          && resource.data.get('viewed', true) == false
+          && resource.data.senderId != me()
+          && !(resource.data.senderId == 'studio' && isAdmin())
+          && request.resource.data.viewed == true
+          && !('snap' in request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewed', 'snap']);
         allow delete: if isAdmin() || leavingForGood();
+      }
+      function snapOk(d) {
+        return d.snap is map && d.snap.keys().hasOnly(['url', 'kind', 'poster'])
+          && d.snap.kind in ['image', 'video']
+          && isStr(d.snap.url, 10, 500) && d.snap.url.matches('https://res[.]cloudinary[.]com/[a-z0-9_-]+/(image|video)/upload/.+')
+          && (!('poster' in d.snap) || (isStr(d.snap.poster, 0, 500) && (d.snap.poster == '' || d.snap.poster.matches('https://res[.]cloudinary[.]com/.+'))));
       }
       // Account deletion: once your profile is gone, you can delete chats you were part of.
       function leavingForGood() { return signedIn() && me() in parts() && me() != 'studio' && !exists(userPath(me())); }

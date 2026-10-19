@@ -8,6 +8,20 @@ import {
 } from './media-config.js';
 import { ICONS } from './icons.js';
 import { LIVE_CAP } from './live.js';
+import { createFx } from './fx/pipeline.js';
+import { mountPicker } from './fx/picker.js';
+import { FX_DEFAULT } from './fx/looks.js';
+import { onDoubleTap } from './tapstar.js';
+import { openEditor } from './snapedit.js';
+
+// Camera rail icons (same stroke style as the rest of the app)
+const SIC = {
+  flash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>',
+  timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M10 2.5h4"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17"/></svg>',
+  beauty: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>',
+  lens: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/></svg>'
+};
 
 const IC = {
   video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13" height="12" rx="3"/><path d="m15.5 10.5 6-3.5v10l-6-3.5z"/></svg>',
@@ -115,7 +129,7 @@ export const cameraSupport = () => ({
 
 // ------------------------------------------------------------------ composer
 export function createComposer(ctx) {
-  const { S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory } = ctx;
+  const { S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends } = ctx;
   let ov = null;       // overlay element (camera or preview)
   let target = 'post'; // 'post' or 'story' (24h story: video up to 15 s, text overlay)
   const isStory = () => target === 'story';
@@ -163,8 +177,17 @@ export function createComposer(ctx) {
   const pickFile = (id) => { const el = document.getElementById(id); if (el) el.click(); };
 
   // ---------------------------------------------------------------- Post tab (chooser)
-  function render(token, { textForm } = {}) {
+  function render(token, { textForm, sub } = {}) {
     const ready = uploadsReady();
+    // Camera-first: Create opens straight into the full-screen camera (#/new/menu = the old chooser).
+    const sup0 = cameraSupport();
+    if (sub !== 'menu' && sub !== 'text' && sup0.stream && sup0.recorder) {
+      target = 'post';
+      main.innerHTML = `<h1 class="page-title">Create</h1><p class="muted small">Opening camera… <a href="#/new/menu">More options</a></p>`;
+      S.unsubs.push(closeOverlay);
+      openCamera('snap');
+      return;
+    }
     main.innerHTML = `
       <h1 class="page-title">Create</h1>
       ${ready ? '' : notReadyNotice()}
@@ -200,7 +223,7 @@ export function createComposer(ctx) {
   function openStory() {
     target = 'story';
     const sup = cameraSupport();
-    if (sup.stream) return openCamera('photo');
+    if (sup.stream) return openCamera('snap');
     // No in-page camera: fall back to the library picker (mounted in a temporary overlay).
     mountOverlay(`<div class="cam-msg" role="alert">${IC.story}<h2>Add to your story</h2><p>Pick a photo or a video up to ${LIMITS.storyVideoSeconds} seconds.</p>
       <div class="cam-msg-btns"><button class="btn" data-a="library">Choose from library</button><button class="btn btn-ghost" data-a="close">Cancel</button></div></div>${inputsHtml}`, 'cam-camera has-msg');
@@ -209,56 +232,82 @@ export function createComposer(ctx) {
     ov.querySelector('[data-a=close]').onclick = closeOverlay;
   }
 
-  // ---------------------------------------------------------------- camera
-  function openCamera(mode = 'video') {
-    let facing = 'user';
-    let recorder = null, chunks = [], recStart = 0, raf = 0, recording = false, pressAt = 0, startedThisPress = false;
+  // ---------------------------------------------------------------- camera (camera-first, lenses)
+  // Full-screen camera: the shutter sits bottom-centre inside a row of lens circles; swipe the row
+  // to change the lens live (the shutter shows the current one). Tap = photo, hold = video. Swipe
+  // the screen left/right for colour looks, tap the screen/face for lenses, double-tap to flip.
+  function openCamera(mode = 'snap') {
+    let facing = 'user', fx = null, picker = null, fxState = { ...FX_DEFAULT }, lensOpen = false;
+    let recorder = null, chunks = [], recStart = 0, raf = 0, recording = false, holdT = 0, pressAt = 0, busy = false;
+    let flash = false, timerSec = 0, grid = false;
+    const BEAUTY_ORDER = ['off', 'light', 'medium', 'strong'];
     const el = mountOverlay(`
       <video class="cam-view mirror" playsinline muted autoplay aria-label="Camera preview"></video>
+      <div class="cam-grid" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <div class="cam-flash" aria-hidden="true"></div>
+      <div class="cam-screenflash" aria-hidden="true"></div>
+      <div class="cam-count" hidden aria-live="assertive"></div>
       <div class="cam-top">
         <button class="cam-btn" data-a="close" aria-label="Close camera">${IC.close}</button>
         <div class="cam-timer" hidden><span class="rec-dot" aria-hidden="true"></span><span class="t">0:00</span> / ${fmtTime(maxSec())}</div>
-        ${isStory() ? '<span class="cam-story-chip">Story</span>' : ''}
-        <button class="cam-btn" data-a="flip" aria-label="Switch to back camera">${IC.flip}</button>
+        ${isStory() ? '<span class="cam-story-chip">Story</span>' : `<a class="cam-pill" href="#/live/new" data-a="live">${ICONS.live}<span>Live</span></a><a class="cam-pill" href="#/new/menu" data-a="more">${IC.text}<span>Text</span></a>`}
+      </div>
+      <div class="cam-rail" role="toolbar" aria-label="Camera tools">
+        <button class="cam-rbtn" data-a="flip" aria-label="Switch to back camera">${IC.flip}<span>Flip</span></button>
+        <button class="cam-rbtn" data-a="flash" aria-pressed="false" aria-label="Flash">${SIC.flash}<span>Flash</span></button>
+        <button class="cam-rbtn" data-a="timer" aria-label="Self-timer off">${SIC.timer}<span>Off</span></button>
+        <button class="cam-rbtn" data-a="grid" aria-pressed="false" aria-label="Grid">${SIC.grid}<span>Grid</span></button>
+        <button class="cam-rbtn" data-a="beauty" aria-label="Smooth skin off">${SIC.beauty}<span>Beauty</span></button>
       </div>
       <div class="cam-msg" hidden role="alert"></div>
       <div class="cam-bottom">
-        <div class="cam-modes" role="radiogroup" aria-label="Camera mode">
-          <button role="radio" data-mode="video">Video</button><button role="radio" data-mode="photo">Photo</button>
-        </div>
+        <div class="cam-lenses" hidden></div>
         <div class="cam-controls">
           <button class="cam-lib" data-a="library" aria-label="Upload from library">${IC.library}</button>
-          <button class="cam-shutter" data-a="shutter" aria-label="Record video">
+          <button class="cam-shutter" data-a="shutter" aria-label="Take a photo (hold to record video)">
             <svg class="ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="${RING_R}"/><circle class="prog" cx="50" cy="50" r="${RING_R}" stroke-dasharray="${RING_C}" stroke-dashoffset="${RING_C}"/></svg>
             <span class="core" aria-hidden="true"></span>
           </button>
-          <span class="cam-side"></span>
+          <button class="cam-lensbtn" data-a="lenses" aria-label="Lenses and filters" aria-expanded="false">${SIC.lens}</button>
         </div>
-        <p class="cam-hint" aria-live="polite"></p>
+        <p class="cam-hint" aria-live="polite">Tap for a photo · hold for video</p>
       </div>
-      ${inputsHtml}`, 'cam-camera');
+      ${inputsHtml}`, 'cam-camera snap');
     wireInputs(el);
-    const view = el.querySelector('.cam-view'), shutter = el.querySelector('.cam-shutter'), prog = el.querySelector('.prog');
+    const view = el.querySelector('.cam-view'), shutter = el.querySelector('.cam-shutter'), prog = el.querySelector('.prog'), core = shutter.querySelector('.core');
     const timer = el.querySelector('.cam-timer'), tEl = timer.querySelector('.t'), msg = el.querySelector('.cam-msg');
-    const hint = el.querySelector('.cam-hint'), flipBtn = el.querySelector('[data-a=flip]');
+    const hint = el.querySelector('.cam-hint'), flipBtn = el.querySelector('[data-a=flip]'), lensBox = el.querySelector('.cam-lenses');
+    const R = (a) => el.querySelector(`[data-a=${a}]`);
+    let stream = null;
+    window.__lksCam = { get fx() { return fx; }, get state() { return fxState; }, get recording() { return recording; }, get facing() { return facing; } };
 
-    function paintMode() {
-      el.dataset.mode = mode;
-      el.querySelectorAll('[data-mode]').forEach((b) => { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
-      shutter.setAttribute('aria-label', mode === 'video' ? (recording ? 'Stop recording' : 'Record video') : 'Take photo');
-      hint.textContent = mode === 'video' ? (recording ? 'Tap to stop' : `Tap to record, or hold · up to ${maxSec()}s`) : (isStory() ? 'Tap for a photo story' : 'Tap to take a photo');
+    const showView = () => { view.srcObject = fx && !fx.isFast() ? fx.stream() : stream; view.play().catch(() => {}); };
+    const applyFx = (st) => { fxState = st; if (fx) { fx.set(st); showView(); } paintBeauty(); };
+    function paintBeauty() {
+      const b = R('beauty'); const v = fxState.beauty || 'off';
+      b.classList.toggle('on', v !== 'off'); b.querySelector('span').textContent = v === 'off' ? 'Beauty' : v[0].toUpperCase() + v.slice(1);
+      b.setAttribute('aria-label', `Smooth skin ${v}`);
     }
+    function openLenses(tab) {
+      if (recording) return;
+      lensOpen = true; lensBox.hidden = false; el.classList.add('lenses-open'); R('lenses').setAttribute('aria-expanded', 'true');
+      if (!picker) picker = mountPicker(lensBox, { state: fxState, tab: tab || 'funny', ring: core, onChange: applyFx });
+      else { if (tab) picker.setTab(tab); picker.set(fxState); }
+      hint.textContent = 'Swipe the circles · tap the screen to close';
+    }
+    function closeLenses() { lensOpen = false; lensBox.hidden = true; el.classList.remove('lenses-open'); R('lenses').setAttribute('aria-expanded', 'false'); hint.textContent = 'Tap for a photo · hold for video'; }
+
     function showMsg(title, body, actions) {
       msg.innerHTML = `${IC.camoff}<h2>${esc(title)}</h2><p>${body}</p><div class="cam-msg-btns">${actions}</div>`;
       msg.hidden = false; el.classList.add('has-msg');
       msg.querySelector('[data-a=retry]')?.addEventListener('click', start);
       msg.querySelector('[data-a=library]')?.addEventListener('click', () => pickFile('in-library'));
-      msg.querySelector('[data-a=native]')?.addEventListener('click', () => pickFile(mode === 'video' ? 'in-cap-video' : 'in-cap-photo'));
+      msg.querySelector('[data-a=native]')?.addEventListener('click', () => pickFile('in-cap-photo'));
     }
+    function stopAll() { if (fx) { fx.stop(); fx = null; } if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; } }
     async function start() {
       msg.hidden = true; el.classList.remove('has-msg');
-      stopStream();
+      stopAll();
       // 720p keeps a 3-minute recording around 55 MB (under the 100 MB cap).
       const video = { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
       try {
@@ -267,22 +316,21 @@ export function createComposer(ctx) {
           if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
           stream = await navigator.mediaDevices.getUserMedia({ video, audio: false }); // no mic available
         }
-        if (!ov || ov !== el) { stopStream(); return; }
-        view.srcObject = stream;
+        if (!ov || ov !== el) { stopAll(); return; }
+        fx = createFx(stream, { onNotice: toast, onState: (st) => { fxState = st; picker && picker.set(st); paintBeauty(); showView(); } });
+        fx.set(fxState);
+        showView();
         view.classList.toggle('mirror', facing === 'user');
-        await view.play().catch(() => {});
         el.classList.add('live');
-        try {
-          const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
-          flipBtn.hidden = cams.length < 2;
-        } catch { /* keep flip visible */ }
+        try { const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput'); flipBtn.hidden = cams.length < 2; } catch { /* keep */ }
         flipBtn.setAttribute('aria-label', facing === 'user' ? 'Switch to back camera' : 'Switch to front camera');
+        if (flash && facing === 'environment') torch(true);
       } catch (e) {
         el.classList.remove('live');
         const n = e && e.name;
         if (n === 'NotAllowedError' || n === 'SecurityError') {
           showMsg('Camera access is blocked',
-            'To record here, allow <b>camera</b> and <b>microphone</b> for this site in your browser settings (tap the lock or “aA” icon next to the address), then try again. You can also upload a video or photo from your library.',
+            'To use the camera here, allow <b>camera</b> and <b>microphone</b> for this site in your browser settings (tap the lock or “aA” icon next to the address), then try again. You can also upload a video or photo from your library.',
             '<button class="btn" data-a="retry">Try again</button><button class="btn btn-ghost" data-a="library">Upload from library</button>');
         } else if (n === 'NotFoundError' || n === 'OverconstrainedError' || n === 'NotReadableError') {
           showMsg(n === 'NotReadableError' ? 'Camera is busy' : 'No camera found',
@@ -294,104 +342,210 @@ export function createComposer(ctx) {
         }
       }
     }
+    async function torch(on) {
+      const t = stream && stream.getVideoTracks()[0]; if (!t) return false;
+      try { const caps = t.getCapabilities ? t.getCapabilities() : {}; if (!caps.torch) return false; await t.applyConstraints({ advanced: [{ torch: on }] }); return true; } catch { return false; }
+    }
+    function flip() { if (recording || busy) return; facing = facing === 'user' ? 'environment' : 'user'; start(); }
 
+    // ---- recording (hold the shutter)
     function tick() {
-      const el2 = (performance.now() - recStart) / 1000;
-      const f = Math.min(1, el2 / maxSec());
-      prog.setAttribute('stroke-dashoffset', String(RING_C * (1 - f)));
-      tEl.textContent = fmtTime(el2);
-      if (el2 >= maxSec()) { stopRec(); return; }
+      const s = (performance.now() - recStart) / 1000;
+      prog.setAttribute('stroke-dashoffset', String(RING_C * (1 - Math.min(1, s / maxSec()))));
+      tEl.textContent = fmtTime(s);
+      if (s >= maxSec()) { stopRec(); return; }
       raf = requestAnimationFrame(tick);
     }
     function startRec() {
       if (!stream || recording) return;
+      if (!cameraSupport().recorder) { toast('Video recording isn’t supported in this browser. Use your camera app, then upload.'); return; }
+      const src = fx && !fx.isFast() ? fx.stream() : stream;
+      fx && fx.lock(true);
       const mimeType = pickRecorderMime();
-      try { recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: LIMITS.recordBitrate, audioBitsPerSecond: 128_000 }); }
-      catch { recorder = new MediaRecorder(stream); }
+      try { recorder = new MediaRecorder(src, { mimeType, videoBitsPerSecond: LIMITS.recordBitrate, audioBitsPerSecond: 128_000 }); }
+      catch { recorder = new MediaRecorder(src); }
       chunks = [];
       recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
       recorder.onstop = finishRec;
       recorder.start(250);
       recording = true; recStart = performance.now();
-      el.classList.add('recording'); timer.hidden = false; flipBtn.disabled = true;
-      el.querySelector('.cam-modes').setAttribute('aria-disabled', 'true');
-      paintMode(); raf = requestAnimationFrame(tick);
+      el.classList.add('recording'); timer.hidden = false;
+      if (flash && facing === 'user') el.classList.add('screenflash-on');
+      hint.textContent = 'Release to stop';
+      raf = requestAnimationFrame(tick);
     }
     function stopRec() {
       if (!recording) return;
       recording = false; cancelAnimationFrame(raf);
-      el.classList.remove('recording'); flipBtn.disabled = false;
-      el.querySelector('.cam-modes').removeAttribute('aria-disabled');
+      el.classList.remove('recording', 'screenflash-on');
       recorder.__dur = (performance.now() - recStart) / 1000;
       try { recorder.stop(); } catch { finishRec(); }
-      paintMode();
+      hint.textContent = 'Tap for a photo · hold for video';
     }
     async function finishRec() {
+      fx && fx.lock(false);
       const dur = Math.min(maxSec(), recorder?.__dur || 0);
       const type = (recorder?.mimeType || pickRecorderMime() || 'video/webm').split(';')[0];
       const blob = new Blob(chunks, { type }); chunks = [];
       prog.setAttribute('stroke-dashoffset', String(RING_C)); timer.hidden = true; tEl.textContent = '0:00';
-      if (dur < 1 || !blob.size) { hint.textContent = 'That was too short. Tap to record, or hold the button.'; return; }
-      const file = new File([blob], `recording-${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`, { type });
+      if (dur < 1 || !blob.size) { hint.textContent = 'That was too short. Hold the button to record.'; return; }
+      const file = new File([blob], `snap-${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`, { type });
       try {
         const info = await inspectFile(file, { duration: dur }, maxSec(), isStory());
-        stopStream();
-        openPreview(file, { ...info, duration: dur }, 'camera', mode);
+        stopAll(); edit(file, { ...info, duration: dur });
       } catch (e) { toast(e.message); }
     }
-    function takePhoto() {
-      if (!stream || !view.videoWidth) return;
-      const c = document.createElement('canvas');
-      c.width = view.videoWidth; c.height = view.videoHeight;
-      const g = c.getContext('2d');
-      if (facing === 'user') { g.translate(c.width, 0); g.scale(-1, 1); }
-      g.drawImage(view, 0, 0, c.width, c.height);
-      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
-      c.toBlob(async (blob) => {
-        if (!blob) return toast('Couldn’t take the photo. Try again.');
-        const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        try { const info = await inspectFile(file, {}, maxSec(), isStory()); stopStream(); openPreview(file, info, 'camera', mode); }
-        catch (e) { toast(e.message); }
-      }, 'image/jpeg', 0.92);
+    // ---- photo (with flash + self-timer)
+    async function takePhoto() {
+      if (!stream || !view.videoWidth || busy) return;
+      busy = true;
+      try {
+        if (timerSec) {
+          const cnt = el.querySelector('.cam-count'); cnt.hidden = false;
+          for (let i = timerSec; i > 0; i--) { cnt.textContent = i; cnt.classList.remove('pop'); void cnt.offsetWidth; cnt.classList.add('pop'); await new Promise((r) => setTimeout(r, 1000)); if (ov !== el) return; }
+          cnt.hidden = true;
+        }
+        if (flash) {
+          if (facing === 'user') { el.classList.add('screenflash-on'); await new Promise((r) => setTimeout(r, 280)); }
+          else { await torch(true); await new Promise((r) => setTimeout(r, 250)); }
+        }
+        const c = document.createElement('canvas');
+        c.width = view.videoWidth; c.height = view.videoHeight;
+        const g = c.getContext('2d');
+        if (facing === 'user') { g.translate(c.width, 0); g.scale(-1, 1); }
+        g.drawImage(view, 0, 0, c.width, c.height);
+        el.classList.remove('screenflash-on'); if (flash && facing !== 'user' && !el.classList.contains('torch-keep')) torch(false);
+        el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+        const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+        if (!blob) { toast('Couldn’t take the photo. Try again.'); return; }
+        const file = new File([blob], `snap-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const info = await inspectFile(file, {}, maxSec(), isStory());
+        stopAll(); edit(file, info);
+      } catch (e) { toast(e.message || 'Couldn’t take the photo.'); }
+      finally { busy = false; }
+    }
+    function edit(file, info) {
+      openEditor({
+        file, info, story: isStory(), mirror: false, esc, toast,
+        lookOf: fxState.look,
+        retake: () => openCamera(mode),
+        close: () => { closeOverlay(); target = 'post'; },
+        mount: (html, cls) => mountOverlay(html, cls),
+        friends: () => (snapFriends ? snapFriends() : []),
+        sendTo: (dest, outFile, outInfo, extra) => sendTo(dest, outFile, outInfo, extra)
+      });
     }
 
-    // Shutter: photo = tap. Video = tap to start / tap to stop, or hold and release to stop.
+    // ---- shutter: tap = photo, hold = video
     shutter.addEventListener('pointerdown', (e) => {
-      if (mode !== 'video' || e.button > 0) return;
-      pressAt = performance.now(); startedThisPress = false;
-      if (!recording) { startRec(); startedThisPress = true; }
+      if (e.button > 0 || busy) return;
+      pressAt = performance.now();
       shutter.setPointerCapture?.(e.pointerId);
+      clearTimeout(holdT);
+      holdT = setTimeout(() => { if (pressAt) startRec(); }, 320);
     });
-    shutter.addEventListener('pointerup', () => {
-      if (mode !== 'video' || !pressAt) return;
-      const held = performance.now() - pressAt; pressAt = 0;
-      if (recording && (!startedThisPress || held > 450)) stopRec();
-    });
-    shutter.addEventListener('pointercancel', () => { if (pressAt && recording && performance.now() - pressAt > 450) stopRec(); pressAt = 0; });
+    const release = () => {
+      if (!pressAt) return;
+      clearTimeout(holdT); pressAt = 0;
+      if (recording) stopRec(); else takePhoto();
+    };
+    shutter.addEventListener('pointerup', release);
+    shutter.addEventListener('pointercancel', () => { clearTimeout(holdT); if (recording) stopRec(); pressAt = 0; });
     shutter.addEventListener('contextmenu', (e) => e.preventDefault());
-    shutter.addEventListener('click', (e) => {
-      if (mode === 'photo') return takePhoto();
-      if (e.detail === 0) { recording ? stopRec() : startRec(); } // keyboard
+    shutter.addEventListener('click', (e) => { if (e.detail === 0) takePhoto(); }); // keyboard Enter/Space = photo
+    shutter.addEventListener('keydown', (e) => { if (e.key === 'r' || e.key === 'R') { e.preventDefault(); recording ? stopRec() : startRec(); } });
+
+    // ---- screen gestures: swipe = looks, tap = lenses, double-tap = flip camera
+    let sx = 0, sy = 0, st = 0, swiped = false;
+    view.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; st = performance.now(); swiped = false; });
+    view.addEventListener('pointerup', (e) => {
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 60 && Math.abs(dy) < 60 && performance.now() - st < 900 && !recording) {
+        swiped = true;
+        if (!picker) { picker = mountPicker(lensBox, { state: fxState, tab: 'looks', ring: core, onChange: applyFx }); lensBox.hidden = !lensOpen; }
+        picker.step('look', dx < 0 ? 1 : -1);
+      }
     });
-    el.querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => {
-      if (recording) return;
-      if (b.dataset.mode === 'video' && !cameraSupport().recorder) { pickFile('in-cap-video'); return; }
-      mode = b.dataset.mode; paintMode();
-    }));
-    flipBtn.onclick = () => { if (recording) return; facing = facing === 'user' ? 'environment' : 'user'; start(); };
-    el.querySelector('[data-a=close]').onclick = () => { if (recording) { recording = false; cancelAnimationFrame(raf); recorder.onstop = null; try { recorder.stop(); } catch { /* */ } } closeOverlay(); };
-    el.querySelector('[data-a=library]').onclick = () => pickFile('in-library');
+    onDoubleTap(view, {
+      ignore: () => swiped,
+      single: () => { if (recording) return; if (lensOpen) closeLenses(); else openLenses('funny'); },
+      double: () => flip()
+    });
+    view.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+    // ---- rail + buttons
+    flipBtn.onclick = flip;
+    R('flash').onclick = async () => {
+      flash = !flash; const b = R('flash'); b.classList.toggle('on', flash); b.setAttribute('aria-pressed', flash);
+      b.querySelector('span').textContent = flash ? 'On' : 'Flash';
+      if (facing === 'environment') { const t = await torch(flash); if (flash && !t) toast('Flash: your screen lights up for selfies; this camera has no torch.'); }
+      else if (flash) toast('Front flash: the screen lights up when you snap');
+    };
+    R('timer').onclick = () => {
+      timerSec = timerSec === 0 ? 3 : timerSec === 3 ? 10 : 0;
+      const b = R('timer'); b.classList.toggle('on', !!timerSec); b.querySelector('span').textContent = timerSec ? timerSec + 's' : 'Off';
+      b.setAttribute('aria-label', timerSec ? `Self-timer ${timerSec} seconds` : 'Self-timer off');
+    };
+    R('grid').onclick = () => { grid = !grid; el.querySelector('.cam-grid').hidden = !grid; R('grid').classList.toggle('on', grid); R('grid').setAttribute('aria-pressed', grid); };
+    R('beauty').onclick = () => {
+      const next = BEAUTY_ORDER[(BEAUTY_ORDER.indexOf(fxState.beauty || 'off') + 1) % BEAUTY_ORDER.length];
+      const st2 = { ...fxState, beauty: next }; applyFx(st2); picker && picker.set(st2);
+      toast(next === 'off' ? 'Smooth skin off' : `Smooth skin: ${next}`);
+    };
+    R('lenses').onclick = () => (lensOpen ? closeLenses() : openLenses());
+    R('library').onclick = () => pickFile('in-library');
+    R('close').onclick = () => { if (recording) { recording = false; cancelAnimationFrame(raf); recorder.onstop = null; try { recorder.stop(); } catch { /* */ } } closeOverlay(); if (location.hash === '#/new') location.hash = '#/new/menu'; };
+    el.querySelectorAll('.cam-pill').forEach((a) => a.addEventListener('click', () => closeOverlay()));
     const onKey = (e) => { if (e.key === 'Escape' && ov === el && !recording) closeOverlay(); };
     document.addEventListener('keydown', onKey);
     cleanupFns.push(() => {
-      document.removeEventListener('keydown', onKey); cancelAnimationFrame(raf);
+      document.removeEventListener('keydown', onKey); cancelAnimationFrame(raf); clearTimeout(holdT);
       if (recorder && recorder.state !== 'inactive') { recorder.onstop = null; try { recorder.stop(); } catch { /* */ } }
+      stopAll(); window.__lksCam = null;
     });
-    paintMode();
+    paintBeauty();
     start();
   }
 
   // ---------------------------------------------------------------- preview + post
+  // "Send to" from the editor: Story / Post reuse the caption + upload screen; Friends = view-once snap.
+  function sendTo(dest, file, info, extra = {}) {
+    if (dest === 'story' || dest === 'post') {
+      target = dest;
+      inspectFile(file, info.kind === 'video' ? { duration: info.duration, width: info.width, height: info.height } : {}, dest === 'story' ? LIMITS.storyVideoSeconds : LIMITS.maxVideoSeconds, dest === 'story')
+        .then((i2) => openPreview(file, { ...info, ...i2 }, 'camera'))
+        .catch((e) => toast(e.message || 'That can’t be shared.'));
+      return;
+    }
+    if (dest === 'friends') return sendSnapFlow(file, info, extra.uids || []);
+  }
+  async function sendSnapFlow(file, info, uids) {
+    if (!uids.length) return;
+    if (!uploadsReady()) { toast('Uploads are almost ready. Try again soon.'); return; }
+    const el = mountOverlay(`<div class="cam-msg snap-sending" role="status"><div class="spinner"></div><h2>Sending snap…</h2><div class="pv-progress"><span></span></div><p class="small muted">To ${uids.length} ${uids.length === 1 ? 'friend' : 'friends'}</p></div>`, 'cam-camera has-msg');
+    const barIn = el.querySelector('.pv-progress span');
+    try {
+      const r = await new Promise((resolve, reject) => {
+        const fd = new FormData(); fd.append('file', file, file.name || 'snap');
+        fd.append('upload_preset', CLOUDINARY.snapPreset || CLOUDINARY.uploadPreset);
+        fd.append('tags', 'lks_snap'); if (S.user) fd.append('context', `uid=${S.user.uid}`);
+        const x = new XMLHttpRequest(); x.open('POST', uploadEndpoint());
+        x.upload.onprogress = (e) => { if (e.lengthComputable) barIn.style.transform = `scaleX(${e.loaded / e.total})`; };
+        x.onload = () => { let j = null; try { j = JSON.parse(x.responseText); } catch { /* */ } (x.status < 300 && j && j.secure_url) ? resolve(j) : reject(new Error((j && j.error && j.error.message) || 'Upload failed')); };
+        x.onerror = () => reject(new Error('Network problem. Check your connection and try again.'));
+        x.send(fd);
+      });
+      const d = deliveryUrls(r);
+      const n = await sendSnap(uids, { url: d.mediaUrl, kind: d.mediaType, poster: d.mediaType === 'video' ? d.posterUrl : '' });
+      closeOverlay(); target = 'post';
+      toast(`Snap sent to ${n} ${n === 1 ? 'friend' : 'friends'}`);
+      location.hash = uids.length === 1 ? '#/chat/' + uids[0] : '#/messages';
+    } catch (e) {
+      closeOverlay();
+      toast(e && e.code === 'permission-denied' ? 'Couldn’t send to everyone. They may not accept messages.' : (e.message || 'Couldn’t send the snap.'));
+    }
+  }
+
   function openPreview(file, info, source, camMode) {
     const ready = uploadsReady();
     let xhr = null, uploaded = null, busy = false;

@@ -1,15 +1,30 @@
 {
-  "name": "Lone Keem Studios",
-  "short_name": "Lone Keem",
-  "description": "Cinematic AI-generated movies, music, and music videos from Lone Keem Studios.",
+  "name": "Kemy",
+  "short_name": "Kemy",
+  "description": "Kemy by Lone Keem Studios: the free app for AI movies, music and funny videos, filters, live streams, stories and games.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#8a2be2",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

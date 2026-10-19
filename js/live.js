@@ -6,6 +6,9 @@
 // Nothing is recorded or stored: when a live ends only the summary numbers stay on lives/{id}.
 import { ICONS } from './icons.js';
 import { fmtCount } from './views.js';
+import { createFx } from './fx/pipeline.js';
+import { mountPicker } from './fx/picker.js';
+import { FX_DEFAULT } from './fx/looks.js';
 
 export const LIVE_CAP = 12;
 export const LIVE_STALE_MS = 60000;      // no heartbeat for 60 s = ended (no Cloud Functions on Spark)
@@ -263,14 +266,16 @@ export function createLive(ctx) {
         ${isAdmin() ? `<label class="check small"><input type="checkbox" id="lv-studio"> Go live as Lone Keem Studios</label>` : ''}
         <div id="lv-app-pane">
           <p class="small">Your camera, straight from this app. Your followers see you in their feed right away. Nothing is recorded.</p>
+          <div class="lv-fx" id="lv-fx0" hidden></div>
           <p class="form-error" id="lv-err" role="alert"></p>
-          <div class="lv-setup-btns"><button class="btn btn-ghost" id="lv-flip0">${IC.flip}Flip</button><button class="btn lv-start" id="lv-start" disabled>${ICONS.live}Go Live</button></div>
+          <div class="lv-setup-btns"><button class="btn btn-ghost" id="lv-flip0">${IC.flip}Flip</button><button class="btn btn-ghost" id="lv-fxbtn0" aria-expanded="false">✨ Filters</button><button class="btn lv-start" id="lv-start" disabled>${ICONS.live}Go Live</button></div>
         </div>
         <div id="lv-yt-pane" hidden>
           <p class="small">Stream on YouTube, and it plays right here in the app with your in-app chat and stars. Viewers don’t need YouTube.</p>
           <label class="sr-only" for="lv-yt">YouTube Live link</label>
           <input id="lv-yt" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="Paste your YouTube Live link" autocomplete="off">
           <label class="check small"><input type="checkbox" id="lv-ytchat" checked> In-app chat and stars</label>
+          <p class="lv-fxnote">Filters for a big live come from YouTube or your streaming software (like OBS), because the video goes straight from there, not through this app.</p>
           <details class="lv-help"><summary>How do I start a YouTube Live?</summary>
             <ol>
               <li>Open the <b>YouTube</b> app, tap <b>Create (+)</b>, then <b>Go live</b>. The first time, YouTube asks you to verify your channel and can take up to 24 hours to turn live streaming on.</li>
@@ -285,7 +290,9 @@ export function createLive(ctx) {
         </div>
       </div></div>`;
     const v = $('#lv-video');
-    let facing = 'user', stream = null, mode = 'app', camTry = 0;
+    let facing = 'user', stream = null, mode = 'app', camTry = 0, fx = null, fxState = { ...FX_DEFAULT }, picker0 = null;
+    const preview = () => { v.srcObject = fx && !fx.isFast() ? fx.stream() : stream; v.play().catch(() => {}); };
+    const newFx = () => { fx && fx.stop(); fx = createFx(stream, { onNotice: toast, onState: (st) => { fxState = st; picker0 && picker0.set(st); preview(); } }); fx.set(fxState); window.__lksFx = fx; preview(); };
     const getCam = async () => {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 24, max: 30 } },
@@ -293,7 +300,7 @@ export function createLive(ctx) {
       });
       return s;
     };
-    const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; v.srcObject = null; };
+    const stop = () => { if (fx) { fx.stop(); fx = null; } if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; v.srcObject = null; };
     S.unsubs.push(() => { if (!hostSession) { stop(); document.body.classList.remove('live-mode'); } });
     $('#lv-x').onclick = () => history.length > 1 ? history.back() : (location.hash = '#/feed');
     async function startCam() {
@@ -303,7 +310,7 @@ export function createLive(ctx) {
         if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) throw Object.assign(new Error('unsupported'), { name: 'Unsupported' });
         const s = await getCam();
         if (stale(token) || my !== camTry || mode !== 'app') { s.getTracks().forEach((t) => t.stop()); return; }
-        stream = s; v.srcObject = stream; v.play().catch(() => {});
+        stream = s; newFx();
         $('#lv-start').disabled = false;
       } catch (e) {
         if (my !== camTry) return;
@@ -322,8 +329,12 @@ export function createLive(ctx) {
     $('#lv').querySelectorAll('.lv-mode').forEach((b) => (b.onclick = () => b.dataset.mode !== mode && setMode(b.dataset.mode)));
     $('#lv-flip0').onclick = async () => {
       facing = facing === 'user' ? 'environment' : 'user';
-      try { const s = await getCam(); stop(); stream = s; v.srcObject = s; v.classList.toggle('mirror', facing === 'user'); }
+      try { const s = await getCam(); stop(); stream = s; newFx(); v.classList.toggle('mirror', facing === 'user'); }
       catch { facing = facing === 'user' ? 'environment' : 'user'; toast('Couldn’t switch cameras'); }
+    };
+    $('#lv-fxbtn0').onclick = () => {
+      const box = $('#lv-fx0'); box.hidden = !box.hidden; $('#lv-fxbtn0').setAttribute('aria-expanded', !box.hidden);
+      if (!box.hidden && !picker0) picker0 = mountPicker(box, { state: fxState, tab: 'looks', onChange: (st) => { fxState = st; if (fx) { fx.set(st); preview(); } } });
     };
     $('#lv-start').onclick = async () => {
       const btn = $('#lv-start'); btn.disabled = true; $('#lv-err').textContent = '';
@@ -331,7 +342,8 @@ export function createLive(ctx) {
       try {
         const id = await createLive($('#lv-title').value.trim().slice(0, 80), asStudio);
         if (stale(token)) return;
-        hostSession = { id, stream, facing, asStudio };
+        hostSession = { id, raw: stream, fx, fxState, stream: new MediaStream([fx ? fx.videoTrack() : stream.getVideoTracks()[0], ...stream.getAudioTracks()]), facing, asStudio };
+        fx = null; // now owned by the broadcast
         history.replaceState(null, '', '#/live/' + id);
         startBroadcast(token);
       } catch (e) {
@@ -393,11 +405,13 @@ export function createLive(ctx) {
       </header>
       <div class="lv-stars" aria-hidden="true"></div>
       <div class="lv-bottom">
+        <div class="lv-fx" id="lv-fx" hidden></div>
         <div class="lv-chat" aria-live="polite" aria-label="Live chat"></div>
         <form class="lv-form"><label class="sr-only" for="lv-say">Say something</label><input id="lv-say" maxlength="150" placeholder="Say something…" autocomplete="off"><button class="lv-send" aria-label="Send">${ICONS.send}</button></form>
         <div class="lv-tools">
           <button class="lv-tool" id="lv-flip" aria-label="Flip camera">${IC.flip}</button>
           <button class="lv-tool" id="lv-mic" aria-label="Mute microphone" aria-pressed="false">${IC.mic}</button>
+          <button class="lv-tool" id="lv-fxbtn" aria-label="Filters" aria-expanded="false">✨</button>
           <span class="lv-starcount" id="lv-starcount" title="Stars">${STAR}<span>0</span></span>
         </div>
       </div></div>`;
@@ -487,15 +501,35 @@ export function createLive(ctx) {
       b.setAttribute('aria-pressed', !micOn); b.setAttribute('aria-label', micOn ? 'Mute microphone' : 'Unmute microphone');
       toast(micOn ? 'Microphone on' : 'Microphone muted');
     };
+    // Filters: the canvas track stays the same while looks/lenses change; only switching to or
+    // from "no filter" swaps the sent track (replaceTrack keeps every connection up).
+    const swapSent = async (nt) => {
+      const cur = H.stream.getVideoTracks()[0];
+      if (cur === nt) return;
+      await Promise.all([...peers.values()].flatMap((p) => p.pc.getSenders().filter((s) => s.track?.kind === 'video').map((s) => s.replaceTrack(nt).catch(() => {}))));
+      if (cur) H.stream.removeTrack(cur);
+      H.stream.addTrack(nt); v.srcObject = H.stream; v.play().catch(() => {});
+    };
+    const applyFx = (st) => { if (!H.fx) return; H.fxState = H.fx.set(st); swapSent(H.fx.videoTrack()); };
+    if (H.fx) { window.__lksFx = H.fx; window.__lksApplyFx = (st) => { picker && picker.set(st); applyFx({ ...H.fxState, ...st }); }; }
+    let picker = null;
+    $('#lv-fxbtn').onclick = () => {
+      const box = $('#lv-fx'), btn = $('#lv-fxbtn'); box.hidden = !box.hidden;
+      btn.classList.toggle('on', !box.hidden); btn.setAttribute('aria-expanded', !box.hidden);
+      if (!H.fx) { box.hidden = true; toast('Filters aren’t available on this device'); return; }
+      if (!box.hidden && !picker) picker = mountPicker(box, { state: H.fxState, tab: 'looks', onChange: applyFx });
+    };
     $('#lv-flip').onclick = async () => {
       const next = H.facing === 'user' ? 'environment' : 'user';
       try {
         const ns = await navigator.mediaDevices.getUserMedia({ video: { facingMode: next, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 24, max: 30 } } });
         const nt = ns.getVideoTracks()[0];
-        const old = H.stream.getVideoTracks()[0];
-        await Promise.all([...peers.values()].flatMap((p) => p.pc.getSenders().filter((s) => s.track?.kind === 'video').map((s) => s.replaceTrack(nt))));
-        H.stream.removeTrack(old); old.stop(); H.stream.addTrack(nt);
-        H.facing = next; v.srcObject = H.stream; v.classList.toggle('mirror', next === 'user');
+        const oldRaw = H.raw.getVideoTracks()[0];
+        H.raw.removeTrack(oldRaw); H.raw.addTrack(nt);
+        if (H.fx) H.fx.setSource(nt);
+        await swapSent(H.fx ? H.fx.videoTrack() : nt);
+        oldRaw.stop();
+        H.facing = next; v.classList.toggle('mirror', next === 'user');
       } catch { toast('Couldn’t switch cameras'); }
     };
     $('#lv-end').onclick = () => { if (confirm('End your live?')) finish(); };
@@ -509,7 +543,9 @@ export function createLive(ctx) {
       peak = Math.max(peak, counted());
       unsubViewers(); unsubChat(); unsubLive();
       [...peers.keys()].forEach((u) => closePeer(u, false));
-      H.stream.getTracks().forEach((t) => t.stop());
+      H.raw.getTracks().forEach((t) => t.stop());
+      if (H.fx) H.fx.stop();
+      window.__lksApplyFx = null;
       hostSession = null;
       if (!byAdmin) { try { await write(true); } catch (e) { console.warn('end live', e); } }
       cleanupSubs(id);

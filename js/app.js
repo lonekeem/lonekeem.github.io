@@ -16,7 +16,7 @@ import {
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy,
   limit, onSnapshot, writeBatch, serverTimestamp, increment, getCountFromServer, Timestamp,
-  getAggregateFromServer, sum, limitToLast
+  getAggregateFromServer, sum, limitToLast, deleteField
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ICONS } from './icons.js';
 import { createLive } from './live.js';
@@ -176,7 +176,7 @@ async function isLiked(postId) {
 }
 const chatIdFor = (a, b) => [a, b].sort().join('_');
 // Sends a DM (used by the chat page and story replies). `me` is the sender (studio for the admin).
-async function sendMessage(otherUid, text, me = S.user.uid) {
+async function sendMessage(otherUid, text, me = S.user.uid, snapData = null) {
   const cid = chatIdFor(me, otherUid);
   const chatRef = doc(db, 'chats', cid);
   const snap = await getDoc(chatRef).catch(() => null);
@@ -185,10 +185,44 @@ async function sendMessage(otherUid, text, me = S.user.uid) {
   const meta = { lastMessage: text.slice(0, 1000), lastAt: serverTimestamp(), lastSender: me };
   if (exists) b.update(chatRef, meta);
   else b.set(chatRef, { participants: [me, otherUid].sort(), ...meta, createdAt: serverTimestamp() });
-  b.set(doc(collection(db, 'chats', cid, 'messages')), { senderId: me, text: text.slice(0, 1000), createdAt: serverTimestamp() });
+  b.set(doc(collection(db, 'chats', cid, 'messages')), { senderId: me, text: text.slice(0, 1000), createdAt: serverTimestamp(), ...(snapData ? { snap: snapData, viewed: false } : {}) });
   b.update(doc(db, 'users', me), { lastMessageAt: serverTimestamp() });
   await b.commit();
   if (!exists || snap.data().lastSender !== me) notify(otherUid, 'message', { text }, me);
+}
+
+// View-once snaps from the camera editor (js/snapedit.js): sent one friend at a time (1 msg/s rule).
+async function sendSnap(uids, snapData) {
+  let sent = 0;
+  for (const uid of uids) {
+    if (sent) await new Promise((r) => setTimeout(r, 1150));
+    await sendMessage(uid, snapData.kind === 'video' ? '🎥 Snap' : '📸 Snap', S.user.uid, snapData);
+    sent++;
+  }
+  return sent;
+}
+// People you follow (newest first), for "Send to → Friends".
+async function snapFriends() {
+  let fol = [...S.following];
+  if (!fol.length) { const qs = await getDocs(query(collection(db, 'follows'), where('follower', '==', S.user.uid), limit(200))).catch(() => null); fol = qs ? qs.docs.map((d) => d.data().followee) : []; }
+  const ids = fol.filter((u) => !S.blocked.has(u) && u !== S.user?.uid).slice(0, 60);
+  const list = await Promise.all(ids.map(async (uid) => { const u = await getProfile(uid).catch(() => null); return u ? { uid, ...u, photoURL: safePhotoURL(u.photoURL) } : null; }));
+  return list.filter(Boolean);
+}
+// Full-screen view-once viewer; marks the message viewed (which deletes the link) when it opens.
+function openSnap(ref, m) {
+  const ov = document.createElement('div'); ov.className = 'snap-view'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Snap');
+  const sn = m.snap;
+  ov.innerHTML = `${sn.kind === 'video' ? `<video src="${esc(sn.url)}" ${sn.poster ? `poster="${esc(sn.poster)}"` : ''} autoplay playsinline webkit-playsinline></video>` : `<img src="${esc(sn.url)}" alt="Snap">`}
+    <div class="snap-view-bar"><span></span></div><button class="snap-view-x" aria-label="Close">✕</button><p class="snap-view-tip">Tap to close · this snap disappears after you view it</p>`;
+  document.body.appendChild(ov);
+  updateDoc(ref, { viewed: true, snap: deleteField() }).catch((e) => console.warn('snap viewed', e));
+  const bar = ov.querySelector('.snap-view-bar span'); let t0 = performance.now(), raf = 0;
+  const media = ov.querySelector('video,img');
+  const dur = () => (sn.kind === 'video' ? (media.duration || 10) * 1000 : 10000);
+  const tick = () => { const p = sn.kind === 'video' ? (media.currentTime * 1000) / dur() : (performance.now() - t0) / dur(); bar.style.transform = `scaleX(${Math.min(1, p)})`; if (p >= 1 || (sn.kind === 'video' && media.ended)) return close(); raf = requestAnimationFrame(tick); };
+  const close = () => { cancelAnimationFrame(raf); ov.remove(); };
+  ov.onclick = close; raf = requestAnimationFrame(tick);
 }
 
 // ---------------------------------------------------------------- shared social actions
@@ -436,15 +470,24 @@ async function showWelcome() {
   S.profile.welcomed = true;
   openModal(`
     <button class="icon-btn close" data-close aria-label="Close">✕</button>
-    <img class="logo" src="logo.png" alt="Lone Keem Studios KL logo" width="84" height="84">
-    <h2 id="welcome-title">Welcome to Lone Keem Studios, ${esc(name)}!</h2>
-    <p>This is where AI meets imagination. Watch our latest drop, follow the studio for new movies and music, and share what you create with the community.</p>
+    <img class="logo" src="kemy-logo.png" alt="Kemy app icon" width="84" height="84" style="border-radius:22%">
+    <h2 id="welcome-title">Welcome to Kemy, ${esc(name)}!</h2>
+    <p>Kemy is the free app from Lone Keem Studios, where AI meets imagination. Watch our latest drop, follow the studio for new movies and music, and share what you create with the community.</p>
     <div class="btns">
       <a class="btn" id="welcome-watch" href="#/watch/stand-up-strong" data-close>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
         Watch now</a>
       <a class="btn btn-ghost" href="#/settings" data-close>Set up my profile</a>
-    </div>`);
+    </div>
+    <form class="welcome-bio" id="welcome-bio">
+      <div class="row"><label for="w-bio"><b>Add a bio</b> <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="w-bio-n"></span></div>
+      <textarea id="w-bio" maxlength="160" rows="3" placeholder="Who are you? What do you make? ✨"></textarea>
+      <div class="row"><span class="small muted">Up to 4 lines · emoji, @names and #tags work</span><span class="spacer"></span><button class="btn btn-sm" type="submit">Save bio</button></div>
+    </form>`);
+  { const ta = $('#w-bio'); if (ta) { wireCounter(ta, $('#w-bio-n'), 160); limitLines(ta);
+    $('#welcome-bio').onsubmit = async (ev) => { ev.preventDefault(); const bio = cleanBio(ta.value); if (!bio) { ta.focus(); return; }
+      try { await updateDoc(doc(db, 'users', S.user.uid), { bio }); S.profile.bio = bio; profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile }); $('#welcome-bio').innerHTML = '<p class="small" style="margin:0">✅ Bio saved. Change it any time in Edit profile.</p>'; }
+      catch (e) { toast(friendlyError(e)); } }; } }
   newestStudioVideo().then((id) => { const a = $('#welcome-watch'); if (a) a.href = '#/watch/' + id; });
   try { await updateDoc(doc(db, 'users', S.user.uid), { welcomed: true }); } catch (e) { console.warn(e); }
 }
@@ -475,7 +518,7 @@ const routes = [
   [/^#\/feed$/, pageFeed, 'feed'],
   [/^#\/explore$/, pageExplore, 'explore'],
   [/^#\/search(?:\?(.*))?$/, pageSearch, 'explore'],
-  [/^#\/new(?:\/(text))?$/, pageCompose, 'new'],
+  [/^#\/new(?:\/(text|menu))?$/, pageCompose, 'new'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
   [/^#\/me$/, pageMe, 'me'],
@@ -568,7 +611,7 @@ async function pageFeed(token) {
   if (!S.user || !S.profile) {
     main.innerHTML = `${feedToggle('feed')}
       <section class="card pad center stack">
-        <img class="auth-logo" src="logo.png" alt="" width="64" height="64">
+        <img class="auth-logo" src="kemy-logo.png" alt="" width="64" height="64" style="border-radius:22%">
         <h1 class="page-title" style="margin:0">Join the community</h1>
         <p class="muted" style="margin:6px 0 0">Follow the studio for new movies and music, star and comment on drops, save favorites, share your own creations, and message other fans.</p>
         <div class="row" style="justify-content:center;flex-wrap:wrap"><a class="btn" href="#/signup">Create account</a><a class="btn btn-ghost" href="#/login">Log in</a></div>
@@ -615,14 +658,28 @@ async function pageExplore(token) {
   renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet. Be the first!');
 }
 async function pageSearch(qs, token) { return search.render(qs, token); }
-const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${avatar(u, '', false)}<div class="meta"><b>${esc(u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${u.bio ? ' · ' + esc(u.bio) : ''}</p></div></a>`;
+// Bios: keep up to 4 lines + emoji; @mentions and #hashtags become links. Website: https only.
+const BIO_MAX = 160, BIO_LINES = 4;
+const cleanBio = (t) => String(t || '').replace(/\r/g, '').split('\n').slice(0, BIO_LINES).join('\n').replace(/\n{2,}/g, '\n').trim().slice(0, BIO_MAX);
+function bioHtml(t) {
+  return esc(cleanBio(t)).replace(/(^|[\s(])@([a-z0-9_.]{3,20})\b/gi, (m, a, u) => `${a}<a href="#/u/${u.toLowerCase()}">@${u}</a>`)
+    .replace(/(^|[\s(])#([\p{L}\p{N}_]{1,40})/gu, (m, a, h) => `${a}<a href="#/search?q=${encodeURIComponent('#' + h)}">#${h}</a>`);
+}
+const WEBSITE_RE = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/[^\s"'<>]*)?$/i;
+const safeWebsite = (u) => (typeof u === 'string' && u.length <= 100 && WEBSITE_RE.test(u) ? u : '');
+const normWebsite = (u) => { u = String(u || '').trim(); if (!u) return ''; if (/^http:\/\//i.test(u)) return null; if (!/^https:\/\//i.test(u)) u = 'https://' + u; return safeWebsite(u) ? u : null; };
+const prettyUrl = (u) => u.replace(/^https:\/\/(www\.)?/i, '').replace(/\/$/, '');
+function wireCounter(input, out, max) { const f = () => { out.textContent = `${input.value.length}/${max}`; out.classList.toggle('warn', input.value.length > max - 15); }; input.addEventListener('input', f); f(); }
+function limitLines(ta, n = BIO_LINES) { ta.addEventListener('input', () => { const l = ta.value.split('\n'); if (l.length > n) { const pos = ta.selectionStart; ta.value = l.slice(0, n).join('\n') + ' ' + l.slice(n).join(' '); ta.selectionStart = ta.selectionEnd = Math.min(pos, ta.value.length); ta.dispatchEvent(new Event('input')); } }); }
+
+const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${avatar(u, '', false)}<div class="meta"><b>${esc(u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${u.bio ? ' · ' + esc(cleanBio(u.bio).replace(/\n/g, ' ')) : ''}</p></div></a>`;
 
 // ---------------------------------------------------------------- compose (Post tab)
 // Camera / photo / library flow lives in js/create.js; the text + link form stays here.
-const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory });
+const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends });
 async function pageCompose(sub, token) {
   if (!requireAuth()) return;
-  composer.render(token, { textForm: (slot) => textComposeForm(slot, sub === 'text') });
+  composer.render(token, { sub, textForm: (slot) => textComposeForm(slot, sub === 'text') });
 }
 async function postAuthor(asStudio) {
   const authorId = asStudio ? STUDIO_UID : S.user.uid;
@@ -777,7 +834,7 @@ async function pageProfile(username, tab, token) {
         <div class="pav" id="pav">${avatar(u, 'lg', false)}</div>
         <div style="min-width:0">
           <h1>${esc(u.displayName)}${badge(uid)}</h1>
-          <div class="muted">@${esc(u.username)}</div>
+          <div class="muted">@${esc(u.username)}${u.pronouns ? ` · <span class="pronouns">${esc(String(u.pronouns).slice(0, 20))}</span>` : ''}</div>
           <div class="stats small">
             <span><b>${pc.data().count}</b> posts</span>
             <a href="#/followers/${esc(uid)}"><b id="fers">${fers.data().count}</b> followers</a>
@@ -789,7 +846,8 @@ async function pageProfile(username, tab, token) {
           </div>
         </div>
       </div>
-      ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
+      ${u.bio ? `<p class="bio">${bioHtml(u.bio)}</p>` : mine ? `<a class="btn btn-sm btn-ghost add-bio" href="#/settings" id="add-bio">✍️ Add a bio</a>` : ''}
+      ${safeWebsite(u.website) ? `<a class="pweb" href="${esc(u.website)}" target="_blank" rel="nofollow noopener noreferrer ugc">🔗 ${esc(prettyUrl(u.website))}</a>` : ''}
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
@@ -802,6 +860,7 @@ async function pageProfile(username, tab, token) {
     </section>
     ${mine ? `<nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/saved" class="${tab ? 'active' : ''}">Saved</a></nav>` : '<div style="height:16px"></div>'}
     <div id="posts"><div class="spinner"></div></div>`;
+  $('#add-bio')?.addEventListener('click', () => sessionStorage.setItem('lks-focus-bio', '1'));
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
   if (!blocked) stories.renderProfile($('#pav'), $('#pstories'), uid, u, token, stale);
   if (!blocked) games.renderProfile($('#pgames'), uid);
@@ -887,7 +946,10 @@ async function pageSettings() {
       <div class="field"><label for="s-name">Display name</label><input id="s-name" type="text" maxlength="50" required value="${esc(p.displayName)}"></div>
       <div class="field"><label for="s-user">Username</label><input id="s-user" type="text" maxlength="20" required value="${esc(p.username)}" autocapitalize="none" autocomplete="off" spellcheck="false">
         <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore.</p></div>
-      <div class="field"><label for="s-bio">Bio</label><textarea id="s-bio" maxlength="160" style="min-height:72px" placeholder="Tell people about yourself">${esc(p.bio)}</textarea></div>
+      <div class="field"><div class="row"><label for="s-bio">Bio</label><span class="spacer"></span><span class="small muted counter" id="s-bio-n" aria-live="polite"></span></div><textarea id="s-bio" maxlength="160" rows="4" style="min-height:96px" placeholder="Tell people about yourself ✨ Use @names and #tags">${esc(p.bio)}</textarea>
+        <p class="small muted" style="margin:4px 0 0">Up to 4 lines. Emoji, @mentions and #hashtags work.</p></div>
+      <div class="field"><div class="row"><label for="s-pro">Pronouns <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="s-pro-n"></span></div><input id="s-pro" type="text" maxlength="20" placeholder="e.g. she/her" value="${esc(p.pronouns || '')}" autocomplete="off"></div>
+      <div class="field"><div class="row"><label for="s-web">Website <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="s-web-n"></span></div><input id="s-web" type="text" inputmode="url" maxlength="100" placeholder="https://your-site.com" value="${esc(p.website || '')}" autocapitalize="none" autocomplete="url" spellcheck="false"></div>
       <fieldset class="field" style="border:0;padding:0;margin:0 0 14px"><legend style="font-weight:500;font-size:.92rem;margin-bottom:8px">Avatar color</legend>
         <div class="color-row">${COLORS.map((c) => `<label><input type="radio" name="color" value="${c}" ${c === p.color ? 'checked' : ''}><span class="swatch" style="background:${c}" title="${c}"></span></label>`).join('')}</div></fieldset>
       <p class="form-error" id="s-err"></p>
@@ -903,6 +965,9 @@ async function pageSettings() {
       <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
     </section>`}`;
+  wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
+  wireCounter($('#s-pro'), $('#s-pro-n'), 20); wireCounter($('#s-web'), $('#s-web-n'), 100);
+  if (sessionStorage.getItem('lks-focus-bio')) { sessionStorage.removeItem('lks-focus-bio'); setTimeout(() => { const t = $('#s-bio'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); } }, 60); }
   $('#s-out').onclick = async () => { await signOut(auth); location.hash = '#/feed'; };
   const del = $('#s-delete');
   if (del) del.onclick = () => accountDeleter.open(S.profile);
@@ -926,7 +991,10 @@ async function pageSettings() {
     const err = $('#s-err'); err.textContent = '';
     const displayName = $('#s-name').value.trim();
     const username = $('#s-user').value.trim().toLowerCase().replace(/^@/, '');
-    const bio = $('#s-bio').value.trim();
+    const bio = cleanBio($('#s-bio').value);
+    const pronouns = $('#s-pro').value.trim().slice(0, 20);
+    const website = normWebsite($('#s-web').value);
+    if (website === null) { err.textContent = 'Website must be a valid https:// link (up to 100 characters).'; return; }
     const color = $('input[name=color]:checked')?.value || p.color;
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
@@ -937,9 +1005,9 @@ async function pageSettings() {
         b.set(doc(db, 'usernames', username), { uid: S.user.uid });
         b.delete(doc(db, 'usernames', p.username));
       }
-      b.update(doc(db, 'users', S.user.uid), { displayName, username, bio, color, ...userSearchFields({ displayName, username }) });
+      b.update(doc(db, 'users', S.user.uid), { displayName, username, bio, pronouns, website, color, ...userSearchFields({ displayName, username }) });
       await b.commit();
-      Object.assign(S.profile, { displayName, username, bio, color });
+      Object.assign(S.profile, { displayName, username, bio, pronouns, website, color });
       profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile });
       updateProfile(S.user, { displayName }).catch(() => {});
       toast('Profile saved');
@@ -998,10 +1066,18 @@ async function pageChat(otherUid, asStudio, token) {
   const log = $('#log');
   const markSeen = () => { const s = seenMap(); s[cid] = Date.now(); localStorage.setItem('lks-seen', JSON.stringify(s)); };
   const unsub = onSnapshot(query(collection(db, 'chats', cid, 'messages'), orderBy('createdAt', 'asc'), limit(300)), (qs) => {
+    const snaps = new Map();
     log.innerHTML = qs.docs.length ? qs.docs.map((d) => {
       const m = d.data();
+      if ('viewed' in m) {
+        const mine = m.senderId === me, open = !m.viewed && m.snap && !mine;
+        if (open) snaps.set(d.id, m);
+        const label = mine ? (m.viewed ? 'Opened' : 'Delivered') : (m.viewed ? 'Opened' : 'Tap to view snap');
+        return `<${open ? 'button' : 'div'} class="bubble snapmsg ${mine ? 'mine' : ''} ${m.viewed ? 'opened' : 'new'}" ${open ? `data-snap="${esc(d.id)}"` : ''}><span class="snap-ic" aria-hidden="true"></span><span><b>${m.snap?.kind === 'video' || /🎥/.test(m.text) ? 'Video snap' : 'Snap'}</b><small>${label}</small></span><time>${esc(timeAgo(m.createdAt))}</time></${open ? 'button' : 'div'}>`;
+      }
       return `<div class="bubble ${m.senderId === me ? 'mine' : ''}">${esc(m.text)}<time>${esc(timeAgo(m.createdAt))}</time></div>`;
     }).join('') : `<p class="muted small center">Say hi to ${esc(other.displayName)} 👋</p>`;
+    log.querySelectorAll('[data-snap]').forEach((b) => (b.onclick = () => { const id = b.dataset.snap; openSnap(doc(db, 'chats', cid, 'messages', id), snaps.get(id)); b.removeAttribute('data-snap'); b.onclick = null; b.disabled = true; b.classList.replace('new', 'opened'); b.querySelector('small').textContent = 'Opened'; }));
     log.scrollTop = log.scrollHeight; markSeen();
   }, (e) => { log.innerHTML = `<p class="muted small center">${esc(friendlyError(e))}</p>`; });
   S.unsubs.push(unsub);
@@ -1098,7 +1174,7 @@ const nextHash = () => {
 };
 function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
 function authShell(title, sub, body) {
-  main.innerHTML = `<section class="card pad auth-card"><div class="center"><img class="auth-logo" src="logo.png" alt="Lone Keem Studios KL logo" width="64" height="64">
+  main.innerHTML = `<section class="card pad auth-card"><div class="center"><img class="auth-logo" src="kemy-logo.png" alt="Kemy app icon" width="64" height="64" style="border-radius:22%">
     <h1 style="font-size:1.5rem">${title}</h1><p class="muted" style="margin:6px 0 18px">${sub}</p></div>${body}</section>`;
 }
 const googleBlock = `<div class="divider">or</div><button class="btn btn-block google-btn" type="button" id="google">${ICON.google}Continue with Google</button>`;

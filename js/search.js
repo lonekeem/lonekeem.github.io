@@ -102,9 +102,12 @@ export function createSearch(ctx) {
     (posts || []).forEach((p) => { if (!order.includes(p.authorId)) order.push(p.authorId); });
     return order.map((id) => byId.get(id)).filter(Boolean).filter(visibleUser).filter((u) => !S.user || u.uid !== S.user.uid).slice(0, n);
   }
+  // Pinned category chips (always shown in Explore) before the trending hashtags.
+  const PINNED = [['funny', '😂 Funny'], ['comedy', '🎭 Comedy']];
+  const pinnedChips = () => PINNED.map(([t, l]) => `<a class="chip chip-pin" href="#/search?q=${encodeURIComponent('#' + t)}" data-tag="${t}">${l}</a>`).join('');
   const tagChips = (tags) => tags.length
-    ? `<div class="chips">${tags.map(([t, c]) => `<a class="chip" href="#/search?q=${encodeURIComponent('#' + t)}" data-tag="${esc(t)}">#${esc(t)}<span>${c}</span></a>`).join('')}</div>`
-    : '<p class="muted small">No hashtags yet. Add #tags to your captions to start a trend.</p>';
+    ? `<div class="chips">${pinnedChips()}${tags.filter(([t]) => !PINNED.some(([p]) => p === String(t).toLowerCase())).map(([t, c]) => `<a class="chip" href="#/search?q=${encodeURIComponent('#' + t)}" data-tag="${esc(t)}">#${esc(t)}<span>${c}</span></a>`).join('')}</div>`
+    : `<div class="chips">${pinnedChips()}</div><p class="muted small">Add #tags to your captions to start a trend.</p>`;
 
   // ------------------------------------------------------------ user rows + follow
   function followBtn(u) {
