@@ -162,3 +162,24 @@ body.feed-mode .pal-float:not(.moved) { bottom: calc(var(--bottom-h, 64px) + 230
 .pal-float canvas { pointer-events: none; }
 @media (min-width: 900px) { .pal-float:not(.moved) { bottom: 24px; left: 24px; } body.feed-mode .pal-float:not(.moved) { bottom: 24px; } }
 body.kb-open .pal-float { display: none; }
+/* Pal Store */
+.pstore .ps-top{display:flex;justify-content:space-between;align-items:center}
+.ps-coins{background:#2a1458;color:#ffe680;border-radius:999px;padding:4px 12px;font-weight:700}
+.ps-stage{position:relative;display:flex;justify-content:center;margin:8px 0}
+.ps-stage canvas{border-radius:18px;cursor:grab;max-width:100%}
+.ps-prev{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#ffb31a;color:#2a1458;font-weight:800;border-radius:999px;padding:3px 12px;font-size:.8rem;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.ps-bgbtn{position:absolute;right:10px;bottom:10px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.92);font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;z-index:2}
+.ps-bgbtn.ps-rot{right:58px}
+.ps-actions,.ps-looks,.ps-row,.ps-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;justify-content:center}
+.ps-tabs{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
+.ps-tabs .chip,.ps-filters .chip{white-space:nowrap}
+.chip.on{background:#6b3fd6;color:#fff}
+.ps-look{display:inline-flex;gap:2px}
+.ps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px}
+.ps-grid .ps-h,.ps-grid p,.ps-grid .ps-row,.ps-grid > a,.ps-grid > button.btn{grid-column:1/-1}
+.ps-tile{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:14px;border:2px solid var(--rc,#9aa3b5);background:#fff;color:#2a1458;cursor:pointer;font:inherit;min-height:96px}
+.ps-tile b{font-size:.78rem;line-height:1.1;text-align:center}
+.ps-tile small{font-size:.7rem;color:#5a4a7a;text-align:center}
+.ps-tile.on{background:#f0e6ff;box-shadow:0 0 0 3px #6b3fd6 inset}
+.ps-emo{font-size:28px;line-height:1;filter:drop-shadow(0 0 0 var(--ic,transparent))}
+.ps-bgt canvas{width:96px;height:64px;border-radius:10px}

@@ -3,6 +3,8 @@ import { playIntro } from '../theme.js';
 import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf } from './art.js';
 import { liveOverlay, popups } from './overlays.js';
 import { createShopUI } from './shop.js';
+import { createPalStore } from './store.js';
+import { drawBg } from './bgs.js';
 import { openTalk } from './talk.js';
 import { doc as fdoc, getDoc as fget, setDoc as fset, serverTimestamp as fts } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { roomOf } from './economy.js';
@@ -44,6 +46,7 @@ export function createPals(ctx) {
   let mine = null; // { uid, list, store }
   const pop = popups({ S, db });
   const shop = createShopUI(ctx);
+  const palStore = createPalStore({ ...ctx, econ: () => shop.econ(), myPals: (f) => myPals(f), activeOf: (m) => { const id = sessionStorage.getItem('kemy-store-pal'); return (id && m.list.find((x) => x.id === id)) || activeOf(m); }, commit: (p, patch) => commit(p, patch) });
   const dances = createDanceUI(ctx); registerDanceItems();
   const danceOpen = (p, tab) => { if (!S.user) return; dances.open(p, { tab, econOf: shop.econ }); };
   addEventListener('kemy:dance-shop', async () => { const m = await myPals(); const a = m && activeOf(m); if (a) danceOpen(a, 'shop'); else toast('Hatch a Pal first'); });
@@ -105,18 +108,18 @@ export function createPals(ctx) {
     if (isMine) { const m = await myPals(); if (m) list = m.list.slice(); }
     if (stale() || !list.length) return;
     const act = list.find((p) => p.id === u.activePet) || list[0];
-    if (isMine) { applyPatBoost(act); applyPlaydates(act); }
+    if (isMine) { applyPatBoost(act); applyPlaydates(act); sessionStorage.removeItem('kemy-store-pal'); }
     const shown = [act]; // only the active Pal; the others live in the Pal Box (a playdate guest is added separately)
     const sp = SPEC[act.species] || SPECIES[0];
     el.innerHTML = `<div class="pal-strip" data-pals="1" aria-label="${esc(u.displayName)}'s Pals"><div class="pal-cv"></div>
       <div class="pal-tag"><b>${esc(act.name)}</b><small>${esc(formName(act))} · Lv ${act.level || 1} · <span class="pal-vibe" style="--v:${VIBES[sp.vibe].c}">${VIBES[sp.vibe].name}</span></small><small class="pal-pats">🐾 <b>${act.pats || 0}</b> pats</small></div>
-      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-pa="dance">💃 Dance</button><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Say hi</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
+      <div class="pal-btns">${isMine ? '<button class="btn btn-sm" data-pa="care">Care</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-pa="dance">💃 Dance</button><a class="btn btn-sm btn-ghost" href="#/pals/store" data-nostore>👗 Store</a><a class="btn btn-sm btn-ghost" href="#/pals">Pal Box</a>' : '<button class="btn btn-sm btn-ghost" data-pa="pat">Pat</button><button class="btn btn-sm btn-ghost" data-pa="talk">💬 Say hi</button><button class="btn btn-sm btn-ghost" data-pa="bring">Bring my Pal</button>'}</div></div>`;
     const host = el.querySelector('.pal-cv'); const W = Math.max(160, Math.min(host.clientWidth || 300, 560)), H = 150; const s = stage(host, W, H);
     const fx = particles();
     const actors = shown.map((p, i) => ({ p, x: W * (0.5 - i * 0.22) + (i ? 0 : 10), tx: 0, face: i % 2 ? 1 : -1, mode: 'idle', until: i * 60, react: 0, mood: moodOf(liveStats(p)), size: i ? 52 : 66 }));
     let guest = null, play = null, curT = 0, room = []; roomOf(db, uid).then((r) => { room = r.filter((id) => ITEM[id]); });
     const f = (t) => { curT = t;
-      const c = s.c; c.clearRect(0, 0, W, H); const night = isNight(); const h = new Date().getHours();
+      const c = s.c; c.clearRect(0, 0, W, H); const night = isNight(); const h = new Date().getHours(); if (act && act.bg) drawBg(c, W, H, act.bg, t);
       c.fillStyle = night ? 'rgba(40,30,110,.35)' : h < 10 ? 'rgba(255,210,150,.18)' : h > 17 ? 'rgba(255,150,190,.16)' : 'rgba(170,140,255,.10)'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill();
       c.fillStyle = 'rgba(120,220,160,.35)'; c.beginPath(); c.ellipse(W / 2, H - 6, W * 0.48, 7, 0, 0, 7); c.fill();
       room.forEach((id, i) => { const it = ITEM[id]; const x = [22, W - 26, W * 0.72][i]; c.save(); c.lineWidth = 0.9; try { DECOR[it.st](c, it.col, x, H - 9, 1.5); } catch {} c.restore(); });
@@ -189,14 +192,14 @@ export function createPals(ctx) {
     if (!requireAuth()) return; const m = await myPals(); const p = m.list.find((x) => x.id === p0.id) || p0;
     openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="pal-sheet">
       <div class="pal-head"><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv <span data-lv>${p.level}</span></small><div class="pal-xp"><i style="width:${(p.xp % 100)}%"></i></div></div>
-      <div class="pal-scene"></div><div class="pal-meters"></div><p class="pal-hint" aria-live="polite">Tap ${esc(p.name)} to play. Pick something to do below.</p>
+      <div class="pal-scene" style="position:relative"><button class="ps-bgbtn" data-store="bg" type="button" aria-label="Change background">🖼️</button><button class="ps-bgbtn ps-rot" data-store="outfits" type="button" aria-label="Dress up">👗</button></div><div class="pal-meters"></div><p class="pal-hint" aria-live="polite">Tap ${esc(p.name)} to play. Pick something to do below.</p>
       <div class="pal-acts">
         <button data-m="shower">🛁<span>Shower</span></button><button data-m="feed">🍓<span>Feed</span></button><button data-m="brush">🪮<span>Brush</span></button>
         <button data-m="catch">⚾<span>Catch</span></button><button data-m="bed">🌙<span>Bed</span></button><button data-m="bandage">🩹<span>Bandage</span></button>
       </div>
       <details class="pal-about"><summary>About Pals</summary><p>${esc(PALS_COPY)}</p><p class="small">${esc(SPEC[p.species].blurb)} Vibe: ${VIBES[SPEC[p.species].vibe].name}.</p></details>
       ${debug() ? '<button class="btn btn-sm btn-ghost" data-dbg>Test: +60 XP</button>' : ''}</div>`);
-    const root = document.querySelector('.pal-sheet'); const W = Math.min(320, root.clientWidth || 320), H = 250; const s = stage(root.querySelector('.pal-scene'), W, H);
+    const root = document.querySelector('.pal-sheet'); root.querySelectorAll('[data-store]').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); sessionStorage.setItem('kemy-store-pal', p.id); closeModal(); location.hash = b.dataset.store === 'bg' ? '#/pals/store-bg' : '#/pals/store'; }); const W = Math.min(320, root.clientWidth || 320), H = 250; const s = stage(root.querySelector('.pal-scene'), W, H);
     const fx = particles(); const PX = W / 2, PY = H - 30, SIZE = 140;
     const st = liveStats(p); let mood = moodOf(st);
     const G = { mode: 'home', t: 0, react: 0, bubbles: [], drops: [], lather: 0, rinse: false, shake: 0, ptr: null, drag: null, brush: 0, ball: null, throws: 0, catches: 0, palX: PX, sleepT: 0, eat: 0, bandage: false, last: null };
@@ -241,8 +244,9 @@ export function createPals(ctx) {
     const f = (t) => {
       G.t = t; const c = s.c; c.clearRect(0, 0, W, H);
       // room
+      if (p.bg && drawBg(c, W, H, p.bg, t)) { if (G.mode === 'bed') { c.fillStyle = 'rgba(10,6,40,.55)'; c.fillRect(0, 0, W, H); } } else {
       const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, G.mode === 'bed' ? '#1a1240' : '#f6e8ff'); g.addColorStop(1, G.mode === 'bed' ? '#2a1a5a' : '#dcc8ff'); c.fillStyle = g; c.fillRect(0, 0, W, H);
-      c.fillStyle = G.mode === 'shower' ? '#bfe6ff' : G.mode === 'bed' ? '#3a2a6a' : '#c7f0d4'; c.fillRect(0, H - 34, W, 34);
+      c.fillStyle = G.mode === 'shower' ? '#bfe6ff' : G.mode === 'bed' ? '#3a2a6a' : '#c7f0d4'; c.fillRect(0, H - 34, W, 34); }
       if (G.mode === 'shower') { c.fillStyle = '#fff'; c.strokeStyle = '#9fb8ff'; c.lineWidth = 2; c.beginPath(); c.roundRect(PX - 85, H - 46, 170, 34, 14); c.fill(); c.stroke(); }
       let mode = G.react > 0 ? 'react' : 'idle'; if (G.react > 0) G.react--;
       if (G.eat > 0) { G.eat--; mode = 'eat'; }
@@ -341,6 +345,7 @@ export function createPals(ctx) {
   async function page(main, token, stale, sub) {
     if (sub === 'gallery') return gallery(main);
     if (sub === 'shop') return shop.shopPage(main, { myPals, activeOf, commit });
+    if (sub === 'store' || sub === 'store-bg') return palStore.page(main);
     if (!requireAuth()) return; const m = await myPals(true); if (stale && stale(token)) return;
     const n = slots(m); const act = activeOf(m); const firstEmpty = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].find((id) => !m.list.some((p) => p.id === id));
     main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Box</h1><span class="muted small">${m.list.length}/${MAX_PALS} Pals · ${n} unlocked · <a href="#/pals/gallery">Pal Gallery (${collected().size}/${SPECIES.length})</a></span><a class="pal-coins" href="#/pals/shop" title="Star Coins: open the Pal Shop" id="pal-coins">${shop.coinTxt('…')}</a></div>
@@ -349,7 +354,7 @@ export function createPals(ctx) {
       <p class="muted small">${esc(PALS_SHORT)} New eggs unlock as your Pals level up and with daily visit streaks.</p>
       <div class="pal-grid">${['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => { const p = m.list.find((x) => x.id === id);
         if (p) return `<div class="pal-card ${act && act.id === id ? 'active' : ''}" data-id="${id}"><div class="pal-thumb"></div><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv ${p.level}</small>
-          <div class="pal-card-b"><button class="btn btn-sm" data-c="care">Care</button><button class="btn btn-sm btn-ghost" data-c="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-c="dance">💃 Dance</button><button class="btn btn-sm btn-ghost" data-c="closet">Closet</button><button class="btn btn-sm btn-ghost" data-c="style">Colors</button>${act && act.id === id ? '<span class="pal-on">On profile</span>' : '<button class="btn btn-sm btn-ghost" data-c="show">Show on profile</button>'}</div></div>`;
+          <div class="pal-card-b"><button class="btn btn-sm" data-c="care">Care</button><button class="btn btn-sm btn-ghost" data-c="talk">💬 Talk</button><button class="btn btn-sm btn-ghost" data-c="dance">💃 Dance</button><button class="btn btn-sm btn-ghost" data-c="closet">👗 Store</button><button class="btn btn-sm btn-ghost" data-c="style">Colors</button>${act && act.id === id ? '<span class="pal-on">On profile</span>' : '<button class="btn btn-sm btn-ghost" data-c="show">Show on profile</button>'}</div></div>`;
         return id === firstEmpty && m.list.length < n ? `<button class="pal-card egg" data-hatch="${id}"><div class="pal-thumb"></div><b>Egg ready!</b><small>Tap to hatch</small></button>` : `<div class="pal-card locked"><div class="pal-lock">🔒</div><small>Level up your Pals to unlock</small></div>`; }).join('')}</div>
       <label class="check small pal-popset"><input type="checkbox" id="pal-vchat"> Let visitors chat with my Pal (AI)</label>
       <label class="check small pal-popset"><input type="checkbox" id="pal-pops" ${pop.enabled() ? 'checked' : ''}> Pal pop-ups while I scroll videos</label>
@@ -361,9 +366,9 @@ export function createPals(ctx) {
     main.querySelector('#pal-pops').onchange = (e) => { pop.set(e.target.checked); toast(e.target.checked ? 'Pal pop-ups on' : 'Pal pop-ups off'); };
     const pt = main.querySelector('#pal-poptest'); if (pt) pt.onclick = () => pop.show(true);
     main.querySelectorAll('.pal-card[data-id]').forEach((card) => { const p = m.list.find((x) => x.id === card.dataset.id); const s = stage(card.querySelector('.pal-thumb'), 110, 90);
-      const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawDancer(s.c, 55, 84, 74, p, { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
+      const f = (t) => { s.c.clearRect(0, 0, 110, 90); if (p.bg) drawBg(s.c, 110, 90, p.bg, t); drawDancer(s.c, 55, 84, 74, p, { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
       card.querySelectorAll('[data-c]').forEach((b) => b.onclick = async () => { const c = b.dataset.c;
-        if (c === 'talk') talk(p, true, S.profile.username, S.user.uid); if (c === 'dance') danceOpen(p); if (c === 'care') openSheet(p); if (c === 'closet') shop.closet(p, async (outfit) => { await m.store.save(p, { outfit }); page(main); }); if (c === 'style') creator({ pal: p, onDone: () => page(main) });
+        if (c === 'talk') talk(p, true, S.profile.username, S.user.uid); if (c === 'dance') danceOpen(p); if (c === 'care') openSheet(p); if (c === 'closet') { sessionStorage.setItem('kemy-store-pal', p.id); location.hash = '#/pals/store'; } if (c === 'style') creator({ pal: p, onDone: () => page(main) });
         if (c === 'show') { try { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } } }); });
     main.querySelectorAll('[data-hatch]').forEach((b) => { const s = stage(b.querySelector('.pal-thumb'), 110, 90); const f = (t) => { s.c.clearRect(0, 0, 110, 90); drawEgg(s.c, 55, 86, 76, RM() ? 0 : t); }; f.el = s.cv; loop(f); b.onclick = () => creator({ slot: b.dataset.hatch, onDone: () => page(main) }); });
   }

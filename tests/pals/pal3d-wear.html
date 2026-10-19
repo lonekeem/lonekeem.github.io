@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="1200" height="900"></canvas>
+<script type="module">
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { drawBg } from '../../js/pals/bgs.js';
+const c = document.getElementById('c').getContext('2d'); c.font = '600 13px sans-serif';
+const O = [
+ ['tiger', { head: 'f_cap_red', body: 'f_hoodie_purple', bottom: 'f_jeans_blue', feet: 'f_sneakers_red', held: 'f_balloon_red' }, 'b_park', ''],
+ ['kitten', { head: 'tiara_pink', full: 'f_dress_pink', feet: 'f_flats_pink', ears: 'f_studs_silver', neck: 'f_beads_pink', bag: 'f_purse_pink' }, 'b_castle', ''],
+ ['puppy', { full: 'f_kit_red', feet: 'f_sneakers_white', held: 'f_ball_white', wrist: 'f_watch_black' }, 'b_school', ''],
+ ['bunny', { hair: 'f_bow_pink', bottom: 'f_tutu_lilac', body: 'f_blouse_white', held: 'f_wand_gold', back: 'fairy_lilac' }, 'b_candy', ''],
+ ['panda', { full: 'astro', held: '' }, 'bp_moon', 'rare_galaxy'],
+ ['elephant', { head: 'crown_gold', neck: 'chain_gold', face: 'f_shades_black', hand: 'starring', back: 'f_cape_red' }, 'bp_concert', 'rare_gold'],
+ ['fox', { full: 'f_pjs_navy', head: 'f_beanie_pink' }, 'b_stars', 'rare_glow'],
+ ['penguin', { full: 'f_swim_teal', face: 'f_specs_gold' }, 'b_beach', 'rare_shiny'],
+ ['dragon', { full: 'suit_black', head: 'tophat_black' }, 'b_citynight', 'rare_crystal'],
+ ['lion', { full: 'dino' }, 'b_forest', ''],
+ ['bear', { full: 'f_overalls_blue', hair: 'f_quiff_orange', bag: 'f_backpack_green' }, 'b_farm', ''],
+ ['kemy', { full: 'gown_lilac', head: 'f_flowercrown', ears: 'hoops_gold', wrist: 'f_bracelet_gold' }, 'b_studio', ''],
+];
+const done = []; let t = 0; const go = () => { t++; let all = true, n = 0;
+ O.forEach(([sp, of, bg, v], i) => { if (done[i] || n++ > 3) { all = all && !!done[i]; return; } const x = (i % 4) * 300, y = Math.floor(i / 4) * 300; c.save(); c.translate(x, y); drawBg(c, 296, 296, bg, t); c.restore();
+   if (drawPal3D(c, x + 148, y + 285, 160, { species: sp, level: 6, outfit: of, variant: v }, { t: 30, mode: 'idle', dance3d: i % 3 === 2 ? 'renegroove' : null, beat: 1.3, amt: 1 })) done[i] = 1; else all = false;
+   c.fillStyle = '#fff'; c.fillText(sp + (v ? ' · ' + v : ''), x + 8, y + 18); });
+ if (!all && t < 200) requestAnimationFrame(go); else window.ready = true; };
+setTimeout(go, 300);
+</script>

@@ -35,7 +35,7 @@ export function createStore(db, uid) {
       const wait = 1100 - (Date.now() - lastWrite); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       const xp = Math.min(p.xp + Math.min(60, Math.max(0, patch.xpGain || 0)), 4900);
       const data = { stats: patch.stats || liveStats(p), xp, level: xpToLevel(xp), at: serverTimestamp(), updatedAt: serverTimestamp() };
-      for (const k of ['name', 'colors', 'pattern', 'acc', 'species', 'outfit', 'voice']) if (patch[k] !== undefined) data[k] = patch[k];
+      for (const k of ['name', 'colors', 'pattern', 'acc', 'species', 'outfit', 'voice', 'bg', 'variant']) if (patch[k] !== undefined) data[k] = patch[k];
       lastWrite = Date.now(); await updateDoc(ref(p.id), data);
       Object.assign(p, data, { at: Date.now() }); return p;
     },

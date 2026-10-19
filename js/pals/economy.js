@@ -55,7 +55,7 @@ export function createEconomy(db, uid) {
   }
   function setRoom(room) { return q(async () => { await gap(); await updateDoc(wref, { room: room.slice(0, 3), updatedAt: serverTimestamp() }); lastWrite = Date.now(); w.room = room.slice(0, 3); emit(); }); }
   async function looks() { const s = await getDocs(collection(db, 'users', uid, 'looks')); return s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); }
-  const saveLook = (id, name, outfit) => setDoc(doc(db, 'users', uid, 'looks', id), { name: String(name).slice(0, 20) || 'Look', outfit });
+  const saveLook = (id, name, outfit, x = {}) => setDoc(doc(db, 'users', uid, 'looks', id), { name: String(name).slice(0, 20) || 'Look', outfit, ...(x.bg !== undefined ? { bg: x.bg || '', variant: x.variant || '', pattern: x.pattern || 'none' } : {}) });
   const delLook = (id) => deleteDoc(doc(db, 'users', uid, 'looks', id));
   return { wallet, inventory, earn, buy, use, claim, setRoom, looks, saveLook, delLook, priceOf, leftToday, sub: (f) => { subs.add(f); return () => subs.delete(f); }, get w() { return w; } };
 }
