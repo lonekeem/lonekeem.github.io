@@ -174,7 +174,7 @@ service cloud.firestore {
                                'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                                'commentCount', 'lastCommentId', 'studio',
                                'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId',
-                               'keywords', 'hashtags'])
+                               'keywords', 'hashtags', 'work'])
         && validPostSearch(d)
         && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                             'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
@@ -182,22 +182,48 @@ service cloud.firestore {
         && d.authorName == u.displayName
         && d.authorUsername == u.username
         && d.authorColor == u.color
-        && d.type in ['text', 'link', 'media']
+        && d.type in ['text', 'link', 'media', 'movie', 'song']
+        && ((d.type in ['movie', 'song']) == ('work' in d))
+        && (!('work' in d) || validWork(d))
         && isStr(d.text, 0, 2000)
         && isStr(d.linkUrl, 0, 300)
         && isStr(d.mediaUrl, 0, 500)
-        && d.mediaType in ['', 'image', 'video']
+        && (d.mediaType in ['', 'image', 'video'] || (d.mediaType == 'audio' && d.type == 'song'))
         && isStr(d.poster, 0, 500)
         && (d.linkUrl == '' || d.linkUrl.matches('^https://([a-z0-9-]+[.])*(youtube[.]com|youtu[.]be|tiktok[.]com)/.*$'))
         && (d.authorId == 'studio' || d.mediaUrl == '' || cloudinaryUrl(d.mediaUrl))
         && (d.authorId == 'studio' || d.poster == '' || cloudinaryUrl(d.poster))
-        && (d.mediaUrl == '' || d.mediaType in ['image', 'video'])
+        && (d.mediaUrl == '' || d.mediaType in ['image', 'video', 'audio'])
         && validMediaExtras(d)
         && (d.text.size() > 0 || d.linkUrl != '' || d.mediaUrl != '')
         && d.createdAt == request.time
         && d.likeCount == 0 && d.commentCount == 0 && d.lastCommentId == ''
         && d.studio == (d.authorId == 'studio')
         && getAfter(userPath(d.authorId)).data.lastPostAt == request.time;
+    }
+
+    // Community movies + songs (type 'movie' / 'song'): a validated `work` map; either a YouTube id
+    // or an upload on our Cloudinary cloud. Creator must tick the rights box.
+    function validWork(d) {
+      let w = d.work;
+      let movieG = ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Fantasy', 'Romance', 'Animation', 'Music', 'Documentary', 'Other'];
+      let songG = ['Hip-Hop', 'R&B', 'Pop', 'Rock', 'Gospel', 'Afrobeats', 'Dancehall/Reggae', 'Electronic', 'Country', 'Lo-fi', 'Other'];
+      return w is map
+        && w.keys().hasOnly(['title', 'genre', 'rating', 'aiTools', 'runtime', 'yt', 'artist', 'lyrics', 'explicit', 'cover', 'rights'])
+        && w.keys().hasAll(['title', 'genre', 'aiTools', 'runtime', 'yt', 'cover', 'rights'])
+        && w.rights == true
+        && isStr(w.title, 1, 80)
+        && isStr(w.aiTools, 0, 100)
+        && w.runtime is number && w.runtime >= 0 && w.runtime <= 86400
+        && w.yt is string && (w.yt == '' || w.yt.matches('^[A-Za-z0-9_-]{11}$'))
+        && (w.cover == '' || cloudinaryUrl(w.cover))
+        && isStr(d.text, 0, 1000)
+        && ((w.yt != '' && d.mediaUrl == '') || (w.yt == '' && cloudinaryUrl(d.mediaUrl) && (w.runtime <= 601)))
+        && (d.type == 'movie'
+              ? (w.genre in movieG && w.rating in ['all', '13', '16', '18'] && !w.keys().hasAny(['artist', 'lyrics', 'explicit'])
+                 && (d.mediaUrl == '' || d.mediaType == 'video'))
+              : (w.genre in songG && isStr(w.artist, 1, 50) && isStr(w.get('lyrics', ''), 0, 5000) && w.get('explicit', false) is bool
+                 && !('rating' in w) && (d.mediaUrl == '' || d.mediaType == 'audio')));
     }
 
     match /posts/{postId} {
@@ -244,7 +270,12 @@ service cloud.firestore {
           && request.resource.data.viewCount == resource.data.get('viewCount', 0) + 1
           && (!signedIn() || viewDocAdded());
       }
-      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange()));
+      // Studio Picks: only the admin can feature / unfeature a community movie or song.
+      function featureChange() {
+        return isAdmin() && changed().hasOnly(['featured']) && request.resource.data.featured is bool
+          && resource.data.type in ['movie', 'song'];
+      }
+      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange()));
       allow delete: if signedIn() && (resource.data.authorId == me() || isAdmin());
 
       match /likes/{likerId} {

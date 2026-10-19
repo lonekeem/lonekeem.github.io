@@ -7,7 +7,8 @@ import { createStories } from './stories.js';
 import { createAvatarEditor } from './avatar-editor.js';
 import { createSearch, SEARCH_ICON } from './search.js';
 import { searchFields, userSearchFields, linkify } from './search-index.js';
-import { viewsHtml, trackVideo, trackVisible, fmtCount, EYE } from './views.js';
+import { viewsHtml, trackVideo, trackVisible, fmtCount, EYE, recordView } from './views.js';
+import { createWorks, isWork, DESC as WORK_DESC, WORK_IC, artOf as workArt, gradientCss } from './works.js';
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   sendPasswordResetEmail, sendEmailVerification, updateProfile, GoogleAuthProvider,
@@ -259,6 +260,11 @@ const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c ===
 async function deletePost(p) {
   await deleteDoc(doc(db, 'posts', p.id));
 }
+let works = null;
+function getWorks() {
+  if (!works) works = createWorks({ db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main });
+  return works;
+}
 const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
 
 // ---------------------------------------------------------------- embeds
@@ -294,6 +300,7 @@ function mediaHtml(p) {
 
 // ---------------------------------------------------------------- post card
 function postCard(p, { detail = false } = {}) {
+  if (isWork(p)) return getWorks().card(p);
   const el = document.createElement('article');
   el.className = 'card post';
   el.dataset.postId = p.id;
@@ -516,13 +523,13 @@ const routes = [
   [/^#?\/?$/, () => location.replace('#/watch'), 'watch'],
   [/^#\/watch(?:\/([\w-]+))?$/, pageWatch, 'watch'],
   [/^#\/feed$/, pageFeed, 'feed'],
-  [/^#\/explore$/, pageExplore, 'explore'],
+  [/^#\/explore(?:\/(movies|songs))?$/, pageExplore, 'explore'],
   [/^#\/search(?:\?(.*))?$/, pageSearch, 'explore'],
-  [/^#\/new(?:\/(text|menu))?$/, pageCompose, 'new'],
+  [/^#\/new(?:\/(text|menu|movie|song))?$/, pageCompose, 'new'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
   [/^#\/me$/, pageMe, 'me'],
-  [/^#\/u\/([a-z0-9_.]{1,30})(?:\/(saved))?$/i, pageProfile, 'me'],
+  [/^#\/u\/([a-z0-9_.]{1,30})(?:\/(saved|movies|songs))?$/i, pageProfile, 'me'],
   [/^#\/(followers|following)\/([\w-]+)$/, pageFollowList, 'me'],
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
   [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
@@ -645,9 +652,12 @@ async function pageFeed(token) {
   renderPosts($('#posts'), posts, 'Your feed is empty. <a href="#/explore">Explore</a> to find people to follow, or <a href="#/new">make your first post</a>.');
 }
 
-async function pageExplore(token) {
+async function pageExplore(tab, token) {
+  if (token === undefined && typeof tab !== 'string') { token = tab; } if (typeof tab !== 'string') tab = '';
+  const tabs = `<nav class="tabs ex-tabs" aria-label="Explore"><a href="#/explore" class="${tab ? '' : 'active'}">Posts</a><a href="#/explore/movies" class="${tab === 'movies' ? 'active' : ''}">${WORK_IC.movie}Movies</a><a href="#/explore/songs" class="${tab === 'songs' ? 'active' : ''}">${WORK_IC.song}Songs</a></nav>`;
+  if (tab) { main.innerHTML = `<h1 class="page-title">Explore</h1>${tabs}<div id="wx"></div>`; return getWorks().explore($('#wx'), tab === 'movies' ? 'movie' : 'song', token); }
   main.innerHTML = `
-    <h1 class="page-title">Explore</h1>
+    <h1 class="page-title">Explore</h1>${tabs}
     <a class="g-promo" href="#/games">${GAMES_ICON}<span><b>Games</b><small>Star Drop, Star Cards, Trivia &amp; more. Play friends or the computer.</small></span><span aria-hidden="true">›</span></a>
     <div id="ex-top"></div>
     <h2 style="margin:22px 0 14px;font-size:1.15rem">Recent posts</h2>
@@ -679,6 +689,7 @@ const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${ava
 const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends });
 async function pageCompose(sub, token) {
   if (!requireAuth()) return;
+  if (sub === 'movie' || sub === 'song') return getWorks().composePage(sub, token);
   composer.render(token, { sub, textForm: (slot) => textComposeForm(slot, sub === 'text') });
 }
 async function postAuthor(asStudio) {
@@ -794,7 +805,7 @@ async function pagePost(postId, token) {
         ? `<form class="comment-form" id="comment-form"><label for="comment-text" class="sr-only">Add a comment</label><input id="comment-text" type="text" maxlength="500" placeholder="Add a comment…" autocomplete="off" required><button class="btn btn-sm" type="submit">Send</button></form><p class="form-error" id="comment-err"></p>`
         : `<p class="muted small" style="margin-top:12px"><a href="#/login?next=${encodeURIComponent('#/post/' + postId)}">Log in</a> or <a href="#/signup">create an account</a> to comment.</p>`}
     </section>`;
-  $('#post-slot').appendChild(postCard(p, { detail: true }));
+  if (isWork(p)) getWorks().page(p, $('#post-slot'), []); else $('#post-slot').appendChild(postCard(p, { detail: true }));
   const form = $('#comment-form');
   S.unsubs.push(comments.mount({ p, box: $('#comments'), form, input: $('#comment-text'), err: $('#comment-err'),
     onCount: (n) => { const s = $('#post-slot a.act[aria-label="Comments"] span'); if (s) s.textContent = n; } }));
@@ -858,7 +869,7 @@ async function pageProfile(username, tab, token) {
         ${!mine && S.user && uid !== STUDIO_UID ? (blocked ? `<button class="btn btn-sm btn-danger" id="unblock">Unblock</button>` : `<button class="btn btn-sm btn-danger" id="block">Block</button>`) : ''}
       </div>
     </section>
-    ${mine ? `<nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/saved" class="${tab ? 'active' : ''}">Saved</a></nav>` : '<div style="height:16px"></div>'}
+    <nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/movies" class="${tab === 'movies' ? 'active' : ''}">Movies</a><a href="#/u/${esc(u.username)}/songs" class="${tab === 'songs' ? 'active' : ''}">Songs</a>${mine ? `<a href="#/u/${esc(u.username)}/saved" class="${tab === 'saved' ? 'active' : ''}">Saved</a>` : ''}</nav>
     <div id="posts"><div class="spinner"></div></div>`;
   $('#add-bio')?.addEventListener('click', () => sessionStorage.setItem('lks-focus-bio', '1'));
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
@@ -889,6 +900,11 @@ async function pageProfile(username, tab, token) {
     const posts = (await Promise.all(sv.docs.map((d) => getDoc(doc(db, 'posts', d.id))))).filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }));
     if (stale(token)) return;
     renderGrid($('#posts'), posts, 'Nothing saved yet. Tap the bookmark on any post to save it here.');
+  } else if (tab === 'movies' || tab === 'songs') {
+    const ps = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(100)));
+    if (stale(token)) return;
+    const kind = tab === 'movies' ? 'movie' : 'song';
+    getWorks().grid($('#posts'), ps.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.type === kind), mine ? `No ${tab} yet. <a href="#/new/${kind}">Share your first ${kind}</a>.` : `No ${tab} yet.`);
   } else {
     const ps = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(40)));
     if (stale(token)) return;
@@ -902,6 +918,7 @@ const GRID_IC = {
   text: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg>'
 };
 function gridTile(p) {
+  if (isWork(p)) { const art = workArt(p); return `<a class="gtile k-work" href="#/post/${esc(p.id)}" aria-label="${esc(p.type)}: ${esc(p.work.title)}" style="${art ? '' : `background:${gradientCss(p.id + p.work.title)}`}">${art ? `<img src="${esc(art)}" alt="" loading="lazy">` : `<span class="gtext">${esc(p.work.title)}</span>`}<span class="gicon">${WORK_IC[p.type]}</span>${viewsHtml(p.viewCount, p.id, 'gviews')}</a>`; }
   const yt = p.linkUrl ? youTubeId(p.linkUrl) : null;
   const kind = p.mediaUrl && p.mediaType === 'video' ? 'video' : p.mediaUrl && p.mediaType === 'image' ? 'image'
     : yt && /^[\w-]+$/.test(yt) ? 'youtube' : p.linkUrl && tikTokId(p.linkUrl) ? 'tiktok' : 'text';

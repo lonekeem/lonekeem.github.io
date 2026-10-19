@@ -13,6 +13,7 @@ import { mountPicker } from './fx/picker.js';
 import { FX_DEFAULT } from './fx/looks.js';
 import { onDoubleTap } from './tapstar.js';
 import { openEditor } from './snapedit.js';
+import { WORK_IC, DESC as WORK_DESC } from './works.js';
 
 // Camera rail icons (same stroke style as the rest of the app)
 const SIC = {
@@ -196,6 +197,8 @@ export function createComposer(ctx) {
         <button class="create-opt" data-src="photo"><span class="ci">${IC.photo}</span><b>Take photo</b><small>Front or back camera</small></button>
         <button class="create-opt wide live-opt" data-src="live"><span class="ci">${ICONS.live}</span><b>Go Live</b><small>Stream from your camera to up to ${LIVE_CAP} viewers · live chat + stars</small></button>
         <button class="create-opt wide story-opt" data-src="story"><span class="ci">${IC.story}</span><b>Add to your story</b><small>Photo or video up to ${LIMITS.storyVideoSeconds}s · disappears after ${LIMITS.storyHours} hours</small></button>
+        <button class="create-opt wide work-opt" data-src="movie"><span class="ci">${WORK_IC.movie}</span><b>Movie</b><small>${WORK_DESC.movie.sub}</small></button>
+        <button class="create-opt wide work-opt" data-src="song"><span class="ci">${WORK_IC.song}</span><b>Song</b><small>${WORK_DESC.song.sub}</small></button>
         <button class="create-opt wide" data-src="library"><span class="ci">${IC.library}</span><b>Upload from library</b><small>Videos up to ${fmtLimit(LIMITS.maxVideoSeconds, true)} / ${LIMITS.maxVideoMB} MB · photos up to ${LIMITS.maxImageMB} MB</small></button>
       </div>
       <div class="divider">or</div>
@@ -206,6 +209,7 @@ export function createComposer(ctx) {
       b.onclick = () => {
         const src = b.dataset.src;
         if (src === 'live') { location.hash = '#/live/new'; return; }
+        if (src === 'movie' || src === 'song') { location.hash = '#/new/' + src; return; }
         if (src === 'story') return openStory();
         target = 'post';
         if (src === 'library') return pickFile('in-library');
@@ -250,7 +254,7 @@ export function createComposer(ctx) {
       <div class="cam-top">
         <button class="cam-btn" data-a="close" aria-label="Close camera">${IC.close}</button>
         <div class="cam-timer" hidden><span class="rec-dot" aria-hidden="true"></span><span class="t">0:00</span> / ${fmtTime(maxSec())}</div>
-        ${isStory() ? '<span class="cam-story-chip">Story</span>' : `<a class="cam-pill" href="#/live/new" data-a="live">${ICONS.live}<span>Live</span></a><a class="cam-pill" href="#/new/menu" data-a="more">${IC.text}<span>Text</span></a>`}
+        ${isStory() ? '<span class="cam-story-chip">Story</span>' : `<a class="cam-pill" href="#/live/new" data-a="live">${ICONS.live}<span>Live</span></a><a class="cam-pill" href="#/new/menu" data-a="more">${IC.text}<span>More</span></a>`}
       </div>
       <div class="cam-rail" role="toolbar" aria-label="Camera tools">
         <button class="cam-rbtn" data-a="flip" aria-label="Switch to back camera">${IC.flip}<span>Flip</span></button>

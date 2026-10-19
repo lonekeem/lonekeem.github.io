@@ -260,6 +260,22 @@
         .install-card h2 { font-size: 1.15rem; margin: 12px 0; }
         .ios-steps { padding-left: 20px; line-height: 1.6; }
         .install-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+        .sub-h { font-size: 1.05rem; margin: 0 0 14px; color: #e3d2ff; letter-spacing: .02em; }
+        .community-row { margin-top: 40px; }
+        .intro-more { color: var(--muted); margin: 0 0 4px; max-width: 680px; }
+        .intro-more.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .more-btn { background: none; border: 0; color: var(--purple-light, #b57cff); padding: 0; font: inherit; font-size: .88rem; cursor: pointer; }
+        @media (min-width: 760px) { .intro-more.clamp { display: block; } .more-btn { display: none; } }
+        .crow { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(140px, 22%); gap: 14px; overflow-x: auto; padding: 14px 0 6px; scrollbar-width: none; }
+        .ctile { color: inherit; text-decoration: none; display: grid; gap: 6px; }
+        .ctile .art { aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #150d24; border: 1px solid rgba(160,110,255,.22); }
+        .ctile.song .art { aspect-ratio: 1; }
+        .ctile img { width: 100%; height: 100%; object-fit: cover; }
+        .ctile b { font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ctile small { color: var(--muted); font-size: .78rem; }
+        .ctile .ai { font-size: .64rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(138,43,226,.35); justify-self: start; }
+        .ctile .gt { padding: 10px; text-align: center; font-weight: 800; }
+        .crow-cta { font-size: .9rem; margin: 6px 0 0; }
         .hero-actions { margin-top: 36px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
         /* Buttons */
@@ -437,7 +453,7 @@
                     <a class="btn btn-ghost" href="app.html">Open Kemy</a>
                 </div>
                 <ul class="features" aria-label="What you can do in Kemy">
-                    <li><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="m10 9 5 3-5 3z" fill="currentColor"/></svg></span><b>Watch</b><small>AI movies, songs, music videos and funny clips.</small></li>
+                    <li><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="m10 9 5 3-5 3z" fill="currentColor"/></svg></span><b>Watch &amp; listen</b><small>AI movies, songs and funny clips from Lone Keem and the community.</small></li>
                     <li><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.8 5h4.4a1.5 1.5 0 0 1 1.2.6L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/><circle cx="12" cy="13" r="3.5"/></svg></span><b>Create</b><small>Camera, filters, beauty and funny face effects, trims and captions.</small></li>
                     <li><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></svg></span><b>Go Live</b><small>Stream to your crew and collect gold stars.</small></li>
                     <li><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10a5 5 0 0 1 4.6 7l-.9 2.1a2.5 2.5 0 0 1-4 .8L14.5 15h-5l-2.2 1.9a2.5 2.5 0 0 1-4-.8L2.4 14A5 5 0 0 1 7 7z"/><path d="M8 10v3M6.5 11.5h3"/><circle cx="16" cy="11" r=".9" fill="currentColor"/><circle cx="18" cy="13" r=".9" fill="currentColor"/></svg></span><b>Play</b><small>Multiplayer games: checkers, Star Drop, KL Grid, Studio Trivia and Star Cards.</small></li>
@@ -521,6 +537,7 @@
                     <h2 id="movies-title">Movies</h2>
                     <p>Cinematic AI movies: AI-generated films and shorts from Lone Keem Studios.</p>
                 </div>
+                <h3 class="sub-h">Lone Keem Studios Originals</h3>
 
                 <div class="card soon">
                     <div class="soon-icon" aria-hidden="true">
@@ -569,6 +586,12 @@
                     </article>
                 </div>
                 -->
+            <div class="community-row" data-kind="movie">
+                    <h3 class="sub-h">Community Movies</h3>
+                    <p class="intro-more clamp">Your film, your vision, made with AI. Share the short films, trailers and full-length movies you’ve created with AI tools, from sci-fi epics to five-minute comedies. Post it, collect gold stars, and get discovered by the Kemy community.</p><button class="more-btn" type="button" aria-expanded="false">more</button>
+                    <div class="crow" aria-live="polite"><p class="muted small">Loading…</p></div>
+                    <p class="crow-cta"><a href="app.html#/explore/movies">See all movies</a> · <a href="app.html#/new/movie">Share yours</a></p>
+                </div>
             </div>
         </section>
 
@@ -578,6 +601,7 @@
                     <h2 id="songs-title">Songs</h2>
                     <p>Original AI music from Lone Keem, written and produced at the studio.</p>
                 </div>
+                <h3 class="sub-h">Lone Keem Studios Originals</h3>
 
                 <div class="card soon">
                     <div class="soon-icon" aria-hidden="true">
@@ -612,6 +636,12 @@
                     </div>
                 </article>
                 -->
+            <div class="community-row" data-kind="song">
+                    <h3 class="sub-h">Community Songs</h3>
+                    <p class="intro-more clamp">Made a track with AI? Drop it here. Share your AI-created songs and beats, add your lyrics and cover art, and let the Kemy community press play, leave gold stars and find your sound.</p><button class="more-btn" type="button" aria-expanded="false">more</button>
+                    <div class="crow" aria-live="polite"><p class="muted small">Loading…</p></div>
+                    <p class="crow-cta"><a href="app.html#/explore/songs">See all songs</a> · <a href="app.html#/new/song">Share yours</a></p>
+                </div>
             </div>
         </section>
 

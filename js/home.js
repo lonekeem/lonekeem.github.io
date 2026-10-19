@@ -5,7 +5,8 @@ import { ICONS } from './icons.js';
 import { viewsHtml, setCounters, trackVideo, trackVisible } from './views.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
-  doc, getDoc, onSnapshot, writeBatch, setDoc, deleteDoc, serverTimestamp, increment
+  doc, getDoc, onSnapshot, writeBatch, setDoc, deleteDoc, serverTimestamp, increment,
+  getDocs, collection, query, where, orderBy, limit
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -111,3 +112,26 @@ onAuthStateChanged(auth, async (user) => {
     b.paint();
   }
 });
+
+// Community Movies / Songs rows under the studio Originals (read-only, loaded when scrolled near).
+(() => {
+  const rows = document.querySelectorAll('.community-row');
+  const grad = (seed) => { let h = 0; for (const c of String(seed)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `linear-gradient(135deg,hsl(${255 + (h % 50)} 75% 42%),hsl(${(h >> 3) % 2 ? 40 + ((h >> 5) % 15) : 300 + ((h >> 5) % 30)} 85% ${(h >> 8) % 2 ? 55 : 35}%))`; };
+  const art = (p) => { const w = p.work || {}; return p.type === 'song' ? (w.cover || (w.yt ? `https://i.ytimg.com/vi/${w.yt}/hqdefault.jpg` : '')) : (p.poster || w.cover || (w.yt ? `https://i.ytimg.com/vi/${w.yt}/hqdefault.jpg` : '')); };
+  async function load(row) {
+    const kind = row.dataset.kind, box = row.querySelector('.crow');
+    try {
+      const qs = await getDocs(query(collection(db, 'posts'), where('type', '==', kind), orderBy('createdAt', 'desc'), limit(12)));
+      const list = qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.work && !(p.type === 'movie' && p.work.rating === '18'));
+      box.innerHTML = list.length ? list.map((p) => { const a = art(p); return `<a class="ctile ${kind}" href="app.html#/post/${esc(p.id)}"><span class="art" style="${a ? '' : `background:${grad(p.id + p.work.title)}`}">${a ? `<img src="${esc(a)}" alt="" loading="lazy" onerror="this.parentNode.style.background='linear-gradient(135deg,#5b21b6,#c026d3 70%,#f5b301)';this.remove()">` : `<span class="gt">${esc(p.work.title)}</span>`}</span><b>${esc(p.work.title)}</b><small>${esc(kind === 'song' ? (p.work.artist || p.authorName) : p.work.genre)} · @${esc(p.authorUsername)}</small><span class="ai">AI-made</span></a>`; }).join('')
+        : `<p class="muted small">No community ${kind}s yet. <a href="app.html#/new/${kind}">Be the first to share one</a>.</p>`;
+    } catch { box.innerHTML = `<p class="muted small"><a href="app.html#/explore/${kind}s">Open the ${kind}s in Kemy</a></p>`; }
+  }
+  rows.forEach((row) => {
+    const p = row.querySelector('.intro-more'), b = row.querySelector('.more-btn');
+    if (b) b.onclick = () => { const open = p.classList.toggle('clamp') === false; b.textContent = open ? 'less' : 'more'; b.setAttribute('aria-expanded', open); };
+  });
+  if (!('IntersectionObserver' in window)) { rows.forEach(load); return; }
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); load(e.target); } }), { rootMargin: '400px' });
+  rows.forEach((r) => io.observe(r));
+})();
