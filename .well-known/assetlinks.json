@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lonekeemstudios.kemy",
+      "sha256_cert_fingerprints": [
+        "80:A4:2A:65:BB:E4:6C:A0:75:BB:6B:9C:1D:A1:5B:71:DE:5A:59:A5:B3:DE:60:59:5C:4F:4A:19:7F:0F:FB:0A"
+      ]
+    }
+  }
+]
