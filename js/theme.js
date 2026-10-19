@@ -8,6 +8,16 @@ export const THEME_TITLE = 'Kemy on Screen';
 export const THEME_ARTIST = 'Keem';
 export const THEME_CREDIT = `Theme song: ${THEME_TITLE} by ${THEME_ARTIST} — Lone Keem Studios`;
 export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
+// Theme playlist (original song files, unchanged). Track 1 is always the welcome / hatch song.
+export const TRACKS = [
+  { title: THEME_TITLE, artist: 'Keem', src: THEME_SRC, dur: 124.8 },
+  { title: 'Julian', artist: 'Keem', src: new URL('../assets/audio/julian.m4a', import.meta.url).href, dur: 161.2 },
+];
+export const PLAYLIST_CREDIT = `Theme songs: ${TRACKS.map((t) => `${t.title} by ${t.artist}`).join(' and ')} — Lone Keem Studios`;
+const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)
+export function getPick() { const v = ls.get(PICK); return v === 'shuffle' || (v && TRACKS[+v]) ? v : 'all'; }
+let cur = 0;
+export const currentTrack = () => cur;
 
 const MODE = 'kemy-theme-mode', VOLK = 'kemy-theme-vol', OLD = 'kemy-theme-bgm';
 export const DEFAULT_VOL = 0.2, FADE = 1.5;
@@ -38,7 +48,8 @@ export function isPlaying() { return !!el && !el.paused && !el.dataset.stopping;
 function otherMediaPlaying() { return [...document.querySelectorAll('video, audio')].some((m) => m !== el && !m.paused && !m.ended && !m.muted && m.volume > 0); }
 function ensureEl() {
   if (el) return el;
-  el = new Audio(); el.preload = 'auto'; el.loop = true; el.dataset.kemyTheme = '1'; el.src = THEME_SRC; el.setAttribute('playsinline', '');
+  el = new Audio(); el.preload = 'auto'; el.loop = false; el.dataset.kemyTheme = '1'; el.src = TRACKS[cur].src;
+  el.addEventListener('ended', () => { const pk = getPick(); if (pk !== 'all' && pk !== 'shuffle') { el.currentTime = 0; el.play().catch(() => {}); return; } loadTrack(nextIndex()); el.play().catch(() => {}); }); el.setAttribute('playsinline', '');
   try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { actx = new AC(); gain = actx.createGain(); gain.gain.value = 0; const srcN = actx.createMediaElementSource(el); srcN.connect(gain); gain.connect(actx.destination); analyser = actx.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.5; srcN.connect(analyser); /* analyser is a dead end: it never changes loudness */ } } catch { actx = null; gain = null; }
   el.addEventListener('play', emit); el.addEventListener('pause', () => { emit(); paintFab(); });
   return el;
@@ -54,7 +65,8 @@ export async function play({ fromStart = false, force = false } = {}) {
   if (document.hidden || otherMediaPlaying()) return false;
   if (!force && getMode() !== 'play') return false;
   const a = ensureEl(); clearTimeout(stopT); delete a.dataset.stopping;
-  if (fromStart || a.ended) { try { a.currentTime = 0; } catch { /* */ } }
+  if (fromStart) { if (cur !== 0) loadTrack(0); try { a.currentTime = 0; } catch { /* */ } }
+  else if (a.ended) { try { a.currentTime = 0; } catch { /* */ } }
   try { if (actx && actx.state !== 'running') await actx.resume(); } catch { /* */ }
   if (!actx) a.volume = 0; else gain.gain.value = Math.min(gain.gain.value, 0.0001);
   try { await a.play(); } catch { return false; }
@@ -70,7 +82,12 @@ export const silence = () => stop(0.25);
 // Welcome screen / egg hatch: play the full song from the start (asks first if never asked).
 export function playIntro() { const m = getMode(); if (m === '') { ask(); return Promise.resolve(false); } return m === 'play' ? play({ fromStart: true }) : Promise.resolve(false); }
 export const playShort = playIntro;
-export function gainInfo() { return { webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume(), duration: el ? el.duration : null, src: el ? el.currentSrc : null }; }
+function nextIndex() { const pk = getPick(); if (pk === 'shuffle') { if (TRACKS.length < 2) return 0; let n; do n = Math.floor(Math.random() * TRACKS.length); while (n === cur); return n; } if (pk !== 'all') return +pk; return (cur + 1) % TRACKS.length; }
+function loadTrack(i) { cur = i; if (el && el.src !== TRACKS[i].src) { el.src = TRACKS[i].src; el.load(); } emit(); }
+// Settings: choose the playlist order or one track; starts it if the theme is on.
+export function setPick(v) { ls.set(PICK, v); const i = v === 'all' || v === 'shuffle' ? (v === 'shuffle' ? nextIndex() : 0) : +v; if (el) { const was = isPlaying(); loadTrack(i); if (was) { el.play().catch(() => {}); } } else cur = i; }
+export function skip() { if (!el) return; const was = isPlaying(); loadTrack(nextIndex()); if (was) el.play().catch(() => {}); }
+export function gainInfo() { return { track: cur, title: TRACKS[cur].title, currentTime: el ? el.currentTime : null, webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume(), duration: el ? el.duration : null, src: el ? el.currentSrc : null }; }
 
 // ---- UI: floating button + first-run prompt ----
 let fab = null;

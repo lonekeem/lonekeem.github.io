@@ -37,7 +37,7 @@ import { createMusic } from './music.js';
 import { loadDiscover } from './discover.js';
 import { danceEnabled, setDanceEnabled } from './pals/dance.js';
 import { keepOn as palKeepOn, setKeep as setPalKeep } from './pals/dance-ui.js';
-import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, getMode as themeMode, setMode as setThemeMode, getVolume as themeVol, setVolume as setThemeVol, THEME_CREDIT, THEME_TITLE } from './theme.js';
+import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, getMode as themeMode, setMode as setThemeMode, getVolume as themeVol, setVolume as setThemeVol, THEME_CREDIT, THEME_TITLE, TRACKS as THEME_TRACKS, getPick as themePick, setPick as setThemePick, PLAYLIST_CREDIT } from './theme.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -1068,7 +1068,10 @@ async function pageSettings() {
       <label for="s-theme-vol" style="margin-top:12px">Volume <span class="muted small" id="s-theme-vol-n">${Math.round(themeVol() * 100)}%</span></label>
       <input type="range" id="s-theme-vol" min="0" max="100" step="5" value="${Math.round(themeVol() * 100)}" style="width:100%">
       <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn btn-sm btn-ghost" type="button" id="s-theme" data-theme-ctl>🎵 Play theme</button></div>
-      <p class="muted small" style="margin:10px 0 0" id="s-theme-credit"><b>${esc(THEME_TITLE)}</b><br>${esc(THEME_CREDIT)}. Written by Lone Keem.</p>
+      <label for="s-theme-pick" style="margin-top:12px">Playlist</label>
+      <select id="s-theme-pick" style="width:100%"><option value="all">All songs in order (loops)</option><option value="shuffle">Shuffle</option>${THEME_TRACKS.map((t, i) => `<option value="${i}">Only “${esc(t.title)}”</option>`).join('')}</select>
+      <ol class="small" style="margin:8px 0 0;padding-left:20px">${THEME_TRACKS.map((t) => `<li><b>${esc(t.title)}</b> by ${esc(t.artist)} · ${Math.floor(t.dur / 60)}:${String(Math.round(t.dur % 60)).padStart(2, '0')}</li>`).join('')}</ol>
+      <p class="muted small" style="margin:10px 0 0" id="s-theme-credit">${esc(PLAYLIST_CREDIT)}. Written by Lone Keem.</p>
     </section>
     <section class="card pad" style="margin-top:16px" aria-labelledby="spals-h">
       <h2 id="spals-h" style="font-size:1.05rem">Pals</h2>
@@ -1097,6 +1100,7 @@ async function pageSettings() {
   $('#s-pal-keep').onchange = (e) => { setPalKeep(e.target.checked); toast(e.target.checked ? 'Your Pal will stay on screen' : 'Floating Pal off'); };
   { const g = $('#s-pal-gfx'); import('./pals/pal3d.js').then((m) => { g.value = m.gfxLevel(); g.onchange = () => { m.setGfx(g.value); toast(g.value === 'low' ? 'Pals use 2D art (reload to apply)' : 'Pal graphics: ' + g.value); }; }).catch(() => { g.value = 'low'; g.disabled = true; }); }
   $('#s-dance-shop').onclick = () => dispatchEvent(new Event('kemy:dance-shop'));
+  { const sel = $('#s-theme-pick'); sel.value = themePick(); sel.onchange = () => { setThemePick(sel.value); toast(sel.value === 'shuffle' ? 'Shuffling theme songs' : sel.value === 'all' ? 'Playing all theme songs' : 'Playing ' + THEME_TRACKS[+sel.value].title); }; }
   $('#s-theme-vol').oninput = (e) => { const v = +e.target.value / 100; setThemeVol(v); $('#s-theme-vol-n').textContent = e.target.value + '%'; };
   { const b = $('#s-theme'); const paint = () => { b.textContent = themePlaying() ? '⏸ Stop theme' : '🎵 Play theme'; };
     b.onclick = async () => { if (themePlaying()) stopTheme(); else await playTheme({ force: true }); paint(); };
