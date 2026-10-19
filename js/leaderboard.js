@@ -81,16 +81,17 @@ export function recordAndShow(game, o) {
 }
 
 // ------------------------------------------------------------- Pal thumbnails (cached data URLs)
-const thumbs = new Map(); let drawPalFn = null;
+const thumbs = new Map(); let artP = null;
+const artMod = () => (artP ||= import('./pals/art.js').catch((e) => { artP = null; throw e; }));
 async function palThumb(pal) {
   if (!pal) return '';
   const k = JSON.stringify(pal); if (thumbs.has(k)) return thumbs.get(k);
   try {
-    if (!drawPalFn) drawPalFn = (await import('./pals/art.js')).drawPal;
+    const drawPalFn = (await Promise.race([artMod(), new Promise((_, j) => setTimeout(() => j(new Error('slow')), 5000))])).drawPal;
     const cv = document.createElement('canvas'); cv.width = cv.height = 96; const c = cv.getContext('2d');
     drawPalFn(c, 48, 92, 72, pal, { t: 0, mode: 'idle', face: 1 });
     const url = cv.toDataURL('image/png'); thumbs.set(k, url); return url;
-  } catch { thumbs.set(k, ''); return ''; }
+  } catch { return ''; }   // egg for now; retried next render
 }
 
 // ------------------------------------------------------------- reading
