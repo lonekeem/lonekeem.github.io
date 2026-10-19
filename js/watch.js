@@ -22,7 +22,7 @@ const IC = {
 export function createWatch(ctx) {
   const { S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, isAdmin, stale,
     isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId, commentsQuery,
-    blockUser, deletePost, canDeletePost } = ctx;
+    blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON } = ctx;
   const { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot } = ctx.fs;
   let muted = true; // stays the same while scrolling between videos
   let session = null;
@@ -84,7 +84,7 @@ export function createWatch(ctx) {
             <a class="vname" href="#/u/${esc(p.authorUsername)}">${esc(p.authorName)}${badge(p.authorId)}</a>
             ${mine ? '' : `<button class="vfollow ${following ? 'on' : ''}" data-a="follow" data-uid="${esc(p.authorId)}" aria-pressed="${following}">${following ? 'Following' : 'Follow'}</button>`}
           </div>
-          ${p.text ? `<p class="vcaption" data-a="more">${esc(p.text)}</p>` : ''}
+          ${p.text ? `<p class="vcaption" data-a="more">${linkify(esc(p.text))}</p>` : ''}
           <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))}</p>
         </div>
         <div class="vrail">
@@ -153,6 +153,7 @@ export function createWatch(ctx) {
         <div class="vtop">
           <nav class="feed-toggle on-video" aria-label="Feed"><a href="#/watch" class="active" aria-current="page">For You</a><a href="#/feed">Posts</a></nav>
           <button class="vmute" id="vmute" aria-pressed="true" aria-label="Unmute"></button>
+          <a class="vsearch" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>
           <button class="vunmute-hint" id="vunmute-hint" tabindex="-1" aria-hidden="true"></button>
         </div>
         <div class="vfeed" id="vfeed" tabindex="-1" aria-label="Video feed. Swipe up or press the down arrow for the next video.">
@@ -277,7 +278,7 @@ export function createWatch(ctx) {
       const btn = ev.target.closest('[data-a]'); if (!btn) return;
       const sl = btn.closest('.vslide'); const p = byId.get(sl?.dataset.id);
       const a = btn.dataset.a;
-      if (a === 'more') { btn.classList.toggle('open'); return; }
+      if (a === 'more') { if (!ev.target.closest('a')) btn.classList.toggle('open'); return; }
       if (a === 'replay') { slides[0].scrollIntoView({ behavior: 'smooth' }); return; }
       if (a === 'share') return share(p);
       if (a === 'comment') return openComments(p, sl);
@@ -413,7 +414,7 @@ export function createWatch(ctx) {
           const row = document.createElement('div'); row.className = 'comment';
           row.innerHTML = `${avatar({ uid: c.authorId, displayName: c.authorName, username: c.authorUsername, color: c.authorColor }, 'sm')}
             <div class="body"><div><a style="font-weight:600;color:var(--text);text-decoration:none" href="#/u/${esc(c.authorUsername)}">${esc(c.authorName)}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
-            <div class="text">${esc(c.text)}</div>
+            <div class="text">${linkify(esc(c.text))}</div>
             <div class="small">${S.user && c.authorId !== S.user.uid ? '<button class="link-btn small" data-c="report">Report</button>' : ''} ${canDelete ? '<button class="link-btn small" data-c="del" style="color:#ffb3c1;margin-left:10px">Delete</button>' : ''}</div></div>`;
           row.onclick = async (e) => {
             const a = e.target.dataset.c;

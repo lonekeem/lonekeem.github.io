@@ -35,7 +35,9 @@ service cloud.firestore {
     // ---------- Profiles ----------
     function validProfile(d) {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
-                               'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio'])
+                               'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
+                               'usernameLower', 'displayNameLower'])
+        && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
         && isStr(d.displayName, 1, 50)
         && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
@@ -43,6 +45,11 @@ service cloud.firestore {
         && isStr(d.color, 1, 20)
         && d.welcomed is bool
         && d.createdAt is timestamp;
+    }
+    // Search fields (lowercase copies used for prefix search). Optional for older profiles.
+    function validUserSearch(d) {
+      return (!('usernameLower' in d) || d.usernameLower == d.username)
+        && (!('displayNameLower' in d) || isStr(d.displayNameLower, 0, 100));
     }
     // Rate limit: a "last action" timestamp may only be set to now, and only after `secs` seconds.
     function rateOk(field, secs) {
@@ -68,6 +75,10 @@ service cloud.firestore {
         && rateOk('lastPostAt', 20)
         && rateOk('lastCommentAt', 5)
         && rateOk('lastMessageAt', 1);
+      // Admin search-index rebuild: only the search fields, on any profile.
+      allow update: if isAdmin()
+        && changed().hasOnly(['usernameLower', 'displayNameLower'])
+        && validUserSearch(request.resource.data);
       allow delete: if (signedIn() && uid == me()) || isAdmin();
 
       // Private favourites
@@ -131,12 +142,21 @@ service cloud.firestore {
             && isStr(d.cloudinaryPublicId, 1, 255)
             && d.cloudinaryPublicId.matches('^[A-Za-z0-9_./-]+$'));
     }
+    // Search fields on posts: lowercase keywords (words + prefixes) and #hashtags, size-capped.
+    function validPostSearch(d) {
+      return (!('keywords' in d) || (d.keywords is list && d.keywords.size() <= 100
+                                     && d.keywords.join(' ').size() <= 2000))
+        && (!('hashtags' in d) || (d.hashtags is list && d.hashtags.size() <= 20
+                                   && d.hashtags.join(' ').size() <= 900));
+    }
     function validNewPost(d) {
       let u = get(userPath(d.authorId)).data;
       return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                                'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                                'commentCount', 'lastCommentId', 'studio',
-                               'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId'])
+                               'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId',
+                               'keywords', 'hashtags'])
+        && validPostSearch(d)
         && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                             'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                             'commentCount', 'lastCommentId', 'studio'])
@@ -183,7 +203,13 @@ service cloud.firestore {
 
       allow read: if true;
       allow create: if signedIn() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data);
-      allow update: if signedIn() && (likeChange() || commentChange());
+      // Search-index backfill by the author (or admin): only keywords / hashtags.
+      function searchChange() {
+        return changed().hasOnly(['keywords', 'hashtags'])
+          && (actingAs(resource.data.authorId) || isAdmin())
+          && validPostSearch(request.resource.data);
+      }
+      allow update: if signedIn() && (likeChange() || commentChange() || searchChange());
       allow delete: if signedIn() && (resource.data.authorId == me() || isAdmin());
 
       match /likes/{likerId} {

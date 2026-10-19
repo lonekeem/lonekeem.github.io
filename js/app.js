@@ -3,6 +3,8 @@ import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { createWatch } from './watch.js';
 import { createComposer } from './create.js';
 import { deliveryUrls, LIMITS } from './media-config.js';
+import { createSearch, SEARCH_ICON } from './search.js';
+import { searchFields, userSearchFields, linkify } from './search-index.js';
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   sendPasswordResetEmail, sendEmailVerification, updateProfile, GoogleAuthProvider,
@@ -223,7 +225,7 @@ function postCard(p, { detail = false } = {}) {
         </div>
       </div>
     </div>
-    ${p.text ? `<p class="post-text">${esc(p.text)}</p>` : ''}
+    ${p.text ? `<p class="post-text">${linkify(esc(p.text))}</p>` : ''}
     ${mediaHtml(p)}
     <div class="actions">
       <button class="act like" data-a="like" aria-pressed="false" aria-label="Like">${ICON.heart}<span class="n">${Number(p.likeCount) || 0}</span></button>
@@ -367,8 +369,9 @@ async function showWelcome() {
 function renderChrome(name) {
   $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === name || a.dataset.also === name));
   const ha = document.getElementById('header-actions');
+  const searchBtn = `<a class="icon-btn" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>`;
   if (S.user && S.profile) {
-    ha.innerHTML = `
+    ha.innerHTML = `${searchBtn}
       ${isAdmin() ? `<a class="icon-btn" href="#/admin" aria-label="Admin">${ICON.shield}</a>` : ''}
       <a class="icon-btn" href="#/notifications" aria-label="Notifications">${ICON.bell}${S.unreadNotes ? '<span class="dot"></span>' : ''}</a>
       ${avatar({ ...S.profile, uid: S.user.uid }, 'sm')}`;
@@ -376,7 +379,7 @@ function renderChrome(name) {
     ha.innerHTML = `<button class="icon-btn" id="hdr-signout">Sign out</button>`;
     $('#hdr-signout').onclick = () => signOut(auth);
   } else {
-    ha.innerHTML = `<a class="signin-pill" href="#/login">Sign in</a>`;
+    ha.innerHTML = `${searchBtn}<a class="signin-pill" href="#/login">Sign in</a>`;
   }
   document.getElementById('msg-dot').hidden = !S.unreadChats;
 }
@@ -387,6 +390,7 @@ const routes = [
   [/^#\/watch(?:\/([\w-]+))?$/, pageWatch, 'watch'],
   [/^#\/feed$/, pageFeed, 'feed'],
   [/^#\/explore$/, pageExplore, 'explore'],
+  [/^#\/search(?:\?(.*))?$/, pageSearch, 'explore'],
   [/^#\/new(?:\/(text))?$/, pageCompose, 'new'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
@@ -402,8 +406,9 @@ const routes = [
   [/^#\/reset$/, pageReset, 'me'],
   [/^#\/onboard$/, pageOnboard, 'me']
 ];
-let routeToken = 0;
+let routeToken = 0, navCount = 0;
 async function route() {
+  navCount++;
   if (!S.ready) return;
   S.unsubs.forEach((u) => u()); S.unsubs = [];
   closeModal();
@@ -427,16 +432,34 @@ async function route() {
   main.innerHTML = '<div class="empty">Page not found. <a href="#/watch">Go home</a></div>';
 }
 window.addEventListener('hashchange', route);
+// Search icons: focus a throwaway input inside the tap so phones (iOS) open the keyboard,
+// then the search page moves focus to the real box.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-open-search]'); if (!a || e.defaultPrevented) return;
+  e.preventDefault();
+  if (location.hash.startsWith('#/search')) { document.getElementById('sq')?.focus(); return; }
+  const t = document.createElement('input');
+  t.type = 'search'; t.setAttribute('aria-hidden', 'true'); t.tabIndex = -1;
+  t.style.cssText = 'position:fixed;top:8px;left:8px;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0';
+  document.body.appendChild(t); t.focus();
+  window.__lksSearchPrimer = t; setTimeout(() => t.remove(), 2000);
+  location.hash = a.getAttribute('href');
+});
 const stale = (t) => t !== routeToken;
 
 // ---------------------------------------------------------------- page: vertical video feed (For You)
 const watch = createWatch({
   S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, closeModal, isAdmin, stale,
   isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId,
-  blockUser, deletePost, canDeletePost, commentsQuery: watchCommentsQuery,
+  blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, commentsQuery: watchCommentsQuery,
   fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot }
 });
 async function pageWatch(postId, token) { return watch.render(postId, token); }
+const search = createSearch({
+  S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
+  STUDIO_UID, youTubeId, tikTokId, stale, canGoBack: () => navCount > 1,
+  fs: { doc, getDocs, collection, query, where, orderBy, limit, getCountFromServer }
+});
 
 // ---------------------------------------------------------------- pages: feed / explore
 const feedToggle = (active) => `<nav class="feed-toggle" aria-label="Feed"><a href="#/watch" class="${active === 'watch' ? 'active' : ''}">For You</a><a href="#/feed" class="${active === 'feed' ? 'active' : ''}">Posts</a></nav>`;
@@ -475,28 +498,15 @@ async function pageFeed(token) {
 async function pageExplore(token) {
   main.innerHTML = `
     <h1 class="page-title">Explore</h1>
-    <form id="search-form" role="search" style="margin-bottom:10px">
-      <label for="search" class="sr-only">Search people by username</label>
-      <input id="search" type="search" placeholder="Search people by @username" autocomplete="off" autocapitalize="none">
-    </form>
-    <div id="search-results"></div>
-    <h2 style="margin:18px 0 14px;font-size:1.15rem">Recent posts</h2>
+    <div id="ex-top"></div>
+    <h2 style="margin:22px 0 14px;font-size:1.15rem">Recent posts</h2>
     <div id="posts"><div class="spinner"></div></div>`;
-  let t;
-  $('#search').oninput = (e) => { clearTimeout(t); t = setTimeout(() => searchUsers(e.target.value), 250); };
-  $('#search-form').onsubmit = (e) => { e.preventDefault(); searchUsers($('#search').value); };
+  search.renderExploreTop($('#ex-top'), token);
   const snap = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(30)));
   if (stale(token)) return;
   renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet. Be the first!');
 }
-async function searchUsers(q) {
-  const box = $('#search-results'); if (!box) return;
-  q = q.trim().replace(/^@/, '').toLowerCase();
-  if (!q) { box.innerHTML = ''; return; }
-  const snap = await getDocs(query(collection(db, 'users'), where('username', '>=', q), where('username', '<=', q + '\uf8ff'), orderBy('username'), limit(10)));
-  const users = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).filter((u) => !S.blocked.has(u.uid));
-  box.innerHTML = users.length ? `<div class="card" style="padding:6px">${users.map(userRow).join('')}</div>` : '<p class="muted small">No people found.</p>';
-}
+async function pageSearch(qs, token) { return search.render(qs, token); }
 const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${avatar(u, '', false)}<div class="meta"><b>${esc(u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${u.bio ? ' · ' + esc(u.bio) : ''}</p></div></a>`;
 
 // ---------------------------------------------------------------- compose (Post tab)
@@ -544,6 +554,7 @@ function textComposeForm(slot, open) {
       b.set(ref, {
         authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
         type: linkUrl ? 'link' : 'text', text, linkUrl, mediaUrl: '', mediaType: '', poster: '',
+        ...searchFields({ text, authorName: author.displayName, authorUsername: author.username }),
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
       });
       b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
@@ -571,6 +582,7 @@ async function saveMediaPost({ upload, info, caption, asStudio }) {
     mediaUrl: urls.mediaUrl, mediaType: urls.mediaType, poster: urls.posterUrl, posterUrl: urls.posterUrl,
     width: n(upload.width || info.width, 20000), height: n(upload.height || info.height, 20000), duration,
     cloudinaryPublicId: String(upload.public_id).slice(0, 255),
+    ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
   });
   b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
@@ -602,7 +614,7 @@ async function pagePost(postId, token) {
       const row = document.createElement('div'); row.className = 'comment';
       row.innerHTML = `${avatar({ uid: c.authorId, displayName: c.authorName, username: c.authorUsername, color: c.authorColor }, 'sm')}
         <div class="body"><div><a style="font-weight:600;color:var(--text);text-decoration:none" href="#/u/${esc(c.authorUsername)}">${esc(c.authorName)}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
-        <div class="text">${esc(c.text)}</div>
+        <div class="text">${linkify(esc(c.text))}</div>
         <div class="small">${S.user && c.authorId !== S.user.uid ? '<button class="link-btn small" data-a="report">Report</button>' : ''} ${canDelete ? '<button class="link-btn small" data-a="del" style="color:#ffb3c1;margin-left:10px">Delete</button>' : ''}</div></div>`;
       row.onclick = async (e) => {
         const a = e.target.dataset.a;
@@ -787,7 +799,7 @@ async function pageSettings() {
         b.set(doc(db, 'usernames', username), { uid: S.user.uid });
         b.delete(doc(db, 'usernames', p.username));
       }
-      b.update(doc(db, 'users', S.user.uid), { displayName, username, bio, color });
+      b.update(doc(db, 'users', S.user.uid), { displayName, username, bio, color, ...userSearchFields({ displayName, username }) });
       await b.commit();
       Object.assign(S.profile, { displayName, username, bio, color });
       profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile });
@@ -905,8 +917,15 @@ async function pageAdmin(token) {
   if (stale(token)) return;
   const reports = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   main.innerHTML = `<h1 class="page-title">Admin · Reports</h1>
+    <div class="card pad" style="margin-bottom:14px"><div class="row" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>Search index</b><p class="muted small" style="margin:2px 0 0">Adds search keywords and #hashtags to every post and profile that’s missing them.</p></div><button class="btn btn-sm" id="reindex">Build search index</button></div><p class="small muted" id="reindex-msg" style="margin:8px 0 0"></p></div>
     <p class="muted small">You can delete any post or comment from its menu. Studio tools: <a href="#/messages/studio">studio inbox</a> · <a href="#/notifications/studio">studio notifications</a> · <a href="#/new">post as the studio</a>.</p>
     <div id="reports"></div>`;
+  $('#reindex').onclick = async () => {
+    const b = $('#reindex'), m = $('#reindex-msg'); b.disabled = true; m.textContent = 'Working…';
+    try { const r = await rebuildSearchIndex((n, t) => (m.textContent = `Updated ${n} of ${t}…`)); m.textContent = `Done. Checked ${r.posts} posts and ${r.users} profiles; updated ${r.updated}.`; }
+    catch (e) { m.textContent = friendlyError(e); }
+    b.disabled = false;
+  };
   const box = $('#reports');
   if (!reports.length) { box.innerHTML = '<div class="card empty">No reports right now.</div>'; return; }
   for (const r of reports) {
@@ -1066,6 +1085,7 @@ async function createProfile(displayName, username) {
   b.set(doc(db, 'usernames', username), { uid });
   b.set(doc(db, 'users', uid), {
     displayName: displayName.slice(0, 50), username, bio: '', color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    ...userSearchFields({ displayName: displayName.slice(0, 50), username }),
     createdAt: serverTimestamp(), welcomed: false
   });
   b.set(doc(db, 'follows', `${uid}_${STUDIO_UID}`), { follower: uid, followee: STUDIO_UID, createdAt: serverTimestamp() });
@@ -1085,6 +1105,7 @@ async function loadSession() {
     getDocs(collection(db, 'users', uid, 'blocks')),
     getDocs(query(collection(db, 'users', uid, 'saved'), limit(500)))
   ]);
+  backfillSearch(uid).catch((e) => console.warn('search backfill', e.code || e.message));
   S.following = new Set(fol.docs.map((d) => d.data().followee));
   S.blocked = new Set(blk.docs.map((d) => d.id));
   S.saved = new Set(sav.docs.map((d) => d.id));
@@ -1098,6 +1119,40 @@ async function loadSession() {
     S.unreadChats = qs.docs.some((d) => d.data().lastSender !== uid && (d.data().lastAt?.toMillis?.() || 0) > (seen[d.id] || 0) && !location.hash.includes(d.data().participants.find((x) => x !== uid)));
     document.getElementById('msg-dot').hidden = !S.unreadChats;
   }, () => {}));
+}
+
+// Lazy search-index backfill: when someone signs in, add the search fields to their own
+// profile and their own recent posts (and the studio's, for the admin) if they're missing.
+async function backfillSearch(uid) {
+  if (sessionStorage.getItem('lks-bf-' + uid)) return;
+  const p = S.profile;
+  const want = userSearchFields(p);
+  if (p.usernameLower !== want.usernameLower || p.displayNameLower !== want.displayNameLower) {
+    await updateDoc(doc(db, 'users', uid), want); Object.assign(p, want);
+  }
+  const authors = isAdmin() ? [uid, STUDIO_UID] : [uid];
+  for (const a of authors) {
+    const snap = await getDocs(query(collection(db, 'posts'), where('authorId', '==', a), orderBy('createdAt', 'desc'), limit(50)));
+    const todo = snap.docs.filter((d) => !Array.isArray(d.data().keywords) || !Array.isArray(d.data().hashtags));
+    for (const d of todo) await updateDoc(d.ref, searchFields(d.data()));
+  }
+  if (isAdmin()) {
+    const st = await getProfile(STUDIO_UID);
+    if (st && st.usernameLower !== userSearchFields(st).usernameLower) await updateDoc(doc(db, 'users', STUDIO_UID), userSearchFields(st));
+  }
+  sessionStorage.setItem('lks-bf-' + uid, '1');
+}
+// Admin: (re)build search fields for every post and profile.
+async function rebuildSearchIndex(onProgress) {
+  const [ps, us] = await Promise.all([getDocs(query(collection(db, 'posts'), limit(1000))), getDocs(query(collection(db, 'users'), limit(1000)))]);
+  const jobs = [];
+  ps.docs.forEach((d) => { const f = searchFields(d.data()); if (JSON.stringify(f.keywords) !== JSON.stringify(d.data().keywords) || JSON.stringify(f.hashtags) !== JSON.stringify(d.data().hashtags)) jobs.push([d.ref, f]); });
+  us.docs.forEach((d) => { const u = d.data(); if (!u.username) return; const f = userSearchFields(u); if (f.usernameLower !== u.usernameLower || f.displayNameLower !== u.displayNameLower) jobs.push([d.ref, f]); });
+  for (let i = 0; i < jobs.length; i += 400) {
+    const b = writeBatch(db); jobs.slice(i, i + 400).forEach(([r, f]) => b.update(r, f)); await b.commit();
+    onProgress(Math.min(jobs.length, i + 400), jobs.length);
+  }
+  return { posts: ps.size, users: us.size, updated: jobs.length };
 }
 
 getRedirectResult(auth).catch((e) => toast(friendlyError(e)));
