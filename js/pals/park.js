@@ -93,8 +93,9 @@ export function createPark(ctx) {
       document.getElementById('pr-f').onsubmit = async (e) => { e.preventDefault(); try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: o.uid, postId: '', reason: ('Pal Park: ' + document.getElementById('pr-r').value + '. ' + document.getElementById('pr-t').value).slice(0, 500), excerpt: String(o.say || '').slice(0, 300), createdAt: serverTimestamp() }); closeModal(); toast('Thanks. The report was sent.'); } catch (er) { toast(friendlyError(er)); } };
     }
     const panel = main.querySelector('#park-panel');
-    main.querySelector('#pk-emote').onclick = () => { panel.hidden = !panel.hidden || panel.dataset.k !== 'e'; panel.dataset.k = 'e'; panel.innerHTML = EMOTES.map((x) => `<button class="pk-e" data-e="${x}">${x}</button>`).join(''); };
-    main.querySelector('#pk-chat').onclick = () => { panel.hidden = !panel.hidden || panel.dataset.k !== 'c'; panel.dataset.k = 'c';
+    const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };
+    main.querySelector('#pk-emote').onclick = () => { if (!toggle('e')) return; panel.innerHTML = EMOTES.map((x) => `<button class="pk-e" data-e="${x}">${x}</button>`).join(''); };
+    main.querySelector('#pk-chat').onclick = () => { if (!toggle('c')) return;
       panel.innerHTML = PHRASES.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`;
       panel.querySelector('#pk-f').onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
     panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
