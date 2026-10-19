@@ -80,9 +80,9 @@ function build(pal) {
   if (kind === 'blob') {
     const torso = mesh(geo('torso', () => { const pts = [[0, -0.24], [0.2, -0.22], [0.33, -0.15], [0.41, -0.02], [0.42, 0.1], [0.38, 0.24], [0.31, 0.36], [0.25, 0.46], [0.22, 0.54], [0.2, 0.62], [0, 0.66]].map(([r, y]) => new THREE.Vector2(r, y));
       return new THREE.LatheGeometry(new THREE.SplineCurve(pts).getPoints(48), 56); }), mB, J.Spine); torso.scale.set(1, 1, 0.88);
-    if (ex.has('belly') || sp.id === 'penguin' || sp.id === 'owl') { const b = mesh(sph(1), mat(sp.id === 'penguin' ? '#fbf6ff' : shade(B, 0.6)), J.Spine); b.scale.set(0.3, 0.34, 0.12); b.position.set(0, 0.05, 0.28); }
+    if (ex.has('belly') || sp.id === 'penguin' || sp.id === 'owl') { const b = mesh(sph(1), mat(sp.id === 'penguin' ? '#fbf6ff' : shade(B, 0.6)), J.Spine); b.scale.set(0.3, 0.36, 0.2); b.position.set(0, 0.04, 0.2); }
     if (ex.has('shell')) { const sh = mesh(sph(1), mat(A, { cc: 0.8, sheen: 0 }), J.Spine); sh.scale.set(0.5, 0.52, 0.34); sh.position.set(0, 0.12, -0.18); }
-    if (ex.has('spikes')) for (let i = 0; i < 9; i++) { const s = mesh(cone(0.07, 0.3), mA, J.Chest); const a = -1.2 + i * 0.3; s.position.set(Math.sin(a) * 0.3, 0.05 + Math.cos(a) * 0.1, -0.24); s.rotation.set(-1.2, 0, -a * 0.6); }
+    if (ex.has('spikes')) for (let r = 0; r < 3; r++) for (let i = 0; i < 7; i++) { const s = mesh(cone(0.075, 0.3), mA, J.Spine); const a = -1.35 + i * 0.45; const y = 0.42 - r * 0.24; const rad = 0.5 - (r === 2 ? 0.06 : 0); s.position.set(Math.sin(a) * rad, y, -Math.cos(a) * rad * 0.9); s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.sin(a) * 0.8, 0.55, -Math.cos(a)).normalize()); }
     if (ex.has('stripes') || ex.has('giraffespots')) for (let i = 0; i < 6; i++) { const s = mesh(sph(1), mA, J.Spine); s.scale.set(ex.has('stripes') ? 0.03 : 0.06, ex.has('stripes') ? 0.12 : 0.05, 0.04); const a = -1 + (i % 3) * 1; s.position.set(Math.sin(a) * 0.4, -0.05 + Math.floor(i / 3) * 0.2, Math.cos(a) * 0.33); }
     if (ex.has('wool')) for (let i = 0; i < 10; i++) { const w = mesh(sph(0.15), mat('#ffffff'), J.Spine); const a = i * 0.63; w.position.set(Math.sin(a) * 0.34, 0.02 + (i % 2) * 0.14, Math.cos(a) * 0.28); }
   } else if (kind === 'jelly') {
@@ -90,7 +90,7 @@ function build(pal) {
     J.tent = []; for (let i = 0; i < 6; i++) { const a = i * 1.05; const t = bone('Tent' + i, J.Spine, Math.sin(a) * 0.3, -0.05, Math.cos(a) * 0.3); const m = mesh(cap(0.05, 0.45), mat(A, { op: 0.85 }), t); m.position.y = -0.25; J.tent.push(t); }
   } else if (kind === 'star') {
     const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.28 : 0.62; sh[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); }
-    const g = geo('star', () => { const e = new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: true, bevelSize: 0.08, bevelThickness: 0.1, bevelSegments: 3 }); e.center(); return e; });
+    const g = geo('star', () => { const e = new THREE.ExtrudeGeometry(sh, { depth: 0.34, bevelEnabled: true, bevelSize: 0.1, bevelThickness: 0.14, bevelSegments: 6 }); e.center(); return e; });
     mesh(g, mat('#ffe680', { em: '#ffcc33', cc: 0.6 }), J.Chest).position.y = 0.05;
   } else if (kind === 'cloud') {
     for (const [x, y, r] of [[0, 0, 0.4], [-0.35, -0.05, 0.3], [0.35, -0.05, 0.3], [-0.18, 0.25, 0.28], [0.2, 0.25, 0.3]]) mesh(sph(r), mat(B, { sheen: 1 }), J.Chest).position.set(x, y, 0);
@@ -99,7 +99,7 @@ function build(pal) {
   const headR = (kind === 'blob' ? 0.44 : 0.4) * (sp.id === 'jelly' ? 0 : 1);
   if (headR) { const h = mesh(sph(1), mB, J.Head); h.scale.set(headR * 1.08, headR, headR * 0.98); h.position.y = headR * 0.82; const ch = mesh(sph(1), mB, J.Head); ch.scale.set(headR * 0.95, headR * 0.6, headR * 0.85); ch.position.set(0, headR * 0.52, headR * 0.08); }
   const hy = headR * 0.82 || 0.05, fz = headR * 0.9 || 0.6;
-  const H = new THREE.Group(); H.position.y = hy; J.Head.add(H); J.face = H;
+  const H = new THREE.Group(); H.position.y = hy - (sp.id === 'jelly' ? 0.42 : 0); J.Head.add(H); J.face = H;
   if (ex.has('mane')) for (let i = 0; i < 14; i++) { const a = i * Math.PI * 2 / 14; mesh(sph(0.16), mA, H).position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.5, -0.12); }
   if (ex.has('wool')) for (let i = 0; i < 6; i++) mesh(sph(0.14), mat('#ffffff'), H).position.set(-0.25 + i * 0.1, 0.42 + (i % 2) * 0.04, 0.05);
   // eyes (glossy, with catch-lights) + blush
@@ -120,8 +120,8 @@ function build(pal) {
   const sn = sp.snout; const snz = fz;
   if (sn === 'muzzle' || sn === 'nose' || sn === 'whiskers') { const m = mesh(sph(1), mLight, H); m.scale.set(0.16, 0.11, 0.1); m.position.set(0, -0.1, snz * 0.95); const n = mesh(sph(1), mNose, H); n.scale.set(0.05, 0.035, 0.03); n.position.set(0, -0.06, snz * 0.95 + 0.09); }
   if (ex.has('whiskers')) for (const s of [-1, 1]) for (const k of [-1, 1]) { const w = mesh(cap(0.006, 0.18), mNose, H); w.position.set(s * 0.22, -0.1 + k * 0.025, snz * 0.95); w.rotation.z = Math.PI / 2 + k * 0.15 * s; }
-  if (sn === 'beak' || sn === 'duckbill') { const b = mesh(cone(0.08, 0.16), mat('#ffa53a', { sheen: 0, cc: 0.6 }), H); b.rotation.x = Math.PI / 2; b.position.set(0, -0.06, snz + 0.05); if (sn === 'duckbill') b.scale.set(1.5, 1, 0.6); }
-  if (sn === 'pig') { const p = mesh(geo('pig', () => new THREE.CylinderGeometry(0.1, 0.1, 0.08, 18)), mat(shade(B, -0.12)), H); p.rotation.x = Math.PI / 2; p.position.set(0, -0.1, snz + 0.02); }
+  if (sn === 'beak' || sn === 'duckbill') { const b = mesh(cone(0.08, 0.16), mat('#ffa53a', { sheen: 0, cc: 0.6 }), H); b.rotation.x = Math.PI / 2; b.position.set(0, -0.07, snz + 0.1); b.scale.setScalar(1.25); if (sn === 'duckbill') b.scale.set(1.9, 1.25, 0.75); }
+  if (sn === 'pig') { const p = mesh(geo('pig', () => new THREE.CylinderGeometry(0.1, 0.1, 0.08, 18)), mat(shade(B, -0.12)), H); p.rotation.x = Math.PI / 2; p.position.set(0, -0.1, snz + 0.05); for (const q of [-1, 1]) { const h = mesh(sph(0.018), mat(shade(B, -0.5), { sheen: 0 }), H); h.position.set(q * 0.035, -0.1, snz + 0.09); h.scale.z = 0.4; } }
   if (sn === 'trunk') {
     J.trunk = []; let par = H; const n = 7, L = 0.078;
     const base = mesh(sph(1), mB, H); base.scale.set(0.13, 0.12, 0.1); base.position.set(0, -0.06, snz * 0.86);
@@ -154,7 +154,7 @@ function build(pal) {
   if (ex.has('rainbowmane')) ['#ff8ab8', '#ffd34d', '#7fe0a0', '#7fb8ff', '#c49aff'].forEach((c, i) => mesh(sph(0.1), mat(c), H).position.set(-0.05, 0.42 - i * 0.12, -0.32 - i * 0.02));
   // arms: shoulder > upper > lower > hand (+3 fingers); flippers / wings swap the hand shape
   const armType = ex.has('wings') ? 'wing' : ex.has('flippers') ? 'flipper' : 'paw';
-  const ua = 0.3, la = 0.27, ar = kind === 'blob' ? 0.075 : 0.06, shY = kind === 'blob' ? 0.1 : 0;
+  const ua = 0.3, la = 0.27, ar = kind === 'blob' ? 0.09 : 0.078, shY = kind === 'blob' ? 0.1 : 0;
   for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) {
     const sh = bone(n + 'Shoulder', J.Chest, s * (kind === 'blob' ? 0.36 : 0.45), shY, 0);
     const up = bone(n + 'UpperArm', sh, 0, 0, 0); const lo = bone(n + 'LowerArm', up, 0, -ua, 0); const hd = bone(n + 'Hand', lo, 0, -la, 0);
@@ -162,21 +162,21 @@ function build(pal) {
     else if (armType === 'flipper') { const w = mesh(sph(1), mB, up); w.scale.set(0.07, 0.3, 0.13); w.position.y = -0.22; }
     else {
       mesh(cap(ar, ua), mB, up).position.y = -ua / 2; mesh(cap(ar * 0.92, la), mB, lo).position.y = -la / 2; mesh(sph(ar * 1.12), mB, up); mesh(sph(ar * 0.98), mB, lo);
-      const p = mesh(sph(1), skin ? mB : mLight, hd); p.scale.set(0.095, 0.088, 0.078); p.position.y = -0.04;
+      const p = mesh(sph(1), skin ? mB : mLight, hd); p.scale.set(0.11, 0.1, 0.09); p.position.y = -0.04;
       for (const f of [-1, 0, 1]) { const fi = mesh(cap(0.022, 0.04), skin ? mB : mLight, hd); fi.position.set(f * 0.04, -0.11, 0.015); fi.rotation.z = f * 0.25; }
     }
     J[n + 'Shoulder'] = sh; J[n + 'UpperArm'] = up; J[n + 'LowerArm'] = lo; J[n + 'Hand'] = hd;
   }
   // legs: hip > upper > lower > foot (+ toe pads)
-  const ul = 0.27, ll = 0.27, lr = 0.095; J.legL = ul + ll;
+  const ul = 0.27, ll = 0.27, lr = 0.122; J.legL = ul + ll;
   const legs = kind === 'blob' && sp.feet !== 'none' && !ex.has('float');
   for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) {
-    const up = bone(n + 'UpperLeg', J.Hips, s * 0.17, 0, 0); const lo = bone(n + 'LowerLeg', up, 0, -ul, 0); const ft = bone(n + 'Foot', lo, 0, -ll, 0);
+    const up = bone(n + 'UpperLeg', J.Hips, s * 0.19, 0, 0); const lo = bone(n + 'LowerLeg', up, 0, -ul, 0); const ft = bone(n + 'Foot', lo, 0, -ll, 0);
     if (legs) {
       mesh(cap(lr, ul), mB, up).position.y = -ul / 2; mesh(cap(lr * 0.9, ll), mB, lo).position.y = -ll / 2; mesh(sph(lr * 1.15), mB, up); mesh(sph(lr * 0.95), mB, lo);
       if (sp.feet === 'webbed') { const f = mesh(sph(1), mat('#ffa53a', { sheen: 0 }), ft); f.scale.set(0.11, 0.035, 0.16); f.position.set(0, -0.02, 0.06); }
       else if (sp.feet === 'flippers') { const f = mesh(sph(1), mDark, ft); f.scale.set(0.12, 0.04, 0.2); f.position.set(0, -0.02, 0.08); }
-      else { const f = mesh(sph(1), mB, ft); f.scale.set(0.11, 0.07, 0.15); f.position.set(0, -0.02, 0.05); for (const q of [-1, 0, 1]) { const tp = mesh(sph(0.025), mat('#ffb3cf', { sheen: 0 }), ft); tp.position.set(q * 0.045, -0.04, 0.18); } }
+      else { const f = mesh(sph(1), mB, ft); f.scale.set(0.13, 0.08, 0.17); f.position.set(0, -0.02, 0.05); for (const q of [-1, 0, 1]) { const tp = mesh(sph(0.025), mat('#ffb3cf', { sheen: 0 }), ft); tp.position.set(q * 0.045, -0.04, 0.18); } }
     }
     J[n + 'UpperLeg'] = up; J[n + 'LowerLeg'] = lo; J[n + 'Foot'] = ft;
   }
@@ -186,11 +186,11 @@ function build(pal) {
   if (tl !== 'none') {
     let p = bone('Tail1', J.Hips, 0, 0.05, -0.3); J.tail.push(p);
     const segs = { wag: [0.05, 0.16], thin: [0.042, 0.18], tuft: [0.042, 0.17], fluffy: [0.11, 0.14], ringed: [0.09, 0.15], axo: [0.07, 0.17], dragon: [0.07, 0.18], flat: [0.08, 0.1] }[tl];
-    if (segs) { for (let i = 0; i < 3; i++) { const m = mesh(cap(segs[0] * (1 - i * 0.18), segs[1]), tl === 'ringed' && i === 1 ? mA : tl === 'flat' ? mDark : mB, p); m.position.y = segs[1] / 2 + 0.03; if (tl === 'flat') m.scale.z = 0.4; p = bone('Tail' + (i + 2), p, 0, segs[1] + 0.03, 0); J.tail.push(p); } p.parent.rotation && 0; }
+    if (segs) { for (let i = 0; i < 3; i++) { const m = mesh(cap(segs[0] * 1.35 * (1 - i * 0.16), segs[1]), tl === 'ringed' && i === 1 ? mA : tl === 'flat' ? mDark : mB, p); m.position.y = segs[1] / 2 + 0.03; if (tl === 'flat') m.scale.z = 0.4; p = bone('Tail' + (i + 2), p, 0, segs[1] + 0.03, 0); J.tail.push(p); } p.parent.rotation && 0; }
     if (tl === 'tuft' || tl === 'fluffy') mesh(sph(tl === 'tuft' ? 0.07 : 0.1), tl === 'tuft' ? mA : mat('#ffffff'), p);
     if (tl === 'dragon') { const k = mesh(cone(0.09, 0.16), mA, p); k.position.y = 0.04; }
     if (tl === 'puff' || tl === 'stub') mesh(sph(tl === 'puff' ? 0.12 : 0.08), tl === 'puff' ? mat('#ffffff') : mDark, J.tail[0]);
-    if (tl === 'curl') mesh(geo('curl', () => new THREE.TorusGeometry(0.07, 0.02, 6, 14, Math.PI * 1.6)), mA, J.tail[0]);
+    if (tl === 'curl') mesh(geo('curl', () => new THREE.TorusGeometry(0.075, 0.032, 12, 24, Math.PI * 1.6)), mA, J.tail[0]);
     J.tail[0].rotation.x = -2.2;
   }
   if (ex.has('batwings') || ex.has('fairywings')) for (const s of [-1, 1]) { const w = bone('Wing' + s, J.Chest, s * 0.18, 0.1, -0.25); const m = mesh(sph(1), mat(ex.has('fairywings') ? '#e8f4ff' : A, { op: ex.has('fairywings') ? 0.6 : 1 }), w); m.scale.set(0.32, 0.22, 0.02); m.position.x = s * 0.3; (J.wings = J.wings || []).push(w); }
