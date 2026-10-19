@@ -144,16 +144,21 @@ export async function scoreboardPage(main, { game = 'all', tab = 'all', S, stale
     <div class="lb-me" id="lb-me" hidden></div></section>`;
   const list = main.querySelector('#lb-list'), more = main.querySelector('#lb-more'), meBox = main.querySelector('#lb-me');
   let rows = [], last = null;
-  try {
+  const load = async () => {
     if (tab === 'friends') {
-      if (!uid) { list.innerHTML = '<li class="lb-empty">Log in to see your friends’ scores.</li>'; return; }
+      if (!uid) { rows = null; return; }
       const ids = new Set([...(S && S.following ? S.following : []), uid]); rows = (await friendsDocs(game, ids)).sort((a, b) => b.score - a.score);
     } else {
       const t = await topDocs(game, tab); last = t.last; more.hidden = !t.more;
       rows = tab === 'all' ? merge(t.rows, await legacy(game)) : t.rows;
     }
-  } catch (e) { list.innerHTML = `<li class="lb-empty">Couldn’t load the scoreboard (${esc(e.code || e.message)}).</li>`; return; }
+  };
+  const timed = (ms) => Promise.race([load(), new Promise((_, j) => setTimeout(() => j(Object.assign(new Error('timeout'), { code: 'timeout' })), ms))]);
+  let err = null;
+  for (const ms of [9000, 20000]) { try { await timed(ms); err = null; break; } catch (e) { err = e; if (stale()) return; } }
+  if (err) { list.innerHTML = `<li class="lb-empty">Couldn’t load the scoreboard (${esc(err.code || err.message)}). <a href="#" id="lb-retry">Try again</a></li>`; list.querySelector('#lb-retry').onclick = (e) => { e.preventDefault(); scoreboardPage(main, { game, tab, S, stale }); }; return; }
   if (stale()) return;
+  if (rows === null) { list.innerHTML = '<li class="lb-empty">Log in to see your friends’ scores.</li>'; return; }
   const render = async (from) => {
     const html = await Promise.all(rows.slice(from).map(async (r, i) => rowHtml(game, tab, r, from + i + 1, r.uid === uid)));
     if (from === 0) list.innerHTML = html.join('') || `<li class="lb-empty">No scores yet${tab === 'week' ? ' this week' : ''}. Play ${esc(game === 'all' ? 'any game' : lbName(game))} to get on the board!</li>`;
