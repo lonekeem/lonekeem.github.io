@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="1200" height="900"></canvas>
+<script type="module">
+import { drawPal, SPECIES } from '../../js/pals/art.js'; import { ITEMS } from '../../js/pals/catalog.js';
+const c = document.getElementById('c').getContext('2d');
+const wear = ITEMS.filter(i => i.kind === 'wear'); const bySlot = s => wear.filter(i => i.slot === s);
+SPECIES.forEach((sp, i) => { const o = {}; for (const s of ['head','face','neck','body','feet','back']) { const l = bySlot(s); o[s] = l[(i * 3 + s.length) % l.length].id; }
+  drawPal(c, 70 + (i % 10) * 116, 170 + Math.floor(i / 10) * 280, 110, { species: sp.id, level: [1,5,12][i%3], outfit: o }, { t: 20, mode: 'idle' }); });
+window.done = true;
+</script>

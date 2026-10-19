@@ -1,6 +1,7 @@
 // Kemy Pals - original creature art, drawn in code with layered, recolorable parts.
 const TAU = Math.PI * 2;
 export const VIBES = { water: { name: 'Water', c: '#5aa8ff' }, star: { name: 'Star', c: '#ffd34d' }, leaf: { name: 'Leaf', c: '#6fd39a' }, flame: { name: 'Flame', c: '#ff8a5c' }, spark: { name: 'Spark', c: '#ffe14d' }, moon: { name: 'Moon', c: '#b9a6ff' } };
+import { drawWear } from './wear.js';
 import { SPECIES } from './species.js';
 export { SPECIES };
 const ALIAS = { twinkbun: 'bunny', nimbo: 'cloudpuff', ember: 'puppy', mossy: 'turtle', prism: 'fox', zap: 'chick', luno: 'owl', petal: 'hamster' };
@@ -95,6 +96,8 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (ex.has('flippers')) for (const s of [-1, 1]) P(() => { c.translate(s * 6.5, -7); c.rotate(s * (0.5 + wing)); ell(c, s * 1.5, 1, 2, 5); fillS(B); });
   if (ex.has('shell')) P(() => { ell(c, -1, -8, 11 * bodyG, 8); fillS(A); c.strokeStyle = shade(A, -0.25); for (const [a, b] of [[-5, -10], [2, -11], [-1, -5]]) { ell(c, a, b, 2.6, 2); c.stroke(); } c.fillStyle = '#7fe08a'; for (let i = 0; i <= stage; i++) { ell(c, -4 + i * 4, -16, 2, 3, 0.4 * (i - 1)); c.fill(); } });
   if (ex.has('spikes')) P(() => { c.fillStyle = A; c.beginPath(); for (let i = 0; i <= 12; i++) { const a = Math.PI * 0.95 + i * (Math.PI * 1.05 / 12); const r = i % 2 ? 11 : 15 + stage; c.lineTo(Math.cos(a) * r - 2, -12 + Math.sin(a) * r); } c.closePath(); c.fill(); c.stroke(); });
+  const WG = () => ({ bodyG, hy, t, stage, kind, top: (sp.ears === 'long' || sp.ears === 'big' ? hy - 7.6 : hy - 7), ey: hy - 0.5, eyeL: -3.6, eyeR: 3.6 });
+  drawWear(c, 'back', pal.outfit, WG());
   // ---------------- feet + body
   const feet = sp.feet;
   if (feet === 'paws') { ell(c, -3 + leg * 1.5, -1.5, 2.4, 1.8); fillS(dark); ell(c, 3.5 - leg * 1.5, -1.5, 2.4, 1.8); fillS(dark); }
@@ -109,6 +112,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (kind === 'cloud') { c.fillStyle = B; for (const [a, b, r] of [[-7, -8, 6], [7, -8, 6], [0, -5, 7], [-4, -14, 6], [5, -14, 6]]) { ell(c, a, b, r, r * 0.9); c.fill(); c.stroke(); } for (const [a, b, r] of [[-7, -8, 5.2], [7, -8, 5.2], [0, -5, 6.2], [-4, -14, 5.2], [5, -14, 5.2]]) { ell(c, a, b, r, r * 0.9); c.fill(); } if (mode === 'happy' || R === 'puff') { c.fillStyle = '#ffd34d'; for (let i = 0; i < 4; i++) { star(c, -6 + i * 4, 2 + ((t * 0.5 + i * 5) % 10), 1.2); c.fill(); } } }
   if (kind === 'jelly') { c.strokeStyle = A; c.lineWidth = 1.6; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(i * 2.6, -6); c.quadraticCurveTo(i * 2.6 + Math.sin(t * 0.1 + i) * 2, -1, i * 2.6, 3 + stage * 2); c.stroke(); } c.lineWidth = 1; c.strokeStyle = line; }
   if (kind === 'star') { star(c, 0, -12, 13 + stage, 7 + stage * 0.5); const g = c.createLinearGradient(0, -25, 0, 0); g.addColorStop(0, '#fffbe0'); g.addColorStop(1, B); fillS(g); }
+  drawWear(c, 'body', pal.outfit, WG());
   // ---------------- ears (behind head)
   const ears = sp.ears;
   const earPair = (fn) => { for (const s of [-1, 1]) P(() => fn(s)); };
@@ -177,7 +181,8 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (a === 'scarf') { c.fillStyle = '#ff7a8a'; c.strokeStyle = '#a3304a'; c.beginPath(); c.roundRect(-6.5, hy + 4.9, 13, 3, 1.5); c.fill(); c.stroke(); c.beginPath(); c.roundRect(2, hy + 6.5, 3, 6, 1.2); c.fill(); c.stroke(); }
   if (a === 'hat') { c.fillStyle = '#6b4fd6'; c.strokeStyle = '#2a1458'; ell(c, 0, top + 0.5, 7, 1.6); c.fill(); c.stroke(); c.beginPath(); c.roundRect(-4, top - 6, 8, 6.5, 1.5); c.fill(); c.stroke(); c.fillStyle = '#ffd34d'; c.fillRect(-4, top - 1.5, 8, 1.4); }
   if (a === 'badge') { c.fillStyle = '#8a2be2'; c.strokeStyle = '#ffd34d'; ell(c, 3, -6, 2.8, 2.8); c.fill(); c.stroke(); c.fillStyle = '#fff'; c.font = 'bold 2.6px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('KL', 3, -5.9); }
-  if (stage === 2 && a !== 'crown' && a !== 'hat') { c.fillStyle = '#ffd34d'; star(c, -5, top - 1, 1.6 + Math.sin(t * 0.08) * 0.3); c.fill(); }
+  drawWear(c, 'head', pal.outfit, { ...WG(), top, ey, eyeL, eyeR, fx });
+  if (stage === 2 && a !== 'crown' && a !== 'hat' && !(pal.outfit && pal.outfit.head)) { c.fillStyle = '#ffd34d'; star(c, -5, top - 1, 1.6 + Math.sin(t * 0.08) * 0.3); c.fill(); }
   c.restore();
   if (mode === 'sleep') { c.save(); c.fillStyle = '#c9b8ff'; c.font = `bold ${7 * k}px sans-serif`; for (let i = 0; i < 3; i++) { const p = ((t * 0.01 + i / 3) % 1); c.globalAlpha = 1 - p; c.fillText('z', x + (8 + p * 10) * k, y - (26 + p * 14) * k); } c.restore(); }
 }
