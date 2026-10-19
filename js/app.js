@@ -937,7 +937,7 @@ async function pageProfile(username, tab, token) {
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
-        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>
+        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && !blocked && !(uid === STUDIO_UID && isAdmin()) ? `<a class="btn btn-sm btn-ghost" href="#/chat/${esc(uid)}" id="msg">Message</a>` : ''}
@@ -1036,6 +1036,7 @@ async function pageSettings() {
   const p = S.profile;
   main.innerHTML = `
     <h1 class="page-title">Edit profile</h1>
+    ${isAdmin() ? '<a class="btn btn-block" href="#/admin" id="set-admin" style="margin-bottom:14px">🛡️ Admin tools (publish shop prices, reports, studio)</a>' : ''}
     <form id="settings" class="card pad">
       <div class="av-edit" id="av-edit">
         <button type="button" class="av-pick" id="av-pick" aria-label="Change profile photo">${avatar({ ...p, uid: S.user.uid }, 'lg', false)}<span class="av-cam" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.8 5h4.4a1.5 1.5 0 0 1 1.2.6L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/><circle cx="12" cy="13" r="3.5"/></svg></span></button>
@@ -1254,16 +1255,59 @@ async function pageNotifications(asStudio, token) {
 }
 
 // ---------------------------------------------------------------- admin
+// All shop items (base catalog + Pal Store outfits/looks/backgrounds/Rare Pals + dances), same doc the Dance Shop button writes.
+async function adminShopDoc() {
+  await import('./pals/store.js'); const du = await import('./pals/dance-ui.js'); await du.registerDanceItems();
+  return (await import('./pals/catalog.js')).shopDoc();
+}
+async function adminShopStatus() {
+  const want = await adminShopDoc(); const s = await getDoc(doc(db, 'config', 'palShop'));
+  const live = (s.exists() && s.data().prices) || {}; const ids = Object.keys(want.prices);
+  const missing = ids.filter((id) => !(id in live)), wrong = ids.filter((id) => id in live && live[id] !== want.prices[id]);
+  return { want, total: ids.length, live: ids.length - missing.length, missing, wrong };
+}
 async function pageAdmin(token) {
   if (!requireAuth()) return;
-  if (!isAdmin()) { main.innerHTML = '<div class="empty">Admins only.</div>'; return; }
+  if (!isAdmin()) {
+    const wrongAcct = S.user.email !== ADMIN_EMAIL;
+    main.innerHTML = `<section class="card pad center" style="max-width:520px;margin:30px auto"><h1 class="page-title">🛡️ Admins only</h1>
+      <p class="muted">${wrongAcct ? `This page is for the Kemy admin. You're signed in as <b>${esc(S.user.email || 'an account without email')}</b>. To use the admin tools, log out and sign in with <b>${esc(ADMIN_EMAIL)}</b>.`
+        : `Your email <b>${esc(S.user.email)}</b> isn't verified yet. Verify it (check your inbox), then reload this page.`}</p>
+      <a class="btn btn-sm btn-ghost" href="#/watch">Back to Kemy</a></section>`;
+    return;
+  }
+  const big = (id, emoji, title, desc, extra = '') => `<div class="card pad adm-tool" style="margin-bottom:12px"><div class="row" style="flex-wrap:wrap;gap:10px"><div style="flex:1;min-width:220px"><b style="font-size:1.05rem">${emoji} ${title}</b><p class="muted small" style="margin:3px 0 0">${desc}</p></div>${extra}</div><p class="small muted" id="${id}-msg" style="margin:8px 0 0"></p></div>`;
+  main.innerHTML = `<h1 class="page-title">🛡️ Admin</h1>
+    <p class="muted small">Signed in as ${esc(S.user.email)}. Only you can see this page.</p>
+    <div class="card pad adm-tool" style="margin-bottom:14px;border:2px solid var(--blue)"><b style="font-size:1.15rem">🛍️ Publish shop prices</b>
+      <p class="muted small" style="margin:3px 0 8px">Sends every price in the app (dances, outfits, jewelry, looks, backgrounds, Rare Pals and pal items) to the live shop, so people can buy them.</p>
+      <p class="small" id="shop-status">Checking the live shop…</p>
+      <button class="btn" id="shop-pub" style="font-size:1.05rem;padding:12px 22px">Publish shop prices</button></div>
+    ${big('reindex', '🔎', 'Build search index', 'Adds search keywords and #hashtags to every post and profile that’s missing them.', '<button class="btn btn-sm" id="reindex">Build search index</button>')}
+    ${big('studio', '🎬', 'Lone Keem Studios account', 'Read and answer the studio’s messages and notifications, or post as the studio.', '<div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn btn-sm btn-ghost" href="#/messages/studio">Studio inbox</a><a class="btn btn-sm btn-ghost" href="#/notifications/studio">Studio notifications</a><a class="btn btn-sm btn-ghost" href="#/new">Post as the studio</a></div>')}
+    ${big('feat', '★', 'Feature posts (Studio Picks)', 'Open any movie, show or song and tap “Feature in Studio Picks” (tap again to unfeature).', '<a class="btn btn-sm btn-ghost" href="#/watch">Go to Watch</a>')}
+    ${big('mod', '🗑️', 'Delete posts, comments and lives', 'Any post or comment has “Delete” in its menu for you. On a live you can tap “End live (guidelines)”. Reports are listed below.')}
+    ${big('media', '🧹', 'Media cleanup', 'After you delete a post, Kemy shows a command to erase its files from Cloudinary on your computer (the key never goes in the app). For a full sweep run <code>node scripts/cloudinary-cleanup.mjs</code> (dry run first).')}
+    <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports</h2>
+    <div id="reports"></div>`;
+  const st = $('#shop-status'), pub = $('#shop-pub');
+  const showStatus = async () => {
+    try { const r = await adminShopStatus(); if (stale(token)) return;
+      st.innerHTML = r.missing.length || r.wrong.length
+        ? `⚠️ <b>${r.live} of ${r.total}</b> items are live. <b>${r.missing.length} missing</b>${r.wrong.length ? `, ${r.wrong.length} with an old price` : ''}. Tap Publish to fix.`
+        : `✅ All <b>${r.total}</b> items are live with the right prices.`;
+    } catch (e) { st.textContent = friendlyError(e); }
+  };
+  pub.onclick = async () => {
+    pub.disabled = true; st.textContent = 'Publishing…';
+    try { await setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()); toast('Shop prices published'); await showStatus(); }
+    catch (e) { st.textContent = friendlyError(e); }
+    pub.disabled = false;
+  };
+  showStatus();
   const snap = await getDocs(query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100)));
   if (stale(token)) return;
   const reports = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  main.innerHTML = `<h1 class="page-title">Admin · Reports</h1>
-    <div class="card pad" style="margin-bottom:14px"><div class="row" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>Search index</b><p class="muted small" style="margin:2px 0 0">Adds search keywords and #hashtags to every post and profile that’s missing them.</p></div><button class="btn btn-sm" id="reindex">Build search index</button></div><p class="small muted" id="reindex-msg" style="margin:8px 0 0"></p></div>
-    <p class="muted small">You can delete any post or comment from its menu. Studio tools: <a href="#/messages/studio">studio inbox</a> · <a href="#/notifications/studio">studio notifications</a> · <a href="#/new">post as the studio</a>.</p>
-    <div id="reports"></div>`;
   $('#reindex').onclick = async () => {
     const b = $('#reindex'), m = $('#reindex-msg'); b.disabled = true; m.textContent = 'Working…';
     try { const r = await rebuildSearchIndex((n, t) => (m.textContent = `Updated ${n} of ${t}…`)); m.textContent = `Done. Checked ${r.posts} posts and ${r.users} profiles; updated ${r.updated}.`; }
