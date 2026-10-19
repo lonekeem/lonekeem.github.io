@@ -183,3 +183,4 @@ body.kb-open .pal-float { display: none; }
 .ps-tile.on{background:#f0e6ff;box-shadow:0 0 0 3px #6b3fd6 inset}
 .ps-emo{font-size:28px;line-height:1;filter:drop-shadow(0 0 0 var(--ic,transparent))}
 .ps-bgt canvas{width:96px;height:64px;border-radius:10px}
+.ps-th{width:72px;height:72px;border-radius:12px;background:radial-gradient(circle at 50% 40%,#3a1f78,#1a0c3a)}

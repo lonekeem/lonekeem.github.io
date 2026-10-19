@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#1a0c3a"><canvas id="c" width="1200" height="780"></canvas>
+<script type="module">
+import { drawPal3D, renderItemThumb } from '../../js/pals/pal3d.js';
+import { WEAR_BY } from '../../js/pals/wardrobe.js';
+const c = document.getElementById('c').getContext('2d'); c.font = '600 12px sans-serif';
+const SP = ['elephant', 'bear', 'kemy'], IT = ['crown_gold', 'f_cap_red', 'f_shades_black', 'f_beads_pink', 'f_dress_pink', 'f_sneakers_red', 'f_cape_red', 'f_watch_black'];
+const jobs = []; SP.forEach((sp, r) => IT.forEach((id, k) => jobs.push([sp, r, id, k])));
+let i = 0; const step = () => { for (let n = 0; n < 2 && i < jobs.length; n++, i++) { const [sp, r, id, k] = jobs[i]; const w = WEAR_BY[id]; const x = k * 150, y = r * 260;
+  const th = renderItemThumb({ species: sp, level: 6 }, w.slot, id, 96); if (th) c.drawImage(th, x + 27, y + 4);
+  drawPal3D(c, x + 75, y + 250, 80, { species: sp, level: 6, outfit: { [w.slot]: id } }, { t: 30, mode: 'idle', yaw: w.slot === 'back' ? 2.6 : 0.35 });
+  c.fillStyle = '#fff'; c.fillText(sp + ' · ' + w.name, x + 4, y + 114); }
+  if (i < jobs.length) requestAnimationFrame(step); else window.ready = true; };
+setTimeout(step, 300);
+</script>

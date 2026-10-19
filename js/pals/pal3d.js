@@ -412,3 +412,17 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B }) {
   w = W('hand'); if (w && J.LeftHand) { const r = mesh(geo('ring', () => new THREE.TorusGeometry(0.03, 0.009, 8, 18)), metal(w.st === 'gem' ? '#ffcf3a' : w.col), J.LeftHand); r.position.set(0, -0.1, 0.03); if (w.st === 'gem') mesh(sph(0.022), M(w.col, { cc: 1, em: w.col }), J.LeftHand).position.set(0, -0.07, 0.04); }
 }
 const C_RED = '#e8434f';
+// Store thumbnails: the REAL 3D item rendered on the user's own Pal (only that item worn), framed on the slot.
+const FOCUS = { head: [0, -0.06, 1, 0.6], hair: [0, -0.06, 1, 0.6], face: [0.15, 0.1, 0.7, 0.45], ears: [0.1, 0.1, 0.8, 0.5], neck: [0.15, 0.25, 0.7, 0.45], feet: [0.15, 0.72, 0.7, 0.3], hand: [0.6, 0.45, 0.5, 0.32], wrist: [0.6, 0.42, 0.5, 0.32] };
+export function renderItemThumb(pal, slot, id, px = 96, opt = {}) {
+  if (!R) init(); if (lost || !R) return null;
+  const p2 = { ...pal, outfit: id ? { [slot]: id } : {}, variant: opt.variant != null ? opt.variant : '', pattern: opt.pattern || 'none' };
+  const m = build(p2); apply(m, modePose('idle', 30), 30, 'idle');
+  m.rotation.y = slot === 'back' || slot === 'bag' ? 2.6 : 0.35; scene.add(m); R.render(scene, cam); scene.remove(m);
+  m.traverse((o) => { if (o.isMesh && o.material && !o.material.userData.shared) o.material.dispose(); });
+  const cv = document.createElement('canvas'); cv.width = cv.height = px; const c = cv.getContext('2d'); const S0 = R.domElement.width;
+  // the Pal fills the lower ~87% of the render; focus boxes are fractions of that area
+  const [fx, fy, fw, fh] = FOCUS[slot] || [-0.05, -0.04, 1.1, 1.08]; const bx = S0 * 0.31, bw = S0 * 0.38, by = S0 * 0.06, bh = S0 * 0.8; // Pal's box in the render
+  const sw = Math.max(fw * bw, fh * bh), sx = bx + fx * bw + (fw * bw - sw) / 2, sy = by + fy * bh + (fh * bh - sw) / 2;
+  c.drawImage(R.domElement, sx, sy, sw, sw, 0, 0, px, px); return cv;
+}

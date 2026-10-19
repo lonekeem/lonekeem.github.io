@@ -44,7 +44,7 @@ export function createPalStore(ctx) {
       if (!drawBg(c, W, H, D.bg, t)) { c.fillStyle = '#2a1458'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill(); }
       drawDancer(c, W / 2, H - 12, 120 * zoom, { ...p, outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }, { t, mode: 'idle', yaw }); requestAnimationFrame(frame); }; frame();
     const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; pv.textContent = u.length ? `Preview · ${u.length} to buy · ★${u.reduce((a, b) => a + (b.p || 0), 0)}` : ''; grid(); };
-    const tile = (id, name, price, r, emo, on, ownd, extra = '') => `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${extra} style="--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}"><span class="ps-emo">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : `★ ${price}`}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`;
+    const tile = (id, name, price, r, emo, on, ownd, extra = '') => `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${extra} style="--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}"><span class="ps-emo" data-th="${esc(id)}">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : `★ ${price}`}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`;
     function filters() {
       const f = $('#ps-filters'); if (tab !== 'outfits' && tab !== 'jewelry') { f.innerHTML = ''; return; }
       const sl = tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s));
@@ -53,6 +53,14 @@ export function createPalStore(ctx) {
       f.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { gf = b.dataset.g; filters(); grid(); });
       f.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => { slot = b.dataset.s; filters(); grid(); });
     }
+    // tile pictures = the real 3D item rendered on this Pal (cached per Pal look + item); emoji only if 3D is off
+    const TH = new Map(); let P3 = null, q = []; import('./pal3d.js').then((m) => { P3 = m; pump(); }).catch(() => {});
+    function thumbs(g) { q = [...g.querySelectorAll('[data-th]')]; pump(); }
+    function pump() { if (!P3 || !q.length) return; let n = 0; while (q.length && n < 3) { const el = q.shift(); if (!document.body.contains(el)) continue; const id = el.dataset.th;
+        const w = WEAR_BY[id]; const k = JSON.stringify([p.species, p.colors, p.level >= 12 ? 2 : p.level >= 5 ? 1 : 0, id]); let cv = TH.get(k);
+        if (!cv) { n++; try { cv = w ? P3.renderItemThumb(p, w.slot, id, 96) : RARE[id] ? P3.renderItemThumb(p, null, '', 96, { variant: id }) : PATTERNS.find((x) => x.id === id) ? P3.renderItemThumb(p, null, '', 96, { pattern: id }) : null; } catch { cv = null; } if (cv) TH.set(k, cv); }
+        if (cv) { const c2 = document.createElement('canvas'); c2.width = c2.height = 96; c2.className = 'ps-th'; c2.getContext('2d').drawImage(cv, 0, 0); el.replaceWith(c2); } }
+      if (q.length) requestAnimationFrame(pump); }
     function grid() {
       const g = $('#ps-grid'); let h = '';
       if (tab === 'outfits' || tab === 'jewelry') { const sl = tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s));
@@ -65,7 +73,7 @@ export function createPalStore(ctx) {
         + `<button class="ps-tile ${!D.variant ? 'on' : ''}" data-rv=""><span class="ps-emo">🐾</span><b>Normal</b><small>Free</small></button>` + RARES.map((r) => tile(r.id, r.name + ' ' + (SPECIES.find((s) => s.id === p.species) || {}).name, r.p, r.r, { rare_shiny: '💠', rare_glow: '🌟', rare_galaxy: '🌌', rare_gold: '🏆', rare_crystal: '💎' }[r.id], D.variant === r.id, own(r.id), 'data-rv="1"')).join('')
         + `<h3 class="ps-h">More Pals</h3><p class="small">You can have up to 6 Pals and switch which one is on your profile. Every species can be hatched for free.</p><a class="btn btn-sm" href="#pals">🥚 Hatch or switch Pals</a>`;
       if (tab === 'dances') h = `<p>Dance moves live in the Dance Shop.</p><button class="btn" id="ps-dshop">💃 Open the Dance Shop</button>`;
-      g.innerHTML = h;
+      g.innerHTML = h; thumbs(g);
       g.querySelectorAll('[data-slot]').forEach((b) => b.onclick = () => { snap(); const s = b.dataset.slot, id = b.dataset.id; if (D.outfit[s] === id) delete D.outfit[s]; else { D.outfit[s] = id; if (s === 'full') { delete D.outfit.body; delete D.outfit.bottom; } if (s === 'body' || s === 'bottom') delete D.outfit.full; } refresh(); });
       g.querySelectorAll('[data-bg]').forEach((b) => { const q = b.querySelector('canvas'); if (q) drawBg(q.getContext('2d'), 96, 64, b.dataset.bg, 0); b.onclick = () => { snap(); D.bg = b.dataset.bg; refresh(); }; });
       g.querySelectorAll('[data-pt]').forEach((b) => b.onclick = () => { snap(); D.pattern = b.dataset.id; refresh(); });
