@@ -30,6 +30,9 @@ import { createGames, CONTROLLER as GAMES_ICON } from './games/index.js';
 import { createPals } from './pals/index.js';
 import { createPalGames } from './pals/games.js';
 import { createPark } from './pals/park.js';
+import { initInterests, interestsPage, learnTap, pickTopics, topicChips } from './interests.js';
+import { createMusic } from './music.js';
+import { loadDiscover } from './discover.js';
 import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, bgmOn, setBgm, THEME_CREDIT } from './theme.js';
 
 // ---------------------------------------------------------------- state
@@ -569,6 +572,8 @@ const routes = [
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/settings$/, pageSettings, 'me'],
+  [/^#\/settings\/interests$/, (t) => interestsPage({ main, esc, toast, getDoc, doc, db, loadDiscover, stale, token: t }), 'me'],
+  [/^#\/music$/, (t) => music.page(t), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
   [/^#\/login(?:\?.*)?$/, pageLogin, 'me'],
@@ -603,6 +608,7 @@ async function route() {
   document.body.classList.remove('feed-mode');
   main.innerHTML = '<div class="empty">Page not found. <a href="#/watch">Go home</a></div>';
 }
+initInterests({ S, db, fs: { doc, getDoc, setDoc, serverTimestamp } });
 window.addEventListener('hashchange', route);
 initThemeMusic();
 // Search icons: focus a throwaway input inside the tap so phones (iOS) open the keyboard,
@@ -646,8 +652,10 @@ const games = createGames({ S, db, main, esc, $, avatar, toast, friendlyError, r
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
   STUDIO_UID, youTubeId, tikTokId, stale, canGoBack: () => navCount > 1,
-  fs: { doc, getDocs, collection, query, where, orderBy, limit, getCountFromServer }
+  fs: { doc, getDoc, setDoc, updateDoc, deleteDoc, increment, serverTimestamp, getDocs, collection, query, where, orderBy, limit, getCountFromServer },
+  openModal, seriesList: () => getWorks().series().fetchList({ max: 40 }), seriesTile: (x) => getWorks().series().seriesTile(x)
 });
+const music = createMusic({ S, db, main, esc, openModal, stale, getWorks, gridTile: (p) => gridTile(p), learnTap, STUDIO_UID, fs: { getDocs, collection, query, where, orderBy, limit } });
 
 // ---------------------------------------------------------------- pages: feed / explore
 const feedToggle = (active) => `<nav class="feed-toggle" aria-label="Feed"><a href="#/watch" class="${active === 'watch' ? 'active' : ''}">For You</a><a href="#/feed" class="${active === 'feed' ? 'active' : ''}">Posts</a></nav>`;
@@ -691,7 +699,7 @@ async function pageFeed(token) {
 
 async function pageExplore(tab, token) {
   if (token === undefined && typeof tab !== 'string') { token = tab; } if (typeof tab !== 'string') tab = '';
-  const tabs = `<nav class="tabs ex-tabs" aria-label="Explore"><a href="#/explore" class="${tab ? '' : 'active'}">Posts</a><a href="#/explore/movies" class="${tab === 'movies' ? 'active' : ''}">${WORK_IC.movie}Movies</a><a href="#/explore/songs" class="${tab === 'songs' ? 'active' : ''}">${WORK_IC.song}Songs</a></nav>`;
+  const tabs = `<nav class="tabs ex-tabs" aria-label="Explore"><a href="#/explore" class="${tab ? '' : 'active'}">Posts</a><a href="#/explore/movies" class="${tab === 'movies' ? 'active' : ''}">${WORK_IC.movie}Movies</a><a href="#/explore/songs" class="${tab === 'songs' ? 'active' : ''}">${WORK_IC.song}Songs</a><a href="#/music">🎵 Music</a></nav>`;
   if (tab) { main.innerHTML = `<h1 class="page-title">Explore</h1>${tabs}<div id="wx"></div>`; return getWorks().explore($('#wx'), tab === 'movies' ? 'movie' : 'song', token); }
   main.innerHTML = `
     <h1 class="page-title">Explore</h1>${tabs}
@@ -1026,6 +1034,7 @@ async function pageSettings() {
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-autoplay-wifi" ${wifiOnly() ? 'checked' : ''} ${autoplayEnabled() ? '' : 'disabled'}> <span>Autoplay on Wi-Fi only</span></label>
       <p class="muted small" id="s-ap-note">Videos start muted as you scroll. ${saveData() ? 'Data Saver is on, so videos wait for a tap.' : ''}${canDetectWifi() ? '' : ' (This browser can’t tell Wi-Fi from mobile data, so Wi-Fi only has no effect here.)'}</p>
     </section>
+    <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
     <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
       <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>
       <label class="row" style="gap:10px;cursor:pointer"><input type="checkbox" id="s-bgm" ${bgmOn() ? 'checked' : ''}><span>Background music on home screens<br><span class="muted small">Plays Kemy’s theme softly on your profile, Pals and settings. Never plays over videos, lives, songs or games.</span></span></label>
@@ -1297,8 +1306,12 @@ function profileFields(prefillName = '') {
   return `
     <div class="field"><label for="p-name">Display name</label><input id="p-name" type="text" maxlength="50" autocomplete="name" required value="${esc(prefillName)}"></div>
     <div class="field"><label for="p-user">Username</label><input id="p-user" type="text" maxlength="20" required autocapitalize="none" autocomplete="username" spellcheck="false" placeholder="e.g. keemfan">
-      <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore.</p></div>`;
+      <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore.</p></div>
+    <fieldset class="field topics-field" style="border:0;padding:0;margin:0 0 14px"><legend style="font-weight:500;font-size:.92rem;margin-bottom:6px">What do you like? <span class="muted small">(optional, shapes your For You feed)</span></legend>${topicChips('topic', (() => { try { return JSON.parse(sessionStorage.getItem('kemy-topics') || '[]'); } catch { return []; } })())}</fieldset>`;
 }
+// Remember topic picks from the sign-up / onboarding form until the profile exists.
+document.addEventListener('change', (e) => { if (e.target.name !== 'topic' || !e.target.closest('#onboard-form, #signup-form, .auth-card, form')) return; if (location.hash.startsWith('#/settings')) return;
+  const picks = [...document.querySelectorAll('input[name=topic]:checked')].map((i) => i.value); try { sessionStorage.setItem('kemy-topics', JSON.stringify(picks)); } catch { /* */ } });
 const agreeField = `<label class="check field"><input type="checkbox" id="p-agree" required> <span>I’m 13 or older and I agree to the <a href="terms.html" target="_blank">Terms</a>, <a href="privacy.html" target="_blank">Privacy</a> and <a href="guidelines.html" target="_blank">Community Guidelines</a>.</span></label>`;
 const readProfileForm = () => ({
   displayName: $('#p-name').value.trim(),
@@ -1380,6 +1393,7 @@ async function createProfile(displayName, username) {
   });
   b.set(doc(db, 'follows', `${uid}_${STUDIO_UID}`), { follower: uid, followee: STUDIO_UID, createdAt: serverTimestamp() });
   await b.commit();
+  try { const t = JSON.parse(sessionStorage.getItem('kemy-topics') || '[]'); if (t.length) { pickTopics(t); } sessionStorage.removeItem('kemy-topics'); } catch { /* */ }
   await loadSession();
 }
 

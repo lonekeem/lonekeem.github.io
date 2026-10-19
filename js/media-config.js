@@ -27,6 +27,12 @@ export const CLOUDINARY = {
 
 // GIFs in comments. GIPHY's API key is a public, client-side key by design (the "SDK/API key"
 // from developers.giphy.com, free). Leave it empty and the GIF button stays hidden.
+// Optional "More from YouTube" row in Search. Needs a YouTube Data API v3 key (free from Google Cloud,
+// about 100 searches a day). Restrict the key to this site's HTTP referrer. Leave empty to hide the row.
+export const YOUTUBE = {
+  key: ''             // paste a referrer-restricted YouTube Data API key here (optional)
+};
+
 export const GIFS = {
   provider: 'giphy',
   key: '',            // paste the free GIPHY API key here

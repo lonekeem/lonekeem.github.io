@@ -72,6 +72,31 @@
       "name": "Ryan's World",
       "channelId": "UChGJGhZ9SOOHvBB0Y4DOO_w",
       "cat": "funny"
+    },
+    {
+      "name": "DisneyMusicVEVO",
+      "channelId": "UCgwv23FVv3lqh567yagXfNg",
+      "cat": "music"
+    },
+    {
+      "name": "Pentatonix",
+      "channelId": "UCmv1CLT6ZcFdTJMHxaR9XeA",
+      "cat": "music"
+    },
+    {
+      "name": "Lindsey Stirling",
+      "channelId": "UCyC_4jvPzLiSkJkLIkA7B8g",
+      "cat": "music"
+    },
+    {
+      "name": "The Piano Guys",
+      "channelId": "UCmKurapML4BF9Bjtj4RbvXw",
+      "cat": "music"
+    },
+    {
+      "name": "Super Simple Songs",
+      "channelId": "UCLsooMJoIpl_7ux2jvdPB-Q",
+      "cat": "music"
     }
   ],
   "news": [
@@ -161,7 +186,11 @@
     "twerk",
     "twerking",
     "sexy",
-    "explicit lyrics"
+    "explicit lyrics",
+    "explicit version",
+    "uncensored",
+    "parental advisory",
+    "diss track"
   ],
   "maxShortsPerChannel": 5
 }

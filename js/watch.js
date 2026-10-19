@@ -13,8 +13,9 @@ import { ICONS } from './icons.js';
 import { rankForYou, rankTrending, mixIn, createPrefsStore } from './feedrank.js';
 import { catOf, CATS } from './feed-cats.js';
 import { loadDiscover } from './discover.js';
+import { prefsStore as sharedPrefsStore } from './interests.js';
 import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from './autoplay.js';
-export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['trending', 'Trending']];
+export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['music', 'Music'], ['trending', 'Trending']];
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
   comment: ICONS.comment,
@@ -35,6 +36,8 @@ export function createWatch(ctx) {
   let postCache = null, postCacheAt = 0, store = null, storeUid = null;
   const prefsStore = () => {
     const uid = S.user?.uid || '';
+    // Shared with search + Settings > Your interests (js/interests.js), so they all learn into one store.
+    try { return sharedPrefsStore(); } catch { /* not initialised (tests): local store */ }
     if (!store || storeUid !== uid) { store?.flush(); store = createPrefsStore({ db, fs: { doc, getDoc, setDoc, serverTimestamp }, uid }); storeUid = uid; }
     return store;
   };
@@ -85,13 +88,13 @@ export function createWatch(ctx) {
     const funnyVids = disc.videos.filter((v) => v.cat === 'funny'), newsVids = disc.videos.filter((v) => v.cat === 'news');
     if (tab === 'following') return followingPosts(own);
     if (tab === 'trending') return rankTrending(own);
-    if (tab === 'funny' || tab === 'dance') return mixIn(rankForYou(own.filter((p) => catOf(p) === tab), prefs, opts), rankForYou(disc.videos.filter((v) => v.cat === tab), prefs, opts), 2);
+    if (tab === 'funny' || tab === 'dance' || tab === 'music') return mixIn(rankForYou(own.filter((p) => catOf(p) === tab), prefs, opts), rankForYou(disc.videos.filter((v) => v.cat === tab), prefs, opts), 2);
     if (tab === 'news') {
       const vids = rankForYou(newsVids, prefs, opts), heads = disc.news.slice(), outside = [];
       while (vids.length || heads.length) { if (heads.length) outside.push(heads.shift()); if (vids.length) outside.push(vids.shift()); }
       return mixIn(rankForYou(own.filter((p) => catOf(p) === 'news'), prefs, opts), outside, 1);
     }
-    return mixIn(rankForYou(own, prefs, opts), rankForYou(funnyVids, prefs, opts).slice(0, 12), 4);
+    return mixIn(rankForYou(own, prefs, opts), rankForYou([...funnyVids, ...disc.videos.filter((v) => v.cat === 'music' || v.cat === 'dance')], prefs, opts).slice(0, 16), 4);
   }
 
   // Outside items: a YouTube video (tap Watch to load the youtube-nocookie player) or a news headline card.

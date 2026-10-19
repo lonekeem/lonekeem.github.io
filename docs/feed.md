@@ -43,3 +43,31 @@ Tabs: **For You · Following · Funny · News · Dance · Trending** (`#/watch`,
   - News items are headline cards with the source name that open the original article.
 - **Kid-safe filtering**: only family-friendly channels and kid/science news outlets are listed. Titles and
   descriptions with mature words are skipped. YouTube's own safety systems apply inside the player.
+
+## Search that customizes the feed (Oct 19, 2026)
+- **Search** (`#/search`, `js/search.js` + `js/search-plus.js`): grouped results — In Kemy (pages + Games), Creators,
+  Music & Songs, Music Videos, Videos, Movies & Series, Pals, Hashtags, Posts. Sources: indexed Firestore queries
+  (`keywords` / `hashtags` array-contains, username / displayNameLower prefixes), a scan of the newest 150 posts and
+  200 profiles (covers posts that were never re-indexed), the latest 40 series, the curated outside videos in
+  `data/discover.json`, and a built-in catalog (Games, pages, the 30 Pal species). Ranking is on the device and
+  typo-tolerant (1 typo for 4+ letters, 2 for 8+, adjacent swaps count as one).
+- **Kid-safe queries**: `blockedQuery()` (leet-speak aware). Blocked searches show a gentle message, are not saved
+  to history and are not counted.
+- **Recent searches**: localStorage + private `users/{uid}/prefs/search` `{ recent[≤20], updatedAt }` (owner only;
+  "Clear all" deletes it; deleted with the account).
+- **Trending searches**: `searchTrends/{day}_{slug}` `{ day, q, n }`. Signed-in users add +1 once per query per day;
+  rules allow only create with n == 1 or +1 updates; the app shows queries searched 2+ times today/yesterday.
+  Two small queries (index `day asc, n desc`), cached 5 min.
+- **How search shapes For You** (`js/interests.js`, one shared store with the feed): a submitted search whose words
+  point to a topic (e.g. "dance", "#funny", "kidz bop songs") adds +0.5 to that topic; tapping a result adds +0.6 to
+  its topic and its creator (Kemy user or YouTube channel). Onboarding topic picks set that topic to 2.
+  Settings › Your interests shows the weights and lets you remove one, re-pick topics or reset.
+- **Optional "More from YouTube"**: set `YOUTUBE.key` in `js/media-config.js` (referrer-restricted YouTube Data API
+  key, ~100 searches/day free). Empty = hidden.
+
+## Music (`#/music`, `js/music.js`)
+Lone Keem Studios songs + music videos, Kemy Community Songs, and curated official music videos (`cat: "music"`
+in `data/discover-sources.json`: DisneyMusicVEVO, Pentatonix, Lindsey Stirling, The Piano Guys, Super Simple Songs,
+plus KIDZ BOP from the Dance list). Songs play in the persistent mini player (`js/works.js`), which dispatches
+`kemy:media-play` (stops the theme, pauses feed videos) and pauses when another source dispatches it.
+The feed has a **Music** tab and music/dance videos are mixed into For You (muted autoplay like other videos).

@@ -153,6 +153,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "searchTrends",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "day",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "n",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

@@ -252,6 +252,10 @@ export function createWorks(ctx) {
       <button class="mp-btn" data-a="pp" aria-label="Play">${PLAY}</button><button class="mp-btn" data-a="next" aria-label="Next song">${NEXT}</button><button class="mp-btn" data-a="x" aria-label="Close player">${CLOSE}</button>
       <span class="mp-prog"><span></span></span>`;
     document.body.appendChild(bar);
+    // One sound at a time: a song starting stops the theme music and pauses feed videos; a video/YouTube
+    // starting with sound elsewhere pauses the song.
+    audio.addEventListener('play', () => window.dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'song' } })));
+    window.addEventListener('kemy:media-play', (e) => { if (e.detail?.source !== 'song' && !audio.paused) audio.pause(); });
     const listeners = new Set(); const emit = () => listeners.forEach((f) => f());
     function analyser() {
       if (an || !audio.src) return an;

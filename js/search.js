@@ -4,9 +4,14 @@
 // profiles, so content that hasn't been re-indexed yet is still found in a small community.
 import { fold, words, parseHashtags } from './search-index.js';
 import { ICONS } from './icons.js';
+import { blockedQuery, BLOCKED_MSG, matchScore, queryTerms, rankItems, groupOf, itemHay, GROUPS, GAMES, PAGES, palItems, searchCatalog, createTrends } from './search-plus.js';
+import { learnSearch, learnTap } from './interests.js';
+import { loadDiscover } from './discover.js';
+import { ytTile } from './music.js';
+import { YOUTUBE } from './media-config.js';
 
 const RECENT_KEY = 'lks-recent-searches';
-const TABS = [['top', 'Top'], ['users', 'Users'], ['videos', 'Videos'], ['photos', 'Photos'], ['posts', 'Posts'], ['hashtags', 'Hashtags']];
+const TABS = GROUPS;
 export const SEARCH_ICON = ICONS.search;
 const IC = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>',
@@ -20,7 +25,9 @@ export const kindOfPost = (p, youTubeId, tikTokId) => p.mediaUrl && p.mediaType 
 export function createSearch(ctx) {
   const { S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile, postCard, STUDIO_UID,
     youTubeId, tikTokId, stale, canGoBack } = ctx;
-  const { doc, getDocs, collection, query, where, orderBy, limit, getCountFromServer } = ctx.fs;
+  const { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, orderBy, limit, getCountFromServer, serverTimestamp } = ctx.fs;
+  const trends = createTrends({ db, fs: ctx.fs, getUid: () => S.user?.uid });
+  const { openModal, seriesList, seriesTile } = ctx;
   const cache = { posts: null, postsAt: 0, users: null, usersAt: 0 };
   const followerCounts = new Map();
 
@@ -40,7 +47,7 @@ export function createSearch(ctx) {
   const tagsOf = (p) => (Array.isArray(p.hashtags) ? p.hashtags : parseHashtags(p.text));
   const hay = (p) => [...words(p.text), ...words(p.authorName), ...words(p.authorUsername), fold(p.authorUsername), ...tagsOf(p)];
   const userHay = (u) => [fold(u.username), ...words(u.username), ...words(u.displayName)];
-  const allMatch = (terms, list) => terms.every((t) => list.some((w) => w.startsWith(t)));
+  const allMatch = (terms, list) => matchScore(terms, list) > 0;
   const visibleUser = (u) => u && !S.blocked.has(u.uid);
   const visiblePost = (p) => p && !S.blocked.has(p.authorId);
   const ms = (p) => p.createdAt?.toMillis?.() || 0;
@@ -49,8 +56,9 @@ export function createSearch(ctx) {
   async function run(raw) {
     const q = raw.trim();
     const isTag = q.startsWith('#'), isUser = q.startsWith('@');
-    const terms = words(q.replace(/^[#@]+/, ''));
+    const terms = queryTerms(q);
     if (!terms.length) return null;
+    if (blockedQuery(q)) return { q, blocked: true };
     const longest = [...terms].sort((a, b) => b.length - a.length)[0].slice(0, 15);
     const tag = fold(q.replace(/^#+/, '')).replace(/[^\p{L}\p{N}_]/gu, '');
     const posts = collection(db, 'posts'), users = collection(db, 'users');
@@ -63,6 +71,7 @@ export function createSearch(ctx) {
       isTag && tag ? safe(getDocs(query(posts, where('hashtags', 'array-contains', tag), orderBy('createdAt', 'desc'), limit(60)))) : null,
       safe(recentPosts()), isTag ? null : safe(recentUsers())
     ]);
+    const [disc, pals, series, ytMore] = await Promise.all([safe(loadDiscover()), isTag || isUser ? [] : palItems(), isTag || isUser ? [] : safe(seriesListCached()), isTag || isUser ? null : safe(youTubeMore(q))]);
     // users
     const um = new Map();
     for (const s of [byName, byDisplay]) s?.docs.forEach((d) => um.set(d.id, { uid: d.id, ...d.data() }));
@@ -73,20 +82,59 @@ export function createSearch(ctx) {
     const pm = new Map();
     for (const s of [byKw, byTag]) s?.docs.forEach((d) => pm.set(d.id, { id: d.id, ...d.data() }));
     (scanP || []).forEach((p) => pm.set(p.id, p));
-    const postList = [...pm.values()].filter(visiblePost).filter((p) => isTag ? tagsOf(p).includes(tag) : isUser ? allMatch(terms, [fold(p.authorUsername), ...words(p.authorUsername)]) : allMatch(terms, hay(p)))
-      .sort((a, b) => ms(b) - ms(a));
+    const postList = [...pm.values()].filter(visiblePost).filter((p) => isTag ? tagsOf(p).includes(tag) : isUser ? allMatch(terms, [fold(p.authorUsername), ...words(p.authorUsername)]) : allMatch(terms, itemHay(p)))
+      ;
+    const ranked = isTag ? postList.sort((a, b) => ms(b) - ms(a)) : rankItems(terms, postList);
+    const outside = isUser ? [] : (disc?.videos || []).filter((v) => isTag ? (v.cat === tag || fold(v.text).includes('#' + tag)) : true);
+    const outRanked = isTag ? outside.slice(0, 24) : rankItems(terms, outside);
+    const groups = { videos: [], music: [], mvideos: [], movies: [], posts: [] };
+    for (const p of [...ranked, ...outRanked]) { const g = groupOf(p); (groups[g] || groups.videos).push(p); }
+    const seriesHits = (series || []).filter((x) => matchScore(terms, [...words(x.title), ...words(x.genre), ...words(x.desc), ...words(x.ownerName)]) > 0);
     // hashtags (from everything we've seen)
     const counts = new Map();
     [...pm.values()].filter(visiblePost).forEach((p) => tagsOf(p).forEach((t) => counts.set(t, (counts.get(t) || 0) + 1)));
     const tagNeedle = isTag ? tag : longest;
     const tagList = [...counts.entries()].filter(([t]) => t.startsWith(tagNeedle)).sort((a, b) => (b[0] === tagNeedle) - (a[0] === tagNeedle) || b[1] - a[1]).slice(0, 30);
-    return { q, isTag, tag, users: isTag ? [] : userList.slice(0, 30), posts: postList, tags: tagList };
+    return { q, isTag, tag, users: isTag ? [] : userList.slice(0, 30), posts: ranked, tags: tagList, groups, series: seriesHits,
+      games: isTag || isUser ? [] : searchCatalog(terms, [...PAGES, ...GAMES]), pals: isTag || isUser ? [] : searchCatalog(terms, pals || []).slice(0, 12), ytMore: ytMore || [] };
+  }
+  let seriesCache = null, seriesAt = 0;
+  async function seriesListCached() {
+    if (seriesCache && Date.now() - seriesAt < 120000) return seriesCache;
+    seriesCache = seriesList ? await seriesList() : []; seriesAt = Date.now(); return seriesCache;
+  }
+  // Optional: with a YouTube Data API key in js/media-config.js (YOUTUBE.key) add a "More from YouTube" row
+  // (safeSearch strict, embeddable only). Without a key this does nothing. Results are cached per query.
+  const ytCache = new Map();
+  async function youTubeMore(q) {
+    if (!YOUTUBE?.key) return [];
+    const k = fold(q).trim(); if (ytCache.has(k)) return ytCache.get(k);
+    const u = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&safeSearch=strict&videoEmbeddable=true&maxResults=12&q=' + encodeURIComponent(q) + '&key=' + encodeURIComponent(YOUTUBE.key);
+    const r = await fetch(u); if (!r.ok) return [];
+    const d = await r.json();
+    const list = (d.items || []).map((it) => ({ id: 'yt-' + it.id.videoId, external: true, kind: 'youtube', ytId: it.id.videoId, text: it.snippet.title, source: it.snippet.channelTitle, channelId: it.snippet.channelId,
+      linkUrl: 'https://www.youtube.com/watch?v=' + it.id.videoId, sourceUrl: 'https://www.youtube.com/channel/' + it.snippet.channelId })).filter((v) => /^[\w-]{11}$/.test(v.ytId) && !blockedQuery(v.text));
+    ytCache.set(k, list); return list;
   }
 
   // ------------------------------------------------------------ recent searches (on this device)
   const recent = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').filter((x) => typeof x === 'string'); } catch { return []; } };
-  const saveRecent = (q) => { q = q.trim().slice(0, 80); if (!q) return; localStorage.setItem(RECENT_KEY, JSON.stringify([q, ...recent().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 10))); };
-  const removeRecent = (q) => localStorage.setItem(RECENT_KEY, JSON.stringify(recent().filter((x) => x !== q)));
+  const saveRecent = (q) => { q = q.trim().slice(0, 80); if (!q) return; localStorage.setItem(RECENT_KEY, JSON.stringify([q, ...recent().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 10))); pushRecent(); };
+  const removeRecent = (q) => { localStorage.setItem(RECENT_KEY, JSON.stringify(recent().filter((x) => x !== q))); pushRecent(true); };
+  // Signed in: search history is also kept in your private users/{uid}/prefs/search doc (owner-only,
+  // max 20, deleted with "Clear all" and with your account) so it follows you across devices.
+  let pushT = 0, pulled = '';
+  const histRef = () => (S.user ? doc(db, 'users', S.user.uid, 'prefs', 'search') : null);
+  function pushRecent(now) {
+    const ref = histRef(); if (!ref) return;
+    clearTimeout(pushT); pushT = setTimeout(() => { setDoc(ref, { recent: recent().slice(0, 20), updatedAt: serverTimestamp() }).catch(() => {}); }, now ? 0 : 4000);
+  }
+  async function pullRecent() {
+    const ref = histRef(); if (!ref || pulled === S.user.uid) return; pulled = S.user.uid;
+    try { const d = await getDoc(ref); if (d.exists()) { const r = (d.data().recent || []).filter((x) => typeof x === 'string'); const mine = recent();
+      localStorage.setItem(RECENT_KEY, JSON.stringify([...mine, ...r.filter((x) => !mine.some((m) => m.toLowerCase() === x.toLowerCase()))].slice(0, 10))); } } catch { /* */ }
+  }
+  function clearRecent() { localStorage.removeItem(RECENT_KEY); const ref = histRef(); if (ref) deleteDoc(ref).catch(() => {}); }
 
   // ------------------------------------------------------------ trending / suggested
   async function trendingTags(n = 12) {
@@ -103,6 +151,7 @@ export function createSearch(ctx) {
     return order.map((id) => byId.get(id)).filter(Boolean).filter(visibleUser).filter((u) => !S.user || u.uid !== S.user.uid).slice(0, n);
   }
   // Pinned category chips (always shown in Explore) before the trending hashtags.
+  const BROWSE = [['funny', '😂 Funny'], ['dance', '💃 Dance'], ['music videos', '🎬 Music videos'], ['songs', '🎶 Songs'], ['gaming', '🎮 Games'], ['pals', '🐾 Pals'], ['animals', '🐶 Animals'], ['movies', '🎞️ Movies'], ['learning', '💡 Learning']];
   const PINNED = [['funny', '😂 Funny'], ['comedy', '🎭 Comedy']];
   const pinnedChips = () => PINNED.map(([t, l]) => `<a class="chip chip-pin" href="#/search?q=${encodeURIComponent('#' + t)}" data-tag="${t}">${l}</a>`).join('');
   const tagChips = (tags) => tags.length
@@ -151,7 +200,7 @@ export function createSearch(ctx) {
   // ------------------------------------------------------------ Explore tab blocks
   async function renderExploreTop(slot, token) {
     slot.innerHTML = `
-      <a class="search-launch" href="#/search" data-open-search role="search" aria-label="Search">${SEARCH_ICON}<span>Search people, videos, #hashtags</span></a>
+      <a class="search-launch" href="#/search" data-open-search role="search" aria-label="Search">${SEARCH_ICON}<span>Search videos, music, creators, Pals, #hashtags</span></a>
       <section class="ex-sec"><h2>Trending hashtags</h2><div id="ex-tags"><div class="spinner sm"></div></div></section>
       <section class="ex-sec"><h2>Suggested creators</h2><div id="ex-people" class="people-row"><div class="spinner sm"></div></div></section>`;
     const [tags, people] = await Promise.all([trendingTags(10), suggestedCreators(8)]);
@@ -175,7 +224,7 @@ export function createSearch(ctx) {
           <button type="button" class="icon-btn sback" id="sback" aria-label="Back">${IC.back}</button>
           <div class="sinput">${SEARCH_ICON}
             <label for="sq" class="sr-only">Search</label>
-            <input id="sq" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="80" placeholder="Search people, videos, #hashtags" value="${esc(q)}">
+            <input id="sq" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="80" placeholder="Search videos, music, creators, Pals, #hashtags" value="${esc(q)}">
             <button type="button" class="sclear" id="sclear" aria-label="Clear search" ${q ? '' : 'hidden'}>${IC.x}</button>
           </div>
         </form>
@@ -204,9 +253,12 @@ export function createSearch(ctx) {
       res.innerHTML = `
         ${rs.length ? `<section class="ssec"><div class="row"><h2>Recent searches</h2><span class="spacer"></span><button class="link-btn small" id="rclear">Clear all</button></div>
           <ul class="recent">${rs.map((r) => `<li><a href="#/search?q=${encodeURIComponent(r)}" data-recent="${esc(r)}">${IC.clock}<span>${esc(r)}</span></a><button class="icon-btn rdel" data-del="${esc(r)}" aria-label="Remove ${esc(r)} from recent searches">${IC.x}</button></li>`).join('')}</ul></section>` : ''}
+        <section class="ssec"><h2>Browse</h2><div class="chips">${BROWSE.map(([q2, l]) => `<a class="chip" href="#/search?q=${encodeURIComponent(q2)}" data-recent="${esc(q2)}">${l}</a>`).join('')}<a class="chip chip-pin" href="#/music">🎵 Music</a></div></section>
+        <section class="ssec"><h2>Trending searches</h2><div id="s-trend"><div class="spinner sm"></div></div></section>
         <section class="ssec"><h2>Trending hashtags</h2><div id="s-tags"><div class="spinner sm"></div></div></section>
         <section class="ssec"><h2>Suggested creators</h2><div id="s-people"><div class="spinner sm"></div></div></section>`;
-      $('#rclear')?.addEventListener('click', () => { localStorage.removeItem(RECENT_KEY); paintEmpty(); });
+      $('#rclear')?.addEventListener('click', () => { clearRecent(); paintEmpty(); });
+      trends.top(8).then((t) => { const box = $('#s-trend'); if (!box || q.trim()) return; box.innerHTML = t.length ? `<ul class="recent">${t.map((x) => `<li><a href="#/search?q=${encodeURIComponent(x.q)}" data-recent="${esc(x.q)}">🔥<span>${esc(x.q)}</span></a></li>`).join('')}</ul>` : '<p class="muted small">Popular searches show up here.</p>'; });
       const mySeq = seq;
       const [tags, people] = await Promise.all([trendingTags(12), suggestedCreators(6)]);
       if (stale(token) || mySeq !== seq || q.trim()) return;
@@ -216,34 +268,54 @@ export function createSearch(ctx) {
     }
 
     function paintResults(r) {
+      if (r.blocked) { tabs.hidden = true; res.innerHTML = `<div class="empty sempty sblocked">🌈 <b>${esc(BLOCKED_MSG)}</b></div>`; return; }
       tabs.hidden = false;
-      const vids = r.posts.filter((p) => kindOfPost(p, youTubeId, tikTokId) === 'video');
-      const pics = r.posts.filter((p) => kindOfPost(p, youTubeId, tikTokId) === 'image');
-      const texts = r.posts.filter((p) => kindOfPost(p, youTubeId, tikTokId) === 'text');
-      const media = r.posts.filter((p) => kindOfPost(p, youTubeId, tikTokId) !== 'text');
+      const G = r.groups, kemy = (l) => l.filter((p) => !p.external), out = (l) => l.filter((p) => p.external);
       const grid = (list) => `<div class="pgrid sgrid">${list.map(gridTile).join('')}</div>`;
+      const ytRow = (list) => list.length ? `<div class="yt-row">${list.map((v) => ytTile(v, esc)).join('')}</div>` : '';
+      const mixed = (list, n) => { const k = kemy(list).slice(0, n), o = out(list).slice(0, n); return (k.length ? grid(k) : '') + ytRow(o); };
+      const cat = (list) => `<ul class="scat">${list.map((x) => `<li><a href="${esc(x.href)}" data-cat-item="${esc(x.cat)}"><span class="scat-ic">${x.kind === 'game' ? '🎮' : x.kind === 'pal' ? '🐾' : esc(x.emoji || '✨')}</span><span><b>${esc(x.name)}</b><span class="muted small">${x.kind === 'game' ? 'Game' : x.kind === 'pal' ? 'Pal species' : 'In Kemy'}</span></span></a></li>`).join('')}</ul>`;
+      const seriesHtml = (list) => list.length ? `<div class="wrow">${list.map((x) => seriesTile ? seriesTile(x) : `<a href="#/series/${esc(x.id)}">${esc(x.title)}</a>`).join('')}</div>` : '';
       const tagRows = (list) => `<ul class="stags">${list.map(([t, c]) => `<li><a href="#/search?q=${encodeURIComponent('#' + t)}" data-tagq="${esc(t)}"><span class="hico">${IC.hash}</span><span><b>#${esc(t)}</b><span class="muted small">${c} post${c === 1 ? '' : 's'}</span></span></a></li>`).join('')}</ul>`;
       const none = (what) => `<div class="empty sempty"><b>No ${what} for “${esc(r.q)}”</b><br>Try a different spelling, fewer words, or search a #hashtag.</div>`;
+      const sec = (key, title, body, count) => body ? `<section class="ssec"><div class="row"><h2>${title}</h2><span class="spacer"></span>${count > 4 ? `<button class="link-btn small" data-goto="${key}">See all</button>` : ''}</div>${body}</section>` : '';
+      const songs = G.music, movies = G.movies, vids = G.videos, mv = G.mvideos;
+      const total = r.users.length + r.posts.length + r.tags.length + vids.length + mv.length + songs.length + movies.length + r.series.length + r.games.length + r.pals.length + r.ytMore.length;
       let html = '';
       if (tab === 'top') {
-        if (!r.users.length && !r.posts.length && !r.tags.length) html = none('results');
+        if (!total) html = none('results');
         else {
           if (r.isTag) html += `<div class="shead"><span class="hico lg">${IC.hash}</span><div><h2>#${esc(r.tag)}</h2><span class="muted small">${r.posts.length} post${r.posts.length === 1 ? '' : 's'}</span></div></div>`;
-          if (r.users.length) html += `<section class="ssec"><div class="row"><h2>Users</h2><span class="spacer"></span>${r.users.length > 3 ? '<button class="link-btn small" data-goto="users">See all</button>' : ''}</div>${r.users.slice(0, 3).map(userRow).join('')}</section>`;
-          if (!r.isTag && r.tags.length) html += `<section class="ssec"><div class="row"><h2>Hashtags</h2><span class="spacer"></span>${r.tags.length > 3 ? '<button class="link-btn small" data-goto="hashtags">See all</button>' : ''}</div>${tagRows(r.tags.slice(0, 3))}</section>`;
-          if (media.length) html += `<section class="ssec"><h2>Videos &amp; photos</h2>${grid(media.slice(0, 12))}</section>`;
-          if (texts.length) html += `<section class="ssec"><h2>Posts</h2><div id="s-texts"></div></section>`;
+          html += sec('games', 'In Kemy', r.games.length ? cat(r.games.slice(0, 4)) : '', r.games.length);
+          html += sec('creators', 'Creators', r.users.length ? r.users.slice(0, 3).map(userRow).join('') : '', r.users.length);
+          html += sec('music', 'Music &amp; Songs', songs.length ? mixed(songs, 6) : '', songs.length);
+          html += sec('mvideos', 'Music Videos', mv.length ? mixed(mv, 6) : '', mv.length);
+          html += sec('videos', 'Videos', vids.length ? mixed(vids, 6) : '', vids.length);
+          html += sec('movies', 'Movies &amp; Series', movies.length || r.series.length ? seriesHtml(r.series.slice(0, 6)) + mixed(movies, 6) : '', movies.length + r.series.length);
+          html += sec('pals', 'Pals', r.pals.length ? cat(r.pals.slice(0, 4)) : '', r.pals.length);
+          html += sec('hashtags', 'Hashtags', !r.isTag && r.tags.length ? tagRows(r.tags.slice(0, 3)) : '', r.tags.length);
+          if (G.posts.length) html += `<section class="ssec"><h2>Posts</h2><div id="s-texts"></div></section>`;
+          if (r.ytMore.length) html += `<section class="ssec"><h2>More from YouTube</h2>${ytRow(r.ytMore)}</section>`;
         }
-      } else if (tab === 'users') html = r.users.length ? r.users.map(userRow).join('') : none('people');
-      else if (tab === 'videos') html = vids.length ? grid(vids) : none('videos');
-      else if (tab === 'photos') html = pics.length ? grid(pics) : none('photos');
-      else if (tab === 'posts') html = texts.length ? '<div id="s-texts"></div>' : none('posts');
+      } else if (tab === 'creators') html = r.users.length ? r.users.map(userRow).join('') : none('creators');
+      else if (tab === 'videos') html = vids.length ? mixed(vids, 60) : none('videos');
+      else if (tab === 'music') html = songs.length ? mixed(songs, 60) : none('songs');
+      else if (tab === 'mvideos') html = mv.length ? mixed(mv, 60) : none('music videos');
+      else if (tab === 'movies') html = movies.length || r.series.length ? seriesHtml(r.series) + mixed(movies, 60) : none('movies or series');
+      else if (tab === 'pals') html = r.pals.length ? cat(r.pals) : none('Pals');
+      else if (tab === 'games') html = r.games.length ? cat(r.games) : none('games');
       else if (tab === 'hashtags') html = r.tags.length ? tagRows(r.tags) : none('hashtags');
       res.innerHTML = html;
       const tb = $('#s-texts', res);
-      if (tb) (tab === 'top' ? texts.slice(0, 5) : texts).forEach((p) => tb.appendChild(postCard(p)));
+      if (tb) G.posts.slice(0, 5).forEach((p) => tb.appendChild(postCard(p)));
       fillFollowerCounts(res);
     }
+    res.addEventListener('click', (e) => {
+      const y = e.target.closest('[data-yt]'); if (!y || !last) return;
+      const all = [...(last.groups ? Object.values(last.groups).flat() : []), ...(last.ytMore || [])];
+      const v = all.find((x) => x.ytId === y.dataset.yt); if (!v) return;
+      saveRecent(q); learnTap(v); import('./music.js').then((m) => m.openYouTube(v, { openModal, esc }));
+    });
 
     async function go(saveIt) {
       clearTimeout(timer);
@@ -256,7 +328,7 @@ export function createSearch(ctx) {
         const r = await run(q);
         if (stale(token) || mySeq !== seq) return;
         last = r; paintResults(r);
-        if (saveIt) saveRecent(q);
+        if (saveIt && !r.blocked) { saveRecent(q); learnSearch(q); trends.count(q); }
       } catch (e) { if (mySeq === seq) res.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
     }
     input.addEventListener('input', () => { q = input.value; clear.hidden = !q; clearTimeout(timer); timer = setTimeout(() => go(false), 300); });
@@ -276,9 +348,18 @@ export function createSearch(ctx) {
         q = rec ? rec.dataset.recent : '#' + (tg.dataset.tagq || tg.dataset.tag);
         input.value = q; tab = 'top'; paintTabs(); go(true); window.scrollTo(0, 0); return;
       }
-      if (e.target.closest('.gtile, .suser-main, .post a')) saveRecent(q);
+      const tile = e.target.closest('.gtile, .wtile, .suser-main, .post a, [data-cat-item]');
+      if (tile && last) {
+        saveRecent(q); learnSearch(q);
+        const id = (tile.getAttribute('href') || '').match(/#\/(?:watch|post)\/([\w-]+)/)?.[1];
+        const p = id && last.posts.find((x) => x.id === id);
+        if (p) learnTap(p);
+        else if (tile.dataset.catItem) learnTap({ id: 'cat:' + tile.dataset.catItem, cat: tile.dataset.catItem });
+        else { const un = (tile.getAttribute('href') || '').match(/#\/u\/([\w.]+)/)?.[1]; const u = un && last.users.find((x) => x.username === un); if (u) learnTap({ uid: u.uid }); }
+      }
     });
     S.unsubs.push(() => { clearTimeout(timer); document.body.classList.remove('search-mode'); });
+    pullRecent().then(() => { if (!q.trim() && !stale(token)) paintEmpty(); });
     await go(!!q.trim());
   }
 

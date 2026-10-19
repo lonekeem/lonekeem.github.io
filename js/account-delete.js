@@ -65,7 +65,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       }
     }));
     await step('Clearing your watch progress…', async () => deleteRefs(await sub(['users', uid, 'watch'])));
-    await step('Clearing your feed interests…', async () => deleteRefs([doc(db, 'users', uid, 'prefs', 'feed')]));
+    await step('Clearing your feed interests and search history…', async () => deleteRefs([doc(db, 'users', uid, 'prefs', 'feed'), doc(db, 'users', uid, 'prefs', 'search')]));
     await step('Deleting your posts…', () => drain(query(collection(db, 'posts'), where('authorId', '==', uid)), async (docs) => {
       for (const d of docs) {
         ownPosts.add(d.id);

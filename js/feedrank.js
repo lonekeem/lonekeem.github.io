@@ -76,7 +76,7 @@ export function mixIn(own, outside, every = 2) {
 }
 
 // ---------------------------------------------------------------- learned interests
-const WEIGHT = { star: 1, comment: 1.2, share: 1.5, save: 1, complete: 0.6, watch: 0.4, skip: -0.4, open: 0.3 };
+const WEIGHT = { star: 1, comment: 1.2, share: 1.5, save: 1, complete: 0.6, watch: 0.4, skip: -0.4, open: 0.3, search: 0.5, tap: 0.6, pick: 2 };
 export function emptyPrefs() { return { v: 1, cats: {}, creators: {}, seen: {} }; }
 // Pure update (used by the store below and the tests). amount scales `watch` (0..1).
 export function learn(prefs, p, kind, amount = 1) {
@@ -125,6 +125,8 @@ export function createPrefsStore({ db, fs, uid }) {
   return {
     get prefs() { return prefs; },
     load, flush,
+    // Direct edits (Settings > Your interests, onboarding topic picks): fn(prefs) mutates, then it's saved.
+    edit(fn) { fn(prefs); saveLocal(); dirty = true; if (ref) { clearTimeout(timer); timer = 0; lastFlush = 0; flush(true); } },
     signal(p, kind, amount) {
       learn(prefs, p, kind, amount);
       if (kind === 'watch' || kind === 'complete' || kind === 'skip' || kind === 'open') prefs.seen[p.id] = Date.now();
