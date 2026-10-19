@@ -7,6 +7,6 @@ const list = (q.get('sp') || SPECIES.map((s) => s.id).join(',')).split(','); con
 window.frame = (t) => { c.fillStyle = '#2a1458'; c.fillRect(0, 0, 1200, 1000); c.font = '600 13px sans-serif';
   list.forEach((id, i) => { const x = 100 + (i % 6) * 200, y = 170 + Math.floor(i / 6) * 200; c.fillStyle = '#ffd34d'; c.fillText(id, x - 90, y - 150);
     window.__fb = window.__fb || 0; drawPal3D.__b = 0;
-    drawPal3D(c, x, y, 80, { species: id, level: 6, outfit: q.has('outfit') ? { head: 'crown', feet: 'sneakers', neck: 'scarf' } : undefined }, { t, mode, face: 1, dance3d: dance, beat: t / 30, amt: 1 }); }); };
+    drawPal3D(c, x, y, 80, { species: id, level: 6, outfit: q.has('outfit') ? { head: 'goldcrown', feet: 'sneakers', neck: 'redscarf', face: 'roundspecs', body: 'hoodie' } : undefined }, { t, mode, face: 1, dance3d: dance, beat: t / 30, amt: 1 }); }); };
 window.ready = true;
 </script>

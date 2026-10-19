@@ -172,9 +172,13 @@ function build(pal) {
   const of = pal.outfit || {}; const it = (s) => { const i = ITEM[of[s]]; return i && i.slot === s ? i : null; };
   const head = it('head'); if (head && headR) { const st = head.st || ''; const c = mat(head.col || '#ffd34d', { cc: 0.4 });
     if (/crown|tiara/.test(st)) { const g = mesh(geo('crown', () => new THREE.CylinderGeometry(0.2, 0.17, 0.14, 8, 1, true)), mat('#ffd34d', { em: '#ffb000', cc: 1 }), H); g.position.y = 0.52; }
+    else if (/wizard|witch|santa/.test(st)) { const g = mesh(cone(0.3, 0.5), c, H); g.position.y = 0.6; g.rotation.z = 0.15; }
+    else if (/halo/.test(st)) { const g = mesh(geo('halo', () => new THREE.TorusGeometry(0.22, 0.03, 8, 24)), mat('#ffe88a', { em: '#ffd34d' }), H); g.rotation.x = Math.PI / 2; g.position.y = 0.7; }
+    else if (/flowers/.test(st)) { for (let i = 0; i < 7; i++) { const a = i * 0.9; mesh(sph(0.06), mat(['#ff8ab8', '#ffd34d', '#ffffff'][i % 3]), H).position.set(Math.cos(a) * 0.32, 0.38, Math.sin(a) * 0.28); } }
     else if (/bow/.test(st)) { for (const s of [-1, 1]) { const b = mesh(cone(0.09, 0.16), c, H); b.position.set(0.2 + s * 0.08, 0.42, 0.1); b.rotation.z = s * Math.PI / 2; } }
     else { const g = mesh(sph(1), c, H); g.scale.set(0.42, 0.2, 0.42); g.position.y = 0.38; if (/top/.test(st)) { g.scale.set(0.26, 0.3, 0.26); g.position.y = 0.62; } } }
-  const face = it('face'); if (face && headR) for (const s of [-1, 1]) { const g = mesh(geo('lens', () => new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16)), mat(face.col || '#222', { cc: 1 }), H); g.rotation.x = Math.PI / 2; g.position.set(s * 0.19, 0.06, fz + 0.04); }
+  const face = it('face'); if (face && headR && /round|monocle|goggles/.test(face.st || '')) for (const s of face.st === 'monocle' ? [1] : [-1, 1]) { const g = mesh(geo('rim', () => new THREE.TorusGeometry(0.11, 0.018, 8, 20)), mat(face.col || '#3a2a63', { cc: 1 }), H); g.position.set(s * 0.19, 0.06, fz + 0.03); }
+  else if (face && headR) for (const s of [-1, 1]) { const g = mesh(geo('lens', () => new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16)), mat(face.col || '#222', { cc: 1 }), H); g.rotation.x = Math.PI / 2; g.position.set(s * 0.19, 0.06, fz + 0.04); }
   const neck = it('neck'); if (neck) { const n = mesh(geo('scarf', () => new THREE.TorusGeometry(0.26, 0.06, 8, 20)), mat(neck.col || '#ff7ab8'), J.Neck); n.rotation.x = Math.PI / 2; n.position.y = -0.03; }
   const body = it('body'); if (body && kind === 'blob') { const t = mesh(sph(1), mat(body.col || '#5aa8ff'), J.Spine); t.scale.set(0.43, 0.33, 0.38); t.position.y = 0.1; const t2 = mesh(sph(1), mat(body.col || '#5aa8ff'), J.Chest); t2.scale.set(0.37, 0.28, 0.32); }
   const feet = it('feet'); if (feet && legs) for (const n of ['Left', 'Right']) { const s = mesh(sph(1), mat(feet.col || '#ff5a6a', { cc: 0.5 }), J[n + 'Foot']); s.scale.set(0.125, 0.08, 0.17); s.position.set(0, -0.01, 0.06); }
