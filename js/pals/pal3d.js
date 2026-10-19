@@ -253,7 +253,7 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   apply(m, P, t, st.mode);
   m.rotation.y = ((st.face || 1) < 0 ? -0.28 : 0.28) + (P.ry || 0);
   scene.add(m); R.render(scene, cam); scene.remove(m);
-  const w = size * 2.3; c.drawImage(R.domElement, x - w / 2, y - w * 0.87, w, w);
+  const w = size * 1.65; c.drawImage(R.domElement, x - w / 2, y - w * 0.87, w, w);
   return true;
 }
 export { DANCES3D };
