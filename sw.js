@@ -1,7 +1,7 @@
-const CACHE = 'lks-v4';
+const CACHE = 'lks-v5';
 const CORE = [
   './', 'index.html', 'app.html', 'terms.html', 'privacy.html', 'guidelines.html',
-  'css/app.css', 'js/app.js', 'js/home.js', 'js/firebase-init.js',
+  'css/app.css', 'js/app.js', 'js/home.js', 'js/firebase-init.js', 'js/watch.js',
   'logo.png', 'icon-192.png', 'icon-512.png', 'favicon.ico'
 ];
 self.addEventListener('install', e => {

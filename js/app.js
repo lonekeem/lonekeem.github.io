@@ -1,5 +1,6 @@
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { auth, db, ADMIN_EMAIL, STUDIO_UID, UPLOADS } from './firebase-init.js';
+import { createWatch } from './watch.js';
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   sendPasswordResetEmail, sendEmailVerification, updateProfile, GoogleAuthProvider,
@@ -74,7 +75,7 @@ function friendlyError(e) {
   return map[c] || (e && e.message ? e.message.replace(/^Firebase: /, '') : 'Something went wrong.');
 }
 function requireAuth() {
-  if (!S.user) { location.hash = '#/login?next=' + encodeURIComponent(location.hash || '#/feed'); return false; }
+  if (!S.user) { location.hash = '#/login?next=' + encodeURIComponent(location.hash || '#/watch'); return false; }
   if (!S.profile) { location.hash = '#/onboard'; return false; }
   return true;
 }
@@ -120,6 +121,44 @@ async function isLiked(postId) {
   return snap.exists();
 }
 const chatIdFor = (a, b) => [a, b].sort().join('_');
+
+// ---------------------------------------------------------------- shared social actions
+// Used by post cards, the post page, profiles and the vertical video feed (js/watch.js).
+async function likePost(p, on) {
+  const b = writeBatch(db);
+  const likeRef = doc(db, 'posts', p.id, 'likes', S.user.uid);
+  if (on) b.set(likeRef, { createdAt: serverTimestamp() }); else b.delete(likeRef);
+  b.update(doc(db, 'posts', p.id), { likeCount: increment(on ? 1 : -1) });
+  await b.commit();
+  S.liked.set(p.id, on);
+  if (on) notify(p.authorId, 'like', { postId: p.id, text: p.text });
+}
+async function savePost(postId, on) {
+  const ref = doc(db, 'users', S.user.uid, 'saved', postId);
+  if (on) { await setDoc(ref, { postId, createdAt: serverTimestamp() }); S.saved.add(postId); }
+  else { await deleteDoc(ref); S.saved.delete(postId); }
+}
+async function followUser(uid, on) {
+  const ref = doc(db, 'follows', `${S.user.uid}_${uid}`);
+  if (on) { await setDoc(ref, { follower: S.user.uid, followee: uid, createdAt: serverTimestamp() }); S.following.add(uid); notify(uid, 'follow'); }
+  else { await deleteDoc(ref); S.following.delete(uid); }
+}
+async function addComment(p, text) {
+  const ref = doc(collection(db, 'posts', p.id, 'comments'));
+  const b = writeBatch(db);
+  b.set(ref, { authorId: S.user.uid, authorName: S.profile.displayName, authorUsername: S.profile.username, authorColor: S.profile.color, text: text.slice(0, 500), createdAt: serverTimestamp() });
+  b.update(doc(db, 'posts', p.id), { commentCount: increment(1), lastCommentId: ref.id });
+  b.update(doc(db, 'users', S.user.uid), { lastCommentAt: serverTimestamp() });
+  await b.commit();
+  notify(p.authorId, 'comment', { postId: p.id, text });
+}
+async function deleteComment(postId, cid) {
+  const b = writeBatch(db);
+  b.delete(doc(db, 'posts', postId, 'comments', cid));
+  b.update(doc(db, 'posts', postId), { commentCount: increment(-1), lastCommentId: cid });
+  await b.commit();
+}
+const watchCommentsQuery = (postId) => query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(200));
 
 // ---------------------------------------------------------------- embeds
 function youTubeId(url) {
@@ -193,13 +232,7 @@ function postCard(p, { detail = false } = {}) {
     const n = $('.n', likeBtn); const cur = parseInt(n.textContent, 10) || 0;
     setLike(on); n.textContent = Math.max(0, cur + (on ? 1 : -1)); likeBtn.disabled = true;
     try {
-      const b = writeBatch(db);
-      const likeRef = doc(db, 'posts', p.id, 'likes', S.user.uid);
-      if (on) b.set(likeRef, { createdAt: serverTimestamp() }); else b.delete(likeRef);
-      b.update(doc(db, 'posts', p.id), { likeCount: increment(on ? 1 : -1) });
-      await b.commit();
-      S.liked.set(p.id, on);
-      if (on) notify(p.authorId, 'like', { postId: p.id, text: p.text });
+      await likePost(p, on);
     } catch (e) { setLike(!on); n.textContent = cur; toast(friendlyError(e)); }
     likeBtn.disabled = false;
   };
@@ -207,9 +240,7 @@ function postCard(p, { detail = false } = {}) {
     if (!requireAuth()) return;
     const on = !S.saved.has(p.id); setSave(on);
     try {
-      const ref = doc(db, 'users', S.user.uid, 'saved', p.id);
-      if (on) { await setDoc(ref, { postId: p.id, createdAt: serverTimestamp() }); S.saved.add(p.id); toast('Saved to your profile'); }
-      else { await deleteDoc(ref); S.saved.delete(p.id); toast('Removed from saved'); }
+      await savePost(p.id, on); toast(on ? 'Saved to your profile' : 'Removed from saved');
     } catch (e) { setSave(!on); toast(friendlyError(e)); }
   };
   const menuBtn = $('[data-a=menu]', el), menu = $('.menu', el);
@@ -313,18 +344,18 @@ async function showWelcome() {
     <h2 id="welcome-title">Welcome to Lone Keem Studios, ${esc(name)}!</h2>
     <p>This is where AI meets imagination. Watch our latest drop, follow the studio for new movies and music, and share what you create with the community.</p>
     <div class="btns">
-      <a class="btn" id="welcome-watch" href="#/post/stand-up-strong" data-close>
+      <a class="btn" id="welcome-watch" href="#/watch/stand-up-strong" data-close>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
         Watch now</a>
       <a class="btn btn-ghost" href="#/settings" data-close>Set up my profile</a>
     </div>`);
-  newestStudioVideo().then((id) => { const a = $('#welcome-watch'); if (a) a.href = '#/post/' + id; });
+  newestStudioVideo().then((id) => { const a = $('#welcome-watch'); if (a) a.href = '#/watch/' + id; });
   try { await updateDoc(doc(db, 'users', S.user.uid), { welcomed: true }); } catch (e) { console.warn(e); }
 }
 
 // ---------------------------------------------------------------- header / nav
 function renderChrome(name) {
-  $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === name));
+  $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === name || a.dataset.also === name));
   const ha = document.getElementById('header-actions');
   if (S.user && S.profile) {
     ha.innerHTML = `
@@ -342,7 +373,8 @@ function renderChrome(name) {
 
 // ---------------------------------------------------------------- router
 const routes = [
-  [/^#?\/?$/, () => location.replace('#/feed'), 'feed'],
+  [/^#?\/?$/, () => location.replace('#/watch'), 'watch'],
+  [/^#\/watch(?:\/([\w-]+))?$/, pageWatch, 'watch'],
   [/^#\/feed$/, pageFeed, 'feed'],
   [/^#\/explore$/, pageExplore, 'explore'],
   [/^#\/new$/, pageCompose, 'new'],
@@ -365,13 +397,15 @@ async function route() {
   if (!S.ready) return;
   S.unsubs.forEach((u) => u()); S.unsubs = [];
   closeModal();
-  const hash = location.hash || '#/feed';
+  // Accept short deep links like app.html#watch/<postId> as well as #/watch/<postId>.
+  const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch');
   const token = ++routeToken;
   for (const [re, fn, nav] of routes) {
     const m = hash.match(re);
     if (m) {
       renderChrome(nav);
       main.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
+      document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
       window.scrollTo(0, 0);
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
@@ -379,15 +413,26 @@ async function route() {
       return;
     }
   }
-  main.innerHTML = '<div class="empty">Page not found. <a href="#/feed">Go home</a></div>';
+  document.body.classList.remove('feed-mode');
+  main.innerHTML = '<div class="empty">Page not found. <a href="#/watch">Go home</a></div>';
 }
 window.addEventListener('hashchange', route);
 const stale = (t) => t !== routeToken;
 
+// ---------------------------------------------------------------- page: vertical video feed (For You)
+const watch = createWatch({
+  S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, closeModal, isAdmin, stale,
+  isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId,
+  commentsQuery: watchCommentsQuery,
+  fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot }
+});
+async function pageWatch(postId, token) { return watch.render(postId, token); }
+
 // ---------------------------------------------------------------- pages: feed / explore
+const feedToggle = (active) => `<nav class="feed-toggle" aria-label="Feed"><a href="#/watch" class="${active === 'watch' ? 'active' : ''}">For You</a><a href="#/feed" class="${active === 'feed' ? 'active' : ''}">Posts</a></nav>`;
 async function pageFeed(token) {
   if (!S.user || !S.profile) {
-    main.innerHTML = `
+    main.innerHTML = `${feedToggle('feed')}
       <section class="card pad center stack">
         <img class="auth-logo" src="logo.png" alt="" width="64" height="64">
         <h1 class="page-title" style="margin:0">Join the community</h1>
@@ -404,7 +449,8 @@ async function pageFeed(token) {
   const verified = S.user.emailVerified || S.user.providerData.some((p) => p.providerId === 'google.com');
   main.innerHTML = `
     ${verified ? '' : `<div class="banner">Check your inbox to verify <b>${esc(S.user.email)}</b>. <button class="link-btn" id="resend">Resend email</button></div>`}
-    <div class="row"><h1 class="page-title">Home</h1><span class="spacer"></span><a class="btn btn-sm btn-ghost" href="#/new">New post</a></div>
+    ${feedToggle('feed')}
+    <div class="row"><h1 class="page-title">Posts</h1><span class="spacer"></span><a class="btn btn-sm btn-ghost" href="#/new">New post</a></div>
     <div id="posts"><div class="spinner"></div></div>`;
   const rs = $('#resend'); if (rs) rs.onclick = async () => { try { await sendEmailVerification(S.user); toast('Verification email sent'); } catch (e) { toast(friendlyError(e)); } };
   const authors = [...new Set([S.user.uid, STUDIO_UID, ...S.following])].filter((u) => !S.blocked.has(u));
@@ -529,7 +575,7 @@ async function pagePost(postId, token) {
         : `<p class="muted small" style="margin-top:12px"><a href="#/login?next=${encodeURIComponent('#/post/' + postId)}">Log in</a> or <a href="#/signup">create an account</a> to comment.</p>`}
     </section>`;
   $('#post-slot').appendChild(postCard(p, { detail: true }));
-  const unsub = onSnapshot(query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(200)), (qs) => {
+  const unsub = onSnapshot(watchCommentsQuery(postId), (qs) => {
     const box = $('#comments'); if (!box) return;
     const list = qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !S.blocked.has(c.authorId));
     box.innerHTML = list.length ? '' : '<p class="muted small">No comments yet. Say something nice!</p>';
@@ -545,10 +591,7 @@ async function pagePost(postId, token) {
         if (a === 'report') reportDialog('comment', c.id, postId, c.text);
         if (a === 'del' && confirm('Delete this comment?')) {
           try {
-            const b = writeBatch(db);
-            b.delete(doc(db, 'posts', postId, 'comments', c.id));
-            b.update(doc(db, 'posts', postId), { commentCount: increment(-1), lastCommentId: c.id });
-            await b.commit(); toast('Comment deleted');
+            await deleteComment(postId, c.id); toast('Comment deleted');
           } catch (err) { toast(friendlyError(err)); }
         }
       };
@@ -563,14 +606,8 @@ async function pagePost(postId, token) {
     const err = $('#comment-err'); err.textContent = '';
     const btn = $('button', form); btn.disabled = true;
     try {
-      const ref = doc(collection(db, 'posts', postId, 'comments'));
-      const b = writeBatch(db);
-      b.set(ref, { authorId: S.user.uid, authorName: S.profile.displayName, authorUsername: S.profile.username, authorColor: S.profile.color, text: text.slice(0, 500), createdAt: serverTimestamp() });
-      b.update(doc(db, 'posts', postId), { commentCount: increment(1), lastCommentId: ref.id });
-      b.update(doc(db, 'users', S.user.uid), { lastCommentAt: serverTimestamp() });
-      await b.commit();
+      await addComment(p, text);
       input.value = '';
-      notify(p.authorId, 'comment', { postId, text });
     } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Please wait a few seconds between comments.' : friendlyError(e); }
     btn.disabled = false;
   };
@@ -633,15 +670,12 @@ async function pageProfile(username, tab, token) {
   if (fb) fb.onclick = async () => {
     if (!requireAuth()) return;
     fb.disabled = true;
-    const ref = doc(db, 'follows', `${S.user.uid}_${uid}`);
     const n = $('#fers');
     try {
       if (S.following.has(uid)) {
-        await deleteDoc(ref); S.following.delete(uid); fb.textContent = 'Follow'; fb.classList.remove('btn-ghost'); n.textContent = +n.textContent - 1;
+        await followUser(uid, false); fb.textContent = 'Follow'; fb.classList.remove('btn-ghost'); n.textContent = +n.textContent - 1;
       } else {
-        await setDoc(ref, { follower: S.user.uid, followee: uid, createdAt: serverTimestamp() });
-        S.following.add(uid); fb.textContent = 'Following'; fb.classList.add('btn-ghost'); n.textContent = +n.textContent + 1;
-        notify(uid, 'follow');
+        await followUser(uid, true); fb.textContent = 'Following'; fb.classList.add('btn-ghost'); n.textContent = +n.textContent + 1;
       }
     } catch (e) { toast(friendlyError(e)); }
     fb.disabled = false;
@@ -869,8 +903,8 @@ async function pageAdmin(token) {
 let pendingProfile = null;
 let pendingNext = null;
 const nextHash = () => {
-  const n = decodeURIComponent(location.hash.split('?next=')[1] || '#/feed');
-  return /^#\/(login|signup|onboard|reset)/.test(n) ? '#/feed' : n;
+  const n = decodeURIComponent(location.hash.split('?next=')[1] || '#/watch');
+  return /^#\/(login|signup|onboard|reset)/.test(n) ? '#/watch' : n;
 };
 function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
 function authShell(title, sub, body) {
