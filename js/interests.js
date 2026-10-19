@@ -60,7 +60,7 @@ export async function interestsPage({ main, esc, toast, getDoc, doc, db, loadDis
     const bar = (v) => `<span class="ibar" aria-hidden="true"><span style="width:${Math.min(100, Math.round(v / 5 * 100))}%"></span></span>`;
     root.innerHTML = `<h1 class="page-title">Your interests</h1>
       <p class="muted">Kemy uses these to put things you like first in <b>For You</b>. They come from the topics you pick, what you watch, star, share and save, and what you search for and tap in search. They stay private to you.</p>
-      <section class="card pad"><h2 style="font-size:1.05rem">Favorite topics</h2><form id="i-topics">${topicChips('topic', cats.map(([k]) => k))}<button class="btn btn-sm" type="submit" style="margin-top:10px">Save topics</button></form></section>
+      <section class="card pad"><h2 style="font-size:1.05rem">Favorite topics</h2><form id="i-topics">${topicChips('topic', cats.filter(([, v]) => v >= 2).map(([k]) => k))}<button class="btn btn-sm" type="submit" style="margin-top:10px">Save topics</button></form></section>
       <section class="card pad" style="margin-top:16px"><h2 style="font-size:1.05rem">Topics Kemy learned</h2>
         ${cats.length ? `<ul class="ilist">${cats.map(([k, v]) => { const c = CATS.find((x) => x.id === k); return `<li><span>${c.emoji} ${c.label}</span>${bar(v)}<button class="btn btn-sm btn-ghost" data-rm-cat="${k}" aria-label="Remove ${c.label}">Remove</button></li>`; }).join('')}</ul>` : '<p class="muted small">Nothing yet. Watch, search and star things you like.</p>'}</section>
       <section class="card pad" style="margin-top:16px"><h2 style="font-size:1.05rem">Creators &amp; channels</h2>
