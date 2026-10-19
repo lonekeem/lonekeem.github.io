@@ -344,22 +344,42 @@ service cloud.firestore {
           let n = request.resource.data;
           return canModerate() && !('parentId' in resource.data)
             && resource.data.get('deleted', false) == false
-            && changed().hasOnly(['deleted', 'text', 'authorName', 'authorUsername', 'authorColor'])
-            && n.deleted == true && n.text == '' && n.authorName == '' && n.authorUsername == '' && n.authorColor == ''
+            && changed().hasOnly(['deleted', 'text', 'authorName', 'authorUsername', 'authorColor', 'media'])
+            && !('media' in n) && n.deleted == true && n.text == '' && n.authorName == '' && n.authorUsername == '' && n.authorColor == ''
             && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount - 1
             && getAfter(postPath()).data.lastCommentId == cid;
+        }
+
+        // Rich comments: text, one media item, or text + one media item. Only GIPHY GIFs, photos
+        // in Cloudinary's lks/comment-media folder, or a sticker of one of the author's own Pals.
+        function validMedia(m) {
+          return m is map && m.kind is string && (
+            (m.kind == 'gif' && m.keys().hasOnly(['kind', 'id', 'url', 'w', 'h']) && m.keys().hasAll(['kind', 'id', 'url'])
+              && isStr(m.id, 1, 64) && isStr(m.url, 20, 300)
+              && m.url.matches('^https://(media[0-9]?|i)[.]giphy[.]com/[A-Za-z0-9_./-]+$')
+              && m.get('w', 1) is int && m.get('h', 1) is int)
+            || (m.kind == 'photo' && m.keys().hasOnly(['kind', 'url', 'w', 'h']) && m.keys().hasAll(['kind', 'url'])
+              && isStr(m.url, 20, 400)
+              && m.url.matches('^https://res[.]cloudinary[.]com/zfmeldgm/image/upload/([A-Za-z0-9_,.:-]+/)*lks/comment-media/[A-Za-z0-9_-]+$')
+              && m.get('w', 1) is int && m.get('h', 1) is int)
+            || (m.kind == 'sticker' && m.keys().hasOnly(['kind', 'petId', 'pose']) && m.keys().hasAll(['kind', 'petId', 'pose'])
+              && isStr(m.petId, 1, 100) && m.pose in ['wave', 'love', 'laugh', 'cry', 'wow', 'dance', 'sleepy']
+              && exists(/databases/$(database)/documents/users/$(me())/pets/$(m.petId))));
+        }
+        function validBody(d) {
+          return ('media' in d) ? (validMedia(d.media) && isStr(d.text, 0, 500)) : isStr(d.text, 1, 500);
         }
 
         allow read: if true;
         allow create: if signedIn()
           && !blockedBy(get(postPath()).data.authorId)
           && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'text', 'createdAt',
-                                                   'parentId', 'likeCount', 'replyCount'])
+                                                   'parentId', 'likeCount', 'replyCount', 'media'])
           && request.resource.data.authorId == me()
           && request.resource.data.authorName == me_().displayName
           && request.resource.data.authorUsername == me_().username
           && isStr(request.resource.data.authorColor, 1, 20)
-          && isStr(request.resource.data.text, 1, 500)
+          && validBody(request.resource.data)
           && request.resource.data.createdAt == request.time
           && request.resource.data.get('likeCount', 0) == 0
           && request.resource.data.get('replyCount', 0) == 0
