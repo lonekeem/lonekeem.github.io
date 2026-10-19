@@ -1470,3 +1470,7 @@ select option { color: #111; background: #fff; }
 /* iOS zooms into any field under 16px */
 @supports (-webkit-touch-callout: none) { html :is(input, textarea, select) { font-size: max(16px, 1em) !important; } }
 body.kb-open .bottom-nav, body.kb-open .pal-pop { display: none !important; }
+/* YouTube Shorts: full-height vertical card */
+.vshort .vembed { inset: 0; }
+.vshort .vembed-frame.tall { height: 100%; max-height: 100%; }
+.vshort .vthumb { aspect-ratio: 9/16; object-fit: cover; max-height: 70vh; width: auto; }

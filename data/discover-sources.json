@@ -62,6 +62,16 @@
       "name": "Matt Steffanina",
       "channelId": "UCcG6zooS9BlSgiT0_ICuD0A",
       "cat": "dance"
+    },
+    {
+      "name": "Zach King",
+      "channelId": "UCq8DICunczvLuJJq414110A",
+      "cat": "funny"
+    },
+    {
+      "name": "Ryan's World",
+      "channelId": "UChGJGhZ9SOOHvBB0Y4DOO_w",
+      "cat": "funny"
     }
   ],
   "news": [
@@ -152,5 +162,6 @@
     "twerking",
     "sexy",
     "explicit lyrics"
-  ]
+  ],
+  "maxShortsPerChannel": 5
 }

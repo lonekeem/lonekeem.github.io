@@ -1,4 +1,4 @@
-const CACHE = 'lks-v39';
+const CACHE = 'lks-v40';
 const CORE = [
   './', 'index.html', 'app.html', 'terms.html', 'privacy.html', 'guidelines.html',
   'css/app.css', 'kemy-logo.png', 'favicon-32.png', 'js/app.js', 'js/home.js', 'js/firebase-init.js', 'js/watch.js', 'js/feed-cats.js', 'js/feedrank.js', 'js/discover.js', 'js/autoplay.js',
@@ -7,12 +7,11 @@ const CORE = [
   'logo.png', 'icon-192.png', 'icon-512.png', 'favicon.ico'
 ];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))));
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== 'kemy-share').map(k => caches.delete(k)))));
-  self.clients.claim();
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== 'kemy-share').map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
@@ -40,7 +39,7 @@ self.addEventListener('fetch', e => {
       /\.(mp4|mov|mp3|m4a|wav|ogg|opus)$/i.test(url.pathname)) return;
   // Network first, cache fallback for offline.
   e.respondWith(
-    fetch(req).then(res => {
+    fetch(req, { cache: 'no-cache' }).then(res => {
       if (res.ok && res.type === 'basic') {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));

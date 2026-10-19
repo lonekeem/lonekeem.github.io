@@ -201,7 +201,10 @@
     <script type="module" src="js/app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+            const hadSW = !!navigator.serviceWorker.controller; let reloaded = false;
+            // A new version took over: reload once so nobody stays on old cached files.
+            navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadSW || reloaded || sessionStorage.getItem('kemy-sw-reload') === '1') return; reloaded = true; sessionStorage.setItem('kemy-sw-reload', '1'); location.reload(); });
+            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => { if (!r) return; r.update().catch(() => {}); setTimeout(() => sessionStorage.removeItem('kemy-sw-reload'), 10000); document.addEventListener('visibilitychange', () => { if (!document.hidden) r.update().catch(() => {}); }); }));
         }
     </script>
 </body>

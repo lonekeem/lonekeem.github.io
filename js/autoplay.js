@@ -54,3 +54,24 @@ export function autoplayIn(root, sel = 'video[data-autoplay]') {
   document.addEventListener('visibilitychange', vis);
   return () => { io.disconnect(); document.removeEventListener('visibilitychange', vis); current?.pause(); };
 }
+
+// YouTube IFrame Player API, loaded once on first need.
+let ytP = null;
+export function loadYT() {
+  if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+  if (ytP) return ytP;
+  ytP = new Promise((res, rej) => {
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { try { prev && prev(); } catch { /* ignore */ } res(window.YT); };
+    const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; s.async = true;
+    s.onerror = () => { ytP = null; rej(new Error('yt api')); };
+    document.head.appendChild(s);
+    setTimeout(() => { if (!(window.YT && window.YT.Player)) rej(new Error('yt api timeout')); }, 6000);
+  });
+  return ytP;
+}
+// The first tap anywhere unlocks autoplay (iOS gesture rule); listeners can resume playback inside that gesture.
+let unlocked = false; const unlockFns = new Set();
+export const isUnlocked = () => unlocked;
+export function onUnlock(fn) { unlockFns.add(fn); return () => unlockFns.delete(fn); }
+['pointerdown', 'touchend', 'keydown'].forEach((t) => addEventListener(t, () => { unlocked = true; unlockFns.forEach((f) => { try { f(); } catch { /* ignore */ } }); }, { capture: true, passive: true }));
