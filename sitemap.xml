@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://lonekeem.github.io/Lone-Keem-Studios/</loc>
+    <lastmod>2026-10-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image><image:loc>https://lonekeem.github.io/Lone-Keem-Studios/og-image.jpg</image:loc></image:image>
+    <video:video>
+      <video:thumbnail_loc>https://lonekeem.github.io/Lone-Keem-Studios/videos/stand-up-strong.jpg</video:thumbnail_loc>
+      <video:title>Stand Up Strong</video:title>
+      <video:description>Stand Up Strong is the official AI music video from Lone Keem Studios, written by Lone Keem.</video:description>
+      <video:content_loc>https://lonekeem.github.io/Lone-Keem-Studios/videos/stand-up-strong.mp4</video:content_loc>
+      <video:duration>102</video:duration>
+      <video:publication_date>2026-10-19</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+    </video:video>
+  </url>
+  <url><loc>https://lonekeem.github.io/Lone-Keem-Studios/app.html</loc><lastmod>2026-10-19</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://lonekeem.github.io/Lone-Keem-Studios/guidelines.html</loc><lastmod>2026-10-19</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://lonekeem.github.io/Lone-Keem-Studios/terms.html</loc><lastmod>2026-10-19</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://lonekeem.github.io/Lone-Keem-Studios/privacy.html</loc><lastmod>2026-10-19</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>

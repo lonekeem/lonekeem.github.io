@@ -1,0 +1,7 @@
+# Note: this file is served at https://lonekeem.github.io/Lone-Keem-Studios/robots.txt.
+# Crawlers only read robots.txt at the root of a host (https://lonekeem.github.io/robots.txt),
+# so this copy is informational. Submit the sitemap in Google Search Console instead.
+User-agent: *
+Allow: /
+
+Sitemap: https://lonekeem.github.io/Lone-Keem-Studios/sitemap.xml
