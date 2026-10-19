@@ -1305,9 +1305,9 @@ async function pageAdmin(token) {
     pub.disabled = false;
   };
   showStatus();
-  const snap = await getDocs(query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100)));
+  let snap = null; try { snap = await getDocs(query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100))); } catch (e) { if (!stale(token)) $('#reports').innerHTML = `<div class="card empty">${esc(friendlyError(e))}</div>`; }
   if (stale(token)) return;
-  const reports = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const reports = snap ? snap.docs.map((d) => ({ id: d.id, ...d.data() })) : null;
   $('#reindex').onclick = async () => {
     const b = $('#reindex'), m = $('#reindex-msg'); b.disabled = true; m.textContent = 'Working…';
     try { const r = await rebuildSearchIndex((n, t) => (m.textContent = `Updated ${n} of ${t}…`)); m.textContent = `Done. Checked ${r.posts} posts and ${r.users} profiles; updated ${r.updated}.`; }
@@ -1315,6 +1315,7 @@ async function pageAdmin(token) {
     b.disabled = false;
   };
   const box = $('#reports');
+  if (!reports) return;
   if (!reports.length) { box.innerHTML = '<div class="card empty">No reports right now.</div>'; return; }
   for (const r of reports) {
     const reporter = await getProfile(r.reporterId);
