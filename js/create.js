@@ -6,6 +6,8 @@
 import {
   CLOUDINARY, LIMITS, VIDEO_EXT, IMAGE_EXT, uploadsReady, uploadEndpoint, deliveryUrls
 } from './media-config.js';
+import { ICONS } from './icons.js';
+import { LIVE_CAP } from './live.js';
 
 const IC = {
   video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13" height="12" rx="3"/><path d="m15.5 10.5 6-3.5v10l-6-3.5z"/></svg>',
@@ -162,6 +164,7 @@ export function createComposer(ctx) {
       <div class="create-grid">
         <button class="create-opt" data-src="video"><span class="ci">${IC.video}</span><b>Record video</b><small>Up to ${LIMITS.maxVideoSeconds} seconds</small></button>
         <button class="create-opt" data-src="photo"><span class="ci">${IC.photo}</span><b>Take photo</b><small>Front or back camera</small></button>
+        <button class="create-opt wide live-opt" data-src="live"><span class="ci">${ICONS.live}</span><b>Go Live</b><small>Stream from your camera to up to ${LIVE_CAP} viewers · live chat + stars</small></button>
         <button class="create-opt wide story-opt" data-src="story"><span class="ci">${IC.story}</span><b>Add to your story</b><small>Photo or video up to ${LIMITS.storyVideoSeconds}s · disappears after ${LIMITS.storyHours} hours</small></button>
         <button class="create-opt wide" data-src="library"><span class="ci">${IC.library}</span><b>Upload from library</b><small>Videos up to ${LIMITS.maxVideoSeconds}s / ${LIMITS.maxVideoMB} MB · photos up to ${LIMITS.maxImageMB} MB</small></button>
       </div>
@@ -172,6 +175,7 @@ export function createComposer(ctx) {
     main.querySelectorAll('.create-opt').forEach((b) => {
       b.onclick = () => {
         const src = b.dataset.src;
+        if (src === 'live') { location.hash = '#/live/new'; return; }
         if (src === 'story') return openStory();
         target = 'post';
         if (src === 'library') return pickFile('in-library');

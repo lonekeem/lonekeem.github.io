@@ -330,6 +330,104 @@ service cloud.firestore {
       }
     }
 
+    // ---------- Live streams (WebRTC peer-to-peer; Firestore only carries signaling + chat) ----------
+    // lives/{id}: written only by the host (or the admin acting as the studio). The admin can also
+    // end any live. A live with no heartbeat for ~60 s is treated as ended by the app.
+    function validNewLive(d) {
+      let u = get(userPath(d.hostId)).data;
+      return d.keys().hasOnly(['hostId', 'hostName', 'hostUsername', 'hostColor', 'title', 'status', 'startedAt',
+                               'heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount'])
+        && d.keys().hasAll(['hostId', 'hostName', 'hostUsername', 'hostColor', 'title', 'status', 'startedAt',
+                            'heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount'])
+        && d.hostName == u.displayName
+        && d.hostUsername == u.username
+        && d.hostColor == u.color
+        && isStr(d.title, 0, 80)
+        && d.status == 'live'
+        && d.startedAt == request.time
+        && d.heartbeatAt == request.time
+        && d.viewerCount == 0 && d.peakViewers == 0 && d.totalViewers == 0 && d.starCount == 0
+        && getAfter(userPath(d.hostId)).data.lastPostAt == request.time;
+    }
+    function hostLiveUpdate() {
+      let n = request.resource.data;
+      let o = resource.data;
+      return actingAs(o.hostId) && o.status == 'live'
+        && changed().hasOnly(['heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount', 'status', 'endedAt', 'endedBy'])
+        && n.heartbeatAt == request.time
+        && n.viewerCount is int && n.viewerCount >= 0 && n.viewerCount <= 50
+        && n.peakViewers is int && n.peakViewers >= o.peakViewers && n.peakViewers <= 50
+        && n.totalViewers is int && n.totalViewers >= o.totalViewers && n.totalViewers <= 100000
+        && n.starCount is int && n.starCount >= o.starCount && n.starCount <= 10000000
+        && ((n.status == 'live' && !('endedAt' in n) && !('endedBy' in n))
+            || (n.status == 'ended' && n.endedAt == request.time && n.endedBy == 'host'));
+    }
+    function adminEndsLive() {
+      return isAdmin() && resource.data.status == 'live'
+        && changed().hasOnly(['status', 'endedAt', 'endedBy'])
+        && request.resource.data.status == 'ended'
+        && request.resource.data.endedAt == request.time
+        && request.resource.data.endedBy == 'admin';
+    }
+    match /lives/{lid} {
+      function live() { return get(/databases/$(database)/documents/lives/$(lid)).data; }
+      function isHost() { return signedIn() && actingAs(live().hostId); }
+      function liveOn() { return live().status == 'live'; }
+
+      allow read: if true;
+      allow create: if signedIn() && actingAs(request.resource.data.hostId) && validNewLive(request.resource.data);
+      allow update: if signedIn() && (hostLiveUpdate() || adminEndsLive());
+      allow delete: if signedIn() && (actingAs(resource.data.hostId) || isAdmin());
+
+      // A viewer asks to join (their own doc only). The host caps the number of connections.
+      match /viewers/{v} {
+        allow read: if signedIn() && (v == me() || isHost() || isAdmin());
+        allow create: if signedIn() && v == me() && liveOn()
+          && live().hostId != me() && !blockedBy(live().hostId)
+          && request.resource.data.keys().hasOnly(['name', 'username', 'color', 'joinedAt'])
+          && request.resource.data.name == get(userPath(me())).data.displayName
+          && request.resource.data.username == get(userPath(me())).data.username
+          && isStr(request.resource.data.color, 1, 20)
+          && request.resource.data.joinedAt == request.time;
+        allow delete: if signedIn() && (v == me() || isHost() || isAdmin());
+      }
+      // The host's WebRTC offer for one viewer (or "full").
+      match /conns/{v} {
+        allow read: if signedIn() && (v == me() || isHost());
+        allow create, update: if isHost()
+          && request.resource.data.keys().hasOnly(['offer', 'full', 'createdAt'])
+          && isStr(request.resource.data.offer, 0, 30000)
+          && request.resource.data.full is bool
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isHost() || (signedIn() && v == me());
+      }
+      // The viewer's WebRTC answer (their own doc only).
+      match /answers/{v} {
+        allow read: if signedIn() && (v == me() || isHost());
+        allow create, update: if signedIn() && v == me() && liveOn()
+          && request.resource.data.keys().hasOnly(['answer', 'createdAt'])
+          && isStr(request.resource.data.answer, 1, 30000)
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn() && (v == me() || isHost());
+      }
+      // Live chat + stars, tied to the signed-in author, max ~1 per second (lastMessageAt).
+      match /chat/{c} {
+        allow read: if true;
+        allow create: if signedIn() && liveOn() && !blockedBy(live().hostId)
+          && request.resource.data.keys().hasOnly(['authorId', 'name', 'username', 'color', 'type', 'text', 'count', 'createdAt'])
+          && request.resource.data.authorId == me()
+          && request.resource.data.name == get(userPath(me())).data.displayName
+          && request.resource.data.username == get(userPath(me())).data.username
+          && isStr(request.resource.data.color, 1, 20)
+          && ((request.resource.data.type == 'msg' && isStr(request.resource.data.text, 1, 150) && request.resource.data.count == 0)
+              || (request.resource.data.type == 'star' && request.resource.data.text == ''
+                  && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
+          && request.resource.data.createdAt == request.time
+          && getAfter(userPath(me())).data.lastMessageAt == request.time;
+        allow delete: if signedIn() && (isHost() || isAdmin() || resource.data.authorId == me());
+      }
+    }
+
     // ---------- Follows (id = followerUid_followeeUid) ----------
     match /follows/{fid} {
       allow read: if true;

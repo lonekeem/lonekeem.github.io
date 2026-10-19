@@ -16,9 +16,10 @@ import {
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy,
   limit, onSnapshot, writeBatch, serverTimestamp, increment, getCountFromServer, Timestamp,
-  getAggregateFromServer, sum
+  getAggregateFromServer, sum, limitToLast
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ICONS } from './icons.js';
+import { createLive } from './live.js';
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -462,6 +463,8 @@ const routes = [
   [/^#\/u\/([a-z0-9_.]{1,30})(?:\/(saved))?$/i, pageProfile, 'me'],
   [/^#\/(followers|following)\/([\w-]+)$/, pageFollowList, 'me'],
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
+  [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
+  [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
   [/^#\/settings$/, pageSettings, 'me'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
@@ -485,6 +488,7 @@ async function route() {
       renderChrome(nav);
       main.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
       document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
+      document.body.classList.remove('live-mode');
       window.scrollTo(0, 0);
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
@@ -526,6 +530,10 @@ const stories = createStories({
   openStory: () => composer.openStory(), sendMessage, refreshProfile,
   fs: { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, writeBatch, Timestamp, serverTimestamp }
 });
+const live = createLive({
+  S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal,
+  fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp }
+});
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
   STUDIO_UID, youTubeId, tikTokId, stale, canGoBack: () => navCount > 1,
@@ -543,10 +551,11 @@ async function pageFeed(token) {
         <p class="muted" style="margin:6px 0 0">Follow the studio for new movies and music, star and comment on drops, save favorites, share your own creations, and message other fans.</p>
         <div class="row" style="justify-content:center;flex-wrap:wrap"><a class="btn" href="#/signup">Create account</a><a class="btn btn-ghost" href="#/login">Log in</a></div>
       </section>
+      <div id="live-now"></div>
       <div id="stories" class="stories-slot"></div>
       <h2 style="margin:26px 0 14px;font-size:1.2rem">Latest from the community</h2>
       <div id="posts"></div>`;
-    stories.renderRow($('#stories'), token, stale);
+    live.renderFeed($('#live-now'), $('#stories'), stories.renderRow($('#stories'), token, stale), token);
     const snap = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)));
     if (stale(token)) return;
     renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet.');
@@ -556,10 +565,11 @@ async function pageFeed(token) {
   main.innerHTML = `
     ${verified ? '' : `<div class="banner">Check your inbox to verify <b>${esc(S.user.email)}</b>. <button class="link-btn" id="resend">Resend email</button></div>`}
     ${feedToggle('feed')}
+    <div id="live-now"></div>
     <div id="stories" class="stories-slot"></div>
     <div class="row"><h1 class="page-title">Posts</h1><span class="spacer"></span><a class="btn btn-sm btn-ghost" href="#/new">New post</a></div>
     <div id="posts"><div class="spinner"></div></div>`;
-  stories.renderRow($('#stories'), token, stale);
+  live.renderFeed($('#live-now'), $('#stories'), stories.renderRow($('#stories'), token, stale), token);
   const rs = $('#resend'); if (rs) rs.onclick = async () => { try { await sendEmailVerification(S.user); toast('Verification email sent'); } catch (e) { toast(friendlyError(e)); } };
   const authors = [...new Set([S.user.uid, STUDIO_UID, ...S.following])].filter((u) => !S.blocked.has(u));
   const chunks = []; for (let i = 0; i < authors.length; i += 30) chunks.push(authors.slice(i, i + 30));
@@ -803,6 +813,7 @@ async function pageProfile(username, tab, token) {
     <div id="posts"><div class="spinner"></div></div>`;
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
   if (!blocked) stories.renderProfile($('#pav'), $('#pstories'), uid, u, token, stale);
+  if (!blocked) live.renderProfile($('#pav'), $('.profile-actions'), uid, mine || (uid === STUDIO_UID && isAdmin()), token);
   $('#report-user')?.addEventListener('click', () => reportDialog('user', uid, '', '@' + u.username));
   $('#block')?.addEventListener('click', () => blockUser(uid, u.username));
   $('#unblock')?.addEventListener('click', () => unblockUser(uid, u.username));
