@@ -582,7 +582,7 @@ const routes = [
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
   [/^#\/pals(?:\/(gallery|shop|store|store-bg))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
   [/^#\/park$/, () => park.page(), 'me'],
-  [/^#\/arcade(?:\/([\w-]+))?$/, (id) => import('./pals/minigames.js').then((m) => (arcade = arcade || m.createArcade({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal })).page(id)), 'games'],
+  [/^#\/arcade(?:\/([\w-]+))?(?:\?(.*))?$/, (id, q) => import('./pals/minigames.js').then((m) => (arcade = arcade || m.createArcade({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal, sendMessage, getProfile })).page(id, q)), 'games'],
   [/^#\/scores(?:\/([\w-]+))?(?:\?(.*))?$/, (g, q, t) => import('./leaderboard.js').then((m) => m.scoreboardPage(main, { game: g || 'all', tab: new URLSearchParams(q || '').get('tab') || 'all', S, stale: () => stale(t) })), 'games'],
   [/^#\/games\/pals(?:\/([\w-]+))?(?:\?(.*))?$/, (b, q) => palGames.page(b, Object.fromEntries(new URLSearchParams(q || ''))), 'games'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],

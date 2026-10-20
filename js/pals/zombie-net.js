@@ -53,7 +53,7 @@ export function createNet(db, uid) {
       S.players = p; if (p[uid]) S.me = S.me || { ...p[uid] }; emit('players'); }));
     S.stops.push(onSnapshot(doc(db, 'zLobbies', code, 's', 'state'), (d) => { S.state = d.exists() ? d.data() : null; emit('state'); }));
     let pending = null, sending = false, lastSend = 0, sState = null, sendingS = false, lastS = 0;
-    async function flush() { if (sending || !pending) return; const wait = 115 - (Date.now() - lastSend); if (wait > 0) { setTimeout(flush, wait); return; }
+    async function flush() { if (sending || !pending) return; if (!S.me) { setTimeout(flush, 150); return; } const wait = 115 - (Date.now() - lastSend); if (wait > 0) { setTimeout(flush, wait); return; }
       sending = true; const data = { ...S.me, ...pending, at: serverTimestamp() }; pending = null; S.me = { ...data };
       try { await setDoc(doc(db, 'zLobbies', code, 'p', uid), data); } catch (e) { console.warn('zombie p', e.code || e.message); } lastSend = Date.now(); sending = false; if (pending) flush(); }
     async function flushS() { if (sendingS || !sState) return; const wait = 160 - (Date.now() - lastS); if (wait > 0) { setTimeout(flushS, wait); return; }
