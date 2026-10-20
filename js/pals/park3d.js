@@ -5,6 +5,7 @@
 // water shading, paths, benches, lamps, a playground, a fountain and the purple Kemy Studio. All original, built in code.
 // Multiplayer: Firestore presence in rooms of 25 (parkRooms/rN/p/{uid}), <= 4 writes/s while moving, 15 s heartbeat,
 // interpolation, stale cleanup. Chat via the safety filter, bubbles + chat log, report / mute / block.
+import { spamOk } from '../spam.js';
 import { doc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp, addDoc }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { THREE, makePal3D, posePal3D, gfxLevel } from './pal3d.js';
@@ -434,7 +435,7 @@ export function createPark3D(ctx) {
     log.addEventListener('click', () => log.classList.toggle('open'));
     // chat input
     let lastSay = 0, burst = [];
-    function say(t) { const now = Date.now(); burst = burst.filter((x) => now - x < 30000); if (now - lastSay < 2500 || burst.length >= 6) { toast('Slow down a little 🙂'); return false; } lastSay = now; burst.push(now); P.say = clean(t).slice(0, 60); P.sayAt = now; dirty = true; send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color); return true; }
+    function say(t) { const now = Date.now(); burst = burst.filter((x) => now - x < 30000); if (now - lastSay < 2500 || burst.length >= 6) { toast('Slow down a bit 💜'); return false; } if (!spamOk('park', t)) return false; lastSay = now; burst.push(now); P.say = clean(t).slice(0, 60); P.sayAt = now; dirty = true; send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color); return true; }
     $('#p3-chat').onsubmit = (e) => { e.preventDefault(); const inp = $('#p3-t'); const v = inp.value.trim(); if (!v) { inp.blur(); return; } if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } if (say(v)) { inp.value = ''; inp.blur(); } };
     const panel = $('#park-panel'); const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };
     // quick chat: tabbed tap-to-say phrases (greetings, teamwork, GG, compliments, park, emoji); the text bar stays too

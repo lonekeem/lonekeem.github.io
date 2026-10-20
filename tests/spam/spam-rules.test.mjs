@@ -1,0 +1,62 @@
+// Rules tests: anti-spam (daily post cap for new accounts, link limits, follow + new-chat rate).
+// Run: firebase emulators:exec --config firebase.emu.json --only firestore --project demo-spam "node tests/spam/spam-rules.test.mjs"
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { doc, setDoc, writeBatch, serverTimestamp, Timestamp, increment } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+const env = await initializeTestEnvironment({ projectId: 'demo-spam', firestore: { host: '127.0.0.1', port: 8199, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, e.message.slice(0, 200)); } };
+const db = (u) => env.authenticatedContext(u, { email: u + '@example.com', email_verified: true }).firestore();
+const Y = new Date().getFullYear(), DAY = Math.floor(Date.now() / 864e5);
+const prof = (n, made) => ({ displayName: n, username: n, bio: '', color: '#8a2be2', createdAt: made, welcomed: true, birthY: Y - 20, birthM: 1, rulesAt: Timestamp.now() });
+const OLD = Timestamp.fromMillis(Date.now() - 10 * 864e5);
+await env.withSecurityRulesDisabled(async (c) => { const f = c.firestore();
+  await setDoc(doc(f, 'users/newbie'), prof('newbie', Timestamp.now()));
+  await setDoc(doc(f, 'users/newb2'), prof('newb2', Timestamp.now()));
+  for (const u of ['vet', 'pal', 'v2', 'studio']) await setDoc(doc(f, 'users/' + u), prof(u, OLD));
+  for (const [a, b] of [['vet', 'pal'], ['pal', 'vet'], ['vet', 'v2'], ['v2', 'vet']]) await setDoc(doc(f, `follows/${a}_${b}`), { follower: a, followee: b, createdAt: Timestamp.now() });
+  await setDoc(doc(f, 'posts/p1'), { authorId: 'vet', authorName: 'vet', authorUsername: 'vet', authorColor: '#8a2be2', type: 'text', text: 'hi', linkUrl: '', mediaUrl: '', mediaType: '', poster: '', createdAt: Timestamp.now(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false });
+});
+const post = (u, text, stamp) => { const f = db(u), b = writeBatch(f), r = doc(f, 'posts', 'x' + Math.random().toString(36).slice(2));
+  b.set(r, { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', type: 'text', text, linkUrl: '', mediaUrl: '', mediaType: '', poster: '', createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false });
+  b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp(), ...stamp }); return b.commit(); };
+const reset = (u, extra) => env.withSecurityRulesDisabled((c) => setDoc(doc(c.firestore(), 'users', u), extra, { merge: true }));
+await ok('new account first post with counter', assertSucceeds(post('newbie', 'hello', { postDay: DAY, postsToday: 1 })));
+await reset('newbie', { lastPostAt: Timestamp.fromMillis(Date.now() - 60e3) });
+await ok('new account post without counter rejected', assertFails(post('newbie', 'hello2', {})));
+await ok('new account cannot fake counter reset', assertFails(post('newbie', 'hello2', { postDay: DAY, postsToday: 1 })));
+await ok('new account second post', assertSucceeds(post('newbie', 'hello2', { postDay: DAY, postsToday: 2 })));
+await reset('newbie', { lastPostAt: Timestamp.fromMillis(Date.now() - 60e3), postsToday: 5 });
+await ok('new account 6th post today rejected', assertFails(post('newbie', 'hello6', { postDay: DAY, postsToday: 6 })));
+await ok('new account post with link rejected', assertFails(post('newb2', 'see https://spam.example', { postDay: DAY, postsToday: 1 })));
+await ok('new account cloudinary link OK', assertSucceeds(post('newb2', 'song https://res.cloudinary.com/x/video/upload/a.mp3', { postDay: DAY, postsToday: 1 })));
+await ok('old account post (no counter) OK with 2 links', assertSucceeds(post('vet', 'a https://a.com b www.b.com', {})));
+await reset('vet', { lastPostAt: Timestamp.fromMillis(Date.now() - 60e3) });
+await ok('old account 3 links rejected', assertFails(post('vet', 'https://a.com https://b.com https://c.com', {})));
+await ok('20 s cooldown still enforced', assertSucceeds(post('vet', 'ok', {})).then(() => assertFails(post('vet', 'again', {}))));
+await ok('counter alone cannot change', assertFails(setDoc(doc(db('newbie'), 'users/newbie'), { postsToday: 0 }, { merge: true })));
+// comments
+const cmt = (u, text) => { const f = db(u), b = writeBatch(f), id = 'c' + Math.random().toString(36).slice(2);
+  b.set(doc(f, 'posts/p1/comments', id), { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', text, createdAt: serverTimestamp(), likeCount: 0, replyCount: 0 });
+  b.update(doc(f, 'posts/p1'), { commentCount: increment(1), lastCommentId: id }); b.update(doc(f, 'users', u), { lastCommentAt: serverTimestamp() }); return b.commit(); };
+await ok('new account comment with link rejected', assertFails(cmt('newb2', 'go www.spam.com')));
+await ok('new account plain comment OK', assertSucceeds(cmt('newb2', 'nice!')));
+await ok('old account comment 3 links rejected', assertFails(cmt('pal', 'https://a.com https://b.com https://c.com')));
+// follows
+const fol = (u, t, stamp = true) => { const f = db(u), b = writeBatch(f); b.set(doc(f, 'follows', `${u}_${t}`), { follower: u, followee: t, createdAt: serverTimestamp() }); if (stamp) b.update(doc(f, 'users', u), { lastFollowAt: serverTimestamp() }); return b.commit(); };
+await ok('follow without stamp rejected', assertFails(fol('newbie', 'vet', false)));
+await ok('follow with stamp OK', assertSucceeds(fol('newbie', 'vet')));
+await ok('second follow within 2 s rejected', assertFails(fol('newbie', 'pal')));
+await ok('follow studio at signup exempt', assertSucceeds(fol('newb2', 'studio', false)));
+// DMs
+const dm = (u, o, text, newChat = true) => { const f = db(u), b = writeBatch(f), parts = [u, o].sort(), cid = parts.join('_');
+  if (newChat) b.set(doc(f, 'chats', cid), { participants: parts, lastMessage: text, lastAt: serverTimestamp(), lastSender: u, createdAt: serverTimestamp() });
+  else b.update(doc(f, 'chats', cid), { lastMessage: text, lastAt: serverTimestamp(), lastSender: u });
+  b.set(doc(f, 'chats', cid, 'messages', 'm' + Math.random().toString(36).slice(2)), { senderId: u, text, createdAt: serverTimestamp() });
+  b.update(doc(f, 'users', u), { lastMessageAt: serverTimestamp(), ...(newChat ? { lastNewChatAt: serverTimestamp() } : {}) }); return b.commit(); };
+await ok('new chat with stamp OK', assertSucceeds(dm('vet', 'pal', 'hey')));
+await new Promise((r) => setTimeout(r, 1100));
+await ok('second new chat within 8 s rejected', assertFails(dm('vet', 'v2', 'hey')));
+await ok('reply in existing chat OK', assertSucceeds(dm('vet', 'pal', 'how are you', false)));
+await new Promise((r) => setTimeout(r, 1100));
+await ok('DM with 3 links rejected', assertFails(dm('vet', 'pal', 'https://a.com https://b.com https://c.com', false)));
+console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

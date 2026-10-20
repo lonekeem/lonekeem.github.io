@@ -31,6 +31,7 @@ import { createLive } from './live.js';
 import { createModeration, BlockSet } from './moderation.js';
 import { initKindGuard } from './kindguard.js';
 import * as safety from './safety.js';
+import { initSpam, spamOk, followOk, postStamp, postDone } from './spam.js';
 import { initMediaScan, takeHold } from './mediascan.js';
 import { initTranslate, settingsHtml as txSettingsHtml, wireSettings as txWireSettings } from './translate.js';
 import { createAccountDeleter } from './account-delete.js';
@@ -201,6 +202,7 @@ const chatIdFor = (a, b) => [a, b].sort().join('_');
 // Sends a DM (used by the chat page and story replies). `me` is the sender (studio for the admin).
 async function sendMessage(otherUid, text, me = S.user.uid, snapData = null) {
   if (me !== STUDIO_UID && !(await safety.gate())) throw Object.assign(new Error('Messages are switched off for your account.'), { code: 'kemy/safety' });
+  if (me !== STUDIO_UID && !snapData && !spamOk('dm', text, { to: otherUid })) throw Object.assign(new Error('Slow down a bit 💜'), { code: 'kemy/spam' });
   if (me !== STUDIO_UID) safety.scanAge(text, 'chat message', chatIdFor(me, otherUid));
   const cid = chatIdFor(me, otherUid);
   const chatRef = doc(db, 'chats', cid);
@@ -214,9 +216,10 @@ async function sendMessage(otherUid, text, me = S.user.uid, snapData = null) {
   const meta = { lastMessage: text.slice(0, 1000), lastAt: serverTimestamp(), lastSender: me };
   if (exists) b.update(chatRef, meta);
   else b.set(chatRef, { participants: [me, otherUid].sort(), ...meta, createdAt: serverTimestamp() });
+  const newChat = !exists && me !== STUDIO_UID && otherUid !== STUDIO_UID && !mod.iAmMod();
   b.set(doc(collection(db, 'chats', cid, 'messages')), { senderId: me, text: text.slice(0, 1000), createdAt: serverTimestamp(), ...(snapData ? { snap: snapData, viewed: false } : {}) });
-  b.update(doc(db, 'users', me), { lastMessageAt: serverTimestamp() });
-  await b.commit();
+  b.update(doc(db, 'users', me), { lastMessageAt: serverTimestamp(), ...(newChat ? { lastNewChatAt: serverTimestamp() } : {}) });
+  try { await b.commit(); } catch (e) { if (newChat && e.code === 'permission-denied') throw Object.assign(new Error('Slow down a bit 💜 You can start a new chat every few seconds.'), { code: 'kemy/spam' }); throw e; }
   if (!exists || snap.data().lastSender !== me) notify(otherUid, 'message', { text }, me);
 }
 
@@ -272,7 +275,13 @@ async function savePost(postId, on) {
 }
 async function followUser(uid, on) {
   const ref = doc(db, 'follows', `${S.user.uid}_${uid}`);
-  if (on) { await setDoc(ref, { follower: S.user.uid, followee: uid, createdAt: serverTimestamp() }); S.following.add(uid); notify(uid, 'follow'); }
+  if (on) {
+    if (!followOk()) throw Object.assign(new Error('Slow down a bit 💜'), { code: 'kemy/spam', quiet: true });
+    const b = writeBatch(db); b.set(ref, { follower: S.user.uid, followee: uid, createdAt: serverTimestamp() });
+    if (uid !== STUDIO_UID && !isAdmin()) b.update(doc(db, 'users', S.user.uid), { lastFollowAt: serverTimestamp() });
+    try { await b.commit(); } catch (e) { if (e.code === 'permission-denied') throw Object.assign(new Error('Slow down a bit 💜 Wait a second between follows.'), { code: 'kemy/spam' }); throw e; }
+    S.following.add(uid); notify(uid, 'follow');
+  }
   else { await deleteDoc(ref); S.following.delete(uid); }
 }
 // Comments, replies and comment stars live in comments.js.
@@ -282,13 +291,7 @@ const comments = createComments({
   reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x)
 });
 // Kind-words filter on every text box; tricks / repeated tries => 1-hour timeout + Mod Hub item.
-initKindGuard({ onBypass: async ({ text, word, sneaky }) => {
-  toast('💜 Let’s keep it kind. Your account is paused for 1 hour.');
-  if (!S.user || isAdmin()) return;
-  const reason = sneaky ? 'Tried to sneak a mean word past the kind-words filter' : 'Kept trying to send mean words';
-  try { await setDoc(doc(db, 'bans', S.user.uid), { until: Timestamp.fromMillis(Date.now() + 3600e3 - 30e3), reason, permanent: false, hide: false, by: 'auto', at: serverTimestamp(), name: String(S.profile?.displayName || '').slice(0, 60), uname: String(S.profile?.username || '').slice(0, 30) }); } catch (e) { console.warn('auto timeout', e.code); }
-  try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: S.user.uid, targetUid: S.user.uid, postId: '', reason: `🤖 Auto timeout (1 hour): ${reason}${word ? ` (“${word}”)` : ''}. Lift it or keep it.`, excerpt: text.slice(0, 300), status: 'open', createdAt: serverTimestamp() }); } catch (e) { console.warn('auto report', e.code); }
-} });
+initKindGuard({ onBypass: ({ text, word, sneaky }) => safety.autoPause({ text, word, reason: sneaky ? 'Tried to sneak a mean word past the kind-words filter' : 'Kept trying to send mean words' }) });
 initTranslate();
 // Moderators, reports inbox, suspensions (js/moderation.js).
 const mod = createModeration({ publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
@@ -670,6 +673,7 @@ const routes = [
 ];
 function gated(fn) { return async (...a) => { if (!requireAuth()) return; if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; } return fn(...a); }; }
 safety.initSafety({ S, db, esc, openModal, closeModal, toast, isAdmin: () => isAdmin(), friendlyError });
+initSpam({ S, toast, isAdmin: () => isAdmin(), autoPause: (o) => safety.autoPause({ ...o, note: 'Slow down a bit 💜 Lots of repeats, so your account is paused for 1 hour.' }) });
 initMediaScan({ S, db, isAdmin: () => isAdmin() });
 // 3+ reports from different people: hidden from everyone except moderators and the author until a
 // moderator keeps it (reportOk) or removes it.
@@ -899,6 +903,7 @@ function textComposeForm(slot, open) {
     if (linkUrl && !LINK_RE.test(linkUrl)) { err.textContent = 'Links must be a YouTube or TikTok URL starting with https://'; return; }
     if (!text && !linkUrl) { err.textContent = 'Write something or add a link.'; return; }
     if (!(await safety.gate())) return;
+    if (!asStudio && !spamOk('post', text, { linkUrl })) return;
     if (!safety.piiOk(text)) return;
     const ytNew = linkUrl ? youTubeId(linkUrl) : null;
     if (ytNew && /^[\w-]+$/.test(ytNew)) { err.textContent = 'Checking the YouTube video…'; const bad = await checkYtForUpload(ytNew); err.textContent = bad; if (bad) return; }
@@ -913,13 +918,13 @@ function textComposeForm(slot, open) {
         ...searchFields({ text, authorName: author.displayName, authorUsername: author.username }),
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
       });
-      b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
-      await b.commit();
+      const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
+      await b.commit(); postDone(st);
       safety.scanAge(text, 'post', ref.id, ref.id);
       toast(S.lastHeld === ref.id ? 'Your post is being reviewed 🕒' : 'Posted!');
       location.hash = '#/post/' + ref.id;
     } catch (e) {
-      err.textContent = e.code === 'permission-denied' ? 'You can post once every 20 seconds. Please wait a moment and try again.' : friendlyError(e);
+      err.textContent = e.code === 'permission-denied' ? 'Slow down a bit 💜 You can post once every 20 seconds (new accounts: 5 posts a day, no links for 3 days).' : friendlyError(e);
       btn.disabled = false; btn.textContent = 'Post';
     }
   };
@@ -927,6 +932,7 @@ function textComposeForm(slot, open) {
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
 async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
+  if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Slow down a bit 💜 Try posting again in a moment.'), { code: 'kemy/spam' });
   if (caption) safety.scanAge(caption, 'post');
   const urls = deliveryUrls(upload);
   const { authorId, author } = await postAuthor(asStudio);
@@ -943,8 +949,8 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
     ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
   }, takeHold());
-  b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
-  await b.commit();
+  const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
+  await b.commit(); postDone(st);
   return ref.id;
 }
 
@@ -966,8 +972,8 @@ async function saveStory({ upload, info, caption, asStudio }) {
     cloudinaryPublicId: String(upload.public_id).slice(0, 255),
     createdAt: serverTimestamp(), expiresAt
   });
-  b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp(), storyUntil: expiresAt });
-  await b.commit();
+  const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), { ...st, storyUntil: expiresAt });
+  await b.commit(); postDone(st);
   if (authorId === S.user.uid) S.profile.storyUntil = expiresAt;
   profileCache.delete(authorId);
   return ref.id;

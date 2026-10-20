@@ -3,6 +3,7 @@
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { doc, setDoc, updateDoc, deleteDoc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
+const ps = async (f, u) => { const d = (await getDoc(doc(f, 'users', u))).data() || {}; const D = Math.floor(Date.now() / 864e5); return { postDay: D, postsToday: d.postDay === D ? (d.postsToday || 0) + 1 : 1 }; };
 const env = await initializeTestEnvironment({ projectId: 'demo-safety', firestore: { host: '127.0.0.1', port: 8199, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
 let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, e.message.slice(0, 200)); } };
 const db = (u) => env.authenticatedContext(u, { email: u + '@example.com', email_verified: true }).firestore();
@@ -29,9 +30,9 @@ await env.withSecurityRulesDisabled(async (c) => { const f = c.firestore();
   await setDoc(doc(f, 'follows/pal_teen'), { follower: 'pal', followee: 'teen', createdAt: Timestamp.now() });
   await setDoc(doc(f, 'follows/teen_stranger'), { follower: 'teen', followee: 'stranger', createdAt: Timestamp.now() });
 });
-const post = (u, id) => { const f = u === 'admin' ? ADMIN : db(u); const b = writeBatch(f); b.set(doc(f, 'posts', id), { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', type: 'text', text: 'hello', linkUrl: '', mediaUrl: '', mediaType: '', poster: '', createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false }); b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp() }); return b.commit(); };
+const post = async (u, id) => { const f = u === 'admin' ? ADMIN : db(u); const b = writeBatch(f); b.set(doc(f, 'posts', id), { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', type: 'text', text: 'hello', linkUrl: '', mediaUrl: '', mediaType: '', poster: '', createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false }); b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp(), ...(await ps(f, u)) }); return b.commit(); };
 const cmt = (u, id) => { const f = db(u); const b = writeBatch(f); b.set(doc(f, 'posts/p1/comments', id), { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', text: 'nice', createdAt: serverTimestamp(), likeCount: 0, replyCount: 0 }); b.update(doc(f, 'posts/p1'), { commentCount: 1, lastCommentId: id }); b.update(doc(f, 'users', u), { lastCommentAt: serverTimestamp() }); return b.commit(); };
-const chat = (u, o) => { const f = db(u); const id = [u, o].sort().join('_'); const b = writeBatch(f); b.set(doc(f, 'chats', id), { participants: [u, o].sort(), lastMessage: 'hey', lastAt: serverTimestamp(), lastSender: u, createdAt: serverTimestamp() }); b.set(doc(f, 'chats', id, 'messages', 'm1'), { senderId: u, text: 'hey', createdAt: serverTimestamp() }); b.update(doc(f, 'users', u), { lastMessageAt: serverTimestamp() }); return b.commit(); };
+const chat = (u, o) => { const f = db(u); const id = [u, o].sort().join('_'); const b = writeBatch(f); b.set(doc(f, 'chats', id), { participants: [u, o].sort(), lastMessage: 'hey', lastAt: serverTimestamp(), lastSender: u, createdAt: serverTimestamp() }); b.set(doc(f, 'chats', id, 'messages', 'm1'), { senderId: u, text: 'hey', createdAt: serverTimestamp() }); b.update(doc(f, 'users', u), { lastMessageAt: serverTimestamp(), lastNewChatAt: serverTimestamp() }); return b.commit(); };
 
 await ok('admin posts without birthday', assertSucceeds(post('admin', 'a5')));
 await ok('13+ teen who agreed can post', assertSucceeds(post('teen', 'a1')));

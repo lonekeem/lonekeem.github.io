@@ -1,5 +1,6 @@
 // Firestore plumbing for Games: creating / joining games and rooms, quick match, heartbeats,
 // quick chat, invites and recording results. Turn-based and cheap on purpose (Spark plan).
+import { spamOk } from '../spam.js';
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, limitToLast, onSnapshot,
   writeBatch, serverTimestamp, runTransaction, addDoc, Timestamp, deleteField
@@ -114,7 +115,7 @@ export function createNet({ db, S }) {
     document.addEventListener('visibilitychange', vis);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
   }
-  const sendEmote = (gid, e) => addDoc(collection(db, 'games', gid, 'chat'), { uid: S.user.uid, e, at: serverTimestamp() });
+  const sendEmote = (gid, e) => !spamOk('game', '') ? Promise.resolve(null) : addDoc(collection(db, 'games', gid, 'chat'), { uid: S.user.uid, e, at: serverTimestamp() });
   const watchChat = (gid, cb) => onSnapshot(query(collection(db, 'games', gid, 'chat'), orderBy('at'), limitToLast(8)), (qs) => {
     qs.docChanges().forEach((c) => { if (c.type === 'added' && !c.doc.metadata.hasPendingWrites) cb({ id: c.doc.id, ...c.doc.data() }); });
   }, () => {});

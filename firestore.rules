@@ -72,7 +72,8 @@ service cloud.firestore {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
-                               'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt'])
+                               'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt',
+                               'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt'])
         && validBirth(d)
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
@@ -98,6 +99,29 @@ service cloud.firestore {
         || (request.resource.data[field] == request.time
             && (isAdmin() || !(field in resource.data)
                 || resource.data[field] + duration.value(secs, 's') < request.time));
+    }
+
+    // ---------- Anti-spam (js/spam.js does the friendly client-side checks) ----------
+    function isNewAcct(d) { return d.get('createdAt', request.time) > request.time - duration.value(3, 'd'); }
+    // Links in free text (our own Cloudinary media links don't count).
+    function linkText(t) { return t.replace('https://res[.]cloudinary[.]com/[^\\s]*', ''); }
+    function hasLink(t) { return linkText(t).matches('(?is).*(https?://|www[.]).*'); }
+    function tooManyLinks(t) { return linkText(t).matches('(?is)(.*(https?://|www[.])){3,}.*'); }
+    // New accounts: no links; everyone else: at most 2 links per post / comment / message.
+    function linksOk(t, u) { return !tooManyLinks(t) && (!isNewAcct(u) || !hasLink(t)); }
+    function dayNo() { return math.floor(request.time.toMillis() / 86400000); }
+    // Daily post cap: accounts under 3 days old get 5 posts (and lives / stories) per UTC day.
+    // postDay / postsToday only change together with lastPostAt.
+    function postCapOk() {
+      let n = request.resource.data;
+      let o = resource.data;
+      return (!changed().hasAny(['postDay', 'postsToday']) || 'lastPostAt' in changed())
+        && (!('lastPostAt' in changed()) || isAdmin()
+          || (!isNewAcct(o) && (!('postDay' in n) || (n.postDay is int && n.get('postsToday', 0) is int)))
+          || (n.get('postDay', null) is int && n.postDay >= dayNo() - 1 && n.postDay <= dayNo()
+              && n.postDay >= o.get('postDay', 0)
+              && n.get('postsToday', 0) == (n.postDay == o.get('postDay', -1) ? o.get('postsToday', 0) + 1 : 1)
+              && n.postsToday <= 5));
     }
 
     // Private feed interests (For You ranking), readable / writable only by the owner.
@@ -132,7 +156,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn() && uid == me()
         && validProfile(request.resource.data)
-        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt'])
+        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt', 'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt'])
         && request.resource.data.createdAt == request.time
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if actingAs(uid)
@@ -144,6 +168,10 @@ service cloud.firestore {
         && rateOk('lastPostAt', 20)
         && rateOk('lastCommentAt', 5)
         && rateOk('lastMessageAt', 1)
+        // Anti-spam: follows at most one per 2 s, new DM conversations one per 8 s, daily post cap for new accounts.
+        && rateOk('lastFollowAt', 2)
+        && rateOk('lastNewChatAt', 8)
+        && postCapOk()
         // Birthday: set once, then locked (admin / human moderators fix mistakes below).
         && (!('birthY' in resource.data) || (request.resource.data.get('birthY', 0) == resource.data.birthY && request.resource.data.get('birthM', 0) == resource.data.birthM))
         // Rules agreement: set to now, once.
@@ -279,6 +307,7 @@ service cloud.firestore {
         && ((d.type in ['movie', 'song']) == ('work' in d))
         && (!('work' in d) || validWork(d))
         && cleanStr(d.text, 0, 2000)
+        && (d.authorId == 'studio' || isAdmin() || linksOk(d.text, u))
         && isStr(d.linkUrl, 0, 300)
         && isStr(d.mediaUrl, 0, 500)
         && (d.mediaType in ['', 'image', 'video'] || (d.mediaType == 'audio' && d.type == 'song'))
@@ -526,6 +555,7 @@ service cloud.firestore {
           && request.resource.data.authorUsername == me_().username
           && isStr(request.resource.data.authorColor, 1, 20)
           && validBody(request.resource.data)
+          && (isAdmin() || linksOk(request.resource.data.text, me_()))
           && request.resource.data.createdAt == request.time
           && request.resource.data.get('likeCount', 0) == 0
           && request.resource.data.get('replyCount', 0) == 0
@@ -737,7 +767,7 @@ service cloud.firestore {
           && request.resource.data.name == get(userPath(me())).data.displayName
           && request.resource.data.username == get(userPath(me())).data.username
           && isStr(request.resource.data.color, 1, 20)
-          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && request.resource.data.count == 0)
+          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && !tooManyLinks(request.resource.data.text) && request.resource.data.count == 0)
               || (request.resource.data.type == 'star' && request.resource.data.text == ''
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
@@ -757,6 +787,9 @@ service cloud.firestore {
         && fid == me() + '_' + request.resource.data.followee
         && exists(userPath(request.resource.data.followee))
         && !blockedBy(request.resource.data.followee)
+        // Anti-spam: each follow stamps lastFollowAt (max one per 2 s); following the studio at signup is exempt.
+        && (request.resource.data.followee == 'studio' || isAdmin()
+            || getAfter(userPath(me())).data.get('lastFollowAt', null) == request.time)
         && request.resource.data.createdAt == request.time;
       allow delete: if signedIn()
         && (resource.data.follower == me() || resource.data.followee == me() || isAdmin());
@@ -789,6 +822,9 @@ service cloud.firestore {
             || (exists(/databases/$(database)/documents/follows/$(request.resource.data.lastSender + '_' + otherOf(request.resource.data.lastSender)))
                 && exists(/databases/$(database)/documents/follows/$(otherOf(request.resource.data.lastSender) + '_' + request.resource.data.lastSender))))
         && isStr(request.resource.data.lastMessage, 0, 1000)
+        // Anti-spam: starting new conversations is limited (lastNewChatAt, one per 8 s).
+        && ('studio' in request.resource.data.participants || isMod()
+            || getAfter(userPath(request.resource.data.lastSender)).data.get('lastNewChatAt', null) == request.time)
         && request.resource.data.lastAt == request.time
         && request.resource.data.createdAt == request.time;
       allow update: if inChat()
@@ -809,6 +845,7 @@ service cloud.firestore {
           && request.resource.data.senderId in parts()
           && actingAs(request.resource.data.senderId)
           && cleanStr(request.resource.data.text, 1, 1000)
+          && ('studio' in parts() || linksOk(request.resource.data.text, get(userPath(request.resource.data.senderId)).data))
           && request.resource.data.createdAt == request.time
           && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
           && getAfter(chatPath()).data.lastAt == request.time

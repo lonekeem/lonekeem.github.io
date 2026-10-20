@@ -5,6 +5,7 @@
 // no-signup option exists), so a few strict networks can't connect; viewers get a clear message.
 // Nothing is recorded or stored: when a live ends only the summary numbers stay on lives/{id}.
 import { ICONS } from './icons.js';
+import { spamOk, postStamp, postDone } from './spam.js';
 import { fmtCount } from './views.js';
 import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
@@ -225,7 +226,8 @@ export function createLive(ctx) {
     form.onsubmit = async (e) => {
       e.preventDefault();
       const input = form.querySelector('input'); const text = input.value.trim(); if (!text) return;
-      if (Date.now() - last < 1100) { toast('Slow down a little'); return; }
+      if (Date.now() - last < 1100) { toast('Slow down a bit 💜'); return; }
+      if (!spamOk('live', text)) return;
       last = Date.now(); input.value = '';
       try { await sendChat(id, text.slice(0, 150)); }
       catch (err) { input.value = text; toast(err.code === 'permission-denied' ? 'Slow down a little, or this live has ended.' : friendlyError(err)); }
@@ -389,8 +391,8 @@ export function createLive(ctx) {
     b.set(ref, { hostId, hostName: host.displayName, hostUsername: host.username, hostColor: host.color, title, status: 'live',
       startedAt: serverTimestamp(), heartbeatAt: serverTimestamp(), viewerCount: 0, peakViewers: 0, totalViewers: 0, starCount: 0,
       ...(yt ? { type: 'youtube', youtubeId: yt.youtubeId, chatOn: yt.chatOn } : {}) });
-    b.update(doc(db, 'users', hostId), { lastPostAt: serverTimestamp() });
-    await b.commit();
+    const st = postStamp(hostId, serverTimestamp()); b.update(doc(db, 'users', hostId), st);
+    await b.commit(); postDone(st);
     return ref.id;
   }
 

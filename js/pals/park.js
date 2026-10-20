@@ -2,6 +2,7 @@
 // real time, emote, chat with safe bubbles, pet other Pals, find treasures, and hop into Pal Games portals.
 // Spark-friendly: rooms of ~20 (parkRooms/r1..r20/p/{uid}), position writes only while moving and at most
 // 4/s (enforced by the rules), a 15 s heartbeat when idle, interpolation, and stale presence cleanup.
+import { spamOk } from '../spam.js';
 import { doc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp, addDoc }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { drawPal, star, heart, drawBubble } from './art.js';
@@ -104,7 +105,7 @@ export function createPark(ctx) {
       panel.innerHTML = PHRASES.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`;
       panel.querySelector('#pk-f').onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
     panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
-    let lastSay = 0; function say(t) { if (Date.now() - lastSay < 2000) return toast('Slow down a little 🙂'); lastSay = Date.now(); P.say = t.slice(0, 60); P.sayAt = Date.now(); dirty = true; send(true); }
+    let lastSay = 0; function say(t) { if (Date.now() - lastSay < 2000) return toast('Slow down a bit 💜'); if (!spamOk('park', t)) return; lastSay = Date.now(); P.say = t.slice(0, 60); P.sayAt = Date.now(); dirty = true; send(true); }
     function emote(x, tgt = '') { P.e = x; P.eAt = Date.now(); P.tgt = tgt; dirty = true; send(true); }
     let near = null; const actBtn = main.querySelector('#pk-act'); actBtn.onclick = () => act();
     function act() { if (near) petOther(near); }

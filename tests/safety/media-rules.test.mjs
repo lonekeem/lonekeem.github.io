@@ -3,6 +3,7 @@
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { doc, setDoc, updateDoc, deleteDoc, getDoc, writeBatch, serverTimestamp, Timestamp, increment } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
+const ps = async (f, u) => { const d = (await getDoc(doc(f, 'users', u))).data() || {}; const D = Math.floor(Date.now() / 864e5); return { postDay: D, postsToday: d.postDay === D ? (d.postsToday || 0) + 1 : 1 }; };
 const env = await initializeTestEnvironment({ projectId: 'demo-media', firestore: { host: '127.0.0.1', port: 8199, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
 let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, e.message.slice(0, 200)); } };
 const db = (u) => env.authenticatedContext(u, { email: u + '@example.com', email_verified: true }).firestore();
@@ -21,14 +22,14 @@ await env.withSecurityRulesDisabled(async (c) => { const f = c.firestore();
   await setDoc(doc(f, 'bans/banned'), { until: Timestamp.fromMillis(Date.now() - 864e5), reason: 'x', permanent: false, hide: false, by: 'mia', at: Timestamp.now(), name: 'b', uname: 'b' });
 });
 const C = 'https://res.cloudinary.com/zfmeldgm/';
-const media = (u, id, kind) => { const f = db(u); const b = writeBatch(f);
+const media = async (u, id, kind) => { const f = db(u); const b = writeBatch(f);
   b.set(doc(f, 'posts', id), { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', type: 'media', text: 'fun', linkUrl: '',
     mediaUrl: kind === 'video' ? C + 'video/upload/v1/lks/a.mp4' : C + 'image/upload/v1/lks/a.jpg', mediaType: kind, poster: C + 'image/upload/v1/lks/a.jpg', posterUrl: C + 'image/upload/v1/lks/a.jpg',
     width: 100, height: 100, duration: kind === 'video' ? 5 : 0, cloudinaryPublicId: 'lks/a', createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false });
-  b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp() }); return b.commit(); };
-const held = (u, id) => { const f = db(u); const b = writeBatch(f);
+  b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp(), ...(await ps(f, u)) }); return b.commit(); };
+const held = async (u, id) => { const f = db(u); const b = writeBatch(f);
   b.set(doc(f, 'heldPosts', id), { post: { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', type: 'media', text: 'fun', linkUrl: '', mediaUrl: C + 'video/upload/v1/lks/a.mp4', mediaType: 'video', poster: C + 'image/upload/v1/lks/a.jpg', createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false }, reason: '🌱 New account', level: 'borderline', authorId: u, createdAt: serverTimestamp() });
-  b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp() }); return b.commit(); };
+  b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp(), ...(await ps(f, u)) }); return b.commit(); };
 const flag = (u, id) => { const f = db(u); const b = writeBatch(f); b.set(doc(f, 'posts', id, 'flags', u), { at: serverTimestamp() }); b.update(doc(f, 'posts', id), { reportCount: increment(1) }); return b.commit(); };
 
 await ok('3-day-old-or-newer account cannot publish a video directly', assertFails(media('newbie', 'n1', 'video')));

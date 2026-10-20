@@ -1,6 +1,6 @@
 // Kemy safety: Community Rules agreement, birthday (13+) check, mod "under 13" flag,
 // personal-info warnings, age-clue review items, photo EXIF stripping. Written by Lone Keem
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 let C = null; // { S, db, esc, openModal, closeModal, toast, isAdmin, friendlyError }
 export function initSafety(ctx) { C = ctx; }
@@ -167,4 +167,12 @@ export async function stripExif(file) {
     const name = String(file.name || 'photo').replace(/\.(heic|heif|webp)$/i, '.jpg');
     return new File([blob], png ? name : name.replace(/\.png$/i, '.jpg'), { type: blob.type, lastModified: Date.now() });
   } catch { return file; }
+}
+
+// ---- shared 1-hour auto pause + Mod Hub report (kind-words filter and anti-spam, js/spam.js)
+export async function autoPause({ reason, text = '', word = '', note = '💜 Let’s keep it kind. Your account is paused for 1 hour.' }) {
+  const S = C.S; C.toast(note);
+  if (!S.user || C.isAdmin()) return;
+  try { await setDoc(doc(C.db, 'bans', S.user.uid), { until: Timestamp.fromMillis(Date.now() + 3600e3 - 30e3), reason: String(reason).slice(0, 300), permanent: false, hide: false, by: 'auto', at: serverTimestamp(), name: String(S.profile?.displayName || '').slice(0, 60), uname: String(S.profile?.username || '').slice(0, 30) }); } catch (e) { console.warn('auto timeout', e.code); }
+  try { await addDoc(collection(C.db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: S.user.uid, targetUid: S.user.uid, postId: '', reason: `🤖 Auto timeout (1 hour): ${reason}${word ? ` (“${word}”)` : ''}. Lift it or keep it.`.slice(0, 500), excerpt: String(text).slice(0, 300), status: 'open', createdAt: serverTimestamp() }); } catch (e) { console.warn('auto report', e.code); }
 }

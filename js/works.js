@@ -7,6 +7,7 @@ import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
 import { createSeries } from './series.js';
 import { stripExif } from './safety.js';
+import { postStamp, postDone } from './spam.js';
 import { guardUpload } from './mediascan.js';
 
 export const GENRES = {
@@ -212,8 +213,8 @@ export function createWorks(ctx) {
           (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, { authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color, type: 'text', text, linkUrl: '', mediaUrl: '', mediaType: '', poster: '',
             cat: 'music', ...searchFields({ text: [title, desc, genre, artist].join(' '), authorName: author.displayName, authorUsername: author.username }),
             createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false });
-          b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
-          await b.commit(); toast('Song shared!'); location.hash = '#/post/' + ref.id;
+          const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
+          await b.commit(); postDone(st); toast('Song shared!'); location.hash = '#/post/' + ref.id;
         } catch (e) { go.disabled = false; err.textContent = e && e.code === 'permission-denied' ? 'You can post once every 20 seconds. Wait a moment and try again.' : friendlyError(e); }
         return;
       }
@@ -256,8 +257,8 @@ export function createWorks(ctx) {
           work, ...(pickedCat(main, 'w-cat') ? { cat: pickedCat(main, 'w-cat') } : {}), ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
           createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
         });
-        b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
-        await b.commit();
+        const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
+        await b.commit(); postDone(st);
         barIn.style.transform = 'scaleX(1)';
         const sp = pickSeries();
         if (sp) { status.textContent = 'Adding to your series…'; try { await series().addEpisode(sp.series, ref.id, sp.season, sp.ep, work.title); } catch (e) { toast('Shared, but it couldn’t be added to the series: ' + (e.message || '')); } }
@@ -520,8 +521,8 @@ export function createWorks(ctx) {
       work, ...searchFields({ text: [work.title, desc, work.genre, aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
       createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
     });
-    b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
-    await b.commit();
+    const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
+    await b.commit(); postDone(st);
     if (seriesPick) await series().addEpisode(seriesPick.series, ref.id, seriesPick.season, seriesPick.ep, work.title);
     return ref.id;
   }
