@@ -41,14 +41,28 @@ function init() {
   R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.9; R.outputColorSpace = THREE.SRGBColorSpace;
   scene = new THREE.Scene();
   cam = new THREE.PerspectiveCamera(26, 1, 0.1, 50); cam.position.set(0, 1.55, 7.2); cam.lookAt(0, 1.15, 0);
-  scene.add(new THREE.HemisphereLight(0xfff4ff, 0x6a4fa0, 1.05));
+  const hemi = new THREE.HemisphereLight(0xfff4ff, 0x6a4fa0, 1.05); scene.add(hemi);
   keyL = new THREE.DirectionalLight(0xfff1dc, 2.2); keyL.position.set(2.5, 5, 4); keyL.castShadow = true;
   keyL.shadow.mapSize.set(RES > 300 ? 1024 : 512, RES > 300 ? 1024 : 512); keyL.shadow.radius = 6; Object.assign(keyL.shadow.camera, { left: -2.2, right: 2.2, top: 3.4, bottom: -1, near: 0.5, far: 14 }); keyL.shadow.bias = -0.002;
   scene.add(keyL);
-  const rim = new THREE.DirectionalLight(0xc9a8ff, 1.3); rim.position.set(-3, 2.5, -3); scene.add(rim);
+  const rim = new THREE.DirectionalLight(0xc9a8ff, 1.6); rim.position.set(-3, 2.5, -3); scene.add(rim);
+  // Realism v1: soft cool fill from front-left + warm back rim (cinematic three-point), procedural env map for gloss
+  const fill = new THREE.DirectionalLight(0x9fe8ec, 0.4); fill.position.set(-4, 1.5, 3); scene.add(fill);
+  const rim2 = new THREE.DirectionalLight(0xffd6b0, 0.9); rim2.position.set(3.2, 2, -3.5); scene.add(rim2);
+  try { if (!window.__noEnv) { scene.environment = makeEnv(R); scene.environmentIntensity = 0.3; hemi.intensity = 0.8; R.toneMappingExposure = 0.86; } } catch { /* env is optional */ }
   shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.ShadowMaterial({ opacity: 0.28 }));
   shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.receiveShadow = true; scene.add(shadowPlane);
   applyGfx();
+}
+// Procedural environment (no asset files): warm sky, pink horizon, teal glowing cave floor, two soft boxes.
+function makeEnv(r) {
+  const pm = new THREE.PMREMGenerator(r); const es = new THREE.Scene();
+  const cv = document.createElement('canvas'); cv.width = 8; cv.height = 128; const c = cv.getContext('2d'); const g = c.createLinearGradient(0, 0, 0, 128);
+  g.addColorStop(0, '#d8cfc0'); g.addColorStop(0.4, '#b89aa8'); g.addColorStop(0.55, '#3f8a86'); g.addColorStop(1, '#0c1c20'); c.fillStyle = g; c.fillRect(0, 0, 8, 128);
+  const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+  es.add(new THREE.Mesh(new THREE.SphereGeometry(10, 24, 12), new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide })));
+  for (const [x, y, z, col, k] of [[3, 5, 4, '#ffffff', 3], [-5, 1, -2, '#7ff0e8', 1.6]]) { const b = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(k), side: THREE.DoubleSide })); b.position.set(x, y, z); b.lookAt(0, 0, 0); es.add(b); }
+  const rt = pm.fromScene(es, 0.04); pm.dispose(); return rt.texture;
 }
 function dropCache() { for (const m of cache.values()) m.traverse?.((o) => { o.geometry?.dispose?.(); }); cache.clear(); }
 function rebuild() { rebuilds++; try { dropCache(); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } R = null; lost = false; init(); }
@@ -67,10 +81,31 @@ function furTex() {
   for (let i = 0; i < img.data.length; i += 4) { const v = 128 + (Math.random() - 0.5) * 70; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
   c.putImageData(img, 0, 0); FUR = new THREE.CanvasTexture(cv); FUR.wrapS = FUR.wrapT = THREE.RepeatWrapping; FUR.repeat.set(6, 6); return FUR;
 }
+// Realism v1 skin shader: cheap subsurface approximation (light wraps + glows through thin edges, tinted by the
+// body colour) and a soft fresnel rim. One extra line of maths per pixel, no extra passes; shared program for all Pals.
+let SPARK = null;
+function glitterTex() { // sparse fine sparkle (emissive map) for pearly skins
+  if (SPARK) return SPARK; const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 420; i++) { const a = Math.random(); c.fillStyle = `rgba(255,${230 + Math.random() * 25 | 0},255,${0.35 + a * 0.65})`; c.fillRect(Math.random() * 256, Math.random() * 256, a > 0.9 ? 2 : 1, a > 0.9 ? 2 : 1); }
+  SPARK = new THREE.CanvasTexture(cv); SPARK.wrapS = SPARK.wrapT = THREE.RepeatWrapping; SPARK.repeat.set(3, 3); return SPARK;
+}
+function skinShader(m, k) {
+  const C = (v) => (v && v.isColor ? '#' + v.getHexString() : typeof v === 'string' ? v : '#' + new THREE.Color(v.r, v.g, v.b).getHexString());
+  m.userData.k = { sss: k.sss, rim: k.rim, sssCol: C(k.sssCol), rimCol: C(k.rimCol) }; m.customProgramCacheKey = () => 'kemy-sss1';
+  m.onBeforeCompile = (sh) => { const u = m.userData.k; sh.uniforms.kSss = { value: window.__noK ? 0 : u.sss }; sh.uniforms.kRim = { value: window.__noK ? 0 : u.rim }; sh.uniforms.kSssCol = { value: new THREE.Color(u.sssCol) }; sh.uniforms.kRimCol = { value: new THREE.Color(u.rimCol) }; m._ku = sh.uniforms;
+    sh.fragmentShader = 'uniform float kSss; uniform float kRim; uniform vec3 kSssCol; uniform vec3 kRimCol;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `{
+      vec3 kv = normalize(vViewPosition); float kf = 1.0 - clamp(dot(normal, kv), 0.0, 1.0);
+      outgoingLight += kSss * diffuseColor.rgb * kSssCol * (0.15 + 0.85 * pow(kf, 1.6));
+      outgoingLight += kRim * pow(kf, 3.0) * kRimCol; }
+      #include <opaque_fragment>`); };
+  return m;
+}
 function mat(hex, o = {}) {
-  return new THREE.MeshPhysicalMaterial({ color: new THREE.Color(hex), roughness: o.r ?? 0.62, sheen: o.sheen ?? 0.6, sheenRoughness: 0.55,
+  const c0 = new THREE.Color(hex), hsl = c0.getHSL({});
+  return skinShader(new THREE.MeshPhysicalMaterial({ envMapIntensity: 0.22, color: new THREE.Color(hex), roughness: o.r ?? 0.62, sheen: o.sheen ?? 0.6, sheenRoughness: 0.55,
     sheenColor: new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), 0.25), clearcoat: o.cc ?? 0, clearcoatRoughness: 0.35,
-    transparent: !!o.op, opacity: o.op ?? 1, bumpMap: o.fur ? furTex() : null, bumpScale: o.fur ? 0.35 : 1, emissive: new THREE.Color(o.em || '#000000'), emissiveIntensity: o.em ? 0.35 : 0 });
+    transparent: !!o.op, opacity: o.op ?? 1, bumpMap: o.fur ? furTex() : null, bumpScale: o.fur ? 0.35 : 1, emissive: new THREE.Color(o.em || '#000000'), emissiveIntensity: o.em ? 0.35 : 0 }),
+    { sss: o.sss ?? (o.fur ? 0.035 : 0.06), rim: o.rim ?? 0.2, sssCol: new THREE.Color().setHSL(hsl.h, Math.min(1, hsl.s + 0.2), 0.62).lerp(new THREE.Color('#ff9a8a'), 0.25), rimCol: c0.clone().lerp(new THREE.Color('#fff4fa'), 0.35) });
 }
 const G = {}; // shared geometries (memory-light)
 const geo = (k, f) => G[k] || (G[k] = f());
@@ -81,17 +116,40 @@ const cone = (r, h) => geo(`k${r}_${h}`, () => new THREE.ConeGeometry(r, h, 28))
 function bone(name, parent, x, y, z) { const b = new THREE.Bone(); b.name = name; b.position.set(x, y, z); parent.add(b); return b; }
 function shade(hex, k) { const c = new THREE.Color(hex); return k < 0 ? c.multiplyScalar(1 + k) : c.lerp(new THREE.Color('#fff'), k); }
 
+let FILTEX = null;
+function filTex() { // one feathery filament: soft alpha edges, white tip (tinted by material colour, tip glows via bloom)
+  if (FILTEX) return FILTEX; const cv = document.createElement('canvas'); cv.width = 16; cv.height = 64; const c = cv.getContext('2d');
+  for (let y = 0; y < 64; y++) { const u = y / 63; const w = 7 * Math.sin(Math.min(1, (1 - u) * 1.15) * Math.PI * 0.5 + 0.2) * (0.35 + 0.65 * Math.sin(u * Math.PI)); const l = 70 + u * 30; const g = c.createLinearGradient(8 - w, 0, 8 + w, 0);
+    g.addColorStop(0, `hsla(0,0%,${l}%,0)`); g.addColorStop(0.5, `hsla(0,0%,${l}%,${0.95 - u * 0.15})`); g.addColorStop(1, `hsla(0,0%,${l}%,0)`); c.fillStyle = g; c.fillRect(0, 63 - y, 16, 1); }
+  FILTEX = new THREE.CanvasTexture(cv); FILTEX.colorSpace = THREE.SRGBColorSpace; return FILTEX;
+}
+// fan of instanced alpha cards along a gill stalk (one draw call per stalk)
+function filaments(L, n, col, k = 1) {
+  const m = new THREE.MeshBasicMaterial({ map: filTex(), color: new THREE.Color(col).lerp(new THREE.Color('#ffc8f4'), 0.45).multiplyScalar(1.4), transparent: true, depthWrite: false, side: THREE.DoubleSide, alphaTest: 0.04 });
+  const g = geo('fil', () => { const p = new THREE.PlaneGeometry(0.045, 0.17); p.translate(0, 0.085, 0); return p; });
+  const im = new THREE.InstancedMesh(g, m, n * 2); const o = new THREE.Object3D(); let j = 0;
+  for (let i = 0; i < n; i++) { const u = (i + 1) / (n + 1); for (const q of [-1, 1]) { o.position.set(0, L * u, 0); o.rotation.set((q * 0.35) * (i % 2 ? 1 : -1), q * 0.5, q * (1.0 + u * 0.35)); const sc = k * (0.75 + 0.45 * Math.sin(u * Math.PI)); o.scale.set(sc, sc, sc); o.updateMatrix(); im.setMatrixAt(j++, o.matrix); } }
+  im.castShadow = false; im.userData.fil = 1; return im;
+}
+let FFTEX = null;
+function fireflies(root, n, k) { // soft glowing motes drifting around the Pal (Care/picker cards; hidden in game scenes)
+  if (!FFTEX) { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d'); const g = c.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,240,1)'); g.addColorStop(0.25, 'rgba(255,240,200,0.7)'); g.addColorStop(1, 'rgba(255,220,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 32, 32); FFTEX = new THREE.CanvasTexture(cv); }
+  const spk = new THREE.Group(); root.add(spk); const ms = ['#fff3c0', '#e2d0ff', '#b8fff2'].map((c) => new THREE.SpriteMaterial({ map: FFTEX, color: c, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  for (let i = 0; i < n; i++) { const a = i * 2.39, r = (0.85 + (i % 4) * 0.14) * k; const o = new THREE.Sprite(ms[i % 3]); o.scale.setScalar(0.09 * k); o.position.set(Math.cos(a) * r, 0.4 + (i * 0.37) % 1.5, Math.sin(a) * r * 0.6); o.userData.ph = i; o.userData.y0 = o.position.y; spk.add(o); }
+  spk.userData.ff = 1; return spk;
+}
 // ---------------------------------------------------------------- build one Pal
 function build(pal) {
   const sp = SPEC[pal.species] || SPECIES[0]; const col = pal.colors || {};
   const B = sp.founder ? sp.body : col.body || sp.body, A = sp.founder ? sp.acc : col.accent || sp.acc, E = col.eye || '#24133f';
   const ex = new Set(sp.extras || []); const kind = sp.body2 || 'blob'; const stage = stageOf(pal.level || 1);
   const skin = ['frog', 'kemy', 'turtle', 'dragon', 'penguin', 'seal', 'jelly', 'starsprite'].includes(sp.id);
-  const mB = mat(B, skin ? { sheen: 0.2, cc: 0.6, r: 0.45 } : { fur: 1 }), mA = mat(A), mDark = mat(shade(B, -0.25)), mLight = mat(shade(B, 0.5));
-  const mEye = new THREE.MeshPhysicalMaterial({ color: E, roughness: 0.15, clearcoat: 1 }), mWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const mB = mat(B, skin ? { sheen: 0.2, cc: 0.6, r: 0.45, sss: 0.1, rim: 0.3 } : { fur: 1 }), mA = mat(A), mDark = mat(shade(B, -0.25)), mLight = mat(shade(B, 0.5));
+  const mEye = new THREE.MeshPhysicalMaterial({ color: E, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.4, sheen: 0.4, sheenColor: new THREE.Color(E).lerp(new THREE.Color('#9a7aff'), 0.6) }), mWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const mPink = mat('#ff9ec4', { op: 0.75, sheen: 0 }), mNose = mat('#3a2440', { sheen: 0, cc: 1, r: 0.3 });
   const FD = sp.id === 'founder'; if (FD) { // pearly, softly glowing axolotl skin
-    for (const mm of [mB]) { mm.bumpMap = null; mm.clearcoat = 0.55; mm.clearcoatRoughness = 0.25; mm.roughness = 0.38; mm.sheen = 1; mm.sheenColor.set('#c9b0ff'); mm.sheenRoughness = 0.35; mm.emissive.set('#ff9ad8'); mm.emissiveIntensity = 0.14; } }
+    for (const mm of [mB]) { mm.bumpMap = furTex(); mm.bumpScale = 0.04; mm.emissiveMap = glitterTex(); mm.userData.k = { ...mm.userData.k, sss: 0.22, rim: 0.5, sssCol: new THREE.Color('#ff7ab8'), rimCol: new THREE.Color('#ffe6ff') }; mm.clearcoat = 0.55; mm.clearcoatRoughness = 0.25; mm.roughness = 0.38; mm.sheen = 1; mm.sheenColor.set('#c9b0ff'); mm.sheenRoughness = 0.35; mm.emissive.set('#ffe0f4'); mm.emissiveIntensity = 0.35; } }
+  if (skin && !FD) { mB.bumpMap = furTex(); mB.bumpScale = 0.05; }
   const root = new THREE.Group(); const S = [0.86, 1, 1.1][stage];
   const J = {}; // joints
   J.Hips = bone("Hips", root, 0, 0.64, 0);
@@ -137,7 +195,7 @@ function build(pal) {
     if (ex.has('frogeyes')) mesh(sph(0.15), mB, g).position.z = -0.06;
     if (new THREE.Color(B).getHSL({}).l < 0.3) { const w = mesh(sph(1), mat('#ffffff', { sheen: 0 }), g); w.scale.set(er * 1.5, er * 1.6, er * 0.5); w.position.z = -0.02; }
     const e = mesh(sph(1), mEye, g); e.scale.set(er, er * 1.15, er * 0.42);
-    const hl = mesh(sph(0.024), mWhite, g); hl.position.set(-0.028, 0.04, er * 0.4); const hl2 = mesh(sph(0.011), mWhite, g); hl2.position.set(0.025, -0.03, er * 0.4);
+    const hl = mesh(sph(0.027), mWhite, g); hl.position.set(-0.028, 0.04, er * 0.4); hl.castShadow = false; const hl2 = mesh(sph(0.011), mWhite, g); hl2.position.set(0.025, -0.03, er * 0.4);
     const lid = mesh(sph(1), mB, g); lid.scale.set(er * 1.2, er * 1.3, er * 0.6); lid.position.y = er * 2.6; lid.userData.open = er * 2.6; lid.userData.shut = er * 0.25; g.userData.lid = lid; eyes.push(g);
     if (sp.id === 'panda' || ex.has('eyepatch')) { const p = mesh(sph(1), mat(A), H); p.scale.set(0.13, 0.15, 0.05); p.position.set(s * 0.19, 0.04, fz * 0.88); p.rotation.z = s * 0.4; }
     const bl = mesh(sph(1), mPink, H); bl.scale.set(0.08, 0.05, 0.03); bl.position.set(s * 0.3, -0.08, fz * 0.84);
@@ -164,7 +222,7 @@ function build(pal) {
   // mouth: small smile
   const mo = mesh(geo('smile', () => new THREE.TorusGeometry(0.05, 0.012, 6, 12, Math.PI)), mNose, H); mo.rotation.z = Math.PI; mo.position.set(0, sn === 'trunk' ? -0.2 : -0.16, snz * 0.97 + 0.02); J.mouth = mo;
   // ears
-  J.ears = []; const ea = sp.ears;
+  J.ears = []; const ea = sp.ears; const of0 = pal.outfit || {}; const hasHat = !!(of0.head && (WEAR_BY[of0.head] || ITEM[of0.head]));
   for (const s of [-1, 1]) {
     const e = bone(s < 0 ? 'EarR' : 'EarL', H, s * 0.3, 0.32, 0); let m;
     if (ea === 'round' || ea === 'biground') { const r = ea === 'round' ? 0.13 : 0.2; m = mesh(sph(1), mB, e); m.scale.set(r, r, r * 0.55); const i = mesh(sph(1), mat(ex.has('eyepatch') ? A : '#ffc0d8'), e); i.scale.set(r * 0.6, r * 0.6, r * 0.2); i.position.z = r * 0.42; e.position.set(s * (ea === 'round' ? 0.34 : 0.4), 0.34, -0.02); }
@@ -175,9 +233,12 @@ function build(pal) {
     if (ea === 'ossicones') { m = mesh(cap(0.03, 0.16), mDark, e); m.position.y = 0.1; mesh(sph(0.055), mA, e).position.y = 0.22; e.position.set(s * 0.14, 0.42, 0); }
     if (ea === 'gills' && FD) { e.position.set(s * 0.4, 0.12, -0.02); for (let i = 0; i < 3; i++) { const st0 = new THREE.Group(); st0.position.set(s * 0.04, 0.12 - i * 0.12, 0); st0.rotation.z = -s * (1.15 - i * 0.55); st0.rotation.y = s * 0.15; e.add(st0);
         const L = 0.34 - i * 0.03; const stalk = mesh(geo('fgst' + i, () => { const g = new THREE.CapsuleGeometry(0.03, L, 8, 16); g.translate(0, L / 2, 0); return g; }), mat('#7a4ad0', { cc: 0.6, sheen: 1, r: 0.35, em: '#5a2ab0' }), st0);
-        for (let k = 0; k < 7; k++) { const u = (k + 1) / 8; for (const q of [-1, 1]) { const fr = mesh(geo('fgfr', () => { const g = new THREE.SphereGeometry(1, 16, 10); g.translate(0, 1, 0); return g; }), mat(new THREE.Color('#8a55dc').lerp(new THREE.Color('#f2b4f0'), u).getStyle(), { cc: 0.5, sheen: 1, r: 0.4, em: '#7a3ad0' }), st0); fr.position.set(0, L * u, 0); fr.scale.set(0.018, 0.055 + 0.03 * Math.sin(u * 3), 0.014); fr.rotation.z = q * (0.9 + u * 0.3); } } }
+        for (let k = 0; k < 7; k++) { const u = (k + 1) / 8; for (const q of [-1, 1]) { const fr = mesh(geo('fgfr', () => { const g = new THREE.SphereGeometry(1, 16, 10); g.translate(0, 1, 0); return g; }), mat(new THREE.Color('#8a55dc').lerp(new THREE.Color('#f2b4f0'), u).getStyle(), { cc: 0.5, sheen: 1, r: 0.4, em: '#7a3ad0' }), st0); fr.position.set(0, L * u, 0); fr.scale.set(0.018, 0.055 + 0.03 * Math.sin(u * 3), 0.014); fr.rotation.z = q * (0.9 + u * 0.3); } }
+        st0.add(filaments(L, 18, '#8a55dc', hasHat ? 0.75 : 1)); st0.userData.base = st0.rotation.z; (J.gill = J.gill || []).push(st0);
+        if (hasHat && i === 0) { st0.rotation.z = -s * 1.45; st0.userData.base = st0.rotation.z; st0.scale.setScalar(0.85); } }
       J.ears.push(e); continue; }
-    if (ea === 'gills') for (let i = 0; i < 3; i++) { const g = mesh(cap(0.035, 0.2), mA, e); g.position.set(s * 0.12, 0.05 - i * 0.12, 0); g.rotation.z = -s * (0.9 - i * 0.6); e.position.set(s * 0.4, 0.05, 0); }
+    if (ea === 'gills') for (let i = 0; i < 3; i++) { const g = mesh(cap(0.035, 0.2), mA, e); g.position.set(s * 0.12, 0.05 - i * 0.12, 0); g.rotation.z = -s * (0.9 - i * 0.6) - (hasHat && i === 0 ? s * 0.3 : 0); e.position.set(s * 0.4, 0.05, 0);
+      const fl = filaments(0.2, 8, A, 0.8); fl.position.y = -0.12; g.add(fl); }
     if (ea === 'tuft' && s > 0) { m = mesh(cone(0.05, 0.2), mA, e); m.position.set(-0.3, 0.18, 0.1); }
     J.ears.push(e);
   }
@@ -224,18 +285,19 @@ function build(pal) {
     if (tl === 'puff' || tl === 'stub') mesh(sph(tl === 'puff' ? 0.12 : 0.08), tl === 'puff' ? mat('#ffffff') : mDark, J.tail[0]);
     if (tl === 'curl') mesh(geo('curl', () => new THREE.TorusGeometry(0.075, 0.032, 12, 24, Math.PI * 1.6)), mA, J.tail[0]);
     J.tail[0].rotation.x = -2.2;
-    if (FD) { const fin = mat('#d8b8ff', { op: 0.5, cc: 1, sheen: 1, r: 0.2, em: '#b48aff' }); fin.side = THREE.DoubleSide; fin.depthWrite = false;
+    if (tl === 'axo' && !FD) { const fin = mat(shade(B, 0.35), { op: 0.45, cc: 1, sheen: 1, r: 0.25, em: A, sss: 0.4, rim: 0.8 }); fin.side = THREE.DoubleSide; fin.depthWrite = false; J.tail.forEach((b, i) => { const f = mesh(sph(1), fin, b); f.scale.set(0.01, 0.14, 0.13 + i * 0.04); f.position.y = 0.1; f.castShadow = false; }); }
+    if (FD) { const fin = mat('#e6ccff', { op: 0.42, cc: 1, sheen: 1, r: 0.2, em: '#c49aff', sss: 0.5, rim: 1.1 }); fin.side = THREE.DoubleSide; fin.depthWrite = false;
       J.tail.forEach((b, i) => { const f = mesh(sph(1), fin, b); f.scale.set(0.012, 0.17, 0.18 + i * 0.05); f.position.set(0, 0.1, 0); });
       const tip = mesh(sph(1), fin, J.tail[J.tail.length - 1]); tip.scale.set(0.012, 0.22, 0.26); tip.position.y = 0.2; }
   }
   if (FD) { // floating sparkles + founder crown
-    const spk = new THREE.Group(); root.add(spk); J.spark = spk; const sm = [new THREE.MeshBasicMaterial({ color: '#fff4c0' }), new THREE.MeshBasicMaterial({ color: '#e8d4ff' })];
-    for (let i = 0; i < 16; i++) { const a = i * 2.39, r = 0.85 + (i % 4) * 0.13; const o = new THREE.Mesh(geo('spk', () => new THREE.OctahedronGeometry(0.035)), sm[i % 2]); o.position.set(Math.cos(a) * r, 0.5 + (i * 0.37) % 1.5, Math.sin(a) * r * 0.6); o.userData.ph = i; spk.add(o); }
+    J.spark = fireflies(root, 18, 1);
     const cr = new THREE.Group(); cr.position.set(0.16, headR * 1.0, 0.05); cr.rotation.set(-0.15, 0, -0.35); H.add(cr); const gm = mat('#ffd34d', { cc: 1, r: 0.25, sheen: 0, em: '#a07000' }); gm.metalness = 0.7;
     mesh(geo('fcr', () => new THREE.CylinderGeometry(0.085, 0.075, 0.06, 20, 1, true)), gm, cr).material.side = THREE.DoubleSide;
     for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; const k = mesh(cone(0.022, 0.07), gm, cr); k.position.set(Math.sin(a) * 0.08, 0.06, Math.cos(a) * 0.08); mesh(sph(0.012), gm, cr).position.set(Math.sin(a) * 0.08, 0.1, Math.cos(a) * 0.08); }
     mesh(sph(0.018), mat('#ff6fae', { cc: 1, em: '#a02060' }), cr).position.set(0, 0.01, 0.085);
   }
+  if (!FD) J.spark = fireflies(root, 7, 0.75);
   if (ex.has('batwings') || ex.has('fairywings')) for (const s of [-1, 1]) { const w = bone('Wing' + s, J.Chest, s * 0.18, 0.1, -0.25); const m = mesh(sph(1), mat(ex.has('fairywings') ? '#e8f4ff' : A, { op: ex.has('fairywings') ? 0.6 : 1 }), w); m.scale.set(0.32, 0.22, 0.02); m.position.x = s * 0.3; (J.wings = J.wings || []).push(w); }
   // outfit: simple 3D pieces by slot (keeps the item's colour)
   const of = pal.outfit || {}; const it = (s) => { const i = WEAR_BY[of[s]] ? null : ITEM[of[s]]; return i && i.slot === s ? i : null; };
@@ -255,7 +317,7 @@ function build(pal) {
   const pt = pal.pattern; if (pt && pt.startsWith('pt_') && kind === 'blob') { const cols = pt === 'pt_rainbow' ? ['#ff6a7a', '#ffb34a', '#ffe64a', '#6ad870', '#4aa8ff', '#9a6aff'] : pt === 'pt_galaxy' ? ['#3a1a8a', '#ffffff', '#6a3aff'] : pt === 'pt_hearts' ? ['#ff6fae'] : ['#ffe680'];
     for (let i = 0; i < 14; i++) { const a = -1.2 + (i % 7) * 0.4, y = 0.02 + Math.floor(i / 7) * 0.2; const d = mesh(sph(1), mat(cols[i % cols.length], { em: pt === 'pt_galaxy' && i % 3 === 1 ? '#ffffff' : undefined }), J.Spine); d.scale.set(0.04, 0.04, 0.015); d.position.set(Math.sin(a) * 0.47, y, Math.cos(a) * 0.43); d.lookAt(Math.sin(a) * 2, y, Math.cos(a) * 2); } }
   // rare variants (shiny / glow / galaxy / gold / crystal)
-  const vr = pal.variant; if (vr) root.traverse((o) => { if (!o.isMesh || !o.material || o.material.userData.wear) return; const m0 = o.material; if (m0.userData.vx || !m0.isMeshStandardMaterial) return; const m = m0.clone(); m.userData.vx = 1;
+  const vr = pal.variant; if (vr) root.traverse((o) => { if (!o.isMesh || !o.material || o.material.userData.wear) return; const m0 = o.material; if (m0.userData.vx || !m0.isMeshStandardMaterial) return; const m = skinShader(m0.clone(), { ...m0.userData.k }); m.userData.vx = 1;
     if (vr === 'rare_shiny') { m.clearcoat = 1; m.clearcoatRoughness = 0.1; m.sheen = 1; }
     if (vr === 'rare_glow') { m.emissive.copy(m.color).multiplyScalar(0.55); m.emissiveIntensity = 0.8; }
     if (vr === 'rare_galaxy') { m.color.lerp(new THREE.Color('#3a1a8a'), 0.6); m.emissive.set('#2a0a5a'); m.emissiveIntensity = 0.7; m.clearcoat = 1; }
@@ -303,15 +365,16 @@ function apply(rootObj, P, t, mode) {
   plantFeet(rootObj, P, legs);
   // life: breathing, blink, ears + tail spring
   const br = Math.sin(t * 0.05) * 0.015; J.Chest.scale.set(1 + br, 1 + br, 1 + br);
-  const shut = (Math.floor(t / 4) % 55 === 0) || mode === 'sleep'; for (const e of J.eyes) { const l = e.userData.lid; if (l) { l.position.y += ((shut ? l.userData.shut : l.userData.open) - l.position.y) * 0.6; l.visible = l.position.y < l.userData.open * 0.95; } }
+  const bt = t % 260; const shut = bt < 5 || (Math.floor(t / 260) % 3 === 1 && bt > 14 && bt < 19) || mode === 'sleep'; /* blink, sometimes a double blink */ for (const e of J.eyes) { const l = e.userData.lid; if (l) { l.position.y += ((shut ? l.userData.shut : l.userData.open) - l.position.y) * 0.6; l.visible = l.position.y < l.userData.open * 0.95; } }
   const sg = springs(rootObj, P); sp.e = sg.e[0] * 2.2 + (P.hrz || 0) * 0.3; // spring-driven floppy parts
   J.ears.forEach((e, i) => { e.rotation.x = sp.e * 0.4 + sg.e[0] * 0.3; e.rotation.y = e.userData.flap ? (i ? 1 : -1) * (Math.sin(t * 0.09) * 0.18 + (mode === 'react' ? Math.sin(t * 0.6) * 0.4 : 0)) : 0; e.userData.z ??= e.rotation.z; e.rotation.z = e.userData.z + Math.sin(t * 0.07 + i) * 0.04 + (i ? -1 : 1) * sp.e * 0.2; });
   sp.tl = sg.tl[0];
+  if (J.gill) J.gill.forEach((g, i) => { g.rotation.z = g.userData.base + Math.sin(t * 0.11 + i * 1.3) * 0.06 + sg.e[1] * 0.25 * (i % 2 ? 1 : -1); g.rotation.x = Math.sin(t * 0.07 + i) * 0.08 + sg.e[0] * 0.3; });
   J.tail.forEach((b, i) => { if (i) b.rotation.set(0.3 + sg.tl[1] * 0.3 * i, 0, Math.sin(t * (P.tw || 0.1) - i * 0.6) * 0.25 + sp.tl * (0.3 + i * 0.12)); else { b.rotation.z = Math.sin(t * (P.tw || 0.1)) * 0.3 + sp.tl; b.rotation.x = sg.tl[1] * 0.3; } });
   if (J.tent) J.tent.forEach((b, i) => { b.rotation.x = Math.sin(t * 0.12 + i) * 0.3 + sg.e[0] * 0.6; b.rotation.z = Math.cos(t * 0.1 + i) * 0.2 + sg.tl[0] * 0.25; });
   if (J.wings) J.wings.forEach((w, i) => { w.rotation.y = (i ? -1 : 1) * (0.4 + Math.sin(t * 0.3) * 0.3); });
   if (J.trunk) { const up = mode === 'react' || mode === 'happy'; J.trunk.forEach((b, k) => { b.rotation.x = (up ? -0.45 : -(0.08 + k * 0.06)) + Math.sin(t * 0.08 - k * 0.55) * (0.07 + k * 0.012) + sg.e[0] * 0.12 * k; b.rotation.z = Math.sin(t * 0.05 - k * 0.4) * 0.05 * k + sg.e[1] * 0.1 * k; }); }
-  J.mouth.scale.set(1, mode === 'eat' || mode === 'happy' ? 1.6 : 1, 1);
+  J.mouth.scale.set(1 + (P.smile || 0) * 0.25, mode === 'eat' || mode === 'happy' ? 1.6 : 1 + (P.smile || 0) * 0.6, 1);
 }
 // everyday motions (idle, walk, wave, hop, happy, sleep, eat) in the same joint format
 export function modePose(mode, t) {
@@ -323,8 +386,15 @@ export function modePose(mode, t) {
   else if (mode === 'sleep') Object.assign(P, { hy: -0.18, cx: 0.25, nx: 0.35, aL: [20, 40, 100], aR: [20, 40, 100] });
   else if (mode === 'eat') Object.assign(P, { aR: [20, 60, 120 + s(t * 0.5) * 10], nx: 0.1 });
   else if (mode === 'shake') Object.assign(P, { hrz: s(t * 1.3) * 0.12, nz: s(t * 1.3) * 0.3 });
-  else Object.assign(P, { hy: s(t * 0.05) * 0.01, hrz: s(t * 0.03) * 0.02, aL: [23 + s(t * 0.05) * 3, 6, 16], aR: [23 - s(t * 0.05) * 3, 6, 16] });
+  else Object.assign(P, { hy: s(t * 0.05) * 0.01, hrz: s(t * 0.03) * 0.02, cx: s(t * 0.05) * 0.015, nz: s(t * 0.011) * 0.09 + Math.max(0, s(t * 0.0047)) ** 4 * 0.14, ny: s(t * 0.0073) * 0.16, nx: s(t * 0.019) * 0.04, aL: [23 + s(t * 0.05) * 3, 6, 16], aR: [23 - s(t * 0.05) * 3, 6, 16] });
   return P;
+}
+// occasional friendly wave + smile layered on idle (cards / Care stage only, never in games): ~2.5 s every 16 s
+function idleLife(P, t) {
+  const c = ((t + 300) % 960); if (c > 150) return P; const w = Math.sin(Math.min(1, c / 150) * Math.PI); const k = Math.min(1, w * 1.6);
+  const s = Math.sin; const W = { aR: [150 + s(t * 0.35) * 18, 10, 30 + s(t * 0.35) * 25], nz: 0.12, cz: -0.05 };
+  const o = { ...P, aR: P.aR.map((v, i) => v + (W.aR[i] - v) * k), nz: (P.nz || 0) + (W.nz - (P.nz || 0)) * k, cz: (P.cz || 0) + W.cz * k, smile: k };
+  return o;
 }
 const sane = (P) => Object.values(P).every((v) => (Array.isArray(v) ? v.every(Number.isFinite) : typeof v !== 'number' || Number.isFinite(v)));
 const clamp1 = (v) => Math.max(-0.4, Math.min(0.4, v));
@@ -367,20 +437,31 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
     P = gaitPose(ph, spd, st.turn || 0, ud.J.legL || 0.54, legs);
   } else if (md === 'hop') P = jumpPose(((t % 72) + 72) % 72 / 72, 0.45);
   else P = modePose(md, t);
+  if (md === 'idle' && !st.dance3d && !st.still) P = idleLife(P, t);
   if (st.dance3d) { const D3 = clipFor(st.dance3d, m.userData.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
   if (!sane(P)) P = modePose('idle', t); // never leave a broken / T-pose on screen
   // overlap & follow-through: every joint eases toward its target (limbs a bit slower than the hips), so moves and
   // dance changes flow into each other instead of snapping
   const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }
   m.userData.prev = P; m.userData.pt = t;
-  if (m.userData.J && m.userData.J.spark) { const g = m.userData.J.spark; g.rotation.y = t * 0.012; g.children.forEach((o) => { const k = 0.6 + 0.5 * Math.sin(t * 0.08 + o.userData.ph); o.scale.setScalar(k); o.rotation.y = t * 0.05; }); }
+  if (m.userData.J && m.userData.J.spark) { const g = m.userData.J.spark; g.visible = gfxLevel() !== 'low'; g.rotation.y = t * 0.008; g.children.forEach((o) => { const k = 0.5 + 0.5 * Math.sin(t * 0.06 + o.userData.ph * 1.7); o.material.opacity = k; o.position.y = o.userData.y0 + Math.sin(t * 0.02 + o.userData.ph) * 0.12; }); }
   apply(m, P, t, st.mode); grip(m, st.dance3d ? st.amt ?? 1 : 0, st.mode, t);
   cs.prev = m.userData.prev; cs.pt = m.userData.pt; cs.spr = m.userData.spr; cs.gPh = m.userData.gPh; cs.gT = m.userData.gT; cs.sp = m.userData.sp0;
   m.rotation.y = st.yaw != null ? st.yaw : ((st.face || 1) < 0 ? -0.28 : 0.28) + (P.ry || 0);
   scene.add(m); try { R.render(scene, cam); } finally { scene.remove(m); }
   if (R.getContext().isContextLost?.()) { if (!lost) { lost = true; lostAt = now; } drawLoading(c, x, y, size); return true; }
   const w = size * 1.65 * (m.userData.sp && m.userData.sp.founder ? 1.2 : 1); c.drawImage(R.domElement, x - w / 2, y - w * 0.87, w, w);
+  bloom(c, x, y, w, size);
   return true;
+}
+// gentle bloom: a tiny downsampled copy (bilinear upscale = free blur) screened back on top. Only on the bigger
+// Care / Founder views at high+ quality, so lists of small cards and weak phones pay nothing.
+let BL = null;
+function bloom(c, x, y, w, size) {
+  const g = gfxLevel(); if (g === 'low' || size < 100) return;
+  if (!BL) { BL = document.createElement('canvas'); BL.width = BL.height = 40; }
+  const b = BL.getContext('2d'); b.clearRect(0, 0, 40, 40); b.drawImage(R.domElement, 0, 0, 40, 40);
+  c.save(); c.globalCompositeOperation = 'screen'; c.globalAlpha = g === 'ultra' ? 0.2 : 0.14; c.drawImage(BL, x - w * 0.53, y - w * 0.9, w * 1.06, w * 1.06); c.restore();
 }
 export { DANCES3D };
 export const THREE_VERSION = THREE.REVISION;
@@ -495,13 +576,15 @@ function grip(m, amt, mode, t) {
 // A live rigged Pal for your own three.js scene (Pal Park 3D, arcade games). pose(mode, t, extra) applies the
 // everyday motions (idle/walk/hop/happy...) plus optional joint overrides in the dances3d.js format.
 export function palRig(pal) {
-  const m = build(pal);
+  const m = build(pal); gameLite(m);
   return { obj: m, pose(mode = 'idle', t = 0, extra) { let P = modePose(mode, t); if (extra) P = { ...P, ...extra }; if (!sane(P)) P = modePose('idle', t); apply(m, P, t, mode); grip(m, 0, mode, t); } };
 }
 // ---------------------------------------------------------------- live 3D scenes (Pal Park): a real model in your own scene
 // makePal3D(pal) builds a fresh rigged model (not cached, caller owns it); posePal3D() poses it each frame with the same
 // idle/walk/hop/dance blending and follow-through as drawPal3D. Feet sit at y = 0, facing +z.
-export function makePal3D(pal) { const m = build(pal); m.userData.pal = pal; return m; }
+export function makePal3D(pal) { const m = build(pal); gameLite(m); m.userData.pal = pal; return m; }
+// game scenes (Pal Park, zombie): no floating motes; on 'low' also drop the filament cards (fewest draw calls)
+function gameLite(m) { const J = m.userData.J; if (J.spark) { J.spark.removeFromParent(); J.spark = null; } if (gfxLevel() === 'low') m.traverse((o) => { if (o.userData.fil) o.visible = false; }); }
 export function posePal3D(m, st = {}) {
   // st.t: your clock in 60 ticks/s; st.dt60: ticks since last call; st.speed: gait speed (1 walk, 1.6+ run); st.cadence: step-rate
   // multiplier (>1 = quicker steps to match a faster ground speed); st.turn -1..1; st.mode idle|walk|run|hop; st.jumpK 0..1

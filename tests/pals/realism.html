@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:0;background:#1e3b4a"><canvas id="c"></canvas>
+<script type="module">
+// Realism showcase: ?v=founder (big close-up) | species (grid) | outfits (hats + tops + held items)
+import { drawPal3D } from '../../js/pals/pal3d.js';
+const q = new URLSearchParams(location.search), v = q.get('v') || 'species';
+const cv = document.getElementById('c'), W = innerWidth, H = innerHeight; cv.width = W; cv.height = H; const c = cv.getContext('2d');
+const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2d5d6e'); g.addColorStop(1, '#152a33'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+const O = (o) => o; let J;
+if (v === 'founder') J = [[{ species: 'founder', level: 6 }, W / 2, H * 0.78, W * 0.62, q.get('m') || 'idle']];
+else if (v === 'outfits') { const L = [['tiger', { head: 'f_cap_red', body: 'f_tee_blue', held: 'f_wand_gold' }], ['bunny', { head: 'f_beanie_pink', full: 'f_dress_pink', held: 'f_balloon_red' }], ['kemy', { head: 'f_cap_blue', neck: 'chain_gold', held: 'f_icecream' }], ['founder', { head: 'f_beanie_navy', body: 'f_hoodie_purple' }], ['puppy', { face: 'f_specs_gold', back: 'f_cape_red', feet: 'f_sneakers_red' }], ['elephant', { head: 'f_cap_green', bag: 'f_backpack_pink' }]];
+  J = L.map(([s, o], i) => [{ species: s, level: 6, outfit: o }, (i % 2 + 0.5) * W / 2, (Math.floor(i / 2) + 0.95) * H / 3, W * 0.2, 'idle']); }
+else { const L = ['kemy', 'kitten', 'puppy', 'bear', 'fox', 'panda', 'dragon', 'frog', 'unicorn']; J = L.map((s, i) => [{ species: s, level: 6 }, (i % 3 + 0.5) * W / 3, (Math.floor(i / 3) + 0.95) * H / 3, W * 0.2, 'idle']); }
+const done = []; let t = 0; const go = () => { t++; let all = true; J.forEach(([p, x, y, s, m], i) => { if (done[i]) return; if (drawPal3D(c, x, y, s, p, { t: 40, mode: m, yaw: 0.3 })) done[i] = 1; else all = false; }); if (!all && t < 400) requestAnimationFrame(go); else window.ready = true; };
+window.__palFixedClock = 1; if (q.get('noenv')) window.__noEnv = 1; if (q.get('nok')) window.__noK = 1; setTimeout(go, 300);
+</script>
