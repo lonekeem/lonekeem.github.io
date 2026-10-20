@@ -1,4 +1,4 @@
-const CACHE = 'lks-v152';
+const CACHE = 'lks-v153';
 // Small app shell only (other files are cached as they are used); a big precache on every version bump
 // slowed phones down on first open after each update.
 const CORE = [
@@ -33,6 +33,8 @@ self.addEventListener('fetch', e => {
   }
   // Cross-origin (Firebase, googleapis, gstatic, auth, fonts, embeds): network only, never cached here.
   if (url.origin !== self.location.origin) return;
+  // Crawler files: always straight from the network, never cached.
+  if (/\/(robots\.txt|sitemap\.xml)$/.test(url.pathname)) return;
   // Only same-origin GETs; skip media streams and Firebase auth helper paths.
   if (req.method !== 'GET' || req.headers.has('range') || url.pathname.includes('/__/') ||
       /\.(mp4|mov|mp3|m4a|wav|ogg|opus)$/i.test(url.pathname)) return;
