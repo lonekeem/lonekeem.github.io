@@ -61,7 +61,7 @@ export function addParkHD(scene, o) {
     const pts = new THREE.Points(g, m); pts.frustumCulled = false; scene.add(pts); }
 
   // ---------------------------------------------------------------- puffy 3D clouds (instanced lumps, drift slowly; Medium+)
-  if (!LOW) { const NC = Math.round(12 * det), PER = 7; const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#dfe9ff', emissiveIntensity: 0.55, fog: false }), NC * PER);
+  if (!LOW && !Q.phone) { const NC = Math.round(12 * det), PER = 7; const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#dfe9ff', emissiveIntensity: 0.55, fog: false }), NC * PER);
     const mt = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(); let k = 0;
     for (let c = 0; c < NC; c++) { const a = (c / NC) * 6.28 + R() * 0.4, r = 120 + R() * 90, cx = Math.cos(a) * r, cz = Math.sin(a) * r, cy = 55 + R() * 25, sc = 5 + R() * 4;
       for (let i = 0; i < PER; i++) { const f = 1 - Math.abs(i - (PER - 1) / 2) / PER; p.set(cx + (i - PER / 2) * sc * 0.9, cy + f * sc * 0.6 + R() * sc * 0.3, cz + (R() - 0.5) * sc); s.set(sc * (0.9 + f), sc * (0.6 + f * 0.7), sc * (0.9 + f * 0.6)); mt.compose(p, q, s); im.setMatrixAt(k++, mt); } }
@@ -83,7 +83,7 @@ export function addParkHD(scene, o) {
   { const beds = []; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8, r = PLAZA_R + 6.2; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (pathD(x, z) > 3) beds.push([x, z]); }
     const kerbG = new THREE.TorusGeometry(1.7, 0.18, 6, 28); kerbG.rotateX(Math.PI / 2); const soilG = new THREE.CircleGeometry(1.7, 24); soilG.rotateX(-Math.PI / 2);
     const km = new THREE.InstancedMesh(kerbG, new THREE.MeshStandardMaterial({ color: '#d9cfbd', roughness: 0.85 }), beds.length), so = new THREE.InstancedMesh(soilG, new THREE.MeshStandardMaterial({ color: '#6b4a32', roughness: 1 }), beds.length);
-    const per = LOW ? 18 : Math.round(46 * det); const bloom = new THREE.IcosahedronGeometry(0.14, LOW ? 0 : 1); const fm = new THREE.InstancedMesh(bloom, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.6 }), beds.length * per);
+    const per = LOW ? 18 : Math.round(46 * det); const bloom = new THREE.IcosahedronGeometry(0.14, LOW || Q.phone ? 0 : 1); const fm = new THREE.InstancedMesh(bloom, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.6 }), beds.length * per);
     const leaf = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.32, 0), new THREE.MeshStandardMaterial({ color: '#4c9a3a', roughness: 0.8, flatShading: true }), beds.length * 6);
     const FC = ['#ff5f9e', '#ffd447', '#ffffff', '#b26bff', '#ff8a4a', '#6fb7ff']; const mt = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), c = new THREE.Color(); let f = 0, l = 0;
     beds.forEach(([x, z], b) => { const y = ground(x, z); mt.compose(p.set(x, y + 0.12, z), q, s.set(1, 1, 1)); km.setMatrixAt(b, mt); mt.compose(p.set(x, y + 0.16, z), q, s); so.setMatrixAt(b, mt);
