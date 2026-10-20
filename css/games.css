@@ -396,3 +396,19 @@
 @keyframes lu-spin { to { transform: rotate(360deg); } }
 .lu-msg { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .g-seat[style*="--lc"] { border-left: 4px solid var(--lc); }
+/* Featured: Pal Zombie Survival */
+.zf-hero{position:relative;display:block;min-height:178px;margin:4px 0 8px;padding:16px;border-radius:22px;overflow:hidden;color:#fff;text-decoration:none;background:radial-gradient(120% 90% at 85% 20%,#3d8a3a 0,#1f3f22 40%,#1a0f2e 100%);border:1px solid rgba(246,201,85,.45);box-shadow:0 10px 28px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18)}
+.zf-hero::after{content:"";position:absolute;inset:auto 0 0 0;height:34px;background:repeating-radial-gradient(circle at 10px 0,#6fbf4a 0 9px,transparent 10px 22px);opacity:.35}
+.zf-badge{position:relative;z-index:2;display:inline-block;padding:3px 10px;border-radius:999px;background:linear-gradient(#ffe08a,#e7a92b);color:#3a2300;font-weight:800;font-size:.75rem;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.zf-txt{position:relative;z-index:2;max-width:56%;margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.zf-txt b{font-size:1.35rem;line-height:1.1;text-shadow:0 2px 0 #1d3b14,0 0 12px rgba(143,209,106,.6)}
+.zf-txt small{font-size:.82rem;opacity:.9}
+.zf-play{align-self:flex-start;margin-top:6px;padding:9px 22px;border-radius:14px;font-weight:800;background:linear-gradient(#b6f08c,#5fae3c);color:#123008;box-shadow:0 4px 0 #2d6a1f,0 6px 14px rgba(0,0,0,.4)}
+.zf-hero:active .zf-play{transform:translateY(3px);box-shadow:0 1px 0 #2d6a1f}
+.zf-pal{position:absolute;z-index:1;right:4px;bottom:6px;width:42%;max-width:190px;height:auto;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5))}
+.zf-zom{position:absolute;right:30%;bottom:4px;width:24%;max-width:110px;transform:rotate(-8deg);animation:zfWob 2.4s ease-in-out infinite}
+@keyframes zfWob{50%{transform:rotate(4deg) translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){.zf-zom{animation:none}}
+.zf-arcade{display:flex;justify-content:space-between;margin:0 0 14px;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,.06);color:inherit;text-decoration:none;font-weight:700}
+.g-prof-z{margin-top:8px}
+.zf-mini{font-size:1.6rem}

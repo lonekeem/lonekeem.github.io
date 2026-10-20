@@ -733,6 +733,7 @@ async function pageExplore(tab, token) {
   main.innerHTML = `
     <h1 class="page-title">Explore</h1>${tabs}
     <a class="g-promo" href="#/games">${GAMES_ICON}<span><b>Games</b><small>Star Pool, Star Drop, checkers, Trivia &amp; more. Play friends or the computer.</small></span><span aria-hidden="true">›</span></a>
+    <a class="g-promo zf-promo" href="#/arcade/zombie"><span class="zf-mini">🧟</span><span><b>New: Pal Zombie Survival</b><small>Bring your Pal, splat silly zombies with bubbles. Tap to play!</small></span><span aria-hidden="true">›</span></a>
     <div id="ex-top"></div>
     <h2 style="margin:22px 0 14px;font-size:1.15rem">Recent posts</h2>
     <div id="posts"><div class="spinner"></div></div>`;

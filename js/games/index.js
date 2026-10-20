@@ -87,6 +87,7 @@ export function createGames(ctx) {
   async function hub(token) {
     const rec = cpuRec();
     main.innerHTML = `<section class="gm-wrap">
+      <a class="zf-hero" href="#/arcade/zombie" aria-label="Play Pal Zombie Survival"><span class="zf-badge">⭐ Featured Game</span><svg class="zf-zom" viewBox="0 0 120 130" aria-hidden="true"><g stroke="#1d3b14" stroke-width="3" stroke-linejoin="round"><path d="M10 70 L48 64 L48 76 L12 82Z" fill="#8fd16a"/><ellipse cx="62" cy="96" rx="30" ry="30" fill="#7cc35a"/><rect x="40" y="88" width="44" height="34" rx="10" fill="#6a4fc4"/><path d="M50 92 l10 0 M70 104 l10 0" stroke="#a99be8"/><circle cx="62" cy="48" r="32" fill="#8fd16a"/><path d="M18 58 L50 54 L50 66 L20 72Z" fill="#8fd16a"/></g><circle cx="50" cy="44" r="10" fill="#fff" stroke="#1d3b14" stroke-width="3"/><circle cx="76" cy="40" r="7" fill="#fff" stroke="#1d3b14" stroke-width="3"/><circle cx="52" cy="46" r="4" fill="#222"/><circle cx="75" cy="42" r="3" fill="#222"/><path d="M48 62 q14 10 28 0" fill="#3a1a1a" stroke="#1d3b14" stroke-width="3"/><path d="M60 66 q4 10 9 2" fill="#ff8fb1" stroke="#1d3b14" stroke-width="2"/><path d="M70 22 l6 -8 M74 24 l10 -4" stroke="#1d3b14" stroke-width="3" stroke-linecap="round"/><path d="M36 30 l8 6 M40 26 l2 8" stroke="#5a3a2a" stroke-width="2.4"/></svg><img class="zf-pal" src="assets/featured/pal-bear.webp" alt="" width="215" height="187"><div class="zf-txt"><b>Pal Zombie Survival</b><small>Team up with your Pal and splat goofy zombies with bubble blasters!</small><span class="zf-play">▶ Play</span></div></a><a class="zf-arcade" href="#/arcade">🕹️ Open the Arcade <span aria-hidden="true">›</span></a>
       <div class="g-hero"><span class="g-hero-ic">${CONTROLLER}</span><div><h1>Games</h1><p class="muted">Free, turn-based and made by the studio. Play friends, get matched, or take on the computer.</p></div>${muteBtn()}</div>
       <div class="g-quick">
         <a class="g-qbtn" href="#/games/pick/friend"><span>${STAR()}</span>Play a friend</a>
@@ -459,8 +460,8 @@ export function createGames(ctx) {
     try {
       const st = await net.getStats(uid);
       const rows = GAMES.filter((g) => st[g.id + '_w'] || st[g.id + '_l'] || st[g.id + '_d']);
-      if (!rows.length) { if (uid === myUid()) el.innerHTML = `<a class="g-prof" href="#/games">${CONTROLLER}<span><b>Games</b> · play friends or the computer</span></a>`; return; }
-      el.innerHTML = `<a class="g-prof" href="#/games" aria-label="Game record">${CONTROLLER}${rows.map((g) => `<span><b>${esc(g.name)}</b> ${st[g.id + '_w'] || 0}W ${st[g.id + '_l'] || 0}L${st[g.id + '_d'] ? ` ${st[g.id + '_d']}D` : ''}</span>`).join('')}</a>`;
+      if (!rows.length) { if (uid === myUid()) el.innerHTML = `<a class="g-prof" href="#/games">${CONTROLLER}<span><b>Games</b> · play friends or the computer</span></a><a class="g-prof g-prof-z" href="#/arcade/zombie">🧟<span><b>Pal Zombie Survival</b> · play now</span></a>`; return; }
+      el.innerHTML = `<a class="g-prof" href="#/games" aria-label="Game record">${CONTROLLER}${rows.map((g) => `<span><b>${esc(g.name)}</b> ${st[g.id + '_w'] || 0}W ${st[g.id + '_l'] || 0}L${st[g.id + '_d'] ? ` ${st[g.id + '_d']}D` : ''}</span>`).join('')}</a><a class="g-prof g-prof-z" href="#/arcade/zombie">🧟<span><b>Pal Zombie Survival</b> · play now</span></a>`;
     } catch { /* optional */ }
   }
   return { page, open, renderProfile, CONTROLLER };
