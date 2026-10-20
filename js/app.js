@@ -1097,6 +1097,7 @@ async function pageProfile(username, tab, token) {
   if (!blocked) live.renderProfile($('#pav'), $('.profile-actions'), uid, mine || (uid === STUDIO_UID && isAdmin()), token);
   $('#report-user')?.addEventListener('click', () => reportDialog('user', uid, '', '@' + u.username));
   mod.profileButton(uid, u, $('#p-modinv'));
+  if (!blocked && uid !== STUDIO_UID) import('./inf-pass.js').then((m) => m.mountProfile(uid, $('.profile-head h1'), !mine && isAdmin() ? $('.profile-actions') : null, !mine && isAdmin(), toast)).catch(() => {});
   $('#block')?.addEventListener('click', () => blockUser(uid, u.username));
   $('#unblock')?.addEventListener('click', () => unblockUser(uid, u.username));
   $('#msg')?.addEventListener('click', (e) => { if (!S.user) { e.preventDefault(); requireAuth(); } });

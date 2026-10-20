@@ -1,0 +1,44 @@
+// Rules tests: ∞ Pass (infPass/{uid}) - only the admin grants/removes; holders buy paid-0 like the admin.
+// Run: firebase emulators:exec --config firebase.emu.json --only firestore "node tests/pals/inf-pass-rules.test.mjs"
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { doc, setDoc, deleteDoc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+const env = await initializeTestEnvironment({ projectId: 'demo-inf-pass', firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, e.message.slice(0, 200)); } };
+const day = Math.floor(Date.now() / 864e5), past = Timestamp.fromMillis(Date.now() - 60000);
+await env.withSecurityRulesDisabled(async (c) => { const d = c.firestore();
+  await setDoc(doc(d, 'config/palShop'), { prices: { hat: 400 }, kinds: { hat: 'wear', z_foam: 'zweapon' }, deals: [{}], dprices: { z_foam: 80 }, v: 1 });
+  for (const u of ['boss', 'kid', 'pal']) {
+    await setDoc(doc(d, `users/${u}/pal/wallet`), { coins: 0, total: 0, day, earned: {}, src: '', last: past, lastBuy: '', paid: 0, buyAt: past, room: [], updatedAt: past });
+    await setDoc(doc(d, `users/${u}/pal/diamonds`), { d: 0, total: 0, day, today: 0, last: past, lastBuy: '', paid: 0, buyAt: past, updatedAt: past });
+  } });
+const ADM = env.authenticatedContext('boss', { email: 'lillykemoy1@gmail.com', email_verified: true }).firestore();
+const KID = env.authenticatedContext('kid').firestore(); const PAL = env.authenticatedContext('pal').firestore();
+const FAKE = env.authenticatedContext('pal', { email: 'lillykemoy1@gmail.com', email_verified: false }).firestore();
+const grant = (db, u, by) => setDoc(doc(db, `infPass/${u}`), { unlimitedPass: true, grantedBy: by, grantedAt: serverTimestamp() });
+const coinBuy = (db, u, id) => { const b = writeBatch(db);
+  b.update(doc(db, `users/${u}/pal/wallet`), { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  b.set(doc(db, `users/${u}/inv/${id}`), { n: 1, at: serverTimestamp() }); return b.commit(); };
+const diaBuy = (db, u, id) => { const b = writeBatch(db);
+  b.update(doc(db, `users/${u}/pal/diamonds`), { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  b.set(doc(db, `users/${u}/inv/${id}`), { n: 1, at: serverTimestamp() }); return b.commit(); };
+await ok('user cannot give themselves a pass', assertFails(grant(KID, 'kid', 'kid')));
+await ok('user cannot give a friend a pass', assertFails(grant(KID, 'pal', 'kid')));
+await ok('unverified admin email cannot grant', assertFails(grant(FAKE, 'pal', 'pal')));
+await ok('no pass: paid-0 buy fails', assertFails(coinBuy(KID, 'kid', 'hat')));
+await ok('admin cannot grant with wrong grantedBy', assertFails(grant(ADM, 'kid', 'kid')));
+await ok('admin cannot add extra fields', assertFails(setDoc(doc(ADM, 'infPass/kid'), { unlimitedPass: true, grantedBy: 'boss', grantedAt: serverTimestamp(), x: 1 })));
+await ok('admin grants pass', assertSucceeds(grant(ADM, 'kid', 'boss')));
+await ok('anyone can read pass (badge)', assertSucceeds(getDoc(doc(PAL, 'infPass/kid'))));
+await ok('holder cannot edit own pass', assertFails(setDoc(doc(KID, 'infPass/kid'), { unlimitedPass: true, grantedBy: 'kid', grantedAt: serverTimestamp() })));
+await ok('holder cannot delete own pass', assertFails(deleteDoc(doc(KID, 'infPass/kid'))));
+await ok('holder buys 400★ hat with 0 coins', assertSucceeds(coinBuy(KID, 'kid', 'hat')));
+await ok('holder buys 💎 item with 0 diamonds', assertSucceeds(diaBuy(KID, 'kid', 'z_foam')));
+await ok('holder cannot buy unknown item', assertFails(coinBuy(KID, 'kid', 'nope')));
+await ok('holder cannot set coins directly', assertFails(writeBatch(KID).update(doc(KID, 'users/kid/pal/wallet'), { coins: 999999, updatedAt: serverTimestamp() }).commit()));
+await ok('holder cannot buy into another user', assertFails(coinBuy(KID, 'pal', 'hat')));
+await ok('non-holder still cannot buy free', assertFails(coinBuy(PAL, 'pal', 'hat')));
+await ok('admin still buys free', assertSucceeds(coinBuy(ADM, 'boss', 'hat')));
+await ok('admin removes pass', assertSucceeds(deleteDoc(doc(ADM, 'infPass/kid'))));
+await ok('after removal: paid-0 buy fails', assertFails(diaBuy(KID, 'kid', 'z_foam')));
+await env.cleanup(); console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

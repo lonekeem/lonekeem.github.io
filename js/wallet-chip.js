@@ -1,9 +1,10 @@
 // Shared live wallet chip: '⭐ 1,240 · 💎 35'. One onSnapshot per balance doc for the whole app
 // (users/{uid}/pal/wallet → coins, users/{uid}/pal/diamonds → d). Every chip on screen reads from this.
-// Admin (same check as economy.isAdminUid / 4fa7466) shows ∞. Logged out: no chip.
+// Admin or ∞ Pass holder (js/inf-pass.js) shows ∞. Logged out: no chip.
 import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-import { auth, db, ADMIN_EMAIL } from './firebase-init.js';
+import { auth, db } from './firebase-init.js';
+import { isAdminUser, watchPass } from './inf-pass.js';
 const st = { uid: null, admin: false, c: null, d: null }; const chips = new Set(); let unsub = [];
 const fmt = (n) => (st.admin ? '∞' : n == null ? '…' : n > 9999 ? (n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K') : Number(n).toLocaleString());
 const CSS = `.wchip{position:relative;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,211,77,.5);background:rgba(20,10,40,.78);color:#fff;border-radius:999px;padding:4px 9px;font:700 13px/1.1 Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -29,8 +30,9 @@ function pop(diff, cur) { if (!diff || st.admin) return; for (const el of chips)
 function render() { for (const el of [...chips]) { if (!el.isConnected && el.id !== 'wallet-fab') { chips.delete(el); continue; } paint(el); } }
 function set(k, v, cur) { const old = st[k]; st[k] = v; render(); if (old != null && v != null) pop(v - old, cur); }
 onAuthStateChanged(auth, (u) => {
-  unsub.forEach((f) => f()); unsub = []; st.uid = u ? u.uid : null; st.c = st.d = null; st.admin = !!(u && u.email === ADMIN_EMAIL && u.emailVerified); render();
+  unsub.forEach((f) => f()); unsub = []; st.uid = u ? u.uid : null; st.c = st.d = null; st.admin = isAdminUser(u); render();
   if (!u) return;
+  if (!st.admin) unsub.push(watchPass(u.uid, (on) => { st.admin = on; render(); }));
   unsub.push(onSnapshot(doc(db, 'users', u.uid, 'pal', 'wallet'), (s) => set('c', s.exists() ? Number(s.data().coins) || 0 : 0, '⭐'), () => {}));
   unsub.push(onSnapshot(doc(db, 'users', u.uid, 'pal', 'diamonds'), (s) => set('d', s.exists() ? Number(s.data().d) || 0 : 0, '💎'), () => {}));
 });

@@ -12,6 +12,12 @@ service cloud.firestore {
         && request.auth.token.email == 'lillykemoy1@gmail.com'
         && request.auth.token.email_verified == true;
     }
+    // Unlimited Star Coins + Diamonds: the admin, or a player the admin gave an ∞ Pass (infPass/{uid}).
+    // Only for your own wallet (callers already require uid == me()). One lookup, only reached for paid-0 buys.
+    function unlimitedFor(uid) {
+      return isAdmin() || (signedIn() && uid == me() && exists(/databases/$(database)/documents/infPass/$(uid))
+        && get(/databases/$(database)/documents/infPass/$(uid)).data.unlimitedPass == true);
+    }
     // Acting as yourself, or the admin acting as the studio account.
     function actingAs(uid) { return signedIn() && (uid == me() || (uid == 'studio' && isAdmin())); }
     function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
@@ -1399,6 +1405,14 @@ service cloud.firestore {
         && isStr(request.resource.data.get('action', ''), 0, 40);
     }
 
+    // ∞ Pass (unlimited Star Coins + Diamonds): public (profile badge), written ONLY by the admin.
+    match /infPass/{uid} {
+      allow read: if true;
+      allow create, update: if isAdmin() && request.resource.data.keys().hasOnly(['unlimitedPass', 'grantedBy', 'grantedAt'])
+        && request.resource.data.unlimitedPass == true && request.resource.data.grantedBy == me()
+        && request.resource.data.grantedAt == request.time;
+      allow delete: if isAdmin();
+    }
     // Moderator roles: public (so everyone sees the blue check), written ONLY by the admin.
     match /roles/{uid} {
       allow read: if true;
@@ -1719,8 +1733,8 @@ service cloud.firestore {
       allow update: if signedIn() && uid == me() && walletShape() && (
         (changed().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'updatedAt']) && earnOk())
         || (changed().hasOnly(['coins', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && buyOk())
-        // owner/admin: unlimited Star Coins - records a valid shop purchase (paid 0) without touching the balance
-        || (isAdmin() && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && adminBuyOk())
+        // owner/admin or ∞ Pass: unlimited Star Coins - records a valid shop purchase (paid 0) without touching the balance
+        || (unlimitedFor(uid) && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && adminBuyOk())
         || (changed().hasOnly(['room', 'updatedAt']) && roomOk()));
       allow delete: if signedIn() && uid == me();
     }
@@ -1753,8 +1767,8 @@ service cloud.firestore {
       allow update: if signedIn() && uid == me() && dShape() && (
         (changed().hasOnly(['d', 'total', 'day', 'today', 'last', 'updatedAt']) && dEarnOk())
         || (changed().hasOnly(['d', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && dBuyOk())
-        // owner/admin: unlimited Diamonds - records a valid Diamond purchase (paid 0) without touching the balance
-        || (isAdmin() && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && d().paid == 0 && d().buyAt == request.time
+        // owner/admin or ∞ Pass: unlimited Diamonds - records a valid Diamond purchase (paid 0) without touching the balance
+        || (unlimitedFor(uid) && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && d().paid == 0 && d().buyAt == request.time
             && d().lastBuy in dShop().get('dprices', {})
             && getAfter(/databases/$(database)/documents/users/$(uid)/inv/$(d().lastBuy)).data.at == request.time));
       allow delete: if signedIn() && uid == me();

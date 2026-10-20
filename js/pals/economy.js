@@ -3,10 +3,9 @@
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ITEM, EARN, dayNo, todaysDeals } from './catalog.js';
-import { auth, ADMIN_EMAIL } from '../firebase-init.js';
-// Owner/admin account (same check as app.js isAdmin() and firestore.rules isAdmin()): unlimited Star Coins + Diamonds.
-// The balance shows as Infinity (renders '∞' via toLocaleString); purchases record ownership but don't deduct.
-export const isAdminUid = (uid) => { const u = auth.currentUser; return !!(u && u.uid === uid && u.email === ADMIN_EMAIL && u.emailVerified); };
+import { isUnlimited } from '../inf-pass.js';
+// Unlimited (admin or ∞ Pass, js/inf-pass.js): balance shows Infinity ('∞'); purchases record ownership but don't deduct.
+export const isAdminUid = isUnlimited; // kept name for older imports (now async)
 export function createEconomy(db, uid) {
   const wref = doc(db, 'users', uid, 'pal', 'wallet');
   let w = null, inv = null, chain = Promise.resolve(), lastWrite = 0; const subs = new Set();
@@ -20,7 +19,7 @@ export function createEconomy(db, uid) {
       await setDoc(wref, { coins: 0, total: 0, day: dayNo(), earned: {}, src: '', last: serverTimestamp(), lastBuy: '', paid: 0, buyAt: serverTimestamp(), room: [], updatedAt: serverTimestamp() });
       lastWrite = Date.now(); w = { coins: 0, total: 0, day: dayNo(), earned: {}, room: [] };
     } else w = s.data();
-    if (isAdminUid(uid)) w = { ...w, coins: Infinity, admin: true };
+    if (await isUnlimited(uid)) w = { ...w, coins: Infinity, admin: true };
     emit(); return w;
   }
   async function inventory(force) {
@@ -46,7 +45,7 @@ export function createEconomy(db, uid) {
       const paid = priceOf(id); if (w.coins < paid) throw new Error('Not enough Star Coins yet.');
       if (it.kind !== 'snack' && inv[id]) throw new Error('You already have this.');
       await gap(); const b = writeBatch(db);
-      if (w.admin) { // admin: ownership only, balance untouched (rules allow paid 0 for isAdmin())
+      if (w.admin) { // admin: ownership only, balance untouched (rules allow paid 0 for unlimitedFor())
         b.update(wref, { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
         b.set(doc(db, 'users', uid, 'inv', id), { n: (inv[id] || 0) + 1, at: serverTimestamp() });
         await b.commit(); lastWrite = Date.now(); inv[id] = (inv[id] || 0) + 1; emit(); return 0;

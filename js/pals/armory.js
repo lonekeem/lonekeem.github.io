@@ -32,7 +32,7 @@ export function createDiamonds(db, uid) {
   async function get(force) { if (w && !force) return w; const s = await getDoc(ref);
     if (!s.exists()) { await setDoc(ref, { d: 0, total: 0, day: dayNo(), today: 0, last: serverTimestamp(), lastBuy: '', paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() }); w = { d: 0, total: 0, day: dayNo(), today: 0 }; last = Date.now(); }
     else { w = s.data(); last = w.last && w.last.toMillis ? w.last.toMillis() : 0; }
-    if (isAdminUid(uid)) w = { ...w, d: Infinity, admin: true }; return w; }
+    if (await isAdminUid(uid)) w = { ...w, d: Infinity, admin: true }; return w; }
   // one reward per finished run; clamps to the per-run + per-day caps; waits out the 45 s gap if needed
   async function earnRun(n) { await get(true); if (w.admin) return 0; const today = w.day === dayNo() ? w.today : 0; const amt = Math.max(0, Math.min(Math.round(n), RUN_CAP, DAY_CAP - today)); if (!amt) return 0;
     const wait = 46000 - (Date.now() - last); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
