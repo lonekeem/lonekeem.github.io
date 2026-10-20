@@ -36,13 +36,13 @@ export function createPalStore(ctx) {
       <div id="ps-filters" class="ps-filters"></div><div id="ps-grid" class="ps-grid"></div></section>`;
     const $ = (s) => main.querySelector(s);
     // stage: background + 3D Pal, drag to rotate, wheel/pinch to zoom
-    const cv = $('#ps-cv'); const W = Math.min(340, main.clientWidth - 24 || 320), H = 260; const dpr = Math.min(2, devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px'; const c = cv.getContext('2d'); c.scale(dpr, dpr);
+    const cv = $('#ps-cv'); cv.dataset.palStage = '1'; if (cv._palLoop) cv._palLoop.on = false; const loopTok = cv._palLoop = { on: true }; const W = Math.min(340, main.clientWidth - 24 || 320), H = 260; const dpr = Math.min(2, devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px'; const c = cv.getContext('2d'); c.scale(dpr, dpr);
     let drag = null, pinch = 0, spin = false; cv.style.touchAction = 'none';
     cv.onpointerdown = (ev) => { drag = ev.clientX; cv.setPointerCapture(ev.pointerId); }; cv.onpointermove = (ev) => { if (drag !== null) { yaw += (ev.clientX - drag) * 0.015; drag = ev.clientX; } }; cv.onpointerup = cv.onpointercancel = () => { drag = null; };
     cv.onwheel = (ev) => { ev.preventDefault(); zoom = Math.max(0.8, Math.min(1.8, zoom - ev.deltaY * 0.001)); };
     cv.addEventListener('touchmove', (ev) => { if (ev.touches.length === 2) { const d = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY); if (pinch) zoom = Math.max(0.8, Math.min(1.8, zoom * d / pinch)); pinch = d; } }, { passive: true }); cv.addEventListener('touchend', () => { pinch = 0; });
     $('#ps-rot').onclick = () => { spin = !spin; };
-    let t = 0; const frame = () => { if (!document.body.contains(cv)) return; t++; if (spin) yaw += 0.02; c.clearRect(0, 0, W, H);
+    let t = 0; const frame = () => { if (!document.body.contains(cv) || !loopTok.on) return; t++; if (spin) yaw += 0.02; c.clearRect(0, 0, W, H);
       if (!drawBg(c, W, H, D.bg, t)) { c.fillStyle = '#2a1458'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill(); }
       drawDancer(c, W / 2, H - 12, 120 * zoom, { ...p, outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }, { t, mode: 'idle', yaw }); requestAnimationFrame(frame); }; frame();
     const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; pv.textContent = u.length ? `Preview · ${u.length} to buy · ★${u.reduce((a, b) => a + (b.p || 0), 0)}` : '';

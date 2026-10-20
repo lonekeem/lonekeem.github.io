@@ -121,7 +121,7 @@ export function openTalk(ctx, p, { owner, mine, visitorChat, onHappy, ownsVoice,
       : `<div class="pal-talk-presets">${VISITOR_LINES(p, owner).map((l, i) => `<button class="pal-chip" data-vl="${i}">${['👋 Hi!', '❓ Whose Pal?', '💜 Friends?', '🏠 Visiting!', '🐾 Pat'][i]}</button>`).join('')}</div><p class="small muted">@${esc(owner)} can let visitors chat with their Pal.</p>`}
   </div>`);
   const root = document.querySelector('.pal-talk'); const host = root.querySelector('.pal-talk-stage');
-  const cv = document.createElement('canvas'); const d = Math.min(3, devicePixelRatio || 1); cv.width = 240 * d; cv.height = 170 * d; cv.style.width = '240px'; cv.style.height = '170px'; host.appendChild(cv); const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0);
+  host.querySelectorAll('canvas[data-pal-stage]').forEach((o) => o.remove()); const cv = document.createElement('canvas'); cv.dataset.palStage = '1'; const d = Math.min(3, devicePixelRatio || 1); cv.width = 240 * d; cv.height = 170 * d; cv.style.width = '240px'; cv.style.height = '170px'; host.appendChild(cv); const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0);
   let talking = 0, emo = 'happy', emoT = 0, t = 0; const stats = liveStats(p); const mood = moodOf(stats);
   const frame = () => { if (!document.body.contains(cv)) { stopSpeaking(); return; } t++; c.clearRect(0, 0, 240, 170); if (p.bg) drawBg(c, 240, 170, p.bg, t);
     let mode = 'idle'; if (talking > 0) { mode = 'eat'; talking--; } else if (emoT > 0) { emoT--; mode = emo === 'giggle' ? 'happy' : emo === 'sleepy' ? 'sleep' : emo === 'curious' ? 'walk' : 'happy'; }

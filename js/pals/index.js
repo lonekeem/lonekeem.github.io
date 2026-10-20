@@ -37,7 +37,8 @@ function snd(kind) {
 }
 // ---------------------------------------------------------------- canvas helper
 function stage(el, w, h) {
-  const cv = document.createElement('canvas'); const dpr = Math.min(3, devicePixelRatio || 1);
+  el.querySelectorAll(':scope > canvas[data-pal-stage]').forEach((o) => o.remove()); // idempotent mount per slot
+  const cv = document.createElement('canvas'); cv.dataset.palStage = '1'; const dpr = Math.min(3, devicePixelRatio || 1);
   cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px'; cv.style.touchAction = 'none';
   el.appendChild(cv); const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); return { cv, c, w, h };
 }

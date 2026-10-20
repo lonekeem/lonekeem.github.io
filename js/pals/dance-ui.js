@@ -92,7 +92,9 @@ export const keepOn = () => { try { return localStorage.getItem(KEEP) === '1'; }
 export function setKeep(on) { try { localStorage.setItem(KEEP, on ? '1' : '0'); if (on) sessionStorage.removeItem(HIDE); } catch { /* */ } window.dispatchEvent(new Event('kemy:pal-float')); }
 const hiddenSession = () => { try { return sessionStorage.getItem(HIDE) === '1'; } catch { return false; } };
 const PAL_SCREENS = /^#\/(me|u\/|pals|park|games|game\/|live|new|settings)/;
+const palOnPage = () => { for (const e of document.querySelectorAll('[data-pal-stage], .pal-strip, .pal-sheet, .pal-talk, .pal-dance, .park-view, .pal-pop')) if (e.isConnected && (e.offsetParent !== null || e.classList.contains('pal-pop'))) return true; return false; };
 export function initFloat({ getPal, toast }) {
+  document.querySelectorAll('.pal-float').forEach((e) => e.remove()); // idempotent: never two floating Pals
   const el = document.createElement('div'); el.className = 'pal-float'; el.hidden = true; el.setAttribute('role', 'button'); el.tabIndex = 0;
   el.setAttribute('aria-label', 'Your Pal. Tap for a move, double-tap to hide'); document.body.appendChild(el);
   const { cv, c } = canvasEl(84, 84); el.appendChild(cv);
@@ -101,6 +103,7 @@ export function initFloat({ getPal, toast }) {
   const want = () => {
     if (!pal || document.hidden) return false; const h = location.hash || '#/watch';
     if (PAL_SCREENS.test(h)) return false; if (document.querySelector('.modal-backdrop')) return false;
+    if (palOnPage()) return false; // one Pal on screen at a time: the page (or a pop-up) already shows it
     if (keepOn() && !hiddenSession()) return true;
     return danceEnabled() && isDancing() && !hiddenSession();
   };

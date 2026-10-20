@@ -79,7 +79,7 @@ export function popups({ S, db }) {
   document.addEventListener('wheel', onScroll, { passive: true }); document.addEventListener('touchmove', onScroll, { passive: true });
   addEventListener('hashchange', () => { if (!POP_ROUTES.test(location.hash || '')) document.querySelectorAll('.pal-pop').forEach((e) => { e.remove(); shown = false; }); });
   async function show(force) {
-    const p = await ensure(); if ((!force && !POP_ROUTES.test(location.hash || '')) || document.querySelector('.pal-strip, .pal-pop') || document.activeElement?.matches?.('input, textarea, [contenteditable]')) return; if (!p || shown || (!force && !enabled())) return; shown = true; localStorage.setItem(LAST, String(Date.now()));
+    const p = await ensure(); if ((!force && !POP_ROUTES.test(location.hash || '')) || document.querySelector('.pal-strip, .pal-pop, .pal-float:not([hidden]), [data-pal-stage]') || document.activeElement?.matches?.('input, textarea, [contenteditable]')) return; if (!p || shown || (!force && !enabled())) return; shown = true; localStorage.setItem(LAST, String(Date.now()));
     const mood = moodOf(liveStats(p)); const key = mood.hungry ? 'hungry' : mood.dirty ? 'dirty' : mood.tired ? 'tired' : mood.sad ? 'sad' : 'ok';
     const line = LINES[key][Math.floor(Math.random() * LINES[key].length)]; const side = Math.random() < 0.5 ? 'left' : 'right';
     const el = document.createElement('div'); el.className = `pal-pop ${side}${RM() ? ' rm' : ''}`; el.setAttribute('role', 'button'); el.setAttribute('aria-label', `${p.name} says: ${line}. Tap to say bye.`); el.tabIndex = 0;
