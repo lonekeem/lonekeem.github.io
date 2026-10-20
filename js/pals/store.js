@@ -22,7 +22,7 @@ const EMO = { phones: '🎧', badge: '🎖️', cap: '🧢', beanie: '🧶', buc
   round: '👓', lens: '🕶️', heart: '💖', star: '🌟', stud: '💎', hoop: '⭕', drop: '✨', beads: '📿', chain: '⛓️', locket: '💝', medal: '🏅', scarf: '🧣', tie: '👔', bowtie: '🎀', tee: '👕', hoodie: '🧥', jersey: '🎽', sweater: '🧶', puffer: '🧥', blouse: '👚',
   shorts: '🩳', skirt: '👗', tutu: '🩰', pants: '👖', dress: '👗', gown: '👸', overalls: '👖', pjs: '🌙', suit: '🤵', kit: '⚽', uniform: '🏫', coat: '🧥', swim: '🩱', dino: '🦖', astro: '🧑‍🚀', hero: '🦸', xmas: '🎄',
   sneakers: '👟', boots: '🥾', flats: '🩰', sandals: '🩴', cape: '🦸', wings: '🧚', angel: '😇', jetpack: '🚀', backpack: '🎒', purse: '👛', satchel: '💼', wand: '🪄', balloon: '🎈', icecream: '🍦', teddy: '🧸', guitar: '🎸', guitar2: '🎸', handbag: '👜', phone: '📱', bouquet: '💐', boba: '🧋', bball: '🏀', ball: '⚽', mic: '🎤', umbrella: '☂️',
-  bracelet: '💫', beadband: '📿', watch: '⌚', ring: '💍', gem: '💍', nhoop: '⭕', nstud: '💎', nstar: '⭐', ndouble: '➰', nheart: '💖', nchain: '⛓️', nrainbow: '🌈', ncrystal: '👑' };
+  bracelet: '💫', beadband: '📿', watch: '⌚', ring: '💍', gem: '💍', nhoop: '⭕', nstud: '💎', nstar: '⭐', nheartstud: '💗', ndouble: '➰', nheart: '💖', nchain: '⛓️', nrainbow: '🌈', ncrystal: '👑' };
 export function createPalStore(ctx) {
   const { S, esc, toast, openModal, closeModal, friendlyError, requireAuth, econ, myPals, activeOf, commit } = ctx;
   async function page(main) {

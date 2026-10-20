@@ -75,6 +75,10 @@ for (const [id, st, col] of [['f_food_berry', 'berry', '#ff4f6f'], ['f_food_cook
   WEAR.push({ id, name: st, kind: 'wear', slot: 'held', st, col, p: 0, r: 'c', g: 'a', free: true, hidden: true });
 // 🎃 Halloween costume collection (js/pals/halloween.js): free f_hw_*, Star Coins hw_*, Diamonds z_hw_*
 for (const w of HALLOWEEN) WEAR.push(w);
+// 🤏 dainty mini nose rings (same 'nose' slot + anchors, drawn at ~55% size: mini: 1)
+for (const [id, name, st, col, p] of [['nosetinyg', 'Tiny Gold Hoop', 'nhoop', '#ffcf3a', 70], ['nosetinys', 'Tiny Silver Hoop', 'nhoop', '#d0d8e8', 70], ['nosetinyrose', 'Tiny Rose Gold Hoop', 'nhoop', '#f0a0b0', 75],
+  ['noseminigem', 'Mini Crystal Stud', 'nstud', '#f4fbff', 80], ['noseministar', 'Mini Star Stud', 'nstar', '#ffcf3a', 65], ['noseminiheart', 'Mini Heart Stud', 'nheartstud', '#ff5f9e', 85]])
+  WEAR.push({ id, name, kind: 'wear', slot: 'nose', st, col, p, r: 'c', g: 'a', mini: 1 });
 // 👑 Diamond nose ring (config/palShop.dprices)
 WEAR.push({ id: 'z_nosecrystal', name: 'Crystal Star Nose Ring', kind: 'wear', slot: 'nose', st: 'ncrystal', col: '#bfe8ff', p: 0, d: 300, prem: 1, r: 'l', g: 'a' });
 export const WEAR_BY = Object.fromEntries(WEAR.map((w) => [w.id, w]));

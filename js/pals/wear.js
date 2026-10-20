@@ -22,7 +22,8 @@ const NX = 1.0, NY = (g) => g.hy + 1.3; // 👃 flat nose-ring spot (just right 
 const nh = (c, col, g, r = 1.2, x = NX) => { c.strokeStyle = col; c.lineWidth = 0.6; ell(c, x, NY(g) + r * 0.9, r, r); c.stroke(); };
 const JEWEL2D = {
   nhoop(c, col, g) { nh(c, col, g); }, ndouble(c, col, g) { nh(c, col, g, 1); nh(c, col, g, 1.4, NX + 0.6); },
-  nstud(c, col, g) { ell(c, NX, NY(g), 0.8, 0.8); fs(c, col); glint2(c, NX + 0.4, NY(g) - 0.4, 0.6, g.t); },
+  nstud(c, col, g) { ell(c, NX, NY(g), 0.8, 0.8); fs(c, col, '#5a1838'); glint2(c, NX + 0.4, NY(g) - 0.4, 0.6, g.t); },
+  nheartstud(c, col, g) { ell(c, NX, NY(g), 0.7, 0.6); fs(c, col); },
   nstar(c, col, g) { starP(c, NX, NY(g), 1.1); fs(c, col); glint2(c, NX + 0.4, NY(g) - 0.4, 0.6, g.t); },
   nheart(c, col, g) { nh(c, col, g, 0.9); ell(c, NX, NY(g) + 2, 0.7, 0.6); fs(c, '#ff7fb0'); },
   nchain(c, col, g) { c.strokeStyle = col; c.lineWidth = 0.5; c.setLineDash([0.6, 0.4]); c.beginPath(); c.moveTo(NX, NY(g)); c.quadraticCurveTo(NX + 2.5, NY(g) + 2.2, NX + 5, NY(g) - 0.5); c.stroke(); c.setLineDash([]); nh(c, col, g, 0.7); },
