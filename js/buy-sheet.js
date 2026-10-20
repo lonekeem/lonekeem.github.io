@@ -28,7 +28,7 @@ export function openBuySheet(o) {
   return new Promise(async (resolve) => {
     let bal = typeof o.balance === 'function' ? await o.balance() : o.balance || 0; bal = Number(bal) || 0;
     const ov = document.createElement('div'); ov.className = 'bs-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
-    const sh = document.createElement('div'); sh.className = 'bs'; ov.appendChild(sh); document.body.appendChild(ov);
+    const sh = document.createElement('div'); sh.className = 'bs'; ov.appendChild(sh); document.body.appendChild(ov); import('./wallet-chip.js').then((m) => { if (ov.isConnected && m.walletState().uid) ov.appendChild(m.walletChip()); }).catch(() => {});
     let done = false; const close = (v) => { if (done) return; done = true; ov.remove(); resolve(v); };
     ov.addEventListener('click', (e) => { if (e.target === ov) close(false); });
     const icon = () => (o.icon instanceof HTMLCanvasElement ? '<div class="bs-ic" id="bs-ic"></div>' : `<div class="bs-ic">${esc(o.icon || '🛍️')}</div>`);

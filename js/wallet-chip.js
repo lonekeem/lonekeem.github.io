@@ -1,0 +1,46 @@
+// Shared live wallet chip: '⭐ 1,240 · 💎 35'. One onSnapshot per balance doc for the whole app
+// (users/{uid}/pal/wallet → coins, users/{uid}/pal/diamonds → d). Every chip on screen reads from this.
+// Admin (same check as economy.isAdminUid / 4fa7466) shows ∞. Logged out: no chip.
+import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+import { auth, db, ADMIN_EMAIL } from './firebase-init.js';
+const st = { uid: null, admin: false, c: null, d: null }; const chips = new Set(); let unsub = [];
+const fmt = (n) => (st.admin ? '∞' : n == null ? '…' : n > 9999 ? (n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K') : Number(n).toLocaleString());
+const CSS = `.wchip{position:relative;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,211,77,.5);background:rgba(20,10,40,.78);color:#fff;border-radius:999px;padding:4px 9px;font:700 13px/1.1 Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.wchip .wc-s{color:#ffd34d}.wchip .wc-d{color:#9fe8ff}.wchip .wc-x{opacity:.55}
+.wchip.sm{font-size:12px;padding:3px 7px}
+.wc-pop{position:absolute;left:50%;top:-4px;transform:translateX(-50%);font:800 13px Inter,system-ui,sans-serif;pointer-events:none;animation:wcp 1.1s ease-out forwards;text-shadow:0 1px 3px #000}
+.wc-pop.up{color:#7dffa1}.wc-pop.dn{color:#ff8a8a}
+@keyframes wcp{0%{opacity:0;transform:translate(-50%,4px)}15%{opacity:1}100%{opacity:0;transform:translate(-50%,-22px)}}
+#wallet-fab{position:fixed;z-index:8500;top:calc(env(safe-area-inset-top) + 8px);left:50%;transform:translateX(-50%)}
+#wallet-fab.hide{display:none}
+body.feed-mode #wallet-fab{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 12px);top:calc(env(safe-area-inset-top) + 92px)}
+body.wc-park #wallet-fab{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 74px);top:calc(env(safe-area-inset-top) + 20px)}
+@media (orientation:landscape){body.wc-park #wallet-fab{right:auto;left:calc(env(safe-area-inset-left) + 14px);top:calc(env(safe-area-inset-top) + 64px)}}
+.bs-ov .wchip{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);z-index:9001}
+@media (max-width:400px){.header-actions .wchip{font-size:12px;padding:3px 7px;gap:3px}.header-actions .don-pill{font-size:0;padding:5px 8px}.header-actions .don-pill::before{content:'💜';font-size:.85rem}.header-actions{gap:4px}}
+@media (prefers-reduced-motion:reduce){.wc-pop{animation-duration:.01s}}`;
+function css() { if (document.getElementById('wchip-css')) return; const s = document.createElement('style'); s.id = 'wchip-css'; s.textContent = CSS; document.head.appendChild(s); }
+function paint(el) { el.hidden = !st.uid; el.innerHTML = `<span class="wc-s">⭐ ${fmt(st.c)}</span><span class="wc-x">·</span><span class="wc-d">💎 ${fmt(st.d)}</span>`;
+  el.setAttribute('aria-label', st.admin ? 'Wallet: unlimited Star Coins and Diamonds' : `Wallet: ${st.c ?? 0} Star Coins, ${st.d ?? 0} Diamonds. Open shop`); }
+function pop(diff, cur) { if (!diff || st.admin) return; for (const el of chips) { if (!el.isConnected || el.hidden) continue; const p = document.createElement('span');
+  p.className = 'wc-pop ' + (diff > 0 ? 'up' : 'dn'); p.textContent = (diff > 0 ? '+' : '−') + cur + Math.abs(diff).toLocaleString(); el.appendChild(p); setTimeout(() => p.remove(), 1200); } }
+function render() { for (const el of [...chips]) { if (!el.isConnected && el.id !== 'wallet-fab') { chips.delete(el); continue; } paint(el); } }
+function set(k, v, cur) { const old = st[k]; st[k] = v; render(); if (old != null && v != null) pop(v - old, cur); }
+onAuthStateChanged(auth, (u) => {
+  unsub.forEach((f) => f()); unsub = []; st.uid = u ? u.uid : null; st.c = st.d = null; st.admin = !!(u && u.email === ADMIN_EMAIL && u.emailVerified); render();
+  if (!u) return;
+  unsub.push(onSnapshot(doc(db, 'users', u.uid, 'pal', 'wallet'), (s) => set('c', s.exists() ? Number(s.data().coins) || 0 : 0, '⭐'), () => {}));
+  unsub.push(onSnapshot(doc(db, 'users', u.uid, 'pal', 'diamonds'), (s) => set('d', s.exists() ? Number(s.data().d) || 0 : 0, '💎'), () => {}));
+});
+const SHOP = '#/pals/store';
+export function walletChip(o = {}) { css(); const el = document.createElement('button'); el.type = 'button'; el.className = 'wchip' + (o.small ? ' sm' : '');
+  el.onclick = (e) => { e.stopPropagation(); const to = o.href || (/^#\/(park|street)|zombie|armory/.test(location.hash) ? '#/pals/shop' : SHOP); if (o.onTap) o.onTap(); location.hash = to; };
+  chips.add(el); paint(el); return el; }
+export function mountHeaderChip(ha) { if (!ha || !st.uid || ha.querySelector('.wchip')) return; ha.prepend(walletChip()); }
+// Floating compact chip for full-screen games / HUDs (top-centre, safe-area aware).
+export function gameChip(on) { css(); let f = document.getElementById('wallet-fab');
+  if (!f) { f = walletChip({ small: true }); f.id = 'wallet-fab'; document.body.appendChild(f); }
+  f.classList.toggle('hide', !on); document.body.classList.toggle('wc-park', !!on && /^#\/(park|street)/.test(location.hash)); }
+export const walletState = () => ({ ...st });
+window.kemyWallet = { walletChip, gameChip, walletState };

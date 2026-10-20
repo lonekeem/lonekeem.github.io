@@ -4,6 +4,7 @@ import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetec
 import { startAutoplayAll } from './autoplay-all.js';
 import { isYtBlocked, setYtReporter, checkYtForUpload } from './ytcheck.js';
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
+import { mountHeaderChip, gameChip } from './wallet-chip.js';
 import { mountGameMusic, hideGameMusic } from './gamemusic.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
@@ -619,6 +620,7 @@ function renderChrome(name) {
       ${isAdmin() ? `<a class="icon-btn" href="#/admin" aria-label="Admin">${ICON.shield}</a>` : ''}
       <a class="icon-btn" href="#/notifications" aria-label="Notifications">${ICON.bell}${S.unreadNotes ? '<span class="dot"></span>' : ''}</a>
       ${avatar({ ...S.profile, uid: S.user.uid }, 'sm')}`;
+    mountHeaderChip(ha);
   } else if (S.user && !S.profile) {
     ha.innerHTML = `<button class="icon-btn" id="hdr-signout">Sign out</button>`;
     $('#hdr-signout').onclick = () => signOut(auth);
@@ -730,6 +732,7 @@ async function route() {
       document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
       document.body.classList.remove('live-mode');
       document.body.classList.toggle('game-mode', /^#\/(park|street|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
+      gameChip(/^#\/(park|street|arcade|game\/|games\/[\w-]+)/.test(hash) || (nav === 'watch' && fn === pageWatch)); // live wallet chip in HUDs / full-screen feed
       window.scrollTo(0, 0);
       gameMusicFor(hash);
       if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset|support|feedback)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
