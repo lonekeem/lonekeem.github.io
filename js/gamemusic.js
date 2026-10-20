@@ -11,7 +11,8 @@ const BASE = new URL('../', import.meta.url).href;
 const SRC = 'game-music';
 
 let cfg = null, root = null, audio = null, stations = [], st = null, idx = 0, wantPlay = false, embed = null, kemySongs = null, opts = {};
-const vol = () => { const v = parseFloat(ls.get(K.vol)); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : (cfg?.defaultVolume ?? 0.35); };
+let volOverride = null; // session-only volume (Pal Park plays the theme playlist softly without changing your saved level)
+const vol = () => { if (volOverride != null) return volOverride; const v = parseFloat(ls.get(K.vol)); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : (cfg?.defaultVolume ?? 0.35); };
 const fire = (state) => {
   const t = st && st.tracks[idx]; const detail = { source: SRC, state, title: t?.title || '', artist: t?.artist || '', station: st?.id || '' };
   dispatchEvent(new CustomEvent(state === 'play' ? 'kemy:media-play' : 'kemy:media-stop', { detail }));
@@ -23,6 +24,7 @@ async function load() {
   try { cfg = await (await fetch(BASE + 'data/game-music.json')).json(); } catch { cfg = { stations: [], defaultVolume: 0.35 }; }
   stations = cfg.stations.map((s) => ({ ...s, tracks: s.tracks.map((t) => ({ ...t, url: BASE + t.file })) }));
   stations.push({ id: 'kemy', name: 'Kemy', emoji: '⭐', tracks: [], lazy: true });
+  stations.push({ id: 'theme', name: 'Theme songs', emoji: '💜', tracks: [], lazy: 'theme' });
 }
 async function kemyTracks() {
   if (kemySongs) return kemySongs;
@@ -44,8 +46,9 @@ function ensureAudio() {
 async function pick(id) {
   closeEmbed();
   st = stations.find((s) => s.id === id) || stations[0]; ls.set(K.st, st.id); idx = 0;
-  if (st.lazy) st.tracks = await kemyTracks();
-  if (st.tracks.length > 1 && st.id !== 'kemy') idx = Math.floor(Math.random() * st.tracks.length);
+  if (st.lazy === 'theme') { try { const th = await import('./theme.js'); st.tracks = th.TRACKS.map((t) => ({ title: t.title, artist: t.artist, url: t.src })); } catch { st.tracks = []; } }
+  else if (st.lazy) st.tracks = await kemyTracks();
+  if (st.tracks.length > 1 && st.id !== 'kemy' && st.id !== 'theme') idx = Math.floor(Math.random() * st.tracks.length);
   paint();
 }
 function startTrack() {
@@ -57,7 +60,10 @@ function startTrack() {
 export async function play() { await load(); if (!st) await pick(ls.get(K.st) || 'chill'); closeEmbed(); startTrack(); }
 export function pause() { wantPlay = false; audio?.pause(); paint(); }
 export function next() { if (!st || !st.tracks.length) return; idx = (idx + 1) % st.tracks.length; if (wantPlay || (audio && !audio.paused)) startTrack(); else paint(); }
-export function setVolume(v) { ls.set(K.vol, String(v)); if (audio) audio.volume = v; paint(); }
+export function setVolume(v) { volOverride = null; ls.set(K.vol, String(v)); if (audio) audio.volume = v; paint(); }
+// Play a station from its first track (playlist order, loops). volume: session-only level. remember=false keeps your saved station.
+export async function playStation(id, { volume = null, remember = false } = {}) { await load(); const keep = ls.get(K.st); volOverride = volume; await pick(id); if (!remember && keep) ls.set(K.st, keep); closeEmbed(); startTrack(); }
+export const audioEl = () => audio;
 export const isPlaying = () => !!audio && !audio.paused;
 export const state = () => ({ playing: isPlaying(), station: st?.id || '', title: st?.tracks[idx]?.title || '', volume: audio ? audio.volume : vol(), embed: embed?.service || '' });
 
@@ -118,4 +124,4 @@ export async function mountGameMusic(o = {}) {
   root.hidden = false; root.classList.toggle('top-right', opts.corner === 'top-right'); paint();
   return root;
 }
-export function hideGameMusic() { if (!root) return; pause(); closeEmbed(); root.hidden = true; }
+export function hideGameMusic() { if (!root) return; pause(); volOverride = null; closeEmbed(); root.hidden = true; }

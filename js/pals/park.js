@@ -9,6 +9,8 @@ import { getActivePal } from './core.js';
 import { clean, checkInput } from './talk.js';
 import { DECOR } from './wear.js';
 import { drawDancer } from './dance.js';
+import { createPark3D } from './park3d.js';
+import { webglOK } from './pal3d.js';
 export const WORLD = { w: 3200, h: 2400 };
 export const ZONES = [
   { id: 'pond', name: 'Lily Pond', x: 0, y: 0, w: 1600, h: 1200, col: '#bfe9d0' },
@@ -32,9 +34,11 @@ export function treasures() { const R = rng(dayNo() * 7919); const out = []; con
   return out; }
 export function createPark(ctx) {
   const { S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal } = ctx;
-  let stop = null;
+  let stop = null; let p3 = null;
   async function page() {
     if (!requireAuth()) return; if (stop) stop();
+    // real-3D park (with the shared rig) whenever WebGL is available and 3D isn't switched off; the 2D park stays as fallback
+    if (webglOK() && !/[?&]park=2d/.test(location.search)) { p3 = p3 || createPark3D(ctx); return p3.page(); }
     main.innerHTML = `<section class="park"><div class="park-top"><b>🌳 Pal Park</b><span id="park-zone" class="park-zone"></span><span id="park-room" class="muted small"></span><a class="btn btn-sm" href="#/arcade" id="park-arcade">🎮 Arcade</a><a class="btn btn-sm btn-ghost" href="#/pals">Leave</a></div>
       <div class="park-view"><canvas id="park-cv" tabindex="0" aria-label="Pal Park. Use arrow keys or WASD to walk."></canvas>
         <div class="park-joy" id="park-joy" aria-hidden="true"><i></i></div>

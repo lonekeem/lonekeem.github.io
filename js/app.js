@@ -605,7 +605,7 @@ const kemySongsForGames = async () => {
     .map((p) => ({ title: (p.work && p.work.title) || 'Song', artist: (p.work && p.work.artist) || p.authorName || 'Kemy', url: p.mediaUrl }));
 };
 function gameMusicFor(hash) {
-  if (/^#\/games?(\/|\?|$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
+  if (/^#\/(games?(\/|\?|$)|park$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
   else hideGameMusic();
 }
 async function route() {

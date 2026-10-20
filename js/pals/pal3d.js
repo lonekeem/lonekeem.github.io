@@ -498,3 +498,23 @@ export function palRig(pal) {
   const m = build(pal);
   return { obj: m, pose(mode = 'idle', t = 0, extra) { let P = modePose(mode, t); if (extra) P = { ...P, ...extra }; if (!sane(P)) P = modePose('idle', t); apply(m, P, t, mode); grip(m, 0, mode, t); } };
 }
+// ---------------------------------------------------------------- live 3D scenes (Pal Park): a real model in your own scene
+// makePal3D(pal) builds a fresh rigged model (not cached, caller owns it); posePal3D() poses it each frame with the same
+// idle/walk/hop/dance blending and follow-through as drawPal3D. Feet sit at y = 0, facing +z.
+export function makePal3D(pal) { const m = build(pal); m.userData.pal = pal; return m; }
+export function posePal3D(m, st = {}) {
+  // st.t: your clock in 60 ticks/s; st.dt60: ticks since last call; st.speed: gait speed (1 walk, 1.6+ run); st.cadence: step-rate
+  // multiplier (>1 = quicker steps to match a faster ground speed); st.turn -1..1; st.mode idle|walk|run|hop; st.jumpK 0..1
+  const ud = m.userData, dt60 = st.dt60 ?? 1; ud.dt60 = dt60; ud.clk = (ud.clk || 0) + dt60 * (st.cadence || 1); const t = st.t || 0;
+  const md = st.mode || 'idle', legs = !!(ud.J.fit && ud.J.fit.legs), L = ud.J.legL || 0.54; let P;
+  if (md === 'walk' || md === 'run' || (st.speed != null && st.speed > 0.02 && md !== 'hop')) { const spd = st.speed != null ? st.speed : md === 'run' ? 2 : 1; P = gaitPose(advancePhase(ud, ud.clk, spd, L), spd, st.turn || 0, L, legs); }
+  else if (md === 'hop') P = jumpPose(st.jumpK != null ? st.jumpK : ((t % 72) + 72) % 72 / 72, 0.45);
+  else P = modePose(md, t);
+  if (st.dance3d) { const D3 = clipFor(st.dance3d, ud.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
+  if (st.extra) P = { ...P, ...st.extra };
+  if (!sane(P)) P = modePose('idle', t);
+  const pv = ud.prev; if (pv && Math.abs(t - (ud.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }
+  ud.prev = P; ud.pt = t;
+  apply(m, P, t, md); grip(m, st.dance3d ? st.amt ?? 1 : 0, md, t);
+}
+export { THREE };
