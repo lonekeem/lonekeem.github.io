@@ -136,7 +136,9 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       for (let i = 1; i <= 20; i++) await deleteDoc(doc(db, 'parkRooms', 'r' + i, 'p', uid)).catch(() => {});
     });
     await step('Clearing saved posts, blocks and notifications…', async () => {
-      for (const c of ['saved', 'blocks', 'notifications']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
+      sessionStorage.setItem('kemy-deleting', '1'); // devices.js: don't treat our own device cleanup as a "Remove"
+      await deleteRefs([doc(db, 'users', uid, 'prefs', 'security')]);
+      for (const c of ['saved', 'blocks', 'notifications', 'devices']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
     });
     // Profile + @handle together (the rules release the handle only with the profile).
     let profileGone = false;

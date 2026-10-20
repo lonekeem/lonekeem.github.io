@@ -20,6 +20,12 @@ service cloud.firestore {
     function cleanStr(v, min, max) { return isStr(v, min, max) && !v.matches('(?s).*([\\x{200B}\\x{200C}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{FEFF}\\x{3164}\\x{115F}\\x{1160}\\x{FFA0}\\x{00AD}]|[\\x{0300}-\\x{036F}]{3,}).*'); }
     function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    // "Sign out everywhere" (js/devices.js): sessions that signed in before users/{uid}.sessionsValidAfter are refused
+    // here (auth_time is whole seconds, hence the +1 s). Checked on profile, device and security writes.
+    function sessionOk(uid) {
+      let d = get(/databases/$(database)/documents/users/$(uid)).data;
+      return !('sessionsValidAfter' in d) || (request.auth.token.auth_time + 1) * 1000 > d.sessionsValidAfter.toMillis();
+    }
     // ---------- Moderators + bans ----------
     // roles/{uid} {mod: true} is written only by the admin. bans/{uid} {until, ...} by moderators.
     function rolePath(u) { return /databases/$(database)/documents/roles/$(u); }
@@ -73,7 +79,7 @@ service cloud.firestore {
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
                                'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt',
-                               'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt'])
+                               'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter'])
         && validBirth(d)
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
@@ -133,6 +139,9 @@ service cloud.firestore {
         && scoreMap(request.resource.data.cats, 20) && scoreMap(request.resource.data.creators, 60)
         && request.resource.data.updatedAt == request.time
       // Private search history (Search > Recent), max 20 short strings. Deleted by "Clear all" and with the account.
+      allow create, update: if signedIn() && uid == me() && docId == 'security'
+        && request.resource.data.keys().hasOnly(['alerts', 'updatedAt']) && request.resource.data.alerts is bool
+        && request.resource.data.updatedAt == request.time && sessionOk(uid);
       allow create, update: if signedIn() && uid == me() && docId == 'search'
         && request.resource.data.keys().hasOnly(['recent', 'updatedAt'])
         && request.resource.data.recent is list && request.resource.data.recent.size() <= 20
@@ -156,10 +165,12 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn() && uid == me()
         && validProfile(request.resource.data)
-        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt', 'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt'])
+        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt', 'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter'])
         && request.resource.data.createdAt == request.time
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if actingAs(uid)
+        && (uid != me() || !('sessionsValidAfter' in resource.data) || (request.auth.token.auth_time + 1) * 1000 > resource.data.sessionsValidAfter.toMillis())
+        && (!('sessionsValidAfter' in changed()) || (uid == me() && request.resource.data.sessionsValidAfter == request.time))
         && validProfile(request.resource.data)
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.get('isStudio', false) == resource.data.get('isStudio', false)
@@ -213,8 +224,32 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time;
       }
 
+      // New-device sign-in devices: owner only (rough UA label + timestamps, no IP / location).
+      match /devices/{dev} {
+        function validDev(d) {
+          return d.keys().hasOnly(['label', 'firstSeen', 'lastSeen', 'ack']) && isStr(d.label, 1, 60) && d.ack is bool
+            && d.firstSeen is timestamp && d.lastSeen is timestamp;
+        }
+        allow read, delete: if signedIn() && uid == me();
+        allow create: if signedIn() && uid == me() && dev.matches('^[A-Za-z0-9]{16,40}$') && exists(userPath(uid)) && sessionOk(uid)
+          && validDev(request.resource.data)
+          && request.resource.data.firstSeen == request.time && request.resource.data.lastSeen == request.time;
+        allow update: if signedIn() && uid == me() && sessionOk(uid) && validDev(request.resource.data)
+          && request.resource.data.firstSeen == resource.data.firstSeen
+          && (!('lastSeen' in changed()) || request.resource.data.lastSeen == request.time)
+          && (!('ack' in changed()) || request.resource.data.ack == true);
+      }
+
       match /notifications/{nid} {
         allow read, delete: if actingAs(uid);
+        // "Kemy Security" new-device alert, written by the owner's own new device to their own inbox.
+        allow create: if signedIn() && uid == me() && sessionOk(uid)
+          && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && request.resource.data.type == 'security' && request.resource.data.fromUid == me()
+          && request.resource.data.fromName == 'Kemy Security' && request.resource.data.fromUsername == ''
+          && isStr(request.resource.data.postId, 0, 40) && isStr(request.resource.data.text, 1, 200)
+          && request.resource.data.text.matches('^New sign-in on .*')
+          && request.resource.data.createdAt == request.time && request.resource.data.read == false;
         // The invited user tells the admin who invited them how they answered.
         allow create: if signedIn() && request.resource.data.type == 'mod_invite' && request.resource.data.fromUid == me()
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])

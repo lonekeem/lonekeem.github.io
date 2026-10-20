@@ -347,10 +347,10 @@ export function createModeration(ctx) {
     if (!iAmMod()) { main.innerHTML = '<section class="card pad center" style="max-width:520px;margin:30px auto"><h1 class="page-title">🛡️ Moderators only</h1><p class="muted">This page is for Kemy moderators.</p><a class="btn btn-sm btn-ghost" href="#/watch">Back to Kemy</a></section>'; return; }
     watchCounts();
     tab = tab || 'home'; if (!TABS.some((t) => t[0] === tab) || (TABS.find((t) => t[0] === tab)[3] && !isAdmin())) tab = 'home';
-    main.innerHTML = `<div class="hub"><div class="hub-top"><h1 class="page-title">🛡️ Mod Hub</h1><span class="muted small">${isAdmin() ? 'Admin' : isAIme() ? 'AI Helper 🤖' : 'Moderator'} · ${esc(myName())}</span></div>
+    main.innerHTML = `<div class="hub"><div class="hub-top"><h1 class="page-title">🛡️ Mod Hub</h1><span class="muted small">${isAdmin() ? 'Admin' : isAIme() ? 'AI Helper 🤖' : 'Moderator'} · ${esc(myName())}</span></div>${ctx.secNotice ? ctx.secNotice() : ''}
       <nav class="hub-nav" aria-label="Mod Hub sections">${TABS.filter((t) => !t[3] || isAdmin()).filter((t) => !(isAIme() && t[0] === 'log')).map(([k, ic, l]) => `<a href="#/mod/${k}" class="${k === tab ? 'on' : ''}"><span aria-hidden="true">${ic}</span> ${l}${cnt[k] !== undefined ? `<span class="mod-count" data-hubcount="${k}" ${cnt[k] ? '' : 'hidden'}>${cnt[k]}</span>` : ''}</a>`).join('')}</nav>
       <div id="mod-body" class="hub-body"><div class="spinner"></div></div></div>`;
-    paintCounts();
+    paintCounts(); ctx.secPaint && ctx.secPaint();
     const body = $('#mod-body'); setTimeout(() => main.querySelector('.hub-nav .on')?.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
     const T = { home: homeTab, queue: queueTab, reports: reportsTab, users: usersTab, bugs: bugsTab, content: contentTab, inbox: inboxTab, notes: notesTab, log: logTab, team: teamTab };
     try { await T[tab](body, token, stale); } catch (e) { body.innerHTML = `<div class="card empty">${esc(friendlyError(e))}</div>`; }

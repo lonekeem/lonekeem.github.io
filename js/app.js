@@ -35,6 +35,7 @@ import { initSpam, spamOk, followOk, postStamp, postDone } from './spam.js';
 import { initMediaScan, takeHold } from './mediascan.js';
 import { initTranslate, settingsHtml as txSettingsHtml, wireSettings as txWireSettings } from './translate.js';
 import { createAccountDeleter } from './account-delete.js';
+import { createDevices } from './devices.js';
 import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
 import { createGames, CONTROLLER as GAMES_ICON } from './games/index.js';
@@ -294,8 +295,10 @@ const comments = createComments({
 initKindGuard({ onBypass: ({ text, word, sneaky }) => safety.autoPause({ text, word, reason: sneaky ? 'Tried to sneak a mean word past the kind-words filter' : 'Kept trying to send mean words' }) });
 initTranslate();
 // Moderators, reports inbox, suspensions (js/moderation.js).
-const mod = createModeration({ publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
+const mod = createModeration({ secNotice: () => devices.noticeHtml(), secPaint: () => devices.paint(), publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
   onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
+// New-device sign-in alerts + Sign out everywhere (js/devices.js).
+const devices = createDevices({ auth, db, isPrivileged: () => mod.iAmMod(), toast });
 const addComment = (p, text) => comments.addComment(p, text);
 const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c === 'string' ? { id: c } : c);
 // Owner or admin. Removes the Firestore doc; the Cloudinary file stays until an admin cleans it
@@ -700,6 +703,7 @@ try { startAutoplayAll(); } catch (e) { console.warn('autoplay', e); }
 async function route() {
   navCount++;
   if (!S.ready) return;
+  if (S.user && S.profile && !devices.active()) devices.start(S.user); // e.g. right after sign-up
   S.unsubs.forEach((u) => u()); S.unsubs = [];
   closeModal();
   // Accept short deep links like app.html#watch/<postId> as well as #/watch/<postId>.
@@ -1185,6 +1189,7 @@ async function pageSettings() {
     <button type="button" class="card pad set-link" data-watch-howto style="margin-top:12px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">📱</span><span><b>How to save Kemy</b><br><span class="muted small">Add Kemy to your phone’s home screen (iPhone &amp; Android).</span></span></button>
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
     ${txSettingsHtml()}
+    ${devices.settingsHtml()}
     <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
       <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>
       <p class="muted small" style="margin:0 0 8px">Kemy’s theme plays softly on your profile, Pals and settings, and stops for videos, lives and games.</p>
@@ -1215,7 +1220,7 @@ async function pageSettings() {
       <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
     </section>`}`;
-  donate.mountSettings($('#set-donate')); txWireSettings(main);
+  donate.mountSettings($('#set-donate')); txWireSettings(main); devices.wireSettings();
   $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
   $('#s-autoplay-wifi').onchange = (e) => { setWifiOnly(e.target.checked); };
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
@@ -1376,6 +1381,7 @@ async function pageNotifications(asStudio, token) {
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
   const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', mod: '', mod_invite: '' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
+    if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
@@ -1410,6 +1416,7 @@ async function pageAdmin(token) {
   const big = (id, emoji, title, desc, extra = '') => `<div class="card pad adm-tool" style="margin-bottom:12px"><div class="row" style="flex-wrap:wrap;gap:10px"><div style="flex:1;min-width:220px"><b style="font-size:1.05rem">${emoji} ${title}</b><p class="muted small" style="margin:3px 0 0">${desc}</p></div>${extra}</div><p class="small muted" id="${id}-msg" style="margin:8px 0 0"></p></div>`;
   main.innerHTML = `<h1 class="page-title">🛡️ Admin</h1>
     <p class="muted small">Signed in as ${esc(S.user.email)}. Only you can see this page.</p>
+    ${devices.noticeHtml()}
     <div class="card pad adm-tool" style="margin-bottom:14px;border:2px solid var(--blue)"><b style="font-size:1.15rem">🛍️ Publish shop prices</b>
       <p class="muted small" style="margin:3px 0 8px">Sends every price in the app (dances, outfits, jewelry, looks, backgrounds, Rare Pals, pal items and Zombie Armory items in ★ and 💎) to the live shop, so people can buy them.</p>
       <p class="small" id="shop-status">Checking the live shop…</p>
@@ -1716,6 +1723,7 @@ onAuthStateChanged(auth, async (user) => {
     } catch (e) { console.error(e); }
   }
   await mod.rolesReady;
+  if (user && S.profile) devices.start(user); else devices.stop();
   S.ready = true;
   if (user && !S.profile) return go('#/onboard');
   if (user && /^#\/(login|signup|onboard)/.test(location.hash)) { const n = pendingNext || nextHash(); pendingNext = null; return go(n); }
