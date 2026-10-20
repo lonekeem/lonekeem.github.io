@@ -78,6 +78,9 @@ const PU = (x) => updateDoc(doc(A, 'users/alice/pets/p1'), { xp: 0, level: 1, st
 await ok('free wardrobe items in new slots ok', assertSucceeds(PU({ outfit: { hair: 'f_pigtails', bottom: 'f_jeans', held: 'f_balloon', head: 'beanie' } })));
 await sleep(1100);
 await ok('unknown outfit slot refused', assertFails(PU({ outfit: { tail: 'f_bow' } })));
+await new Promise((r) => setTimeout(r, 1100)); await ok('free nose ring in the nose slot ok', assertSucceeds(PU({ outfit: { nose: 'f_nose_ring', head: 'beanie' } })));
+await new Promise((r) => setTimeout(r, 1100)); await ok('unowned paid nose ring refused', assertFails(PU({ outfit: { nose: 'nose_gold' } })));
+await ok('saved look with a nose ring ok', assertSucceeds(setDoc(doc(A, 'users/alice/looks/l2'), { name: 'Nose', outfit: { nose: 'f_nose_ring', head: 'beanie' } })));
 await ok('unowned premium item in a new slot refused', assertFails(PU({ outfit: { full: 'tutu' } })));
 await ok('free background ok', assertSucceeds(PU({ bg: 'b_beach' })));
 await sleep(1100);

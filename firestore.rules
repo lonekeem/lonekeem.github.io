@@ -1625,10 +1625,10 @@ service cloud.firestore {
           || exists(/databases/$(database)/documents/users/$(uid)/inv/$(o.get(k, '')));
       }
       function outfitOk(o) {
-        return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand'])
+        return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand', 'nose'])
           && owns(o, 'head') && owns(o, 'face') && owns(o, 'neck') && owns(o, 'body') && owns(o, 'feet') && owns(o, 'back')
           && owns(o, 'hair') && owns(o, 'bottom') && owns(o, 'full') && owns(o, 'bag') && owns(o, 'held')
-          && owns(o, 'ears') && owns(o, 'wrist') && owns(o, 'hand');
+          && owns(o, 'ears') && owns(o, 'wrist') && owns(o, 'hand') && owns(o, 'nose');
       }
       function patPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid)/pats/$(me()); }
       allow read: if true;
@@ -1804,7 +1804,7 @@ service cloud.firestore {
         function zp() { return request.resource.data; }
         function zpShape() {
           return zp().keys().hasOnly(['name', 'pal', 'slot', 'ready', 'x', 'y', 'z', 'f', 'a', 'fire', 'w', 'hp', 'down', 'rev', 'em', 'emAt', 'hits', 'hs', 'at'])
-            && isStr(zp().name, 0, 40) && zp().pal is map && zp().pal.size() <= 8 && zp().pal.get('outfit', {}) is map && zp().pal.get('outfit', {}).size() <= 14
+            && isStr(zp().name, 0, 40) && zp().pal is map && zp().pal.size() <= 8 && zp().pal.get('outfit', {}) is map && zp().pal.get('outfit', {}).size() <= 15
             && zp().pal.get('colors', {}) is map && zp().pal.get('colors', {}).size() <= 4
             && zp().slot is int && zp().slot >= 0 && zp().slot <= 3 && zp().ready is bool
             && zp().x is number && zp().y is number && zp().z is number && zp().f is number && zp().a is number
@@ -1860,7 +1860,7 @@ service cloud.firestore {
         function sp() { return request.resource.data; }
         function spShape() {
           return sp().keys().hasOnly(['name', 'pal', 'slot', 'ready', 'x', 'y', 'z', 'f', 'v', 'st', 'r', 'sc', 'tp', 'bp', 'em', 'emAt', 'at'])
-            && isStr(sp().name, 0, 40) && sp().pal is map && sp().pal.size() <= 8 && sp().pal.get('outfit', {}) is map && sp().pal.get('outfit', {}).size() <= 14
+            && isStr(sp().name, 0, 40) && sp().pal is map && sp().pal.size() <= 8 && sp().pal.get('outfit', {}) is map && sp().pal.get('outfit', {}).size() <= 15
             && sp().pal.get('colors', {}) is map && sp().pal.get('colors', {}).size() <= 4
             && sp().slot is int && sp().slot >= 0 && sp().slot <= 29 && sp().ready is bool
             && sp().x is number && sp().y is number && sp().z is number && sp().f is number && sp().v is number
@@ -1951,8 +1951,8 @@ service cloud.firestore {
       allow read: if true;
       allow write: if signedIn() && uid == me() && lid.matches('^l[1-6]$')
         && request.resource.data.keys().hasOnly(['name', 'outfit', 'bg', 'variant', 'pattern', 'colors', 'at']) && isStr(request.resource.data.name, 1, 20)
-        && request.resource.data.outfit is map && request.resource.data.outfit.size() <= 14
-        && request.resource.data.outfit.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand'])
+        && request.resource.data.outfit is map && request.resource.data.outfit.size() <= 15
+        && request.resource.data.outfit.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand', 'nose'])
         && (!('bg' in request.resource.data) || isStr(request.resource.data.bg, 0, 16))
         && (!('variant' in request.resource.data) || isStr(request.resource.data.variant, 0, 16))
         && (!('pattern' in request.resource.data) || isStr(request.resource.data.pattern, 0, 16))
