@@ -51,7 +51,7 @@ function shapePts(kind) { const P = [];
   else if (kind === 'k') P.push([-0.45, -0.65], [-0.2, -0.65], [-0.2, -0.12], [0.25, -0.65], [0.55, -0.65], [0.05, -0.02], [0.55, 0.65], [0.25, 0.65], [-0.2, 0.12], [-0.2, 0.65], [-0.45, 0.65]);
   const out = []; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.035)); for (let k = 0; k < n; k++) out.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); } return out; }
 export const COOKIES = [['circle', '⚪ Circle'], ['star', '⭐ Star'], ['heart', '💖 Heart'], ['moon', '🌙 Moon'], ['fish', '🐟 Fish'], ['k', '🅺 Kemy K']];
-const CSS = `.sg{position:fixed;inset:0;z-index:900;background:#8fd8ff;overflow:hidden;touch-action:none;font-family:system-ui,sans-serif;color:#fff}.sg canvas.sv{position:absolute;inset:0;width:100%;height:100%;display:block}
+const CSS = `.sg{position:fixed;inset:0;z-index:900;background:#8fd8ff;overflow:hidden;touch-action:none;font-family:system-ui,sans-serif;color:#fff}.sg canvas.sg-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
 .sg-hud{position:absolute;left:0;right:112px;top:0;padding:max(8px,env(safe-area-inset-top)) 10px 0;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none;z-index:6}.sg-pill{background:rgba(20,10,50,.55);border-radius:99px;padding:4px 11px;font-weight:800;font-size:14px;white-space:nowrap}
 .sg-tb{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 56px);right:8px;display:flex;flex-direction:column;gap:6px;z-index:7}.sg-tb button{width:48px;height:48px;border-radius:50%;border:0;background:rgba(20,10,50,.5);color:#fff;font-size:20px}
 .sg-light{position:absolute;left:50%;top:calc(max(8px,env(safe-area-inset-top)) + 112px);transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;min-width:200px}
@@ -81,7 +81,7 @@ export function createShowGame(ctx) {
   function game({ pal, uid, net, name, bots: nBots0, casual, planOpt }) {
     const solo = !net; const isHost = () => solo || net.isHost();
     const Q = gfxPreset(); const low = Q.tier === 'low';
-    const el = document.createElement('div'); el.className = 'sg'; el.setAttribute('data-kemy-game', 'show'); el.innerHTML = `<canvas class="sv"></canvas><div class="sg-flash"></div>
+    const el = document.createElement('div'); el.className = 'sg'; el.setAttribute('data-kemy-game', 'show'); el.innerHTML = `<canvas class="sg-cv"></canvas><div class="sg-flash"></div>
       <div class="sg-hud"><span class="sg-pill" data-h="rd">🎪 Kemy Challenge Show</span><span class="sg-pill" data-h="time">⏱️</span><span class="sg-pill" data-h="alive">👥</span><span class="sg-pill" data-h="dia">💎 0</span></div>
       <div class="sg-light" hidden><b></b><i><s></s></i></div>
       <div class="sg-tb"><button type="button" data-t="pov" aria-label="Switch camera">👁️</button><button type="button" data-t="wheel" aria-label="Emote wheel">😊</button><button type="button" data-t="chat" aria-label="Quick chat">💬</button><button type="button" data-t="spec" aria-label="Watch another player" hidden>👀</button><button type="button" data-t="pause" aria-label="Menu">⏸️</button></div>
@@ -91,7 +91,7 @@ export function createShowGame(ctx) {
     const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     let msgT = 0; const msg = (t, s = 1.8) => { const m = $('.sg-msg'); m.innerHTML = t; m.style.opacity = 1; msgT = s; };
     // ------------------------------------------------------------ renderer + world
-    const cv = $('canvas.sv'); const R = makeRenderer(cv, { ...Q, dpr: Math.min(Q.dpr, 2) }, { exposure: 1.05 });
+    const cv = $('canvas.sg-cv'); const R = makeRenderer(cv, { ...Q, dpr: Math.min(Q.dpr, 2) }, { exposure: 1.05 });
     let pr = dprFor({ dpr: Math.min(Q.dpr, 2) }); let prMax = pr; const prMin = Math.min(pr, 1);
     const scene = new THREE.Scene(); scene.fog = new THREE.Fog(new THREE.Color('#cfe9ff'), 60, 60 + Q.draw * 0.4);
     const sky = makeSky({ sunDir: new THREE.Vector3(0.4, 0.6, 0.35), top: '#3f8fe8', hor: '#d6efff', ground: '#8cc47a', cloud: 0.5, radius: 160 }); scene.add(sky);

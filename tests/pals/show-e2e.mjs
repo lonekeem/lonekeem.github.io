@@ -12,7 +12,7 @@ const stamp = Date.now().toString(36).slice(-6); const pass = 'Test-' + Math.ran
 writeFileSync(LOG, JSON.stringify({ stamp, pass, tags: ['sa', 'sb', 'sc'], base }), { mode: 0o600 });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const errors = []; const P = {}; const DEV = { sa: 'iPhone 13', sb: 'Pixel 7', sc: 'Pixel 7' }; const SP = { sa: 'tiger', sb: 'bunny', sc: 'panda' };
-for (const t of ['sa', 'sb', 'sc']) { const ctx = await browser.newContext({ ...devices[DEV[t]], ...(t === 'sb' ? { recordVideo: { dir: '/tmp/showvid', size: devices[DEV[t]].viewport } } : {}) }); await ctx.addInitScript(() => { try { localStorage.setItem('kemy-welcome-seen-v1', '1'); localStorage.setItem('kemy-tut-show', '1'); } catch {} }); const p = await ctx.newPage(); P[t] = p; p._ctx = ctx;
+for (const t of ['sa', 'sb', 'sc']) { const ctx = await browser.newContext({ ...devices[DEV[t]], ...(t === 'sb' ? { recordVideo: { dir: '/tmp/showvid', size: devices[DEV[t]].viewport } } : {}) }); await ctx.addInitScript(() => { try { localStorage.setItem('kemy-welcome-seen-v1', '1'); localStorage.setItem('kemy-tut-show', '1'); localStorage.setItem('kemy-gfx', 'low'); } catch {} }); const p = await ctx.newPage(); P[t] = p; p._ctx = ctx;
   p.on('pageerror', (e) => errors.push(t + ': ' + String(e).slice(0, 200))); p.on('console', (m) => { if (m.type() === 'error' && !/favicon|ERR_|net::|404|403/.test(m.text())) errors.push(t + ' console: ' + m.text().slice(0, 160)); }); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function signup(t) { const p = P[t];
@@ -52,7 +52,8 @@ try {
   await P.sc.waitForFunction(() => window.__show.state.me.out, null, { timeout: 30000 }); out.cheaterCaught = true; await sleep(800); await P.sc.screenshot({ path: shot + '06-caught-bubble-pixel7.png' });
   await sleep(2500); await P.sc.screenshot({ path: shot + '07-cheer-zone-pixel7.png' }); out.cheerZone = await st('sc');
   await P.sc.evaluate(() => document.querySelector('[data-t="wheel"]').click()); await sleep(800); await P.sc.screenshot({ path: shot + '08-emote-wheel-pixel7.png' }); await P.sc.evaluate(() => document.querySelector('.ew-wheel button, .ew button[data-id], [data-emote]')?.click()); await P.sc.keyboard.press('Escape');
-  // the honest racers reach the finish (driven by real input, ~70 m)
+  // the honest racers: headless software GL runs ~2-5 fps, so hop them near the line, then they walk over it with real input on green
+  for (const t of ['sa', 'sb']) await P[t].evaluate(() => window.__show.game._debug.tp(-4, -64)).catch(() => {});
   await P.sa.waitForFunction(() => { const s = window.__show.state; return s.ph !== 'play' || s.me.st !== 0; }, null, { timeout: 120000 }).catch(() => {});
   out.afterR1 = { sa: await st('sa'), sb: await st('sb') }; console.log('r1', JSON.stringify(out.afterR1));
   await P.sa.waitForFunction(() => window.__show.state.ph === 'inter' || window.__show.state.ph === 'end', null, { timeout: 90000 }); await sleep(800); await P.sb.screenshot({ path: shot + '09-standings-pixel7.png' }); stops.forEach((f) => f());
