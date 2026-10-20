@@ -142,7 +142,7 @@ export function createShowGame(ctx) {
       const sh = new THREE.Mesh(blobGeo, blobMat); sh.scale.setScalar(1.3); scene.add(sh); const bb = new THREE.Mesh(bubbleGeo, bubbleMat); bb.visible = false; scene.add(bb);
       const v = { id, rig, g, label, bub, sh, bb, x: 0, y: 0, z: 0, f: Math.PI, tx: 0, ty: 0, tz: 0, tf: Math.PI, name: nm, t: Math.random() * 10, bubT: 0, poofT: 0, mv: 0, isMe }; ppl.set(id, v); return v; }
     function dropPal(id) { const v = ppl.get(id); if (!v) return; scene.remove(v.g, v.label, v.bub, v.sh, v.bb); ppl.delete(id); }
-    const me = { x: 0, y: 0, z: 0, vy: 0, yaw: Math.PI, face: Math.PI, t: 0, st: 0, sc: 0, tp: 0, bp: [], bseq: 0, em: -1, emAt: 0, out: false, kx: 0, kz: 0, dashCd: 0, ground: true, emo: '', emoUntil: 0 };
+    const me = { x: 0, y: 0, z: 0, vy: 0, spd: 0, yaw: Math.PI, face: Math.PI, t: 0, st: 0, sc: 0, tp: 0, bp: [], bseq: 0, em: -1, emAt: 0, out: false, kx: 0, kz: 0, dashCd: 0, ground: true, emo: '', emoUntil: 0 };
     const meV = addPal(uid, pal, name, true);
     // ------------------------------------------------------------ shared show state
     // hs (host): ph intro|play|inter|end, rd, plan, left, light g|t|r|f, lq, ll, alive, out, elim, teams, pairs, rope, seed, rev, nb, bots, bb, champ, casual, seq
@@ -457,7 +457,7 @@ export function createShowGame(ctx) {
         if (k === 'duel' && plat) { /* soft personal space so Pals don't overlap */ for (const [id, v] of ppl) { if (id === uid || !st.alive.includes(id)) continue; const dx = me.x - v.x, dz = me.z - v.z, d = Math.hypot(dx, dz); if (d < 0.9 && d > 0.01) { me.x += dx / d * (0.9 - d) * 0.5; me.z += dz / d * (0.9 - d) * 0.5; } } }
         const g = groundAt(me.x, me.z); me.vy -= 20 * dt; let ny = me.y + me.vy * dt;
         if (g !== null && me.y >= g - 0.35 && ny <= g) { ny = g; me.vy = 0; me.ground = true; } else me.ground = false; me.y = Math.max(-5.4, ny); if (me.y <= -5.4) me.vy = 0; }
-      me.spd = me.spd * 0.5 + (Math.hypot(me.x - ox, me.z - oz) / Math.max(dt, 0.001)) * 0.5;
+      { const sp = Math.hypot(me.x - ox, me.z - oz) / Math.max(dt, 0.001); me.spd = Number.isFinite(sp) ? me.spd * 0.5 + sp * 0.5 : 0; }
       // round rules for me
       if (st.ph === 'play' && !me.out && me.st === 0 && st.alive.includes(uid)) {
         if (k === 'rlgl') { me.sc = clamp(-me.z, 0, 70);
