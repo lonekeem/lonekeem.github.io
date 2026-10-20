@@ -14,6 +14,7 @@ const CSS = `.wchip{position:relative;display:inline-flex;align-items:center;gap
 @keyframes wcp{0%{opacity:0;transform:translate(-50%,4px)}15%{opacity:1}100%{opacity:0;transform:translate(-50%,-22px)}}
 #wallet-fab{position:fixed;z-index:8500;top:calc(env(safe-area-inset-top) + 8px);left:50%;transform:translateX(-50%)}
 #wallet-fab.hide{display:none}
+body.wc-video .wchip:not(.bs-ov .wchip),body.feed-mode #wallet-fab,body.live-mode #wallet-fab{display:none!important}
 body.feed-mode #wallet-fab{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 12px);top:calc(env(safe-area-inset-top) + 92px)}
 body.wc-park #wallet-fab{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 74px);top:calc(env(safe-area-inset-top) + 20px)}
 @media (orientation:landscape){body.wc-park #wallet-fab{right:auto;left:calc(env(safe-area-inset-left) + 14px);top:calc(env(safe-area-inset-top) + 64px)}}
@@ -41,6 +42,6 @@ export function mountHeaderChip(ha) { if (!ha || !st.uid || ha.querySelector('.w
 // Floating compact chip for full-screen games / HUDs (top-centre, safe-area aware).
 export function gameChip(on) { css(); let f = document.getElementById('wallet-fab');
   if (!f) { f = walletChip({ small: true }); f.id = 'wallet-fab'; document.body.appendChild(f); }
-  f.classList.toggle('hide', !on); document.body.classList.toggle('wc-park', !!on && /^#\/(park|street)/.test(location.hash)); }
+  f.classList.toggle('hide', !on); document.body.classList.toggle('wc-video', /^#\/(watch|post|live|feed)(\/|\?|$)/.test(location.hash) || /^#?\/?$/.test(location.hash)); document.body.classList.toggle('wc-park', !!on && /^#\/(park|street)/.test(location.hash)); }
 export const walletState = () => ({ ...st });
 window.kemyWallet = { walletChip, gameChip, walletState };

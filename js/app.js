@@ -732,7 +732,7 @@ async function route() {
       document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
       document.body.classList.remove('live-mode');
       document.body.classList.toggle('game-mode', /^#\/(park|street|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
-      gameChip(/^#\/(park|street|arcade|game\/|games\/[\w-]+)/.test(hash) || (nav === 'watch' && fn === pageWatch)); // live wallet chip in HUDs / full-screen feed
+      gameChip(/^#\/(park|street|arcade|game\/|games\/[\w-]+)/.test(hash)); // live wallet chip in game HUDs (never on video/feed screens)
       window.scrollTo(0, 0);
       gameMusicFor(hash);
       if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset|support|feedback)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
