@@ -92,7 +92,7 @@ export function attachDrive(api, world) {
         try { await loadInv(); if (c.p) await econ.buy(carItem(c)); else await dia.buy(carItem(c)); owned.add(c.id); say(`🎉 ${c.name} is yours!`); } catch (er) { say(er && er.code === 'permission-denied' ? 'The shop isn’t ready for cars yet (prices not published). Try again soon!' : (er && er.message) || 'Could not buy right now'); } paint(); } }; }
   myB.onclick = openMyCars;
   // ---------------------------------------------------------------- enter / exit
-  function enterSync() { P.dance = carCode(my.id, my.color, my.door > 0.5); P.danceUntil = Date.now() + 864e5; api.markDirty(); }
+  function enterSync() { P.dance = myCode(); P.danceUntil = Date.now() + 864e5; api.markDirty(); }
   function getIn() { if (!my || my.state !== 'parked') return; my.state = 'enter'; my.t = 0; my.from = { x: P.x, z: P.z }; my.cy.r = 0; dropCy(); resetInput(); my.eng = my.eng || createEngineSound(); enterSync(); H.show(true); H.setFade(true); setTimeout(() => H.setFade(false), 320); buzz(20); myB.hidden = true; api.tc.root.classList.add('kd-on'); world.hud.querySelector('.ks-act').hidden = true; window.__kd && (window.__kd.state = 'enter'); }
   function getOut() { if (!my || my.state !== 'drive') return; if (my.V.speed() > 1.2) { say('Slow down to get out 🙂'); return; } my.state = 'exit'; my.t = 0; held.gas = held.brake = 0; }
   function exitNow() { if (!my) return; const c = my.m.userData.def; const s = Math.sin(my.V.yaw), co = Math.cos(my.V.yaw); const side = c.Wd / 2 + 0.8; P.x = my.V.x + co * side; P.z = my.V.z - s * side; P.y = ground(P.x, P.z); me.scale.setScalar(1); me.visible = true;
@@ -111,14 +111,14 @@ export function attachDrive(api, world) {
       const d = Math.hypot(R.s.x - P.x, R.s.z - P.z); R.m.visible = d < (LOW ? 90 : 160); poseCar(R.m, { x: R.s.x, y: ground(R.s.x, R.s.z), z: R.s.z, yaw: R.s.yaw, roll: clamp(-R.v.w * spd * 0.004, -0.06, 0.06) }, clamp(R.v.w * 0.3, -0.5, 0.5), R.spin);
       if (o.obj) { seatWorld(R.m, sv); o.obj.position.copy(sv); o.obj.rotation.y = R.s.yaw; o.obj.scale.setScalar(0.6); sitPose(o.obj, dt); }
       // gentle push: a remote car nudges me aside (never hurts)
-      if (!my || my.state === 'parked') { const c = R.m.userData.def; const lx = (P.x - R.s.x) * Math.cos(R.s.yaw) - (P.z - R.s.z) * Math.sin(R.s.yaw), lz = (P.x - R.s.x) * Math.sin(R.s.yaw) + (P.z - R.s.z) * Math.cos(R.s.yaw);
+      if ((!my || my.state === 'parked') && !(ride && ride.drv === o.uid)) { const c = R.m.userData.def; const lx = (P.x - R.s.x) * Math.cos(R.s.yaw) - (P.z - R.s.z) * Math.sin(R.s.yaw), lz = (P.x - R.s.x) * Math.sin(R.s.yaw) + (P.z - R.s.z) * Math.cos(R.s.yaw);
         if (Math.abs(lx) < c.Wd / 2 + 0.45 && Math.abs(lz) < c.L / 2 + 0.45) { const push = (c.Wd / 2 + 0.45 - Math.abs(lx)) * Math.sign(lx || 1) * Math.min(1, dt * 8); P.x += Math.cos(R.s.yaw) * push; P.z -= Math.sin(R.s.yaw) * push; api.markDirty(); } } }
     for (const [id, R] of remote) if (!seen.has(id)) { scene.remove(R.m); remote.delete(id); const o = api.others.get(id); if (o && o.obj) o.obj.scale.setScalar(1); } }
   function sitPose(obj, dt) { const m = obj.userData.m; const J = m.userData.J; obj.userData.st = (obj.userData.st || 0) + dt * 60; api.posePal3D(m, { mode: 'idle', t: obj.userData.st, dt60: dt * 60, still: true });
     for (const n of ['Left', 'Right']) { if (J[n + 'UpperLeg']) J[n + 'UpperLeg'].rotation.x = -1.45; if (J[n + 'LowerLeg']) J[n + 'LowerLeg'].rotation.x = 1.35; if (J[n + 'UpperArm']) J[n + 'UpperArm'].rotation.x = -0.9; } }
   // ---------------------------------------------------------------- per frame
   const camP = new THREE.Vector3(), camL = new THREE.Vector3(); let camInit = false;
-  function update(dt, now) { const nowMs = performance.now(); remoteCars(dt, nowMs); if (!my) return;
+  function update(dt, now) { const nowMs = performance.now(); remoteCars(dt, nowMs); rideTick(dt, nowMs); if (!my) return;
     const c = my.m.userData.def; my.door += (my.doorWant - my.door) * Math.min(1, dt * 5);
     if (my.state === 'enter' || my.state === 'exit') { my.t += dt; const t = my.state === 'enter' ? my.t : 1.3 - my.t; my.doorWant = t < 0.95 ? 1 : 0; if (my.state === 'exit' && my.t < 0.4) my.doorWant = 1;
       seatWorld(my.m, sv); const s = Math.sin(my.V.yaw), co = Math.cos(my.V.yaw); sv2.set(my.V.x + co * (c.Wd / 2 + 0.8), ground(my.V.x, my.V.z), my.V.z - s * (c.Wd / 2 + 0.8)); const k = clamp((t - 0.3) / 0.6, 0, 1);
@@ -138,7 +138,7 @@ export function attachDrive(api, world) {
       my.rs = rs; poseCar(my.m, rs, my.V.steer, my.V.spin); setDoors(my.m, my.door); setBrakeLights(my.m, inp.brk > 0.1 && !my.V.rev);
       if (drive) { seatWorld(my.m, sv); me.position.copy(sv); me.rotation.y = rs.yaw; me.scale.setScalar(0.6); sitPose(me, dt); }
       P.x = my.V.x; P.z = my.V.z; P.yaw = my.V.yaw; P.y = ground(P.x, P.z); P.vy = 0; if (my.V.speed() > 0.05) api.markDirty();
-      const code = carCode(my.id, my.color, my.door > 0.5); if (P.dance !== code && my.state !== 'exit') { P.dance = code; P.danceUntil = Date.now() + 864e5; api.markDirty(); }
+      const code = myCode(); if (P.dance !== code && my.state !== 'exit') { P.dance = code; P.danceUntil = Date.now() + 864e5; api.markDirty(); }
       // nudge bots out of the way (gently)
       for (const b of world.bots) { const lx = (b.x - my.V.x) * Math.cos(my.V.yaw) - (b.z - my.V.z) * Math.sin(my.V.yaw), lz = (b.x - my.V.x) * Math.sin(my.V.yaw) + (b.z - my.V.z) * Math.cos(my.V.yaw); if (Math.abs(lx) < c.Wd / 2 + 0.5 && Math.abs(lz) < c.L / 2 + 0.6) { b.pause = 1.2; b.k += (lx >= 0 ? 0.004 : -0.004); } }
       if (my.eng) my.eng.set(my.V.rpm, inp.thr, 0.06);
@@ -152,16 +152,50 @@ export function attachDrive(api, world) {
           if (!camInit) { camP.copy(want); camInit = true; } else camP.lerp(want, Math.min(1, dt * 5)); camL.set(rs.x + fx * 2, rs.y + 1.0, rs.z + fz * 2); cam.position.copy(camP); if (getCfg().shake && Math.abs(my.V.vf) > 14) { const k = Math.min(1, (Math.abs(my.V.vf) - 14) / 20) * 0.035, t = nowMs / 1000; camP.x += Math.sin(t * 37) * k; camP.y += Math.sin(t * 43 + 1) * k; } cam.position.copy(camP); cam.lookAt(camL); const fv = getCfg().fov + Math.min(8, Math.abs(my.V.vf) * 0.2); if (Math.abs(cam.fov - fv) > 0.3) { cam.fov = fv; cam.updateProjectionMatrix(); } } } }
     else { poseCar(my.m, my.rs, 0, my.V.spin); setDoors(my.m, my.door); FX.update(dt, null); H.blur.style.opacity = 0; }
     window.__kd = Object.assign(window.__kd || {}, { state: my.state, kmh: Math.round(Math.abs(my.V.vf) * 3.6), gear: my.V.gear, rpm: Math.round(my.V.rpm), x: my.V.x, z: my.V.z, yaw: my.V.yaw, pitch: my.rs.pitch, roll: my.rs.roll, heave: my.rs.heave, cam: camMode, remote: remote.size }); }
+  // ---------------------------------------------------------------- 🧑‍🤝‍🧑 Ride along: passenger seat (synced through the presence 'dn' code, no extra writes)
+  // passenger asks '~q'+driver8 -> driver accepts (auto for mutual follows, else a popup) by adding 'o'+passenger8 to its car code -> passenger shows '~r'+driver8
+  const U8 = (u) => String(u || '').slice(0, 8); const me8 = U8(uid); let rider = null, riderSeen = 0; let ride = null; const asked = new Map(); const sp = new THREE.Vector3();
+  const myCode = () => carCode(my.id, my.color, my.door > 0.5) + (rider ? 'o' + rider : '');
+  const riderOf = (dn) => (dn && dn.slice(0, 2) === '~c' && dn[5] === 'o' ? dn.slice(6, 14) : null);
+  const seatP = (car, out) => { car.updateMatrixWorld(true); out.copy(car.userData.seat); out.x = -out.x; out.y -= 0.1; return out.applyMatrix4(car.userData.chassis.matrixWorld); };
+  const rcss = document.createElement('style'); rcss.textContent = `.kr-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(14px,env(safe-area-inset-bottom)) + 74px);display:flex;gap:8px;pointer-events:auto;z-index:9}.kr-bar[hidden],.kr-pop[hidden]{display:none}.kr-bar button,.kr-pop button{border:2px solid #fff;border-radius:999px;background:rgba(30,20,60,.8);color:#fff;font:800 14px Inter,sans-serif;height:44px;padding:0 16px}
+.kr-pop{position:absolute;left:50%;transform:translateX(-50%);top:calc(max(10px,env(safe-area-inset-top)) + 60px);background:rgba(255,255,255,.97);color:#111;border-radius:16px;padding:10px 12px;pointer-events:auto;z-index:20;font:700 14px Inter,sans-serif;text-align:center;max-width:90vw}.kr-pop button{background:#6d28d9;margin:6px 4px 0;height:40px}.kr-pop button.g{background:#9ca3af}`; document.head.appendChild(rcss);
+  const rbar = document.createElement('div'); rbar.className = 'kr-bar'; rbar.hidden = true; rbar.innerHTML = '<button data-c>🎥 Camera</button><button data-x>🚪 Exit ride</button>'; hud.appendChild(rbar);
+  const rpop = document.createElement('div'); rpop.className = 'kr-pop'; rpop.hidden = true; hud.appendChild(rpop);
+  rbar.querySelector('[data-x]').onclick = () => leaveRide('🚪 You hopped out'); rbar.querySelector('[data-c]').onclick = () => { if (ride) { ride.cam = ride.cam === 'pov' ? 'chase' : ride.cam === 'chase' ? 'far' : 'pov'; say('🎥 ' + ride.cam); } };
+  function askRide(du) { const o = api.others.get(du); if (!o || !parseCar(o.dn)) return; if (my && my.state !== 'parked') return; ride = { drv: du, st: 'ask', t: performance.now(), cam: 'chase' }; P.dance = '~q' + U8(du); P.danceUntil = Date.now() + 864e5; api.markDirty(); say('🧑‍🤝‍🧑 Asking ' + (o.name || 'the driver') + ' for a ride…'); }
+  function leaveRide(msg) { if (!ride) return; const R = remote.get(ride.drv); ride = null; P.dance = ''; P.danceUntil = 0; me.scale.setScalar(1); me.visible = true; rbar.hidden = true; if (R) { const s = Math.sin(R.s.yaw), co = Math.cos(R.s.yaw), c = R.m.userData.def; const x = R.s.x - co * (c.Wd / 2 + 0.9), z = R.s.z + s * (c.Wd / 2 + 0.9); const [nx, nz] = api.collide(x, z, ground(x, z)); P.x = nx; P.z = nz; P.y = ground(nx, nz); } api.markDirty(); if (msg) say(msg); window.__kd && (window.__kd.ride = null); }
+  async function isFriend(u) { try { const { doc: d2, getDoc: g2 } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js'); const [a, b] = await Promise.all([g2(d2(db, 'follows', uid + '_' + u)), g2(d2(db, 'follows', u + '_' + uid))]); return a.exists() && b.exists(); } catch { return false; } }
+  function accept(o) { rider = U8(o.uid); riderSeen = performance.now(); rpop.hidden = true; if (my) { P.dance = myCode(); P.danceUntil = Date.now() + 864e5; api.markDirty(); } say('🧑‍🤝‍🧑 ' + (o.name || 'A Pal') + ' hopped in!'); }
+  function rideTick(dt, nowMs) {
+    // driver side: requests + my passenger in my car
+    if (my && my.state !== 'parked') { for (const o of api.others.values()) { if (o.dn === '~q' + me8 && !rider && !asked.has(o.uid)) { asked.set(o.uid, nowMs); isFriend(o.uid).then((f) => { if (rider || !my || my.state === 'parked') return; if (f) accept(o); else { rpop.innerHTML = `🧑‍🤝‍🧑 <b>${String(o.name || 'A Pal').replace(/[<>&]/g, '')}</b> wants to ride along<br><button data-a>Accept</button><button class="g" data-n>No thanks</button>`; rpop.hidden = false; rpop.querySelector('[data-a]').onclick = () => accept(o); rpop.querySelector('[data-n]').onclick = () => { rpop.hidden = true; }; setTimeout(() => { rpop.hidden = true; }, 40000); } }); }
+        if (rider && U8(o.uid) === rider && (o.dn === '~r' + me8 || o.dn === '~q' + me8)) { riderSeen = nowMs; if (o.obj && o.dn === '~r' + me8) { seatP(my.m, sp); o.obj.position.copy(sp); o.obj.rotation.y = my.V.yaw; o.obj.scale.setScalar(0.6); sitPose(o.obj, dt); } } }
+      if (rider && nowMs - riderSeen > 8000) { rider = null; P.dance = myCode(); api.markDirty(); } }
+    else if (rider) rider = null;
+    for (const [u, t] of asked) if (nowMs - t > 30000) asked.delete(u);
+    // third parties: show other drivers' passengers in their cars
+    for (const o of api.others.values()) if (o.obj && o.dn && o.dn.slice(0, 2) === '~r' && o.dn.slice(2) !== me8) { for (const [du, R] of remote) if (U8(du) === o.dn.slice(2) && riderOf(api.others.get(du)?.dn) === U8(o.uid)) { seatP(R.m, sp); o.obj.position.copy(sp); o.obj.rotation.y = R.s.yaw; o.obj.scale.setScalar(0.6); sitPose(o.obj, dt); } }
+    // passenger side
+    if (!ride) return; const o = api.others.get(ride.drv); const R = remote.get(ride.drv); const okd = o && riderOf(o.dn) === me8;
+    if (ride.st === 'ask') { if (okd && R) { ride.st = 'on'; P.dance = '~r' + U8(ride.drv); api.markDirty(); rbar.hidden = false; say('🚗 Riding with ' + (o.name || 'a Pal') + ' · 🎥 to switch view · 🚪 to hop out'); } else if (!o || !parseCar(o.dn) || nowMs - ride.t > 45000) { leaveRide('No answer this time 🙂'); return; } else return; }
+    if (!okd || !R) { leaveRide('🚗 The ride ended'); return; }
+    seatP(R.m, sp); me.position.copy(sp); me.rotation.y = R.s.yaw; me.scale.setScalar(0.6); sitPose(me, dt); P.x = R.s.x; P.z = R.s.z; P.y = ground(P.x, P.z);
+    const fx = Math.sin(R.s.yaw), fz = Math.cos(R.s.yaw);
+    if (ride.cam === 'pov') { me.visible = false; camP.set(sp.x, sp.y + 0.62, sp.z); camL.set(camP.x + fx * 10, camP.y - 0.7, camP.z + fz * 10); cam.position.copy(camP); cam.lookAt(camL); }
+    else { me.visible = true; const dist = ride.cam === 'far' ? 12 : 6.5, h = ride.cam === 'far' ? 3.8 : 2.4; const want = new THREE.Vector3(R.s.x - fx * dist, ground(R.s.x, R.s.z) + h, R.s.z - fz * dist); camP.lerp(want, Math.min(1, dt * 5)); if (camP.distanceTo(want) > 30) camP.copy(want); camL.set(R.s.x + fx * 2, ground(R.s.x, R.s.z) + 1, R.s.z + fz * 2); cam.position.copy(camP); cam.lookAt(camL); }
+    window.__kd = Object.assign(window.__kd || {}, { ride: ride.st, rideCam: ride.cam }); }
   // world hooks
-  api.prompt = () => { if (my && my.state === 'parked' && Math.hypot(my.V.x - P.x, my.V.z - P.z) < 3.4) return { id: 'enter', label: '🚗 Enter car' }; return null; };
-  const prevAct = api.onAction; api.onAction = (a) => { if (a === 'enter') getIn(); else if (prevAct) prevAct(a); };
+  api.prompt = () => { if (my && my.state === 'parked' && Math.hypot(my.V.x - P.x, my.V.z - P.z) < 3.4) return { id: 'enter', label: '🚗 Enter car' };
+    if (!ride && (!my || my.state === 'parked')) for (const [du, R] of remote) if (Math.hypot(R.s.x - P.x, R.s.z - P.z) < 3.6 && !riderOf(api.others.get(du)?.dn)) return { id: 'ride:' + du, label: '🧑‍🤝‍🧑 Ride along' }; return null; };
+  const prevAct = api.onAction; api.onAction = (a) => { if (a === 'enter') getIn(); else if (a && a.startsWith('ride:')) askRide(a.slice(5)); else if (prevAct) prevAct(a); };
   api.driving = () => !!my && my.state !== 'parked'; api.myCar = () => (my && my.state !== 'parked' ? { x: my.V.x, z: my.V.z } : null);
-  world.move = (m) => (api.driving() ? { x: 0, y: 0, mag: 0, run: false } : m); world.driving = () => api.driving();
-  window.__kdApi = { spawn: (id, c, at) => { id = id || 'pip'; if (!owned.has(id) && lsg('kemy-pals-debug') !== '1') return false; spawnCar(id, c ?? 0, at); return true; }, enter: () => getIn(), out: () => getOut(), cam: () => cycleCam(), reset: (r) => resetCar(r !== false), stuckProbe: () => ({ stuckT: my && my.stuckT, nudges: my && my.nudges, ownCy: !!my && api.cyl.includes(my.cy) }), doors: () => toggleDoors(), test: (o) => { window.__kdTest = o; }, showroom: (x, z) => { CARS.forEach((c, i) => { const m = buildCar(c, c.color); scene.add(m); poseCar(m, { x: x + i * 5.2, y: ground(x + i * 5.2, z), z, yaw: 0.5 }, 0.3, 0); setDoors(m, i % 2 ? 0.8 : 0); }); }, owned: () => [...owned], myCars: () => openMyCars() };
+  world.move = (m) => (api.driving() || (ride && ride.st === 'on') ? { x: 0, y: 0, mag: 0, run: false } : m); world.driving = () => api.driving() || !!(ride && ride.st === 'on'); api.riding = () => !!(ride && ride.st === 'on');
+  window.__kdApi = { remotes: () => [...remote.keys()], askRide, leaveRide, accept: (u) => { const o = api.others.get(u); if (o) accept(o); }, rider: () => rider, ride: () => ride, spawn: (id, c, at) => { id = id || 'pip'; if (!owned.has(id) && lsg('kemy-pals-debug') !== '1') return false; spawnCar(id, c ?? 0, at); return true; }, enter: () => getIn(), out: () => getOut(), cam: () => cycleCam(), reset: (r) => resetCar(r !== false), stuckProbe: () => ({ stuckT: my && my.stuckT, nudges: my && my.nudges, ownCy: !!my && api.cyl.includes(my.cy) }), doors: () => toggleDoors(), test: (o) => { window.__kdTest = o; }, showroom: (x, z) => { CARS.forEach((c, i) => { const m = buildCar(c, c.color); scene.add(m); poseCar(m, { x: x + i * 5.2, y: ground(x + i * 5.2, z), z, yaw: 0.5 }, 0.3, 0); setDoors(m, i % 2 ? 0.8 : 0); }); }, owned: () => [...owned], myCars: () => openMyCars() };
   const mine = () => (my ? { id: my.id, color: my.color, x: my.V.x, z: my.V.z, yaw: my.V.yaw, state: my.state, speed: my.V.speed() } : null);
   function stash() { if (!my) return; exitNow(); removeCar(); } // park in a garage bay: hop out and the car stays in the bay
   function place(id, color, at, enter) { if (!CAR[id]) return null; spawnCar(id, color, at); if (enter) getIn(); return my; }
   function isOwned(id) { return owned.has(id); }
-  return { update, destroy() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); H.destroy(); FX.destroy(); }, spawnCar, mine, stash, place, removeCar, isOwned, resetCar, resetAt: (p) => { if (!my) return; my.V.place(p.x, p.z, p.yaw || 0); my.V.rev = false; my.V.gear = 1; my.stuckT = 0; api.markDirty(); } };
+  return { update, destroy() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); rcss.remove(); rbar.remove(); rpop.remove(); H.destroy(); FX.destroy(); }, spawnCar, mine, stash, place, removeCar, isOwned, resetCar, resetAt: (p) => { if (!my) return; my.V.place(p.x, p.z, p.yaw || 0); my.V.rev = false; my.V.gear = 1; my.stuckT = 0; api.markDirty(); } };
 }
 void FLAT;
