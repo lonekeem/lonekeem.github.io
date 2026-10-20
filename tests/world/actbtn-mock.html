@@ -1,0 +1,15 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>html,body{margin:0;height:100%;overflow:hidden}#v{position:fixed;inset:0;background:linear-gradient(#8fd3ff,#9be38b 60%)}#pal{position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);font-size:90px}#chat{position:absolute;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);width:50%;height:36px;border-radius:18px;background:#fff9;text-align:center;line-height:36px}</style>
+<div id=v><div id=pal>🐯</div><div id=chat>💬 chat…</div></div>
+<script type=module>
+import { createControls } from '/js/controls.js';
+const v=document.getElementById('v');
+createControls(v,{settings:false,buttons:[{id:'jump',icon:'⤒',label:'Jump',big:true},{id:'run',icon:'🏃',label:'Run'},{id:'emote',icon:'😊',label:'Emote'},{id:'cam',icon:'👁',label:'Camera'}]});
+document.querySelectorAll('.kc-tut,.kc-tip').forEach(e=>e.remove());
+const src=await (await fetch('/js/world/kemyworld.js')).text();
+const css=src.match(/\.ks-act\{[^}]*\}/)[0]+'.ks-hud{position:absolute;inset:0;pointer-events:none;z-index:6}';
+const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+const hud=document.createElement('div');hud.className='ks-hud';v.appendChild(hud);
+hud.innerHTML='<button class="ks-act" id="ks-act">'+(new URLSearchParams(location.search).get('l')||'🛍️ For Sale · ⭐800')+'</button>';
+const actB=hud.querySelector('#ks-act');
+eval(src.match(/const placeAct = [\s\S]*?(?=\n  addEventListener)/)[0].replace('const placeAct','window.placeAct'));placeAct();
+</script>
