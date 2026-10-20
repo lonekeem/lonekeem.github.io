@@ -470,7 +470,7 @@ export function createGames(ctx) {
     try {
       const st = await net.getStats(uid);
       const rows = GAMES.filter((g) => st[g.id + '_w'] || st[g.id + '_l'] || st[g.id + '_d']);
-      if (!rows.length) { if (uid === myUid()) el.innerHTML = `<a class="g-prof" href="#/games">${CONTROLLER}<span><b>Games</b> · play friends or the computer</span></a><a class="g-prof g-prof-z" href="#/park">🌳<span><b>Pal Park</b> · walk with friends</span></a><a class="g-prof g-prof-z" href="#/park">🌳<span><b>Pal Park</b> · walk with friends</span></a><a class="g-prof g-prof-z" href="#/arcade/zombie">🧟<span><b>Pal Zombie Survival</b> · play now</span></a>`; return; }
+      if (!rows.length) { if (uid === myUid()) el.innerHTML = `<a class="g-prof" href="#/games">${CONTROLLER}<span><b>Games</b> · play friends or the computer</span></a><a class="g-prof g-prof-z" href="#/park">🌳<span><b>Pal Park</b> · walk with friends</span></a><a class="g-prof g-prof-z" href="#/arcade/zombie">🧟<span><b>Pal Zombie Survival</b> · play now</span></a>`; return; }
       el.innerHTML = `<a class="g-prof" href="#/games" aria-label="Game record">${CONTROLLER}${rows.map((g) => `<span><b>${esc(g.name)}</b> ${st[g.id + '_w'] || 0}W ${st[g.id + '_l'] || 0}L${st[g.id + '_d'] ? ` ${st[g.id + '_d']}D` : ''}</span>`).join('')}</a><a class="g-prof g-prof-z" href="#/arcade/zombie">🧟<span><b>Pal Zombie Survival</b> · play now</span></a>`;
     } catch { /* optional */ }
   }
