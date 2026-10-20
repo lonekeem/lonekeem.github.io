@@ -26,6 +26,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ICONS } from './icons.js';
 import { createLive } from './live.js';
+import { createModeration, BlockSet } from './moderation.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
@@ -95,7 +96,7 @@ let hydrateRaf = 0;
 new MutationObserver(() => { cancelAnimationFrame(hydrateRaf); hydrateRaf = requestAnimationFrame(hydrateAvatars); })
   .observe(document.body, { childList: true, subtree: true });
 const refreshAvatarsFor = (uid, url) => document.querySelectorAll(`.avatar[data-uid="${CSS.escape(uid)}"]`).forEach((el) => paintAvatar(el, url));
-const badge = (uid) => uid === STUDIO_UID ? '<span class="badge" title="Official studio account" aria-label="Official studio account">✓</span>' : '';
+const badge = (uid) => uid === STUDIO_UID ? '<span class="badge" title="Official studio account" aria-label="Official studio account">✓</span>' : (mod ? mod.badge(uid) : '');
 function timeAgo(ts) {
   if (!ts) return 'just now';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -267,6 +268,9 @@ const comments = createComments({
   toast: (m) => toast(m), friendlyError: (e) => friendlyError(e), isAdmin: () => isAdmin(),
   reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x)
 });
+// Moderators, reports inbox, suspensions (js/moderation.js).
+const mod = createModeration({ S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
+  onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
 const addComment = (p, text) => comments.addComment(p, text);
 const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c === 'string' ? { id: c } : c);
 // Owner or admin. Removes the Firestore doc; the Cloudinary file stays until an admin cleans it
@@ -446,11 +450,11 @@ function renderPosts(container, posts, emptyMsg) {
 }
 
 // ---------------------------------------------------------------- moderation actions
-function reportDialog(targetType, targetId, postId, excerpt) {
+function reportDialog(targetType, targetId, postId, excerpt, targetUid = '') {
   if (!requireAuth()) return;
   openModal(`
     <h2 style="font-size:1.25rem">Report ${esc(targetType)}</h2>
-    <p>Tell us what’s wrong. Reports go privately to the studio.</p>
+    <p>Tell us what’s wrong. Reports go privately to the Kemy moderators.</p>
     <form id="report-form" style="text-align:left">
       <div class="field"><label for="report-reason">Reason</label>
       <textarea id="report-reason" maxlength="500" required placeholder="e.g. spam, stolen content, harassment, explicit content"></textarea></div>
@@ -463,7 +467,7 @@ function reportDialog(targetType, targetId, postId, excerpt) {
     try {
       await addDoc(collection(db, 'reports'), {
         reporterId: S.user.uid, targetType, targetId, postId: postId || '', reason: reason.slice(0, 500),
-        excerpt: String(excerpt || '').slice(0, 300), createdAt: serverTimestamp()
+        excerpt: String(excerpt || '').slice(0, 300), targetUid: String(targetUid || ''), status: 'open', createdAt: serverTimestamp()
       });
       closeModal(); toast('Thanks. The report was sent.');
     } catch (e) { $('#report-err').textContent = friendlyError(e); }
@@ -549,6 +553,7 @@ function renderChrome(name) {
   const searchBtn = `<a class="icon-btn" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>`;
   if (S.user && S.profile) {
     ha.innerHTML = `${searchBtn}
+      ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${S.modOpen ? `, ${S.modOpen} open reports` : ''}">🛡️ Mod${S.modOpen ? `<span class="mod-count">${S.modOpen > 99 ? '99+' : S.modOpen}</span>` : ''}</a>` : ''}
       ${isAdmin() ? `<a class="icon-btn" href="#/admin" aria-label="Admin">${ICON.shield}</a>` : ''}
       <a class="icon-btn" href="#/notifications" aria-label="Notifications">${ICON.bell}${S.unreadNotes ? '<span class="dot"></span>' : ''}</a>
       ${avatar({ ...S.profile, uid: S.user.uid }, 'sm')}`;
@@ -559,6 +564,12 @@ function renderChrome(name) {
     ha.innerHTML = `${searchBtn}<a class="signin-pill" href="#/login">Sign in</a>`;
   }
   document.getElementById('msg-dot').hidden = !S.unreadChats;
+  // Full-screen feed hides the header: keep a floating Moderator button there.
+  let fab = document.getElementById('mod-fab');
+  if (mod && mod.iAmMod() && S.profile) {
+    if (!fab) { fab = document.createElement('a'); fab.id = 'mod-fab'; fab.className = 'mod-pill'; fab.href = '#/mod'; document.body.appendChild(fab); }
+    fab.innerHTML = `🛡️${S.modOpen ? `<span class="mod-count">${S.modOpen > 99 ? '99+' : S.modOpen}</span>` : ''}`; fab.setAttribute('aria-label', `Moderator Tools${S.modOpen ? `, ${S.modOpen} open reports` : ''}`);
+  } else if (fab) fab.remove();
 }
 
 // ---------------------------------------------------------------- router
@@ -592,6 +603,7 @@ const routes = [
   [/^#\/music$/, (t) => music.page(t), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
+  [/^#\/mod(?:\/(users|log))?$/, (tab, t) => mod.page(tab, t, stale), ''],
   [/^#\/login(?:\?.*)?$/, pageLogin, 'me'],
   [/^#\/signup$/, pageSignup, 'me'],
   [/^#\/reset$/, pageReset, 'me'],
@@ -626,6 +638,7 @@ async function route() {
       document.body.classList.toggle('game-mode', /^#\/(park|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
       window.scrollTo(0, 0);
       gameMusicFor(hash);
+      if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
       if (token === routeToken && S.profile && S.profile.welcomed === false && !/onboard|login|signup/.test(hash)) showWelcome();
@@ -942,7 +955,7 @@ async function pageProfile(username, tab, token) {
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
-        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}
+        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${S.modOpen ? ` <span class="mod-count">${S.modOpen}</span>` : ''}</a>` : ''}
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && !blocked && !(uid === STUDIO_UID && isAdmin()) ? `<a class="btn btn-sm btn-ghost" href="#/chat/${esc(uid)}" id="msg">Message</a>` : ''}
@@ -1041,6 +1054,7 @@ async function pageSettings() {
   const p = S.profile;
   main.innerHTML = `
     <h1 class="page-title">Edit profile</h1>
+    ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Moderator Tools${S.modOpen ? ` <span class="mod-count">${S.modOpen}</span>` : ''}</a>` : ''}
     ${isAdmin() ? '<a class="btn btn-block" href="#/admin" id="set-admin" style="margin-bottom:14px">🛡️ Admin tools (publish shop prices, reports, studio)</a>' : ''}
     <form id="settings" class="card pad">
       <div class="av-edit" id="av-edit">
@@ -1222,8 +1236,9 @@ async function pageChat(otherUid, asStudio, token) {
         const label = mine ? (m.viewed ? 'Opened' : 'Delivered') : (m.viewed ? 'Opened' : 'Tap to view snap');
         return `<${open ? 'button' : 'div'} class="bubble snapmsg ${mine ? 'mine' : ''} ${m.viewed ? 'opened' : 'new'}" ${open ? `data-snap="${esc(d.id)}"` : ''}><span class="snap-ic" aria-hidden="true"></span><span><b>${m.snap?.kind === 'video' || /🎥/.test(m.text) ? 'Video snap' : 'Snap'}</b><small>${label}</small></span><time>${esc(timeAgo(m.createdAt))}</time></${open ? 'button' : 'div'}>`;
       }
-      return `<div class="bubble ${m.senderId === me ? 'mine' : ''}">${esc(m.text)}<time>${esc(timeAgo(m.createdAt))}</time></div>`;
+      return `<div class="bubble ${m.senderId === me ? 'mine' : ''}">${esc(m.text)}<time>${esc(timeAgo(m.createdAt))}</time>${m.senderId !== me ? `<button type="button" class="bub-rep" data-rep="${esc(d.id)}" aria-label="Report this message" title="Report">⚑</button>` : ''}</div>`;
     }).join('') : `<p class="muted small center">Say hi to ${esc(other.displayName)} 👋</p>`;
+    log.querySelectorAll('[data-rep]').forEach((b) => (b.onclick = () => reportDialog('chat message', `${cid}/${b.dataset.rep}`, '', b.parentElement.firstChild.textContent, otherUid)));
     log.querySelectorAll('[data-snap]').forEach((b) => (b.onclick = () => { const id = b.dataset.snap; openSnap(doc(db, 'chats', cid, 'messages', id), snaps.get(id)); b.removeAttribute('data-snap'); b.onclick = null; b.disabled = true; b.classList.replace('new', 'opened'); b.querySelector('small').textContent = 'Opened'; }));
     log.scrollTop = log.scrollHeight; markSeen();
   }, (e) => { log.innerHTML = `<p class="muted small center">${esc(friendlyError(e))}</p>`; });
@@ -1254,8 +1269,9 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', mod: '' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
+    if (n.type === 'mod') return `<div class="list-item mod-note ${n.read ? '' : 'unread'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></div>`;
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b>${esc(n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
@@ -1297,13 +1313,15 @@ async function pageAdmin(token) {
     ${big('reindex', '🔎', 'Build search index', 'Adds search keywords and #hashtags to every post and profile that’s missing them.', '<button class="btn btn-sm" id="reindex">Build search index</button>')}
     ${big('studio', '🎬', 'Lone Keem Studios account', 'Read and answer the studio’s messages and notifications, or post as the studio.', '<div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn btn-sm btn-ghost" href="#/messages/studio">Studio inbox</a><a class="btn btn-sm btn-ghost" href="#/notifications/studio">Studio notifications</a><a class="btn btn-sm btn-ghost" href="#/new">Post as the studio</a></div>')}
     ${big('feat', '★', 'Feature posts (Studio Picks)', 'Open any movie, show or song and tap “Feature in Studio Picks” (tap again to unfeature).', '<a class="btn btn-sm btn-ghost" href="#/watch">Go to Watch</a>')}
+    <div id="adm-mods"></div>
     ${big('mod', '🗑️', 'Delete posts, comments and lives', 'Any post or comment has “Delete” in its menu for you. On a live you can tap “End live (guidelines)”. Reports are listed below.')}
     ${big('media', '🧹', 'Media cleanup', 'After you delete a post, Kemy shows a command to erase its files from Cloudinary on your computer (the key never goes in the app). For a full sweep run <code>node scripts/cloudinary-cleanup.mjs</code> (dry run first).')}
-    <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports</h2>
+    <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports <a class="btn btn-sm" href="#/mod" style="margin-left:8px">Open Moderator Tools</a></h2>
     <div id="reports"></div>`;
   const founderSet = async (on) => { if (!isAdmin()) return toast('Admins only'); try { const m = await pals.myPals(true); const p = m && (m.list.find((x) => x.id === S.profile.activePet) || m.list[0]); if (!p) return toast('Hatch a Pal first');
       const k = 'kemy-founder-prev-' + p.id; let sp = 'founder'; if (on) { if (p.species !== 'founder') localStorage.setItem(k, p.species); } else { sp = localStorage.getItem(k) || 'kemy'; }
       await m.store.save(p, { species: sp }); dispatchEvent(new Event('kemy:pal-changed')); toast(on ? `${p.name} is now Kemy (Founder) 👑` : `${p.name} switched back`); } catch (e) { toast(friendlyError(e)); } };
+  mod.adminSection($('#adm-mods'));
   if ($('#adm-founder')) { $('#adm-founder').onclick = () => founderSet(true); $('#adm-founder-off').onclick = () => founderSet(false); }
   const st = $('#shop-status'), pub = $('#shop-pub');
   const showStatus = async () => {
@@ -1516,9 +1534,10 @@ async function loadSession() {
   ]);
   backfillSearch(uid).catch((e) => console.warn('search backfill', e.code || e.message));
   S.following = new Set(fol.docs.map((d) => d.data().followee));
-  S.blocked = new Set(blk.docs.map((d) => d.id));
+  S.blocked = new BlockSet(blk.docs.map((d) => d.id), S.hidden);
   S.saved = new Set(sav.docs.map((d) => d.id));
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = [];
+  await mod.loadMine();
   S.globalUnsubs.push(onSnapshot(query(collection(db, 'users', uid, 'notifications'), where('read', '==', false), limit(1)), (qs) => {
     S.unreadNotes = !qs.empty;
     if (S.ready) renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav);
@@ -1568,7 +1587,7 @@ getRedirectResult(auth).catch((e) => toast(friendlyError(e)));
 onAuthStateChanged(auth, async (user) => {
   S.ready = false;
   S.user = user; S.profile = null; S.liked.clear();
-  S.following = new Set(); S.blocked = new Set(); S.saved = new Set();
+  S.following = new Set(); S.blocked = new BlockSet([], S.hidden); S.saved = new Set();
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; S.unreadNotes = S.unreadChats = false;
   if (user) {
     try {
@@ -1579,6 +1598,7 @@ onAuthStateChanged(auth, async (user) => {
       }
     } catch (e) { console.error(e); }
   }
+  await mod.rolesReady;
   S.ready = true;
   if (user && !S.profile) return go('#/onboard');
   if (user && /^#\/(login|signup|onboard)/.test(location.hash)) { const n = pendingNext || nextHash(); pendingNext = null; return go(n); }

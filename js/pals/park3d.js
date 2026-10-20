@@ -370,12 +370,12 @@ export function createPark3D(ctx) {
 
     // ---------------------------------------------------------------- name tags + speech bubbles (HTML overlay, crisp on phones)
     const tags = $('#p3-tags');
-    function tagFor(o, mine) { if (o.tag) return o.tag; const el = document.createElement('div'); el.className = 'p3-tag' + (mine ? ' me' : ''); el.innerHTML = `<div class="p3-bub" hidden></div><span></span>`; el.querySelector('span').textContent = mine ? 'You · ' + (palSnap.name || 'Pal') : `${o.name || ''}`; tags.appendChild(el); o.tag = el; return el; }
+    function tagFor(o, mine) { if (o.tag) return o.tag; const el = document.createElement('div'); el.className = 'p3-tag' + (mine ? ' me' : ''); el.innerHTML = `<div class="p3-bub" hidden></div><span></span>`; el.querySelector('span').textContent = mine ? 'You · ' + (palSnap.name || 'Pal') : `${o.name || ''}`; { const mb = (window.kemyModBadge ? window.kemyModBadge(mine ? (S.user && S.user.uid) : o.uid) : ''); if (mb) el.querySelector('span').insertAdjacentHTML('beforeend', mb); } tags.appendChild(el); o.tag = el; return el; }
     const meTag = { }; tagFor(meTag, true);
     const v3 = new THREE.Vector3();
     function placeTag(o, x, y, z, say, sayAt, hide) { const el = o.tag; v3.set(x, y, z).project(cam); const vis = !hide && v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1; el.style.display = vis ? '' : 'none'; if (!vis) return;
       const w = view.clientWidth, h = view.clientHeight; el.style.transform = `translate(${((v3.x + 1) / 2 * w).toFixed(1)}px,${((1 - v3.y) / 2 * h).toFixed(1)}px) translate(-50%,-100%)`;
-      const b = el.firstChild; const show = say && Date.now() - sayAt < 7000; if (show) { if (b.dataset.s !== String(sayAt)) { b.dataset.s = String(sayAt); b.textContent = say; } b.hidden = false; } else b.hidden = true; }
+      const b = el.firstChild; const show = say && Date.now() - sayAt < 7000; if (show) { if (b.dataset.s !== String(sayAt)) { b.dataset.s = String(sayAt); b.textContent = say; const mb = (window.kemyModBadge ? window.kemyModBadge(o === meTag ? (S.user && S.user.uid) : o.uid) : ''); if (mb) b.insertAdjacentHTML('afterbegin', mb + ' '); } b.hidden = false; } else b.hidden = true; }
     // chat log
     const log = $('#p3-log'); function logMsg(name, text, color) { const d = document.createElement('div'); d.className = 'p3-msg'; const b = document.createElement('b'); b.textContent = (name || 'Someone') + ': '; b.style.color = color || '#d9c2ff'; d.append(b, document.createTextNode(text)); log.appendChild(d); while (log.children.length > 30) log.firstChild.remove(); log.scrollTop = log.scrollHeight; log.classList.add('fresh'); clearTimeout(log._t); log._t = setTimeout(() => log.classList.remove('fresh'), 8000); }
     log.addEventListener('click', () => log.classList.toggle('open'));

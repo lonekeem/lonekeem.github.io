@@ -202,7 +202,7 @@ export function createPalGames(ctx) {
         host.querySelector('#pg-copy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(link).then(() => toast('Link copied'));
         host.querySelector('#pg-cpu').onclick = () => { updateDoc(doc(db, 'palGames', gid), { status: 'done', updatedAt: serverTimestamp() }).catch(() => {}); if (g.quick) setDoc(doc(db, 'gameQueue', 'pal-' + g.game), { gid: '', uid: '', at: serverTimestamp() }).catch(() => {}); cpu(g.game); };
         return; }
-      if (g.status === 'active' && !started && g.players.includes(me())) { started = true; top.innerHTML = `<b>${esc(GAME[g.game].name)}</b> · you vs ${esc(g.names[oi])}`; go(other, oi); }
+      if (g.status === 'active' && !started && g.players.includes(me())) { started = true; top.innerHTML = `<b>${esc(GAME[g.game].name)}</b> · you vs ${esc(g.names[oi])}${(window.kemyModBadge ? window.kemyModBadge(other) : '')}`; go(other, oi); }
       if (!g.players.includes(me())) top.innerHTML = `${esc(g.names.join(' vs '))} · this match is full`;
     }
     async function go(other, oi) {

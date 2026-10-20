@@ -43,7 +43,7 @@ export function createZombieLobby(ctx) {
     const $ = (s) => main.querySelector(s); const thumbs = new Map();
     const render = () => { if (!sess) return; const P = sess.players; const L = sess.lobby; if (!L) { $('.zl-err').textContent = 'This team was closed.'; return; }
       const list = Object.entries(P).sort((a, b) => a[1].slot - b[1].slot); const host = L.host;
-      $('.zl-ps').innerHTML = [...list.map(([u, d]) => `<div class="zl-p ${d.ready ? 'rdy' : ''}" data-u="${esc(u)}"><canvas width="180" height="180"></canvas><b>${esc(d.name)}${u === host ? ' 👑' : ''}${u === uid ? ' (you)' : ''}</b><span class="st">${d.ready ? '✅ Ready' : '⏳ Not ready'}</span></div>`),
+      $('.zl-ps').innerHTML = [...list.map(([u, d]) => `<div class="zl-p ${d.ready ? 'rdy' : ''}" data-u="${esc(u)}"><canvas width="180" height="180"></canvas><b>${esc(d.name)}${(window.kemyModBadge ? window.kemyModBadge(u) : '')}${u === host ? ' 👑' : ''}${u === uid ? ' (you)' : ''}</b><span class="st">${d.ready ? '✅ Ready' : '⏳ Not ready'}</span></div>`),
         ...Array.from({ length: Math.max(0, MAX_TEAM - list.length) }, () => '<div class="zl-p zl-empty">Waiting for a friend…</div>')].join('');
       main.querySelectorAll('.zl-p[data-u]').forEach((card) => { const d = P[card.dataset.u]; const c = card.querySelector('canvas'); const x = c.getContext('2d');
         import('./pal3d.js').then((m) => { x.clearRect(0, 0, 180, 180); if (!m.drawPal3D(x, 90, 150, 82, { ...d.pal }, { mode: d.ready ? 'happy' : 'idle', t: performance.now() / 16 })) import('./art.js').then((a) => a.drawPal && a.drawPal(x, 90, 150, 70, d.pal)); }).catch(() => {}); });

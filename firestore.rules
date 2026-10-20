@@ -18,6 +18,13 @@ service cloud.firestore {
     function isStr(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
     function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    // ---------- Moderators + bans ----------
+    // roles/{uid} {mod: true} is written only by the admin. bans/{uid} {until, ...} by moderators.
+    function rolePath(u) { return /databases/$(database)/documents/roles/$(u); }
+    function banPath(u) { return /databases/$(database)/documents/bans/$(u); }
+    function isMod() { return isAdmin() || (signedIn() && exists(rolePath(me())) && get(rolePath(me())).data.mod == true); }
+    // Banned right now (the admin can never be locked out).
+    function notBanned() { return !signedIn() || isAdmin() || !exists(banPath(me())) || get(banPath(me())).data.until <= request.time; }
 
     // ---------- Usernames (uniqueness) ----------
     match /usernames/{name} {
@@ -144,6 +151,13 @@ service cloud.firestore {
 
       match /notifications/{nid} {
         allow read, delete: if actingAs(uid);
+        // Moderator notices ("Thanks, we took action" / warnings / suspensions), shown as "Kemy Moderators".
+        allow create: if isMod() && exists(userPath(uid))
+          && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && request.resource.data.type == 'mod' && request.resource.data.fromUid == me()
+          && request.resource.data.fromName == 'Kemy Moderators' && request.resource.data.fromUsername == ''
+          && isStr(request.resource.data.postId, 0, 100) && isStr(request.resource.data.text, 1, 400)
+          && request.resource.data.createdAt == request.time && request.resource.data.read == false;
         allow update: if actingAs(uid)
           && changed().hasOnly(['read']) && request.resource.data.read is bool;
         allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
@@ -284,7 +298,7 @@ service cloud.firestore {
       }
 
       allow read: if true;
-      allow create: if signedIn() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data);
+      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data);
       // Search-index backfill by the author (or admin): only keywords / hashtags.
       function searchChange() {
         return changed().hasOnly(['keywords', 'hashtags'])
@@ -323,7 +337,7 @@ service cloud.firestore {
           && !exists(shareP) && existsAfter(shareP);
       }
       allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange() || catChange() || shareChange()));
-      allow delete: if signedIn() && (resource.data.authorId == me() || isAdmin());
+      allow delete: if signedIn() && (resource.data.authorId == me() || isMod());
 
       match /likes/{likerId} {
         allow read: if true;
@@ -363,7 +377,7 @@ service cloud.firestore {
         function cPath(id) { return /databases/$(database)/documents/posts/$(postId)/comments/$(id); }
         function me_() { return get(userPath(me())).data; }
         function canModerate() {
-          return resource.data.authorId == me() || isAdmin() || actingAs(get(postPath()).data.authorId);
+          return resource.data.authorId == me() || isMod() || actingAs(get(postPath()).data.authorId);
         }
         // A reply: one level deep, under a live (not deleted) top-level comment, which counts it.
         function validReplyTo(pid) {
@@ -427,7 +441,7 @@ service cloud.firestore {
         }
 
         allow read: if true;
-        allow create: if signedIn()
+        allow create: if signedIn() && notBanned()
           && !blockedBy(get(postPath()).data.authorId)
           && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'text', 'createdAt',
                                                    'parentId', 'likeCount', 'replyCount', 'media'])
@@ -526,7 +540,7 @@ service cloud.firestore {
     }
     match /stories/{sid} {
       allow read: if canSeeStories(resource.data.authorId);
-      allow create: if signedIn() && actingAs(request.resource.data.authorId) && validStory(request.resource.data);
+      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validStory(request.resource.data);
       allow delete: if signedIn() && (actingAs(resource.data.authorId) || isAdmin());
 
       // Who viewed a story: written by each viewer, read by the owner.
@@ -651,7 +665,7 @@ service cloud.firestore {
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
           && getAfter(userPath(me())).data.lastMessageAt == request.time;
-        allow delete: if signedIn() && (isHost() || isAdmin() || resource.data.authorId == me());
+        allow delete: if signedIn() && (isHost() || isMod() || resource.data.authorId == me());
       }
     }
 
@@ -683,7 +697,7 @@ service cloud.firestore {
       allow get: if inChat();
       allow list: if signedIn() && (me() in resource.data.participants
         || ('studio' in resource.data.participants && isAdmin()));
-      allow create: if signedIn()
+      allow create: if signedIn() && notBanned()
         && request.resource.data.keys().hasOnly(['participants', 'lastMessage', 'lastAt', 'lastSender', 'createdAt'])
         && request.resource.data.participants is list
         && request.resource.data.participants.size() == 2
@@ -706,7 +720,7 @@ service cloud.firestore {
 
       match /messages/{mid} {
         allow read: if inChat();
-        allow create: if inChat()
+        allow create: if inChat() && notBanned()
           && request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt', 'snap', 'viewed'])
           && (!('snap' in request.resource.data) || snapOk(request.resource.data))
           && (!('viewed' in request.resource.data) || ('snap' in request.resource.data && request.resource.data.viewed == false))
@@ -725,7 +739,7 @@ service cloud.firestore {
           && request.resource.data.viewed == true
           && !('snap' in request.resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewed', 'snap']);
-        allow delete: if isAdmin() || leavingForGood();
+        allow delete: if isMod() || leavingForGood();
       }
       function snapOk(d) {
         return d.snap is map && d.snap.keys().hasOnly(['url', 'kind', 'poster'])
@@ -820,7 +834,7 @@ service cloud.firestore {
           && d.colors is list && d.colors.size() == d.players.size();
       }
       allow read: if true;
-      allow create: if signedIn()
+      allow create: if signedIn() && notBanned()
         && nd().keys().hasOnly(['type', 'mode', 'status', 'players', 'names', 'unames', 'colors', 'host', 'invitee', 'quick',
                                 'createdAt', 'updatedAt', 'winnerUid', 'endReason', 'rematch', 'hb', 'board', 'turn', 'moveNo',
                                 'last', 'turnAt', 'round', 'qs', 'roundAt', 'roundLen', 'scores', 'pv', 'seedHash', 'seeds', 'intent', 'call', 'from',
@@ -1068,7 +1082,7 @@ service cloud.firestore {
     // ---------- Quick-match queue: one slot per game type ----------
     match /gameQueue/{qid} {
       allow read: if signedIn();
-      allow write: if signedIn() && qid.matches('^[a-z-]{3,30}$')
+      allow write: if signedIn() && notBanned() && qid.matches('^[a-z-]{3,30}$')
         && request.resource.data.keys().hasOnly(['gid', 'uid', 'at'])
         && request.resource.data.uid in [me(), ''] && isStr(request.resource.data.gid, 0, 40)
         && request.resource.data.at == request.time;
@@ -1148,16 +1162,66 @@ service cloud.firestore {
 
     // ---------- Reports (admin only can read) ----------
     match /reports/{rid} {
-      allow read, delete: if isAdmin();
+      allow read, delete: if isMod();
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'postId', 'reason', 'excerpt', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'postId', 'reason', 'excerpt', 'createdAt', 'targetUid', 'status'])
         && request.resource.data.reporterId == me()
-        && request.resource.data.targetType in ['post', 'comment', 'user', 'live', 'live chat', 'series', 'movie', 'song']
+        && request.resource.data.targetType in ['post', 'comment', 'user', 'live', 'live chat', 'series', 'movie', 'song', 'chat message']
         && isStr(request.resource.data.targetId, 1, 200)
         && isStr(request.resource.data.postId, 0, 200)
         && isStr(request.resource.data.reason, 1, 500)
         && isStr(request.resource.data.excerpt, 0, 300)
+        && isStr(request.resource.data.get('targetUid', ''), 0, 128)
+        && request.resource.data.get('status', 'open') == 'open'
         && request.resource.data.createdAt == request.time;
+      // Moderators move a report through open -> review -> resolved.
+      allow update: if isMod()
+        && changed().hasOnly(['status', 'handledBy', 'handledAt', 'action'])
+        && request.resource.data.status in ['open', 'review', 'resolved']
+        && request.resource.data.handledBy == me() && request.resource.data.handledAt == request.time
+        && isStr(request.resource.data.get('action', ''), 0, 40);
+    }
+
+    // Moderator roles: public (so everyone sees the blue check), written ONLY by the admin.
+    match /roles/{uid} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['mod', 'name', 'uname', 'by', 'at'])
+        && request.resource.data.mod == true
+        && isStr(request.resource.data.name, 0, 60) && isStr(request.resource.data.uname, 0, 30)
+        && request.resource.data.by == me() && request.resource.data.at == request.time;
+      allow delete: if isAdmin();
+    }
+    // Suspensions. Readable by the person themselves and moderators. Moderators can't suspend
+    // themselves or other moderators (only the admin can).
+    match /bans/{uid} {
+      allow read: if signedIn() && (uid == me() || isMod());
+      allow create, update: if isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
+        && request.resource.data.keys().hasOnly(['until', 'reason', 'permanent', 'hide', 'by', 'at', 'name', 'uname'])
+        && request.resource.data.until is timestamp && request.resource.data.until > request.time
+        && isStr(request.resource.data.reason, 1, 300)
+        && request.resource.data.permanent is bool && request.resource.data.hide is bool
+        && isStr(request.resource.data.get('name', ''), 0, 60) && isStr(request.resource.data.get('uname', ''), 0, 30)
+        && request.resource.data.by == me() && request.resource.data.at == request.time;
+      allow delete: if isMod() && (isAdmin() || !exists(rolePath(uid)));
+    }
+    // Removed accounts whose content is hidden everywhere (public list, moderators write).
+    match /hiddenUsers/{uid} {
+      allow read: if true;
+      allow create, update: if isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
+        && request.resource.data.keys().hasOnly(['by', 'at']) && request.resource.data.by == me() && request.resource.data.at == request.time;
+      allow delete: if isMod();
+    }
+    // Audit log of moderator actions: append-only, readable by the admin.
+    match /modLog/{id} {
+      allow read: if isAdmin();
+      allow create: if isMod()
+        && request.resource.data.keys().hasOnly(['by', 'byName', 'action', 'targetUid', 'targetName', 'reportId', 'detail', 'at'])
+        && request.resource.data.by == me() && isStr(request.resource.data.byName, 0, 60)
+        && isStr(request.resource.data.action, 1, 40) && isStr(request.resource.data.targetUid, 0, 128)
+        && isStr(request.resource.data.targetName, 0, 60) && isStr(request.resource.data.reportId, 0, 100)
+        && isStr(request.resource.data.detail, 0, 400) && request.resource.data.at == request.time;
+      allow delete: if isAdmin();
     }
       // Kemy's Bubble Quest: one best-score doc per user per level (fastest time leaderboard).
     match /kqLevels/{lvl}/scores/{uid} {
@@ -1344,7 +1408,7 @@ service cloud.firestore {
           && zl().n is int && zl().n >= 0 && zl().n <= 4 && zl().wave is int && zl().wave >= 0 && zl().wave <= 1000 && zl().updatedAt == request.time;
       }
       allow read: if signedIn();
-      allow create: if signedIn() && code.matches('^[A-Z2-9]{5}$') && zlShape() && zl().host == me() && zl().status == 'open' && zl().n == 1 && zl().createdAt == request.time;
+      allow create: if signedIn() && notBanned() && code.matches('^[A-Z2-9]{5}$') && zlShape() && zl().host == me() && zl().status == 'open' && zl().n == 1 && zl().createdAt == request.time;
       allow update: if signedIn() && zlShape() && zl().createdAt == resource.data.createdAt && (
         (resource.data.host == me() && (zl().host == me() || exists(zlp(zl().host))))
         || (zl().host == me() && resource.data.host != me() && exists(zlp(me()))
@@ -1353,7 +1417,7 @@ service cloud.firestore {
       allow delete: if signedIn() && (resource.data.host == me() || resource.data.updatedAt < request.time - duration.value(30, 'm'));
       match /slot/{s} {
         allow read: if signedIn();
-        allow create: if signedIn() && s in ['0', '1', '2', '3'] && exists(zlPath())
+        allow create: if signedIn() && notBanned() && s in ['0', '1', '2', '3'] && exists(zlPath())
           && request.resource.data.keys().hasOnly(['uid', 'at']) && request.resource.data.uid == me() && request.resource.data.at == request.time;
         allow delete: if signedIn() && (resource.data.uid == me() || !exists(zlPath()) || get(zlPath()).data.host == me()
           || resource.data.at < request.time - duration.value(30, 'm'));
@@ -1455,7 +1519,7 @@ service cloud.firestore {
       function g() { return request.resource.data; }
       function og() { return resource.data; }
       allow read: if true;
-      allow create: if signedIn() && g().keys().hasOnly(['game', 'status', 'players', 'names', 'unames', 'pals', 'host', 'invitee', 'quick', 'seed', 'startAt', 'createdAt', 'updatedAt'])
+      allow create: if signedIn() && notBanned() && g().keys().hasOnly(['game', 'status', 'players', 'names', 'unames', 'pals', 'host', 'invitee', 'quick', 'seed', 'startAt', 'createdAt', 'updatedAt'])
         && g().game in ['race', 'bubbles', 'stars', 'dance'] && g().status == 'waiting' && g().host == me()
         && g().players == [me()] && g().names is list && g().names.size() == 1 && g().unames is list && g().unames.size() == 1
         && g().pals is list && g().pals.size() == 1 && isStr(g().invitee, 0, 128) && g().quick is bool && g().seed is int
@@ -1513,7 +1577,7 @@ service cloud.firestore {
     match /parkRooms/{room}/p/{uid} {
       function pp() { return request.resource.data; }
       allow read: if signedIn();
-      allow create, update: if signedIn() && uid == me() && room.matches('^r[0-9]{1,2}$')
+      allow create, update: if signedIn() && notBanned() && uid == me() && room.matches('^r[0-9]{1,2}$')
         && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at', 'h', 'r', 'dn', 'v'])
         // 3D park extras: height (dm), facing (deg), dance id, client version
         && (!('h' in pp()) || (pp().h is int && pp().h >= 0 && pp().h <= 2000))
