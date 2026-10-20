@@ -3,7 +3,10 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
-import { HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS } from './layout.js';
+import { HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL } from './layout.js';
+import { attachEast } from './east.js';
+import { attachHomes } from './homes.js';
+import { attachRespawn } from './respawn.js';
 import { buildCar, poseCar, CAR_IDX, CARS } from './cars.js';
 import { attachDrive } from './drive.js';
 export { worldGround, worldClamp } from './layout.js';
@@ -27,9 +30,9 @@ export function attachWorld(api) {
   function put(k, geo, color, x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) { const g = geo.index ? geo.toNonIndexed() : geo.clone(); tq.setFromEuler(new THREE.Euler(rx, ry, rz)); tmpM.compose(tv.set(x, y, z), tq, ts.set(sx, sy, sz)); g.applyMatrix4(tmpM);
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     const n = g.attributes.position.count, c = new Float32Array(n * 3); col.set(color); for (let i = 0; i < n; i++) { c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(c, 3)); batch(k).push(g); }
-  function flush(k, material, shadow = true) { const gs = batches[k]; if (!gs || !gs.length) return null; let n = 0; gs.forEach((g) => (n += g.attributes.position.count));
+  function flush(k, material, shadow = true, parent = root) { const gs = batches[k]; if (!gs || !gs.length) return null; let n = 0; gs.forEach((g) => (n += g.attributes.position.count));
     const out = new THREE.BufferGeometry(); for (const [a, s] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3]]) { const arr = new Float32Array(n * s); let o = 0; for (const g of gs) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; } out.setAttribute(a, new THREE.BufferAttribute(arr, s)); }
-    out.computeBoundingSphere(); const m = new THREE.Mesh(out, material); m.castShadow = shadow && !LOW; m.receiveShadow = true; root.add(m); gs.forEach((g) => g.dispose()); delete batches[k]; return m; }
+    out.computeBoundingSphere(); const m = new THREE.Mesh(out, material); m.castShadow = shadow && !LOW; m.receiveShadow = true; parent.add(m); gs.forEach((g) => g.dispose()); delete batches[k]; return m; }
   const G = { box: new THREE.BoxGeometry(1, 1, 1), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 12), cyl6: new THREE.CylinderGeometry(0.5, 0.5, 1, 6), prism: new THREE.CylinderGeometry(1, 1, 1, 3), cone4: new THREE.ConeGeometry(0.7071, 1, 4), cone: new THREE.ConeGeometry(0.5, 1, 16), sph: new THREE.SphereGeometry(0.5, 14, 10), plane: new THREE.PlaneGeometry(1, 1) };
   G.plane.rotateX(-Math.PI / 2);
 
@@ -56,16 +59,16 @@ export function attachWorld(api) {
   // ---------------------------------------------------------------- houses (4 original styles, merged by material)
   const WALL = ['#f6e7c8', '#cfe3f0', '#f3d1dc', '#d8ecd0', '#efe0ff', '#ffe2b8', '#e2e8f0', '#f5d0a9'], ROOF = ['#5b3a7a', '#7a3b3b', '#3b4a7a', '#2f5d50', '#6b4a2f', '#4a3a6b'], TRIM = ['#ffffff', '#fff6e0', '#3b2a55'];
   const doors = []; const pumpkins = [], ghosts = [], bulbs = [], hay = [], lamps = [], bats = [];
-  for (const h of HOUSES) { const r = rng(h.seed * 31 + 7); const wall = WALL[Math.floor(r() * WALL.length)], roof = ROOF[Math.floor(r() * ROOF.length)], trim = TRIM[r() < 0.8 ? 0 : 1];
+  for (const h of HOUSES) { const r = rng(h.seed * 31 + 7); const TP = h.town && TOWN_PAL[h.town]; const wall = TP ? TP.wall[Math.floor(r() * TP.wall.length)] : WALL[Math.floor(r() * WALL.length)], roof = TP ? TP.roof[Math.floor(r() * TP.roof.length)] : ROOF[Math.floor(r() * ROOF.length)], trim = TRIM[r() < 0.8 ? 0 : 1];
     const f = h.face, x = h.x, z = h.z, y0 = FLAT; const W = h.w, D = h.d; const ry = f > 0 ? 0 : Math.PI; const two = h.style === 1 || h.style === 3; const Hh = two ? 5.6 : 3.4;
     const L = (lx, lz) => [x + (f > 0 ? lx : -lx), z + (f > 0 ? lz : -lz)]; // local (front = +lz) -> world
-    const P3 = (k, g, c, lx, ly, lz, sx, sy, sz, rot = 0, rx = 0) => { const [wx, wz] = L(lx, lz); put(k, g, c, wx, y0 + ly, wz, ry + rot, sx, sy, sz, rx); };
+    const TK = h.town ? '@' + h.town : ''; const P3 = (k, g, c, lx, ly, lz, sx, sy, sz, rot = 0, rx = 0) => { const [wx, wz] = L(lx, lz); put(k + TK, g, c, wx, y0 + ly, wz, ry + rot, sx, sy, sz, rx); };
     P3('wall', G.box, '#8b8378', 0, 0.2, 0, W + 0.4, 0.4, D + 0.4); // foundation
     P3('wall', G.box, wall, 0, 0.4 + Hh / 2, 0, W, Hh, D);
     if (h.style === 2) { P3('wall', G.box, wall, -W / 2 - 2.2, 0.4 + 1.5, -0.5, 4.4, 3, D - 1); P3('roof', G.cone4, roof, -W / 2 - 2.2, 0.4 + 3 + 0.8, -0.5, 6.4, 1.6, D + 0.4, Math.PI / 4); }
     if (h.style === 3) { P3('wall', G.cyl, wall, W / 2 - 0.4, 0.4 + (Hh + 1.6) / 2, D / 2 - 0.6, 2.6, Hh + 1.6, 2.6); P3('roof', G.cone, roof, W / 2 - 0.4, 0.4 + Hh + 1.6 + 1.4, D / 2 - 0.6, 3.4, 2.8, 3.4); }
     // gable roof: triangular prism along x
-    { const rh = two ? 2.4 : 2.2; const [wx, wz] = L(0, 0); put('roof', G.prism, roof, wx, y0 + 0.4 + Hh + rh * 0.25, wz, ry + Math.PI / 2, (D / 2 + 0.6) * 1.15, W + 0.8, rh * 0.75 * 1.15 / 0.75, Math.PI / 2, 0); }
+    { const rh = two ? 2.4 : 2.2; const [wx, wz] = L(0, 0); put('roof' + TK, G.prism, roof, wx, y0 + 0.4 + Hh + rh * 0.25, wz, ry + Math.PI / 2, (D / 2 + 0.6) * 1.15, W + 0.8, rh * 0.75 * 1.15 / 0.75, Math.PI / 2, 0); }
     P3('wall', G.box, '#7c4a2a', W / 3, 0.4 + Hh + 1.6, -1, 0.8, 2.2, 0.8); // chimney
     // porch, steps, door frame, windows (glowing warm)
     P3('wall', G.box, '#a08c74', 0, 0.3, D / 2 + 1, 3.2, 0.25, 2); P3('wall', G.box, '#a08c74', 0, 0.12, D / 2 + 2.2, 2.4, 0.22, 0.6);
@@ -76,26 +79,29 @@ export function attachWorld(api) {
     for (const sx of [-1, 1]) P3('glow', G.box, '#ffcf80', sx * W / 2 + sx * 0.03, 0.4 + 1.6, 0, 0.06, 1.0, 1.2);
     // yard: path, fence with a gap, mailbox, a tree spot
     const yardF = D / 2 + 5.5; P3('walk', G.box, '#d9cfbd', 0, 0.05, (D / 2 + 2.4 + yardF) / 2, 1.4, 0.1, yardF - D / 2 - 2.4);
-    for (const side of [-1, 1]) { const len = W / 2 + 1.2; const cx = side * (1.2 + len / 2); P3('trim', G.box, '#ffffff', cx, 0.75, yardF - 0.2, len, 0.1, 0.08); P3('trim', G.box, '#ffffff', cx, 0.4, yardF - 0.2, len, 0.1, 0.08);
+    if (h.sale) for (const side of [-1, 1]) P3('walk', G.box, '#bdb6aa', side * 3.7, 0.04, D / 2 + 2.75, 3.6, 0.08, 5.4); // driveways (garage bays)
+    if (!h.sale) for (const side of [-1, 1]) { const len = W / 2 + 1.2; const cx = side * (1.2 + len / 2); P3('trim', G.box, '#ffffff', cx, 0.75, yardF - 0.2, len, 0.1, 0.08); P3('trim', G.box, '#ffffff', cx, 0.4, yardF - 0.2, len, 0.1, 0.08);
       for (let i = 0; i <= Math.floor(len / 0.5); i++) P3('trim', G.box, '#fbfbfb', side * (1.2 + i * 0.5), 0.5, yardF - 0.2, 0.09, 1.0, 0.06); }
-    P3('trim', G.box, '#6b4a2f', 2.1, 0.55, yardF - 0.7, 0.12, 1.1, 0.12); P3('wall', G.box, f > 0 ? '#7c3aed' : '#2f7fe6', 2.1, 1.2, yardF - 0.7, 0.32, 0.3, 0.55);
+    if (!h.sale) P3('trim', G.box, '#6b4a2f', 2.1, 0.55, yardF - 0.7, 0.12, 1.1, 0.12); if (!h.sale) P3('wall', G.box, f > 0 ? '#7c3aed' : '#2f7fe6', 2.1, 1.2, yardF - 0.7, 0.32, 0.3, 0.55);
     // colliders (house body + porch posts); doors are handled by the knock system
     { const [cx, cz] = L(0, 0); const ex = W / 2 + (h.style === 2 ? 4.4 : 0.1), ez = D / 2 + 0.1; box.push({ x0: cx - ex - (h.style === 2 && f < 0 ? -4.4 + 0 : 0), x1: cx + ex, z0: cz - ez, z1: cz + ez, top: 99, bot: -99 });
       if (h.style === 2) { const b = box[box.length - 1]; if (f > 0) { b.x1 = cx + W / 2 + 0.1; b.x0 = cx - W / 2 - 4.5; } else { b.x0 = cx - W / 2 - 0.1; b.x1 = cx + W / 2 + 4.5; } }
       for (const sx of [-1.45, 1.45]) { const [px, pz] = L(sx, D / 2 + 1.8); cyl.push({ x: px, z: pz, r: 0.12, top: 99 }); }
-      for (const side of [-1, 1]) { const len = W / 2 + 1.2; const [fx, fz] = L(side * (1.2 + len / 2), yardF - 0.2); box.push({ x0: fx - (f > 0 ? len : len) / 2, x1: fx + len / 2, z0: fz - 0.1, z1: fz + 0.1, top: FLAT + 1.05, bot: -99 }); } }
+      if (!h.sale) for (const side of [-1, 1]) { const len = W / 2 + 1.2; const [fx, fz] = L(side * (1.2 + len / 2), yardF - 0.2); box.push({ x0: fx - (f > 0 ? len : len) / 2, x1: fx + len / 2, z0: fz - 0.1, z1: fz + 0.1, top: FLAT + 1.05, bot: -99 }); } }
     // door (animated, instanced below), decorations
     { const [dx, dz] = L(0, D / 2 + 0.07); const [hx, hz] = L(-0.7, D / 2 + 0.07); doors.push({ h, x: dx, z: dz, hx, hz, ry, a: 0, want: 0 }); }
-    const nP = 2 + Math.floor(r() * 4 * det); for (let i = 0; i < nP; i++) { const side = i % 2 ? 1 : -1; const [px, pz] = i < 2 ? L(side * 1.1, D / 2 + 2.15 + (i > 1 ? 0.5 : 0)) : L(side * (2 + r() * (W / 2 - 1)), D / 2 + 2.5 + r() * 2.4); pumpkins.push({ x: px, z: pz, s: 0.5 + r() * 0.55, ry: ry + (r() - 0.5) * 0.8 }); }
-    if (r() < 0.55) { const [gx, gz] = L((r() < 0.5 ? -1 : 1) * (W / 2 - 0.5), D / 2 + 3.6); ghosts.push({ x: gx, z: gz, y: 1.4 + r(), ph: r() * TAU }); }
+    const nP = h.sale ? 2 : 2 + Math.floor(r() * 4 * det); for (let i = 0; i < nP; i++) { const side = i % 2 ? 1 : -1; const [px, pz] = i < 2 ? L(side * 1.1, D / 2 + 2.15 + (i > 1 ? 0.5 : 0)) : L(side * (2 + r() * (W / 2 - 1)), D / 2 + 2.5 + r() * 2.4); pumpkins.push({ x: px, z: pz, s: 0.5 + r() * 0.55, ry: ry + (r() - 0.5) * 0.8 }); }
+    if (r() < 0.55 && !h.sale) { const [gx, gz] = L((r() < 0.5 ? -1 : 1) * (W / 2 - 0.5), D / 2 + 3.6); ghosts.push({ x: gx, z: gz, y: 1.4 + r(), ph: r() * TAU }); }
     if (r() < 0.6) for (let i = 0; i < 12; i++) { const [bx, bz] = L(-1.7 + i * 0.31, D / 2 + 2.1); bulbs.push({ x: bx, z: bz, y: 0.4 + 2.72 - Math.sin(i / 11 * Math.PI) * 0.18, c: ['#ff8a1f', '#a855f7', '#4ade80'][i % 3] }); }
-    if (r() < 0.45) { const [hx, hz] = L(-(W / 2 - 1.2), D / 2 + 4.2); hay.push({ x: hx, z: hz, ry: ry }); }
+    if (r() < 0.45 && !h.sale) { const [hx, hz] = L(-(W / 2 - 1.2), D / 2 + 4.2); hay.push({ x: hx, z: hz, ry: ry }); }
     if (r() < 0.4) { const [bx, bz] = L(0, D / 2 + 3.0); bats.push({ x: bx, z: bz, y: 3.3, ph: r() * TAU }); } }
   const glowMat = new THREE.MeshStandardMaterial({ vertexColors: true, color: '#555', emissive: '#ffffff', emissiveIntensity: 0, roughness: 0.4 });
   glowMat.onBeforeCompile = (sh) => { sh.uniforms.gK = api.nightU; sh.fragmentShader = 'uniform float gK;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance = vColor * (0.35 + gK * 1.6);'); };
   api.nightU = api.nightU || { value: 0 };
   const sidingT = api.proceduralTex ? api.proceduralTex('siding', Q, [1, 1]) : null; const wallMat = std('#fff', { vc: true, r: 0.85 }); if (sidingT) { wallMat.normalMap = sidingT.normalMap; wallMat.normalScale = new THREE.Vector2(0.6, 0.6); }
-  flush('wall', wallMat); flush('roof', std('#fff', { vc: true, r: 0.7 })); flush('trim', std('#fff', { vc: true, r: 0.55 })); flush('glow', glowMat, false); flush('walk', std('#fff', { vc: true, r: 0.9 }), false);
+  const townG = {}; const roofM = std('#fff', { vc: true, r: 0.7 }), trimM = std('#fff', { vc: true, r: 0.55 }), walkM = std('#fff', { vc: true, r: 0.9 });
+  for (const t of ['', ...Object.keys(TOWN_PAL)]) { const tk = t ? '@' + t : ''; let par = root; if (t) { par = townG[t] = new THREE.Group(); const hs = HOUSES.filter((h) => h.town === t); par.userData.c = [hs.reduce((a, h) => a + h.x, 0) / hs.length, hs.reduce((a, h) => a + h.z, 0) / hs.length]; root.add(par); }
+    flush('wall' + tk, wallMat, true, par); flush('roof' + tk, roofM, true, par); flush('trim' + tk, trimM, true, par); flush('glow' + tk, glowMat, false, par); flush('walk' + tk, walkM, false, par); }
   // instanced front doors (each one can swing open)
   const doorG = new THREE.BoxGeometry(1.2, 2.2, 0.1); doorG.translate(0.6, 1.1, 0); const doorM = new THREE.InstancedMesh(doorG, std('#fff', { r: 0.6 }), doors.length);
   const DCOL = ['#8a3ffc', '#e8434f', '#16a34a', '#2563eb', '#f59e0b', '#7c2d12']; doors.forEach((d, i) => { doorM.setColorAt(i, col.set(DCOL[i % DCOL.length])); });
@@ -174,10 +180,11 @@ export function attachWorld(api) {
   const cars = []; const NDRIVE = LOW ? 3 : Q.tier === 'medium' ? 5 : 7, NPARK = LOW ? 8 : Q.tier === 'medium' ? 14 : 20;
   const LOOP = [[-64, 100], [64, 100], [64, 145], [-64, 145]]; // driven counter-clockwise on the right-hand lane
   const loopLen = LOOP.reduce((s, p, i) => s + Math.hypot(LOOP[(i + 1) % 4][0] - p[0], LOOP[(i + 1) % 4][1] - p[1]), 0);
-  function loopAt(d, lane) { d = ((d % loopLen) + loopLen) % loopLen; for (let i = 0; i < 4; i++) { const a = LOOP[i], b = LOOP[(i + 1) % 4]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d <= l) { const k = d / l, dx = (b[0] - a[0]) / l, dz = (b[1] - a[1]) / l; return { x: a[0] + (b[0] - a[0]) * k - dz * lane, z: a[1] + (b[1] - a[1]) * k + dx * lane, yaw: Math.atan2(dx, dz) }; } d -= l; } return { x: 0, z: 0, yaw: 0 }; }
+  const LOOP0 = { pts: LOOP, len: loopLen };
+  function loopAt(d, lane, Lp = LOOP0) { const LOOP = Lp.pts, loopLen = Lp.len; d = ((d % loopLen) + loopLen) % loopLen; for (let i = 0; i < LOOP.length; i++) { const a = LOOP[i], b = LOOP[(i + 1) % LOOP.length]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d <= l) { const k = d / l, dx = (b[0] - a[0]) / l, dz = (b[1] - a[1]) / l; return { x: a[0] + (b[0] - a[0]) * k - dz * lane, z: a[1] + (b[1] - a[1]) * k + dx * lane, yaw: Math.atan2(dx, dz) }; } d -= l; } return { x: 0, z: 0, yaw: 0 }; }
   { const r = rng(31); const designs = CARS.filter((c) => !c.prem).map((c) => c.id);
     for (let i = 0; i < NDRIVE; i++) { const def = designs[i % designs.length]; const m = buildCar(def, Math.floor(r() * 12), { lite: true, noShadow: LOW }); root.add(m); cars.push({ m, drive: true, d: i * loopLen / NDRIVE, v: 0, vmax: 5 + r() * 2, spin: 0 }); }
-    const spots = []; for (const z of [100, 145]) for (let x = -88; x <= 88; x += 9) { if (Math.abs(x + 64) < 9 || Math.abs(x - 64) < 9 || Math.abs(x) < 9) continue; spots.push([x, z + (r() < 0.5 ? -1 : 1) * 2.9]); }
+    const spots = []; for (const z of [100, 145]) for (let x = -88; x <= 88; x += 9) { if (Math.abs(x + 64) < 9 || Math.abs(x - 64) < 9 || Math.abs(x) < 9) continue; if (HOUSES.some((h) => h.sale && Math.abs(h.x - x) < 8 && Math.abs(h.z - z) < 20)) continue; spots.push([x, z + (r() < 0.5 ? -1 : 1) * 2.9]); }
     for (let i = 0; i < NPARK && spots.length; i++) { const [x, z] = spots.splice(Math.floor(r() * spots.length), 1)[0]; const def = designs[Math.floor(r() * designs.length)]; const m = buildCar(def, Math.floor(r() * 12), { lite: true, noShadow: true }); root.add(m); const yaw = (z % 100 < 50 ? (z < 100 ? -1 : 1) : 1) * Math.PI / 2 * (z > (z > 120 ? 145 : 100) ? -1 : 1);
       poseCar(m, { x, y: FLAT, z, yaw }, 0, 0); cars.push({ m, drive: false, x, z, yaw }); const c = m.userData.def; cyl.push({ x, z, r: c.Wd * 0.5, top: FLAT + c.H, car: 1 }); cyl.push({ x: x + Math.sin(yaw) * c.L * 0.3, z: z + Math.cos(yaw) * c.L * 0.3, r: c.Wd * 0.5, top: FLAT + c.H }, { x: x - Math.sin(yaw) * c.L * 0.3, z: z - Math.cos(yaw) * c.L * 0.3, r: c.Wd * 0.5, top: FLAT + c.H }); } }
 
@@ -185,8 +192,10 @@ export function attachWorld(api) {
   const SPEC = ['kemy', 'puppy', 'kitten', 'bunny', 'panda', 'fox', 'penguin', 'duckling', 'frog', 'owl', 'unicorn', 'dragon', 'hamster', 'koala', 'lamb', 'otter'];
   const COST = [{ hat: 'wizard' }, { hat: 'tophat' }, { cape: 'cape' }, {}, { hat: 'beanie' }];
   const NAMES = ['Mimi', 'Toby', 'Pip', 'Luna', 'Ziggy', 'Bea', 'Coco', 'Milo', 'Nori', 'Juno', 'Ollie', 'Kiki', 'Bo', 'Ruby', 'Taro', 'Suki'];
-  const bots = []; const NB = LOW ? 6 : Q.tier === 'medium' ? 10 : ULTRA ? 18 : 14;
-  const WALKS = [[[-90, 96.2], [90, 96.2]], [[90, 103.8], [-90, 103.8]], [[-90, 141.2], [90, 141.2]], [[90, 148.8], [-90, 148.8]], [[-67.8, 104], [-67.8, 141]], [[67.8, 141], [67.8, 104]], [[3.8, 104], [3.8, 141]]];
+  const bots = []; const NB = LOW ? 12 : Q.tier === 'medium' ? 20 : ULTRA ? 32 : 26;
+  const WALKS = [[[-90, 96.2], [90, 96.2]], [[90, 103.8], [-90, 103.8]], [[-90, 141.2], [90, 141.2]], [[90, 148.8], [-90, 148.8]], [[-67.8, 104], [-67.8, 141]], [[67.8, 141], [67.8, 104]], [[3.8, 104], [3.8, 141]],
+    // townspeople along each town's main street sidewalk
+    [[132, 95.2], [236, 95.2]], [[252, 24.8], [346, 24.8]], [[132, 265.2], [236, 265.2]], [[250, 274.8], [354, 274.8]], [[132, 350.2], [236, 350.2]], [[250, 359.8], [354, 359.8]], [[132, 485.2], [354, 485.2]], [[200, 58], [224, 58]], [[110, 503], [370, 503]]];
   function mkBot(i, kind) { const r = rng(1000 + i); const ps = { species: SPEC[i % SPEC.length], name: NAMES[i % NAMES.length], colors: {}, pattern: '', acc: '', outfit: kind === 'tt' ? COST[i % COST.length] : {}, level: 3 + (i % 9) };
     let obj; try { obj = api.palObj(ps, !LOW); } catch { return null; } root.add(obj); const w = WALKS[i % WALKS.length]; const b = { obj, ps, kind, r, seg: w, k: r(), dir: 1, v: kind === 'tt' ? 1.2 + r() * 0.5 : 0.9, t: r() * 100, x: 0, z: 0, yaw: 0, pause: 0, say: '', sayAt: 0, name: ps.name + (kind === 'tt' ? ' 🎃' : ' 🏡') }; return b; }
   for (let i = 0; i < NB; i++) { const b = mkBot(i, i % 3 === 2 ? 'nb' : 'tt'); if (b) bots.push(b); }
@@ -234,21 +243,21 @@ export function attachWorld(api) {
 
   // ---------------------------------------------------------------- minimap
   function drawMap() { const S2 = 184; const x0 = BOUNDS.x0, x1 = BOUNDS.x1, z0 = BOUNDS.z0, z1 = BOUNDS.z1; const sc = S2 / Math.max(x1 - x0, z1 - z0); const mx = (x) => (x - x0) * sc + (S2 - (x1 - x0) * sc) / 2, mz = (z) => (z - z0) * sc;
-    mapX.clearRect(0, 0, S2, S2); mapX.fillStyle = 'rgba(80,160,80,.55)'; mapX.fillRect(mx(-PARK.W), mz(-PARK.H), PARK.W * 2 * sc, PARK.H * 2 * sc); mapX.fillStyle = 'rgba(70,50,120,.6)'; mapX.fillRect(mx(STREET.x0), mz(STREET.z0), (STREET.x1 - STREET.x0) * sc, (STREET.z1 - STREET.z0) * sc);
-    mapX.strokeStyle = '#d6d3d1'; mapX.lineWidth = 3; for (const r of ROADS) { mapX.beginPath(); mapX.moveTo(mx(r.a[0]), mz(r.a[1])); mapX.lineTo(mx(r.b[0]), mz(r.b[1])); mapX.stroke(); }
-    mapX.fillStyle = '#ff8a1f'; for (const h of HOUSES) mapX.fillRect(mx(h.x) - 2, mz(h.z) - 2, 4, 4);
-    mapX.fillStyle = '#7dd3fc'; for (const o of api.others.values()) { mapX.beginPath(); mapX.arc(mx(o.x), mz(o.z), 3, 0, 7); mapX.fill(); }
+    mapX.clearRect(0, 0, S2, S2); if (W.mapExtra) W.mapExtra(mapX, mx, mz, sc); mapX.fillStyle = 'rgba(80,160,80,.55)'; mapX.fillRect(mx(-PARK.W), mz(-PARK.H), PARK.W * 2 * sc, PARK.H * 2 * sc); mapX.fillStyle = 'rgba(70,50,120,.6)'; mapX.fillRect(mx(STREET.x0), mz(STREET.z0), (STREET.x1 - STREET.x0) * sc, (STREET.z1 - STREET.z0) * sc);
+    mapX.strokeStyle = '#d6d3d1'; mapX.lineWidth = 3; for (const r of ALL_ROADS()) { mapX.beginPath(); mapX.moveTo(mx(r.a[0]), mz(r.a[1])); mapX.lineTo(mx(r.b[0]), mz(r.b[1])); mapX.stroke(); }
+    mapX.fillStyle = '#ff8a1f'; for (const h of HOUSES) mapX.fillRect(mx(h.x) - 1.5, mz(h.z) - 1.5, 3, 3); if (W.mapLabels) W.mapLabels(mapX, mx, mz);
+    mapX.fillStyle = '#7dd3fc'; for (const o of api.others.values()) { if (o.x > 392) continue; mapX.beginPath(); mapX.arc(mx(o.x), mz(o.z), 3, 0, 7); mapX.fill(); }
     mapX.fillStyle = '#ffd23f'; mapX.beginPath(); mapX.arc(mx(P.x), mz(P.z), 5, 0, 7); mapX.fill(); mapX.strokeStyle = '#ffd23f'; mapX.lineWidth = 2; mapX.beginPath(); mapX.moveTo(mx(P.x), mz(P.z)); mapX.lineTo(mx(P.x + Math.sin(P.yaw) * 14), mz(P.z + Math.cos(P.yaw) * 14)); mapX.stroke(); }
   mapC.onclick = () => { mapC.style.width = mapC.style.width ? '' : 'min(70vw,300px)'; mapC.style.height = mapC.style.height ? '' : 'min(70vw,300px)'; };
 
   // ---------------------------------------------------------------- per-frame update
   let lightT = 0, mapT = 0, cullT = 0; const peds = () => { const out = [{ x: P.x, z: P.z }]; for (const o of api.others.values()) out.push({ x: o.x, z: o.z }); for (const b of bots) out.push({ x: b.x, z: b.z }); return out; };
   const titleEl = view.querySelector('.p3-top b'); let area = '';
-  function update(dt, now) { const tt = now / 1000; const inS = P.z > PARK.H - 14 ? sstep(PARK.H - 16, PARK.H + 14, P.z) : 0; setNight(inS);
-    const ar = P.z > PARK.H + 2 ? '🎃 Kemy Street' : '🌳 Pal Park'; if (ar !== area && titleEl) { area = ar; titleEl.textContent = ar; }
+  function update(dt, now) { const tt = now / 1000; const inS = P.z > PARK.H - 14 && P.x < 392 ? sstep(PARK.H - 16, PARK.H + 14, P.z) * (1 - sstep(104, 124, P.x)) : 0; setNight(inS);
+    const ar = areaAt(P.x, P.z); if (ar !== area && titleEl) { area = ar; titleEl.textContent = ar; }
     const cp = api.cam.position; moon.position.set(cp.x - 120, cp.y + 160, cp.z + 260); moon.lookAt(cp); stars.position.copy(cp); const near = P.z > PARK.H - 40;
     root.visible = true; // culling per object below
-    if ((cullT += dt) > 0.4) { cullT = 0; const far = Q.draw * 0.75; for (const c of cars) { const x = c.drive ? c.m.position.x : c.x, z = c.drive ? c.m.position.z : c.z; c.m.visible = Math.hypot(x - P.x, z - P.z) < far; } }
+    if ((cullT += dt) > 0.4) { cullT = 0; const far = Q.draw * 0.75; for (const g of Object.values(townG)) g.visible = Math.hypot(g.userData.c[0] - P.x, g.userData.c[1] - P.z) < Q.draw + 70; for (const c of cars) { const x = c.drive ? c.m.position.x : c.x, z = c.drive ? c.m.position.z : c.z; c.m.visible = Math.hypot(x - P.x, z - P.z) < far; } }
     // pooled lights -> nearest lamps / porches
     if (NPL && (lightT += dt) > 0.5 && inS > 0.05) { lightT = 0; const s = lightSpots.map((l) => [l, (l.x - P.x) ** 2 + (l.z - P.z) ** 2]).sort((a, b) => a[1] - b[1]); pls.forEach((pl, i) => { const l = s[i] && s[i][0]; if (!l) return; pl.position.set(l.x, l.y, l.z); pl.color.set(l.c); pl.userData.i = l.i; }); }
     for (const pl of pls) pl.intensity = (pl.userData.i || 0) * inS;
@@ -257,11 +266,12 @@ export function attachWorld(api) {
     bats.forEach((b, i) => { for (let j = 0; j < 3; j++) { const fl = 1 + Math.sin(tt * 6 + b.ph + j) * 0.25; tq.setFromAxisAngle(UP, 0); tmpM.compose(tv.set(b.x - 1 + j, FLAT + b.y - j % 2 * 0.15, b.z), tq, ts.set(fl, 1, 1)); batIM.setMatrixAt(i * 3 + j, tmpM); } }); batIM.instanceMatrix.needsUpdate = true;
     gate.userData.portal.material.opacity = 0.16 + Math.sin(tt * 2) * 0.08;
     // driving NPC cars: slow, stop for anyone ahead, never touch people
-    const ppl = peds(); for (const c of cars) { if (!c.drive) continue; const here = loopAt(c.d, -2); const ahead = loopAt(c.d + 3, -2); let block = 99;
+    const ppl = peds(); for (const c of cars) { if (!c.drive) continue; const Lp = c.L || LOOP0, ln = c.lane || -2, loopLen = Lp.len; if (c.L && !c.m.visible && Math.hypot(c.x - P.x, c.z - P.z) > 120) { c.d += c.vmax * dt; c.x = loopAt(c.d, ln, Lp).x; c.z = loopAt(c.d, ln, Lp).z; continue; }
+      const here = loopAt(c.d, ln, Lp); const ahead = loopAt(c.d + 3, ln, Lp); let block = 99;
       for (const p of ppl) { const dx = p.x - here.x, dz = p.z - here.z; const fwd = dx * Math.sin(here.yaw) + dz * Math.cos(here.yaw), lat = Math.abs(dx * Math.cos(here.yaw) - dz * Math.sin(here.yaw)); if (fwd > -1 && fwd < 12 && lat < 2.6) block = Math.min(block, fwd); }
-      for (const o of cars) if (o !== c && o.drive) { const dd = ((o.d - c.d) % loopLen + loopLen) % loopLen; if (dd > 0 && dd < 9) block = Math.min(block, dd - 3); }
+      for (const o of cars) if (o !== c && o.drive && o.L === c.L) { const dd = ((o.d - c.d) % loopLen + loopLen) % loopLen; if (dd > 0 && dd < 9) block = Math.min(block, dd - 3); }
       if (api.myCar && api.myCar()) { const mc = api.myCar(); const dx = mc.x - here.x, dz = mc.z - here.z; const fwd = dx * Math.sin(here.yaw) + dz * Math.cos(here.yaw), lat = Math.abs(dx * Math.cos(here.yaw) - dz * Math.sin(here.yaw)); if (fwd > 0 && fwd < 14 && lat < 3) block = Math.min(block, fwd - 2); }
-      const want = block < 3.5 ? 0 : block < 10 ? c.vmax * (block - 3.5) / 6.5 : c.vmax; c.v += clamp(want - c.v, -6 * dt, 1.5 * dt); c.d += c.v * dt; const p = loopAt(c.d, -2); c.spin += c.v / c.m.userData.def.wr * dt;
+      const want = block < 3.5 ? 0 : block < 10 ? c.vmax * (block - 3.5) / 6.5 : c.vmax; c.v += clamp(want - c.v, -6 * dt, 1.5 * dt); c.d += c.v * dt; const p = loopAt(c.d, ln, Lp); c.spin += c.v / c.m.userData.def.wr * dt;
       let dy = ahead.yaw - p.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yawS = (c.yawS ?? p.yaw) + Math.atan2(Math.sin(p.yaw - (c.yawS ?? p.yaw)), Math.cos(p.yaw - (c.yawS ?? p.yaw))) * Math.min(1, dt * 4);
       if (c.m.visible) poseCar(c.m, { x: p.x, y: ground(p.x, p.z), z: p.z, yaw: c.yawS, pitch: c.v < 1 && want === 0 ? 0.01 : 0 }, dy * 0.8, c.spin); c.x = p.x; c.z = p.z; c.yaw = c.yawS; }
     // gentle push: if anything car-shaped overlaps me, slide me aside (never damage)
@@ -291,8 +301,11 @@ export function attachWorld(api) {
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
   const W = { update: null, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
   const D = attachDrive(api, W); W.drive = D;
-  W.update = (dt, now) => { D.update(dt, now); update(dt, now); };
-  W.destroy = () => { try { D.destroy(); } catch { /* */ } destroy(); };
+  const E = attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots });
+  const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
+  const Rs = attachRespawn(api, W);
+  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Hm.update(dt, now); Rs.update(dt); update(dt, now); };
+  W.destroy = () => { for (const x of [D, E, Hm, Rs]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];

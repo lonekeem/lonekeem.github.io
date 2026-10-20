@@ -144,15 +144,15 @@ export function createVehicle(def, groundAt) { const c = typeof def === 'string'
   function step(h, inp) { // inp: { thr 0..1, brk 0..1, steer -1..1, hand }
     // smoothed input: gradual throttle, speed-sensitive steering
     V.thr += ((inp.thr || 0) - V.thr) * Math.min(1, h * 3.5); V.brk += ((inp.brk || 0) - V.brk) * Math.min(1, h * 8);
-    const spd = Math.abs(V.vf); const maxSt = c.steer / (1 + spd * 0.055); V.steer += (((inp.steer || 0) * maxSt) - V.steer) * Math.min(1, h * 6);
+    const spd = Math.abs(V.vf); const maxSt = c.steer / (1 + spd * 0.055) * (V.abs === false && V.brk > 0.8 && spd > 6 ? 0.4 : 1); V.steer += (((inp.steer || 0) * maxSt) - V.steer) * Math.min(1, h * 6);
     // reverse: brake held when (nearly) stopped
     if (V.brk > 0.5 && V.vf < 0.6 && !V.rev && V.thr < 0.1) V.revT = (V.revT || 0) + h; else V.revT = 0; if (V.revT > 0.35) V.rev = true; if (V.rev && (V.thr > 0.1 || V.vf > 0.3) && V.brk < 0.1) V.rev = false;
     // gears + rpm (auto box)
     const wheelRpm = Math.abs(V.vf) / c.wr * 60 / (2 * Math.PI); const ratio = (V.rev ? 3.2 : c.gears[V.gear - 1]) * c.fd;
-    let rpm = Math.max(900, wheelRpm * ratio); if (!V.rev) { if (rpm > c.redline * 0.9 && V.gear < c.gears.length) { V.gear++; V.shiftT = 0.25; } else if (V.gear > 1 && rpm < c.redline * 0.38) V.gear--; } else V.gear = 1;
+    let rpm = Math.max(900, wheelRpm * ratio); if (!V.rev) { if (V.manual) { if (V.wantShift) { V.gear = Math.max(1, Math.min(c.gears.length, V.gear + V.wantShift)); V.shiftT = 0.2; V.wantShift = 0; } } else if (rpm > c.redline * 0.9 && V.gear < c.gears.length) { V.gear++; V.shiftT = 0.25; V.shifted = 1; } else if (V.gear > 1 && rpm < c.redline * 0.38) V.gear--; } else V.gear = 1;
     V.shiftT = Math.max(0, (V.shiftT || 0) - h); const pedal = V.rev ? V.brk : V.thr;
     rpm = Math.min(c.redline, Math.max(rpm, 900 + pedal * 2200 * (spd < 3 ? 1 : 0.2))); V.rpm += (rpm - V.rpm) * Math.min(1, h * 10);
-    let Fd = (V.shiftT > 0 ? 0.3 : 1) * pedal * torqueAt(V.rpm) * ratio * 0.9 / c.wr; if (V.rpm >= c.redline * 0.995) Fd *= 0.2; if (V.rev) Fd = -Fd * 0.6;
+    let Fd = (V.shiftT > 0 ? 0.3 : 1) * pedal * torqueAt(V.rpm) * ratio * 0.9 / c.wr; if (V.rpm >= c.redline * 0.995) Fd *= 0.2; if (V.tc && V.slip > 0.5 && !V.drift) Fd *= 0.55; if (V.rev) Fd = -Fd * 0.6;
     if (spd > c.top && !V.rev) Fd = Math.min(Fd, 0);
     const brakeF = (V.rev ? 0 : V.brk) * m * g * 0.95 + (inp.hand ? m * g * 0.6 : 0);
     const Fb = Math.abs(V.vf) < 0.05 ? 0 : -Math.sign(V.vf) * Math.min(brakeF, Math.abs(V.vf) * m / h * 0.9);
@@ -163,7 +163,7 @@ export function createVehicle(def, groundAt) { const c = typeof def === 'string'
       V.r = V.vf * Math.tan(V.steer) / L; V.vl *= Math.max(0, 1 - h * 10);
       V.acc = (Fd + Fb + drag) / m; V.vf += V.acc * h; } else {
       const sf = Math.atan2(V.vl + a * V.r, Math.abs(V.vf)) - V.steer * Math.sign(V.vf), sr = Math.atan2(V.vl - b * V.r, Math.abs(V.vf));
-      const Cf = m * 9, Cr = m * 9.6; const Fyf = Math.max(-mu * Nf, Math.min(mu * Nf, -Cf * sf)), rg = inp.hand ? 0.6 : 1.12, Fyr = Math.max(-mu * Nr * rg, Math.min(mu * Nr * rg, -Cr * sr));
+      const Cf = m * 9, Cr = m * 9.6; const Fyf = Math.max(-mu * Nf, Math.min(mu * Nf, -Cf * sf)), rg = inp.hand ? 0.6 : V.drift && Math.abs(V.steer) > 0.15 && V.thr > 0.5 ? 0.9 : 1.12, Fyr = Math.max(-mu * Nr * rg, Math.min(mu * Nr * rg, -Cr * sr));
       V.slip = Math.max(Math.abs(sf), Math.abs(sr)) * (Math.abs(Cr * sr) > mu * Nr ? 1.6 : 0.6);
       V.acc = (Fd + Fb + drag - Fyf * Math.sin(V.steer)) / m; const ay = (Fyr + Fyf * Math.cos(V.steer)) / m - V.vf * V.r; V.ay = ay;
       V.vf += V.acc * h; V.vl += ay * h; V.r += (a * Fyf * Math.cos(V.steer) - b * Fyr) / I * h; V.vl *= 1 - h * 0.6; V.r *= 1 - h * 0.25; const rmax = mu * g * (inp.hand ? 1.6 : 1.15) / Math.max(spd, 3); V.r = Math.max(-rmax, Math.min(rmax, V.r)); }
