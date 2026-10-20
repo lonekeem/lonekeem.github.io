@@ -3,7 +3,7 @@ const CACHE = 'lks-v131';
 // slowed phones down on first open after each update.
 const CORE = [
   './', 'index.html', 'app.html', 'css/app.css', 'css/polish.css', 'js/app.js', 'js/home.js', 'js/firebase-init.js',
-  'js/watch.js', 'js/discover.js', 'kemy-logo.png', 'favicon-32.png', 'icon-192.png'
+  'js/watch.js', 'js/discover.js', 'js/loadscreen.js', 'kemy-logo.png', 'favicon-32.png', 'icon-192.png'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))));

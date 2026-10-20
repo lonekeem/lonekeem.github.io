@@ -44,6 +44,8 @@ import { createPark } from './pals/park.js';
 import { initInterests, interestsPage, learnTap, pickTopics, topicChips } from './interests.js';
 import { createMusic } from './music.js';
 import { createDonate } from './donate.js';
+import * as loadScreen from './loadscreen.js';
+import { gameName, GAMES } from './games/art.js';
 import { loadDiscover } from './discover.js';
 import { danceEnabled, setDanceEnabled } from './pals/dance.js';
 import { keepOn as palKeepOn, setKeep as setPalKeep } from './pals/dance-ui.js';
@@ -700,6 +702,16 @@ setYtReporter((postId, yt, why) => {
   addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'post', targetId: postId, postId, targetUid: '', reason: `🤖 Auto: YouTube video ${yt} can’t play in other apps (${why}). It’s hidden from video feeds; no action needed unless you want to remove it.`, excerpt: '', status: 'open', createdAt: serverTimestamp() }).catch(() => {});
 });
 try { startAutoplayAll(); } catch (e) { console.warn('autoplay', e); }
+// Game loading screen name for a route ('' = not a game start).
+const ARCADE_NAMES = { zombie: 'Pal Zombie Survival', show: 'the Kemy Challenge Show' };
+function gameLoadName(hash) {
+  if (/^#\/park$/.test(hash)) return 'Pal Park';
+  if (/^#\/street$/.test(hash)) return 'Kemy Street';
+  let m = hash.match(/^#\/arcade\/([\w-]+)/); if (m) return ARCADE_NAMES[m[1]] || m[1].replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  m = hash.match(/^#\/games\/([\w-]+)/); if (m && GAMES.some((g) => g.id === m[1])) return gameName(m[1]);
+  if (/^#\/game\/[\w-]+$/.test(hash)) return 'Kemy Games';
+  return '';
+}
 async function route() {
   navCount++;
   if (!S.ready) return;
@@ -721,8 +733,10 @@ async function route() {
       window.scrollTo(0, 0);
       gameMusicFor(hash);
       if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset|support|feedback)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
+      const gName = gameLoadName(hash); if (gName) loadScreen.show(gName); else loadScreen.hide();
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
+      finally { if (gName && token === routeToken) requestAnimationFrame(() => requestAnimationFrame(() => loadScreen.hide())); }
       if (token === routeToken && S.profile && S.profile.welcomed === false && !/onboard|login|signup/.test(hash)) showWelcome();
       else if (token === routeToken) pals.onRoute(hash);
       return;
