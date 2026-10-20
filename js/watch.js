@@ -65,12 +65,13 @@ export function createWatch(ctx) {
   async function loadPosts(force = false) {
     if (!force && postCache && Date.now() - postCacheAt < 180e3) return postCache.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
     const posts = collection(db, 'posts');
-    const q = (f, v) => getDocs(query(posts, where(f, '==', v), orderBy('createdAt', 'desc'), limit(60)))
-      .catch(() => getDocs(query(posts, where(f, '==', v), limit(60))));
+    const capped = (pr) => Promise.race([pr, new Promise((r) => setTimeout(() => r({ docs: [], timedOut: true }), 8000))]);
+    const q = (f, v) => capped(getDocs(query(posts, where(f, '==', v), orderBy('createdAt', 'desc'), limit(60)))
+      .catch(() => getDocs(query(posts, where(f, '==', v), limit(60)))).catch(() => ({ docs: [] })));
     const [v, im, l] = await Promise.all([q('mediaType', 'video'), q('mediaType', 'image'), q('type', 'link')]);
     const seen = new Map();
     [...v.docs, ...im.docs, ...l.docs].forEach((d) => seen.set(d.id, { id: d.id, ...d.data() }));
-    postCache = [...seen.values()].filter((p) => kindOf(p)).sort((a, b) => ms(b) - ms(a)); postCacheAt = Date.now();
+    postCache = [...seen.values()].filter((p) => kindOf(p)).sort((a, b) => ms(b) - ms(a)); postCacheAt = [v, im, l].some((x) => x.timedOut) ? 0 : Date.now();
     return postCache.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
   }
   async function followingPosts(own) {

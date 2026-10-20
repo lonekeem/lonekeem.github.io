@@ -33,7 +33,6 @@ import { initKindGuard } from './kindguard.js';
 import * as safety from './safety.js';
 import { initSpam, spamOk, followOk, postStamp, postDone } from './spam.js';
 import { initMediaScan, takeHold } from './mediascan.js';
-import { initTranslate, settingsHtml as txSettingsHtml, wireSettings as txWireSettings } from './translate.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createDevices } from './devices.js';
 import { createComments } from './comments.js';
@@ -293,7 +292,8 @@ const comments = createComments({
 });
 // Kind-words filter on every text box; tricks / repeated tries => 1-hour timeout + Mod Hub item.
 initKindGuard({ onBypass: ({ text, word, sneaky }) => safety.autoPause({ text, word, reason: sneaky ? 'Tried to sneak a mean word past the kind-words filter' : 'Kept trying to send mean words' }) });
-initTranslate();
+// Auto-translate removed; clear its leftovers.
+try { ['kemy-translate', 'kemy-tx-cache', 'kemy-tx-quota'].forEach((k) => localStorage.removeItem(k)); } catch { /* */ }
 // Moderators, reports inbox, suspensions (js/moderation.js).
 const mod = createModeration({ secNotice: () => devices.noticeHtml(), secPaint: () => devices.paint(), publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
   onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
@@ -713,7 +713,8 @@ async function route() {
     const m = hash.match(re);
     if (m) {
       renderChrome(nav);
-      main.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
+      main.innerHTML = fn === pageWatch ? '<div class="feed-skel" role="status" aria-label="Loading"><div class="sk-card"></div><div class="sk-line"></div><div class="sk-line short"></div></div>' : '<div class="spinner" role="status" aria-label="Loading"></div>';
+      setTimeout(() => { if (token === routeToken && main.querySelector(':scope > .spinner, :scope > .feed-skel')) main.innerHTML = '<div class="empty">This is taking longer than usual. Check your connection.<br><br><button class="btn" type="button" onclick="location.reload()">Try again</button></div>'; }, 15000);
       document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
       document.body.classList.remove('live-mode');
       document.body.classList.toggle('game-mode', /^#\/(park|street|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
@@ -1188,7 +1189,6 @@ async function pageSettings() {
     <button type="button" class="card pad set-link" data-watch-intro style="margin-top:16px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">🎬</span><span><b>Watch intro</b><br><span class="muted small">Replay Kemy’s welcome video anytime.</span></span></button>
     <button type="button" class="card pad set-link" data-watch-howto style="margin-top:12px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">📱</span><span><b>How to save Kemy</b><br><span class="muted small">Add Kemy to your phone’s home screen (iPhone &amp; Android).</span></span></button>
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
-    ${txSettingsHtml()}
     ${devices.settingsHtml()}
     <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
       <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>
@@ -1220,7 +1220,7 @@ async function pageSettings() {
       <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
     </section>`}`;
-  donate.mountSettings($('#set-donate')); txWireSettings(main); devices.wireSettings();
+  donate.mountSettings($('#set-donate')); devices.wireSettings();
   $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
   $('#s-autoplay-wifi').onchange = (e) => { setWifiOnly(e.target.checked); };
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
@@ -1715,7 +1715,7 @@ onAuthStateChanged(auth, async (user) => {
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; S.unreadNotes = S.unreadChats = false;
   if (user) {
     try {
-      await loadSession();
+      await Promise.race([loadSession(), new Promise((r) => setTimeout(r, 8000))]);
       if (!S.profile && pendingProfile) {
         const p = pendingProfile; pendingProfile = null;
         try { await createProfile(p.displayName, p.username); } catch (e) { toast(friendlyError(e)); }

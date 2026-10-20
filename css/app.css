@@ -1647,10 +1647,6 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .ap-tap span{display:grid;place-items:center;width:78px;height:78px;border-radius:50%;background:rgba(0,0,0,.6);font-size:2rem}
 .ap-tap small{font:700 1rem system-ui;text-shadow:0 1px 3px #000}
 .vslide.yt-wait .vcard::after{content:'▶  Tap to play';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:18px 26px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font:800 1.15rem system-ui;pointer-events:none}
-/* Auto-translate line (inherits text color so it reads in light and dark boxes) */
-.tx-line { font-size: .74rem; opacity: .75; margin: 3px 0 0; color: inherit; }
-.tx-line .tx-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; font-weight: 600; }
-.bubble .tx-line { display: block; }
 .don-pill { border: 1px solid rgba(192,75,216,.55); background: rgba(138,43,226,.18); color: #f3e8ff; border-radius: 999px; padding: 5px 10px; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .don-pill:hover { background: rgba(138,43,226,.32); }
 .don-btn-sm { background: linear-gradient(135deg, #8a2be2, #c04bd8); }
@@ -1666,3 +1662,10 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .sec-notice b { display: block; margin-bottom: 6px; }
 .sec-dev { display: flex; align-items: center; gap: 10px; }
 .sec-dev .meta { flex: 1; min-width: 0; }
+
+/* For You loading skeleton */
+.feed-skel{height:calc(100dvh - 120px);padding:14px;display:flex;flex-direction:column;gap:12px}
+.feed-skel .sk-card{flex:1;border-radius:18px}
+.feed-skel .sk-line{height:14px;width:70%;border-radius:8px}.feed-skel .sk-line.short{width:40%}
+.feed-skel>div{background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(255,255,255,.14),rgba(255,255,255,.06));background-size:200% 100%;animation:skel 1.2s linear infinite}
+@keyframes skel{to{background-position:-200% 0}}

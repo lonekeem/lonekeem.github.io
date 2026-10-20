@@ -1,10 +1,9 @@
-const CACHE = 'lks-v129';
+const CACHE = 'lks-v130';
+// Small app shell only (other files are cached as they are used); a big precache on every version bump
+// slowed phones down on first open after each update.
 const CORE = [
-  './', 'index.html', 'app.html', 'terms.html', 'privacy.html', 'guidelines.html',
-  'css/app.css', 'css/polish.css', 'assets/featured/pal-bear.webp', 'js/polish.js', 'js/welcome.js', 'kemy-logo.png', 'favicon-32.png', 'js/app.js', 'js/moderation.js', 'js/safety.js', 'js/kindguard.js', 'js/plaintext.js', 'js/translate.js', 'js/home.js', 'js/firebase-init.js', 'js/watch.js', 'js/feed-cats.js', 'js/feedrank.js', 'js/discover.js', 'js/autoplay.js', 'js/autoplay-all.js', 'js/ytcheck.js', 'js/gamemusic.js', 'js/embeds.js', 'js/leaderboard.js', 'css/gamemusic.css',
-  'js/create.js', 'js/mediascan.js', 'js/media-config.js', 'js/search.js', 'js/search-index.js', 'js/stories.js', 'js/avatar-editor.js', 'js/views.js', 'js/icons.js', 'js/live.js', 'js/account-delete.js', 'js/comments.js', 'js/tapstar.js', 'js/snapedit.js', 'js/works.js', 'js/moviemaker.js', 'js/theme.js', 'js/search-plus.js', 'js/interests.js', 'js/music.js', 'js/richcomments.js', 'js/series.js', 'js/animator.js', 'js/emoji-data.json', 'js/fx/looks.js', 'js/fx/engine.js', 'js/fx/face.js', 'js/fx/pipeline.js', 'js/fx/picker.js',
-  'css/games.css', 'js/games/index.js', 'js/games/boards.js', 'js/games/cards.js', 'js/games/net.js', 'js/games/sfx.js', 'js/games/art.js', 'js/games/trivia.js', 'js/games/starcards.js', 'js/games/questions.json', 'js/games/pool.js', 'js/games/pool-engine.js', 'js/games/chess.js', 'js/games/chess-engine.js', 'js/games/ludo.js', 'js/games/ludo-engine.js',
-  'logo.png', 'icon-192.png', 'icon-512.png', 'favicon.ico'
+  './', 'index.html', 'app.html', 'css/app.css', 'css/polish.css', 'js/app.js', 'js/home.js', 'js/firebase-init.js',
+  'js/watch.js', 'js/discover.js', 'kemy-logo.png', 'favicon-32.png', 'icon-192.png'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))));
@@ -38,13 +37,16 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET' || req.headers.has('range') || url.pathname.includes('/__/') ||
       /\.(mp4|mov|mp3|m4a|wav|ogg|opus)$/i.test(url.pathname)) return;
   // Network first, cache fallback for offline.
-  e.respondWith(
-    fetch(req, { cache: 'no-cache' }).then(res => {
-      if (res.ok && res.type === 'basic') {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
-      }
-      return res;
-    }).catch(() => caches.match(req).then(r => r || (req.mode === 'navigate' ? caches.match('index.html') : undefined)))
-  );
+  // Network first with a time limit: on a slow or stalled phone connection fall back to the cached copy
+  // after 3.5s (the network copy still refreshes the cache in the background) so the app never hangs.
+  const net = fetch(req, { cache: 'no-cache' }).then(res => {
+    if (res.ok && res.type === 'basic') { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+    return res;
+  });
+  const fallback = () => caches.match(req).then(r => r || (req.mode === 'navigate' ? caches.match('index.html') : undefined));
+  e.respondWith(new Promise(resolve => {
+    let done = false; const finish = (r) => { if (!done && r) { done = true; resolve(r); } };
+    const t = setTimeout(() => fallback().then(finish), 3500);
+    net.then(r => { clearTimeout(t); finish(r); }).catch(() => { clearTimeout(t); fallback().then(r => { if (r) finish(r); else if (!done) { done = true; resolve(Response.error()); } }); });
+  }));
 });

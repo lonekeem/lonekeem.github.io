@@ -19,7 +19,7 @@ export function markYtBlocked(id, why, postId) {
 // Free oEmbed check (CORS-enabled). true = embeddable, false = not embeddable, null = unknown (offline etc).
 export async function oembedOk(id) {
   try {
-    const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
+    const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id), { signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined });
     if (r.ok) return true; if ([400, 401, 403, 404].includes(r.status)) return false; return null;
   } catch { return null; }
 }

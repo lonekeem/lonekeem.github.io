@@ -8,7 +8,7 @@ const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 
 export async function loadDiscover() {
   if (cache && Date.now() - at < 30 * 60e3) return cache;
   try {
-    const r = await fetch('data/discover.json?h=' + Math.floor(Date.now() / 36e5), { cache: 'default' });
+    const r = await fetch('data/discover.json?h=' + Math.floor(Date.now() / 36e5), { cache: 'default', signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined });
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     const videos = (d.videos || []).filter((v) => /^[\w-]{11}$/.test(v.id)).map((v) => ({
