@@ -1,7 +1,7 @@
 {
   "name": "Kemy by Lone Keem Studios",
   "short_name": "Kemy",
-  "description": "Kemy by Lone Keem Studios: the free app for AI movies, music and funny videos, filters, live streams, stories, games and virtual Pals.",
+  "description": "Kemy by Lone Keem Studios: free, no ads. Virtual Kemy Pals, 3D Pal Park, zombie game, chess, pool, trivia and Lone Keem Studios Originals videos.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
