@@ -1,0 +1,48 @@
+// Rules tests: false-report strikes, report blocks, report rate limit.
+// Run: firebase emulators:exec --config firebase.emu.json --only firestore --project demo-fr "node tests/safety/false-report-rules.test.mjs"
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { doc, setDoc, updateDoc, deleteDoc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+const env = await initializeTestEnvironment({ projectId: 'demo-fr', firestore: { host: '127.0.0.1', port: 8199, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, e.message.slice(0, 200)); } };
+const db = (u) => env.authenticatedContext(u, { email: u + '@example.com', email_verified: true }).firestore();
+const ADMIN = env.authenticatedContext('admin', { email: 'lillykemoy1@gmail.com', email_verified: true }).firestore();
+await env.withSecurityRulesDisabled(async (c) => { const f = c.firestore();
+  await setDoc(doc(f, 'roles/mia'), { mod: true, name: 'Mia', uname: 'mia', by: 'admin', at: Timestamp.now() });
+  await setDoc(doc(f, 'roles/helper'), { mod: true, ai: true, name: 'Kemy Helper', uname: 'helper', by: 'admin', at: Timestamp.now() });
+});
+let k = 0;
+const rep = (u, { quota = true, target = 'cal' } = {}) => { const f = db(u); const b = writeBatch(f); const id = 'r' + (++k);
+  b.set(doc(f, 'reports', id), { reporterId: u, targetType: 'user', targetId: target, postId: '', reason: 'Spam', excerpt: '', targetUid: target, status: 'open', createdAt: serverTimestamp() });
+  return { b, f, id, go: async () => { if (quota) { const q = await getDoc(doc(f, 'reportQuota', u)); const o = q.exists() ? q.data() : null; const t = serverTimestamp();
+    b.set(doc(f, 'reportQuota', u), o ? { hStart: o.hStart, hN: o.hN + 1, dStart: o.dStart, dN: o.dN + 1, at: t } : { hStart: t, hN: 1, dStart: t, dN: 1, at: t }); } return b.commit(); } }; };
+const R = (u, o) => rep(u, o).go();
+const strike = (f, by, n, until, extra = {}) => setDoc(doc(f, 'reportStrikes/bob'), { n, times: Array(Math.min(n, 20)).fill(Timestamp.now()), until, blocks: 0, flag: false, by, at: serverTimestamp(), ...extra });
+
+await ok('report with quota bump works', assertSucceeds(R('bob')));
+await ok('report without quota bump is rejected', assertFails(R('bob', { quota: false })));
+await ok('self auto-report needs no quota', assertSucceeds(R('bob', { quota: false, target: 'bob' })));
+await ok('cannot fake quota reset', assertFails(setDoc(doc(db('bob'), 'reportQuota/bob'), { hStart: serverTimestamp(), hN: 1, dStart: serverTimestamp(), dN: 1, at: serverTimestamp() })));
+for (let i = 1; i <= 10; i++) await R('dan');
+await ok('10 reports in an hour OK', assertSucceeds(Promise.resolve()));
+await ok('11th report in an hour blocked', assertFails(R('dan')));
+await ok('user cannot give themselves a strike doc', assertFails(strike(db('bob'), 'bob', 1, Timestamp.now())));
+await ok('other user cannot strike bob', assertFails(strike(db('cal'), 'cal', 1, Timestamp.now())));
+await ok('Kemy Helper adds 1st strike', assertSucceeds(strike(db('helper'), 'helper', 1, Timestamp.now())));
+await ok('reporter reads own strikes', assertSucceeds(getDoc(doc(db('bob'), 'reportStrikes/bob'))));
+await ok('reporter cannot clear strikes', assertFails(deleteDoc(doc(db('bob'), 'reportStrikes/bob'))));
+await ok('reporter cannot edit strikes', assertFails(updateDoc(doc(db('bob'), 'reportStrikes/bob'), { n: 0 })));
+await ok('1 strike: can still report', assertSucceeds(R('bob')));
+await ok('Kemy Helper cannot undo (lower n)', assertFails(strike(db('helper'), 'helper', 1, Timestamp.now())));
+await ok('Kemy Helper cannot delete', assertFails(deleteDoc(doc(db('helper'), 'reportStrikes/bob'))));
+await ok('Helper: 3rd... (2nd) strike', assertSucceeds(strike(db('helper'), 'helper', 2, Timestamp.now())));
+await ok('Helper: 3rd strike + 7-day block', assertSucceeds(strike(db('helper'), 'helper', 3, Timestamp.fromMillis(Date.now() + 7 * 864e5), { blocks: 1 })));
+await ok('blocked reporter cannot report', assertFails(R('bob')));
+await ok('blocked reporter can still self auto-report', assertSucceeds(R('bob', { quota: false, target: 'bob' })));
+await ok('block cannot exceed 31 days', assertFails(strike(db('mia'), 'mia', 4, Timestamp.fromMillis(Date.now() + 60 * 864e5))));
+await ok('mod: 4th strike, 30-day block + admin flag', assertSucceeds(strike(db('mia'), 'mia', 4, Timestamp.fromMillis(Date.now() + 30 * 864e5), { blocks: 2, flag: true })));
+await ok('human mod undoes a strike (n-1, unblocked)', assertSucceeds(strike(db('mia'), 'mia', 3, Timestamp.now(), { blocks: 2 })));
+await ok('unblocked reporter can report again', assertSucceeds(R('bob')));
+await ok('admin deletes strikes', assertSucceeds(deleteDoc(doc(ADMIN, 'reportStrikes/bob'))));
+await ok('mod cannot strike themselves', assertFails(setDoc(doc(db('mia'), 'reportStrikes/mia'), { n: 1, times: [], until: Timestamp.now(), blocks: 0, flag: false, by: 'mia', at: serverTimestamp() })));
+console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

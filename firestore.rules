@@ -1205,9 +1205,54 @@ service cloud.firestore {
     }
 
     // ---------- Reports (admin only can read) ----------
+    function strikePath(u) { return /databases/$(database)/documents/reportStrikes/$(u); }
+    function quotaPath(u) { return /databases/$(database)/documents/reportQuota/$(u); }
+    function reportsAllowed() { return !exists(strikePath(me())) || get(strikePath(me())).data.until <= request.time; }
+    function quotaBumped() {
+      let q = getAfter(quotaPath(me())).data;
+      return q.at == request.time && q.hN <= 10 && q.dN <= 30;
+    }
+    // Report rate counter, bumped by the reporter together with each report.
+    match /reportQuota/{uid} {
+      function q() { return request.resource.data; }
+      function win(start, n, oldStart, oldN, secs) {
+        return (oldStart > request.time - duration.value(secs, 's') && start == oldStart && n == oldN + 1)
+          || (oldStart <= request.time - duration.value(secs, 's') && start == request.time && n == 1);
+      }
+      allow read: if signedIn() && (uid == me() || isMod());
+      allow create: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'dStart', 'dN', 'at'])
+        && q().at == request.time && q().hStart == request.time && q().dStart == request.time && q().hN == 1 && q().dN == 1;
+      allow update: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'dStart', 'dN', 'at'])
+        && q().at == request.time
+        && win(q().hStart, q().hN, resource.data.hStart, resource.data.hN, 3600)
+        && win(q().dStart, q().dN, resource.data.dStart, resource.data.dN, 86400);
+    }
+    // False-report strikes (mod-controlled; the user can only read their own).
+    // n = total strikes, times = recent strike times, until = reporting blocked until,
+    // blocks = how many report blocks so far, flag = flagged for the admin.
+    // Kemy Helper may only ADD one strike; only the admin / human moderators undo.
+    match /reportStrikes/{uid} {
+      function sd() { return request.resource.data; }
+      function validStrikes() {
+        return sd().keys().hasOnly(['n', 'times', 'until', 'blocks', 'flag', 'by', 'at'])
+          && sd().n is int && sd().n >= 1 && sd().n <= 1000
+          && sd().times is list && sd().times.size() <= 20
+          && sd().until is timestamp && sd().until <= request.time + duration.value(31, 'd')
+          && sd().blocks is int && sd().blocks >= 0 && sd().flag is bool
+          && sd().by == me() && sd().at == request.time;
+      }
+      allow read: if signedIn() && (uid == me() || isMod());
+      allow create: if isMod() && uid != me() && validStrikes() && sd().n == 1;
+      allow update: if isMod() && uid != me() && validStrikes() && (!isAI() || sd().n == resource.data.n + 1);
+      allow delete: if isMod() && !isAI();
+    }
     match /reports/{rid} {
       allow read, delete: if isMod();
       allow create: if signedIn()
+        // Reports about someone else: not while report-blocked (false-report strikes), and counted
+        // in reportQuota/{me} in the same batch (10 per hour, 30 per day). Auto self-reports and
+        // moderators skip both.
+        && (isMod() || request.resource.data.get('targetUid', '') == me() || (reportsAllowed() && quotaBumped()))
         && request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'postId', 'reason', 'excerpt', 'createdAt', 'targetUid', 'status'])
         && request.resource.data.reporterId == me()
         && request.resource.data.targetType in ['post', 'comment', 'user', 'live', 'live chat', 'series', 'movie', 'song', 'chat message']

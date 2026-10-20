@@ -58,6 +58,7 @@ export const RULES = [
   ['🔒', 'Keep your info private', 'Never share your address, school, phone number, email or where you are right now. Same for other people\'s info.'],
   ['🎨', 'Post your own stuff', 'Only post things you made or have the right to share.'],
   ['🎵', 'No copyrighted music or videos', 'Don\'t upload songs, shows or movies made by someone else.'],
+  ['🙅', 'No false reports', 'Only report real problems. Reporting people to be mean or as a joke can pause your reporting.'],
   ['🚩', 'Report anything that feels wrong', 'Tap ⋯ or 🚩 Report. Moderators check every report, and it\'s private.']
 ];
 export function rulesHtml() {

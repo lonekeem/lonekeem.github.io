@@ -10,6 +10,7 @@ const db = (u) => env.authenticatedContext(u, { email: u + '@example.com', email
 const M = db('mia'), U = db('bob'), C = db('cal');
 const prof = (n) => ({ displayName: n, username: n, bio: '', color: '#8a2be2', createdAt: Timestamp.now(), welcomed: true, birthY: 2000, birthM: 1, rulesAt: Timestamp.now() });
 await env.withSecurityRulesDisabled(async (c) => { const f = c.firestore(); for (const n of ['admin', 'mia', 'bob', 'cal']) await setDoc(doc(f, 'users', n), prof(n)); await setDoc(doc(f, 'posts/p1'), { authorId: 'cal', text: 'hi', commentCount: 0, lastCommentId: '' }); });
+const withQuota = (f, ref, data) => { const b = writeBatch(f); b.set(ref, data); b.set(doc(f, 'reportQuota', data.reporterId), { hStart: serverTimestamp(), hN: 1, dStart: serverTimestamp(), dN: 1, at: serverTimestamp() }); return b.commit(); };
 const role = (by) => ({ mod: true, name: 'Mia', uname: 'mia', by, at: serverTimestamp() });
 const ban = (by, ms = 86400000, o = {}) => ({ until: Timestamp.fromMillis(Date.now() + ms), reason: 'Rude chat', permanent: false, hide: false, by, at: serverTimestamp(), ...o });
 
@@ -20,7 +21,7 @@ await ok('anyone can read roles (for the blue check)', assertSucceeds(getDoc(doc
 await ok('moderator cannot appoint another moderator', assertFails(setDoc(doc(M, 'roles/cal'), role('mia'))));
 await ok('moderator cannot remove a moderator', assertFails(deleteDoc(doc(M, 'roles/mia'))));
 await ok('user cannot read reports', assertFails(getDoc(doc(U, 'reports/r1'))));
-await ok('user files a report', assertSucceeds(setDoc(doc(U, 'reports/r1'), { reporterId: 'bob', targetType: 'chat message', targetId: 'x/y', postId: '', reason: 'mean', excerpt: 'bad words', targetUid: 'cal', status: 'open', createdAt: serverTimestamp() })));
+await ok('user files a report', assertSucceeds(withQuota(U, doc(U, 'reports/r1'), { reporterId: 'bob', targetType: 'chat message', targetId: 'x/y', postId: '', reason: 'mean', excerpt: 'bad words', targetUid: 'cal', status: 'open', createdAt: serverTimestamp() })));
 await ok('moderator reads reports', assertSucceeds(getDoc(doc(M, 'reports/r1'))));
 await ok('moderator marks report in review', assertSucceeds(updateDoc(doc(M, 'reports/r1'), { status: 'review', handledBy: 'mia', handledAt: serverTimestamp() })));
 await ok('user cannot change report status', assertFails(updateDoc(doc(U, 'reports/r1'), { status: 'resolved', handledBy: 'bob', handledAt: serverTimestamp() })));
@@ -40,7 +41,7 @@ await ok('banned user cannot send chat messages', assertFails(chat('cal', 'bob')
 await ok('banned user cannot talk in Pal Park', assertFails(setDoc(doc(C, 'parkRooms/r1/p/cal'), { x: 1, y: 1, d: 1, e: '', say: 'hi', sayAt: 1, tgt: '', name: 'cal', uname: 'cal', color: '#fff', pal: {}, at: serverTimestamp() })));
 await ok('unbanned user can be in Pal Park (control)', assertSucceeds(setDoc(doc(U, 'parkRooms/r1/p/bob'), { x: 1, y: 1, d: 1, e: '', say: 'hi', sayAt: 1, tgt: '', name: 'bob', uname: 'bob', color: '#fff', pal: {}, at: serverTimestamp() })));
 await ok('banned user cannot open a zombie lobby', assertFails(setDoc(doc(C, 'zLobbies/ABCDE'), { host: 'cal', status: 'open', pub: true, n: 1, wave: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })));
-await ok('banned user cannot report-spam? (still may report)', assertSucceeds(setDoc(doc(C, 'reports/r2'), { reporterId: 'cal', targetType: 'user', targetId: 'bob', postId: '', reason: 'x', excerpt: '', createdAt: serverTimestamp() })));
+await ok('banned user cannot report-spam? (still may report)', assertSucceeds(withQuota(C, doc(C, 'reports/r2'), { reporterId: 'cal', targetType: 'user', targetId: 'bob', postId: '', reason: 'x', excerpt: '', createdAt: serverTimestamp() })));
 await ok('moderator sends a notice', assertSucceeds(setDoc(doc(M, 'users/cal/notifications/n1'), { type: 'mod', fromUid: 'mia', fromName: 'Kemy Moderators', fromUsername: '', postId: '', text: 'Your account is suspended for 1 day: Rude chat', createdAt: serverTimestamp(), read: false })));
 await ok('user cannot send a moderator notice', assertFails(setDoc(doc(U, 'users/cal/notifications/n2'), { type: 'mod', fromUid: 'bob', fromName: 'Kemy Moderators', fromUsername: '', postId: '', text: 'fake', createdAt: serverTimestamp(), read: false })));
 await ok('moderator deletes a post', assertSucceeds(deleteDoc(doc(M, 'posts/p1'))));

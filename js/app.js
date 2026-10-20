@@ -471,8 +471,17 @@ function renderPosts(container, posts, emptyMsg) {
 
 // ---------------------------------------------------------------- moderation actions
 const REPORT_REASONS = [['bullying', '😢 Bullying or being mean'], ['inappropriate', '🙈 Inappropriate (swearing, adult or scary)'], ['spam', '📢 Spam or scam'], ['personal', '🔒 Shares personal info'], ['under13', '🧒 Seems under 13'], ['other', '❓ Something else']];
-function reportDialog(targetType, targetId, postId, excerpt, targetUid = '') {
+async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '') {
   if (!requireAuth()) return;
+  if (!mod.iAmMod()) {
+    const st = await getDoc(doc(db, 'reportStrikes', S.user.uid)).then((d) => (d.exists() ? d.data() : null)).catch(() => null);
+    const until = st && st.until && st.until.toMillis ? st.until.toMillis() : 0;
+    if (until > Date.now()) {
+      openModal(`<h2 style="font-size:1.25rem">Reporting is paused 💜</h2><p>Some of your recent reports weren’t real problems, so reporting is paused until <b>${esc(new Date(until).toLocaleDateString())}</b>.</p><p>You can still block people, and if something is really wrong, ask the moderators in your Kemy Moderators messages.</p><div class="btns"><a class="btn" href="#/support" id="rep-paused-help">🛡️ Kemy Moderators</a><button class="btn btn-ghost" data-close>OK</button></div>`);
+      $('#rep-paused-help')?.addEventListener('click', () => closeModal());
+      return;
+    }
+  }
   openModal(`
     <h2 style="font-size:1.25rem">Report ${esc(targetType)}</h2>
     <p>Tell us what’s wrong. Reports go privately to the Kemy moderators.</p>
@@ -491,12 +500,21 @@ function reportDialog(targetType, targetId, postId, excerpt, targetUid = '') {
     const note = $('#report-reason').value.trim();
     const reason = (pick.value === 'under13' ? '🧒 Possible under 13: ' : '') + lbl + (note ? ' · ' + note : '');
     try {
-      await addDoc(collection(db, 'reports'), {
+      const b = writeBatch(db);
+      b.set(doc(collection(db, 'reports')), {
         reporterId: S.user.uid, targetType, targetId, postId: postId || '', reason: reason.slice(0, 500),
         excerpt: String(excerpt || '').slice(0, 300), targetUid: String(targetUid || ''), status: 'open', createdAt: serverTimestamp()
       });
+      // Report rate counter (rules: 10 per hour, 30 per day).
+      const qref = doc(db, 'reportQuota', S.user.uid);
+      const q = await getDoc(qref).then((d) => (d.exists() ? d.data() : null)).catch(() => null); const now = Date.now(), t = serverTimestamp();
+      const ms = (x) => (x && x.toMillis ? x.toMillis() : 0);
+      const hOld = q && now - ms(q.hStart) < 3600e3 - 5e3, dOld = q && now - ms(q.dStart) < 864e5 - 5e3;
+      if (hOld && q.hN >= 10 || dOld && q.dN >= 30) { $('#report-err').textContent = 'You’ve sent a lot of reports today. Thank you! Please try again a bit later.'; return; }
+      b.set(qref, { hStart: hOld ? q.hStart : t, hN: hOld ? q.hN + 1 : 1, dStart: dOld ? q.dStart : t, dN: dOld ? q.dN + 1 : 1, at: t });
+      await b.commit();
       closeModal(); toast('Thanks. The report was sent.');
-    } catch (e) { $('#report-err').textContent = friendlyError(e); }
+    } catch (e) { $('#report-err').textContent = e.code === 'permission-denied' ? 'Couldn’t send the report right now. Please try again in a minute.' : friendlyError(e); }
   };
 }
 async function blockUser(uid, username) {

@@ -215,6 +215,33 @@ export function createModeration(ctx) {
   }
   const u13Btn = (flag) => flag ? (isAIme() ? '<span class="tag">🧒 Marked under 13</span>' : '<button class="btn btn-sm btn-ghost" data-u13="off">↩️ Undo under 13</button>') : '<button class="btn btn-sm btn-ghost" data-u13="on">🧒 Mark under 13</button>';
 
+  // False-report strikes (reportStrikes/{uid}). Only a moderator tapping "False report" adds one.
+  const STRIKE_MS = 30 * DAY;
+  const getStrikes = (uid) => getDoc(doc(db, 'reportStrikes', uid)).then((s) => (s.exists() ? s.data() : null)).catch(() => null);
+  const tms = (x) => (x && x.toMillis ? x.toMillis() : 0);
+  async function addFalseStrike(uid, name, reportId = '') {
+    const old = await getStrikes(uid); const now = Date.now();
+    const times = [...((old && old.times) || []).filter((x) => now - tms(x) < STRIKE_MS), Timestamp.fromMillis(now)].slice(-20);
+    const n = ((old && old.n) || 0) + 1; let blocks = (old && old.blocks) || 0, flag = !!(old && old.flag), until = (old && old.until) || Timestamp.fromMillis(now), msg = '';
+    const blockedNow = tms(until) > now;
+    if (blocks >= 1 && !blockedNow) { until = Timestamp.fromMillis(now + 30 * DAY); blocks++; flag = true; msg = 'Reporting is paused for 30 days because of repeated reports that weren’t real problems. A Kemy admin will look at your account. 💜'; }
+    else if (times.length >= 3 && !blockedNow) { until = Timestamp.fromMillis(now + 7 * DAY); blocks++; msg = 'Reporting is paused for 7 days because several recent reports weren’t real problems. Please only report real problems 💜'; }
+    else if (n === 1) msg = 'Thanks for helping keep Kemy safe! Your recent report wasn’t a real problem. Please only report real problems 💜';
+    else msg = 'Another report wasn’t a real problem. Please only report real problems 💜 Too many can pause reporting.';
+    await setDoc(doc(db, 'reportStrikes', uid), { n, times, until, blocks, flag, by: S.user.uid, at: serverTimestamp() });
+    log('false-report', uid, name, `strike ${n}${tms(until) > now ? ' · reporting blocked until ' + new Date(tms(until)).toLocaleDateString() : ''}${flag ? ' · flagged for admin' : ''}`, reportId);
+    await sendThread(uid, msg, reportId ? 'report:' + reportId : '').catch(() => {});
+    return { n, until, flag };
+  }
+  async function undoStrike(uid, name) {
+    const old = await getStrikes(uid); if (!old) return;
+    if (!confirm(`Undo one false-report strike for ${name || 'this user'}? This also lifts any reporting pause.`)) return;
+    if (old.n <= 1) await deleteDoc(doc(db, 'reportStrikes', uid));
+    else await setDoc(doc(db, 'reportStrikes', uid), { n: old.n - 1, times: (old.times || []).slice(0, -1), until: Timestamp.now(), blocks: old.blocks || 0, flag: false, by: S.user.uid, at: serverTimestamp() });
+    log('undo-strike', uid, name); toast('Strike removed');
+  }
+  const strikeLine = (st) => !st ? '' : `<span class="tag" style="background:#3a1020;color:#ffd6e0">🚫 ${st.n} false-report strike${st.n > 1 ? 's' : ''}${tms(st.until) > Date.now() ? ' · reporting paused' : ''}${st.flag ? ' · ⚑ admin' : ''}</span>`;
+
   // ------------------------------------------------------------ suspended screen
   function suspendedHtml() {
     const b = S.ban;
@@ -386,18 +413,18 @@ export function createModeration(ctx) {
     const box = $('#mod-uprof'); if (!box) return; box.innerHTML = '<div class="spinner"></div>';
     const u = await getProfile(uid); if (!u) { box.innerHTML = '<div class="card empty">Profile not found (maybe deleted).</div>'; return; }
     const safe = (p) => p.then((s) => s.docs.map((d) => ({ id: d.id, ...d.data() }))).catch(() => []);
-    const [banS, against, by, posts, held, hist, u13flag] = await Promise.all([
+    const [banS, against, by, posts, held, hist, u13flag, ust] = await Promise.all([
       getDoc(doc(db, 'bans', uid)).catch(() => null),
       safe(getDocs(query(collection(db, 'reports'), where('targetUid', '==', uid), limit(30)))),
       safe(getDocs(query(collection(db, 'reports'), where('reporterId', '==', uid), limit(30)))),
       safe(getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(12)))),
       safe(getDocs(query(collection(db, 'heldPosts'), where('authorId', '==', uid), limit(20)))),
-      safe(getDocs(query(collection(db, 'modLog'), where('targetUid', '==', uid), limit(50)))), isU13(uid)]);
+      safe(getDocs(query(collection(db, 'modLog'), where('targetUid', '==', uid), limit(50)))), isU13(uid), getStrikes(uid)]);
     const ban = banS && banS.exists() ? activeBan(banS.data()) : null; const warns = hist.filter((x) => x.action === 'warn');
     const joined = u.createdAt && u.createdAt.toDate ? u.createdAt.toDate().toLocaleDateString() : '';
     box.innerHTML = `<div class="card pad hub-prof"><div class="row" style="gap:12px;align-items:center">${avatar({ ...u, uid }, 'lg', false)}<div style="min-width:0"><h2 style="margin:0;font-size:1.2rem">${esc(u.displayName)}${badge(uid)}</h2><p class="muted small" style="margin:2px 0">@${esc(u.username)}${joined ? ' · joined ' + esc(joined) : ''}</p>${ban ? `<p class="small" style="margin:0;color:#ffb3c1"><b>Suspended ${esc(fmtUntil(ban))}</b> · ${esc(ban.reason)}</p>` : '<p class="small" style="margin:0;color:#b5f5d3">Active account</p>'}</div></div>
       <div class="hub-stats"><span><b>${against.length}</b> reports about them</span><span><b>${warns.length}</b> warnings</span><span><b>${by.length}</b> reports they sent</span><span><b>${held.length}</b> held posts</span></div>
-      <div class="mod-acts">${u13Btn(u13flag)}<a class="btn btn-sm btn-ghost" href="#/u/${esc(u.username)}">Profile</a><button class="btn btn-sm" data-p="msg">💬 Message</button><button class="btn btn-sm btn-ghost" data-p="warn">⚠️ Warn</button>${ban ? '<button class="btn btn-sm btn-ghost" data-p="unban">✅ Unsuspend</button>' : '<button class="btn btn-sm btn-danger" data-p="ban">⛔ Suspend</button>'}</div>
+      ${ust ? `<p class="small" style="margin:6px 0">${strikeLine(ust)}${tms(ust.until) > Date.now() ? ` <span class="muted">until ${esc(new Date(tms(ust.until)).toLocaleDateString())}</span>` : ''}</p>` : ''}<div class="mod-acts">${ust && !isAIme() ? '<button class="btn btn-sm btn-ghost" data-p="unstrike">↩️ Undo a false-report strike</button>' : ''}${u13Btn(u13flag)}<a class="btn btn-sm btn-ghost" href="#/u/${esc(u.username)}">Profile</a><button class="btn btn-sm" data-p="msg">💬 Message</button><button class="btn btn-sm btn-ghost" data-p="warn">⚠️ Warn</button>${ban ? '<button class="btn btn-sm btn-ghost" data-p="unban">✅ Unsuspend</button>' : '<button class="btn btn-sm btn-danger" data-p="ban">⛔ Suspend</button>'}</div>
       <h3 class="hub-h3">History</h3>${hist.length ? hist.sort((a, b) => (b.at?.toMillis?.() || 0) - (a.at?.toMillis?.() || 0)).map((x) => `<p class="small hub-hist"><b>${esc(ACT[x.action] || x.action)}</b> by ${esc(x.byName)} · ${esc(timeAgo(x.at))}${x.detail ? `<br><span class="muted">${esc(x.detail)}</span>` : ''}</p>`).join('') : '<p class="muted small">No moderator actions yet.</p>'}
       <h3 class="hub-h3">Reports about them</h3>${against.length ? against.map((r) => `<p class="small hub-hist"><b>${esc(TYPE_LABEL[r.targetType] || r.targetType)}</b> · ${esc(STATUS_LABEL[r.status || 'open'])} · ${esc(timeAgo(r.createdAt))}<br><span class="muted">${esc(r.reason)}</span></p>`).join('') : '<p class="muted small">None.</p>'}
       <h3 class="hub-h3">Recent posts</h3>${posts.length ? posts.map((p) => `<p class="small hub-hist"><a href="#/post/${esc(p.id)}">${esc((p.work && p.work.title) || p.text || p.mediaType || 'post').slice(0, 90)}</a> · ${esc(timeAgo(p.createdAt))}</p>`).join('') : '<p class="muted small">No posts.</p>'}</div>`;
@@ -407,6 +434,7 @@ export function createModeration(ctx) {
       else if (a === 'warn') await messageDialog(uid, u.displayName, 'warn');
       else if (a === 'ban') await banDialog(uid, u.displayName, u.username);
       else if (a === 'unban') await unban(uid, u.displayName);
+      else if (a === 'unstrike') { try { await undoStrike(uid, u.displayName); } catch (er) { toast(friendlyError(er)); } }
       userProfile(uid); };
     box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -516,7 +544,7 @@ export function createModeration(ctx) {
   }
 
   // ---- Audit log (admin) + recent actions
-  const ACT = { 'mark-u13': '🧒 marked under 13', 'undo-u13': '↩️ removed under-13 mark from', 'make-ai': '🤖 marked as AI Helper', 'remove-ai': 'removed AI Helper flag from', 'auto-timeout': '⏳ auto timeout for', 'keep-timeout': '⏳ kept timeout for', 'invite-mod': '✉️ invited as moderator', 'cancel-invite': '✕ cancelled moderator invite for', ban: '⛔ suspended', 'remove-account': '🗑️ removed account of', unban: '✅ unsuspended', warn: '⚠️ warned', message: '💬 messaged', remove: '🗑️ removed content by', dismiss: '👍 dismissed report about', review: '👀 is reviewing report about', 'make-mod': '✓ made moderator', 'remove-mod': '✕ removed moderator', restore: '✅ restored post by', hold: '🕒 held post by', feedback: '🐞 updated feedback from', feature: '★ featured', unfeature: '☆ unfeatured' };
+  const ACT = { 'false-report': '🚫 false-report strike for', 'undo-strike': '↩️ removed a false-report strike from', 'mark-u13': '🧒 marked under 13', 'undo-u13': '↩️ removed under-13 mark from', 'make-ai': '🤖 marked as AI Helper', 'remove-ai': 'removed AI Helper flag from', 'auto-timeout': '⏳ auto timeout for', 'keep-timeout': '⏳ kept timeout for', 'invite-mod': '✉️ invited as moderator', 'cancel-invite': '✕ cancelled moderator invite for', ban: '⛔ suspended', 'remove-account': '🗑️ removed account of', unban: '✅ unsuspended', warn: '⚠️ warned', message: '💬 messaged', remove: '🗑️ removed content by', dismiss: '👍 dismissed report about', review: '👀 is reviewing report about', 'make-mod': '✓ made moderator', 'remove-mod': '✕ removed moderator', restore: '✅ restored post by', hold: '🕒 held post by', feedback: '🐞 updated feedback from', feature: '★ featured', unfeature: '☆ unfeatured' };
   async function logList(box, n) {
     try { const snap = await getDocs(query(collection(db, 'modLog'), orderBy('at', 'desc'), limit(n)));
       box.innerHTML = snap.docs.length ? snap.docs.map((d) => { const x = d.data(); return `<div class="list-item"><div class="meta"><div><b>${esc(x.byName)}</b> ${esc(ACT[x.action] || x.action)} <b>${esc(x.targetName || '')}</b> <span class="muted small">· ${esc(timeAgo(x.at))}</span></div>${x.detail ? `<p>${esc(x.detail)}</p>` : ''}</div></div>`; }).join('') : '<div class="empty">No moderator actions yet.</div>';
@@ -568,25 +596,36 @@ export function createModeration(ctx) {
     let snap; try { snap = await getDocs(query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(300))); } catch (e) { body.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; return; }
     if (stale && stale(token)) return;
     const all = snap.docs.map((d) => ({ id: d.id, ...d.data(), status: d.data().status || 'open' }));
-    let fs = 'todo', ft = 'all';
+    let fs = 'todo', ft = 'all'; const expanded = new Set(); let strikes = new Map();
     body.innerHTML = `<div class="mod-filters"><div class="chips" id="mod-fs">${[['todo', 'To do'], ['open', 'Open'], ['review', 'In review'], ['resolved', 'Resolved'], ['all', 'All']].map(([k, l]) => `<button type="button" class="chip ${k === fs ? 'on' : ''}" data-fs="${k}">${l} <small>${all.filter((r) => k === 'all' || r.status === k || (k === 'todo' && r.status !== 'resolved')).length}</small></button>`).join('')}</div>
       <label class="sr-only" for="mod-ft">Type</label><select id="mod-ft" class="mod-select"><option value="all">All types</option>${Object.entries(TYPE_LABEL).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div><div id="mod-list"></div>`;
     const list = $('#mod-list'); const profs = new Map(); const prof = async (uid) => { if (!uid) return null; if (!profs.has(uid)) profs.set(uid, await getProfile(uid).catch(() => null)); return profs.get(uid); };
     const draw = async () => {
       const rs = all.filter((r) => (fs === 'all' || r.status === fs || (fs === 'todo' && r.status !== 'resolved')) && (ft === 'all' || r.targetType === ft));
       list.innerHTML = rs.length ? '' : '<div class="card empty">No reports here. 🎉</div>';
+      // Mass reports against one user from the same reporter collapse into the first one.
+      const groups = new Map(); rs.forEach((r) => { if (!r.targetUid || r.targetUid === r.reporterId) return; const g = r.reporterId + '>' + r.targetUid; groups.set(g, [...(groups.get(g) || []), r]); });
+      strikes = new Map(); const stOf = async (u) => { if (!strikes.has(u)) strikes.set(u, await getStrikes(u)); return strikes.get(u); };
       for (const r of rs) {
+        const gk = r.reporterId + '>' + r.targetUid, grp = groups.get(gk) || [r];
+        if (grp.length > 1 && grp[0] !== r && !expanded.has(gk)) continue;
         const el = document.createElement('div'); el.className = 'card pad mod-rep st-' + r.status; el.dataset.rid = r.id; list.appendChild(el);
         const [reporter, tuid] = await Promise.all([prof(r.reporterId), r._t != null ? r._t : targetUidOf(r)]); r._t = tuid;
         const target = await prof(tuid); r._tn = target ? target.displayName : ''; r._tu = target ? target.username : '';
         const t = r.targetType, link = t === 'user' ? (target ? `#/u/${target.username}` : '') : t === 'series' ? `#/series/${r.targetId}` : (t === 'live' || t === 'live chat') ? `#/live/${r.postId || r.targetId}` : t === 'chat message' ? '' : `#/post/${r.postId || r.targetId}`;
         const u13flag = tuid ? await isU13(tuid) : false;
         const banned = tuid ? await getDoc(doc(db, 'bans', tuid)).then((s) => s.exists() && activeBan(s.data())).catch(() => false) : false;
+        const rst = r.reporterId !== tuid ? await stOf(r.reporterId) : null;
+        const hist = all.filter((x) => x.reporterId === r.reporterId && x.reporterId !== x.targetUid);
+        const histFalse = hist.filter((x) => x.action === 'false report').length;
+        const histLine = r.reporterId === tuid ? '' : `<p class="muted small mod-rhist" style="margin:2px 0 0">Reporter history: <b>${hist.length}</b> report${hist.length === 1 ? '' : 's'} sent${histFalse ? ` · <b>${histFalse}</b> marked false` : ''}${hist.filter((x) => Date.now() - tms(x.createdAt) < DAY).length > 4 ? ' · ⚠️ many today' : ''} ${strikeLine(rst)}</p>`;
+        const grpLine = grp.length > 1 && grp[0] === r ? `<p class="small" style="margin:4px 0 0"><button type="button" class="link-btn" data-grp="${esc(gk)}">${expanded.has(gk) ? '▲ Hide' : '▼ Show'} ${grp.length - 1} more report${grp.length > 2 ? 's' : ''} from the same reporter about this user</button></p>` : '';
         el.innerHTML = `<div class="row" style="flex-wrap:wrap;gap:6px"><span class="tag mod-type">${esc(TYPE_LABEL[t] || t)}</span><span class="mod-st">${esc(STATUS_LABEL[r.status])}${r.action ? ' · ' + esc(r.action) : ''}</span><span class="spacer"></span><span class="muted small">${esc(timeAgo(r.createdAt))}</span></div>
           ${r.excerpt ? `<blockquote class="mod-quote">${esc(r.excerpt)}</blockquote>` : ''}
           <p style="margin:6px 0 2px"><b>Reason:</b> ${esc(r.reason)}</p>
           <p class="muted small" style="margin:0">Reported user: ${target ? `<b>${esc(target.displayName)}</b>${badge(tuid)} @${esc(target.username)}` : '<i>unknown / deleted</i>'}${banned ? ' · <b style="color:#ff6b8a">suspended</b>' : ''}<br>Reporter: ${reporter ? `${esc(reporter.displayName)} @${esc(reporter.username)}` : 'unknown'}</p>
-          <div class="mod-acts">${link ? `<a class="btn btn-sm btn-ghost" href="${esc(link)}">Open</a>` : ''}${tuid && (/under 13/i.test(r.reason || '') || u13flag) ? u13Btn(u13flag) : ''}
+          ${histLine}${grpLine}
+          <div class="mod-acts">${link ? `<a class="btn btn-sm btn-ghost" href="${esc(link)}">Open</a>` : ''}${r.reporterId !== tuid && r.status !== 'resolved' ? '<button class="btn btn-sm btn-ghost" data-a="false">🚫 False report</button>' : ''}${tuid && (/under 13/i.test(r.reason || '') || u13flag) ? u13Btn(u13flag) : ''}
             ${r.status === 'open' ? '<button class="btn btn-sm btn-ghost" data-a="review">👀 In review</button>' : ''}
             <button class="btn btn-sm btn-ghost" data-a="dismiss">👍 Dismiss</button>
             ${['user', 'live'].includes(t) ? '' : '<button class="btn btn-sm btn-danger" data-a="remove">🗑️ Remove content</button>'}
@@ -595,12 +634,19 @@ export function createModeration(ctx) {
       }
     };
     list.onclick = async (e) => {
+      const gb = e.target.closest('[data-grp]'); if (gb) { const g = gb.dataset.grp; expanded.has(g) ? expanded.delete(g) : expanded.add(g); draw(); return; }
       const ub = e.target.closest('[data-u13]'); if (ub) { const r0 = all.find((x) => x.id === ub.closest('[data-rid]').dataset.rid); try { if (await u13(r0._t, r0._tn, ub.dataset.u13 === 'on', r0.id)) { if (ub.dataset.u13 === 'on') { await mark(r0.id, 'resolved', 'marked under 13'); r0.status = 'resolved'; r0.action = 'marked under 13'; } draw(); } } catch (er) { toast(friendlyError(er)); } return; }
       const b = e.target.closest('[data-a]'); if (!b) return; const el = b.closest('[data-rid]'); const r = all.find((x) => x.id === el.dataset.rid); const a = b.dataset.a;
       const tn = r._tn || '';
       const done = async (status, action) => { await mark(r.id, status, action); r.status = status; r.action = action; S.modOpen = all.filter((x) => x.status !== 'resolved').length; onChange && onChange('count'); };
       try {
         if (a === 'review') { await done('review', ''); log('review', r._t, tn, r.reason, r.id); toast('Marked in review'); }
+        else if (a === 'false') {
+          const rp = await prof(r.reporterId);
+          if (!confirm(`Mark this as a FALSE report? It closes with no action against ${tn || 'the reported user'}, and ${rp ? rp.displayName : 'the reporter'} gets a false-report strike (kind warning; 3 in 30 days pauses reporting for 7 days).`)) return;
+          await done('resolved', 'false report'); const res = await addFalseStrike(r.reporterId, rp ? rp.displayName : '', r.id); strikes.delete(r.reporterId);
+          toast(`False report: strike ${res.n}${tms(res.until) > Date.now() ? ' · reporting paused' : ''}${res.flag ? ' · flagged for admin' : ''}`);
+        }
         else if (a === 'dismiss') { await done('resolved', 'dismissed'); log('dismiss', r._t, tn, r.reason, r.id); toast('Report dismissed'); }
         else if (a === 'remove') { if (!confirm('Remove the reported content for everyone?')) return; await removeContent(r); await done('resolved', 'removed'); log('remove', r._t, tn, `${r.targetType}: ${r.excerpt || r.targetId}`, r.id); toast('Content removed'); }
         else if (a === 'warn') { if (await messageDialog(r._t, tn, 'warn', { reportId: r.id })) await done('resolved', 'warned'); }
