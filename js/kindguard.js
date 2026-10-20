@@ -2,6 +2,8 @@
 // captions, bios, names, park / lobby chat). A bad word highlights the hint, disables Send/Post and
 // blocks Enter. Tricks that only a stricter check catches on submit (s.p.a.c.e.d letters, l33t,
 // repeated letters) or 3+ blocked tries in 10 minutes => 1-hour timeout + an item in the Mod Hub.
+import { plainText, isFancy } from './plaintext.js';
+export { plainText, isFancy };
 const WORDS = [
   'fuck', 'fuk', 'fck', 'shit', 'bitch', 'asshole', 'bastard', 'dick', 'cunt', 'slut', 'whore', 'fag', 'faggot', 'nigga', 'nigger',
   'retard', 'wtf', 'stfu', 'porn', 'nude', 'nudes', 'naked', 'sexy', 'sex', 'penis', 'vagina', 'boobs', 'horny', 'kys', 'kill yourself',
@@ -11,7 +13,7 @@ const ROOTS = ['fuck', 'shit', 'bitch', 'cunt', 'nigg', 'fagg', 'porn', 'pussy',
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const WRE = new RegExp('(^|[^a-z])(' + WORDS.map((w) => w.replace(/ /g, '\\s+')).join('|') + ')(?:s|es|ing|ed|er|y)?(?=$|[^a-z])', 'i');
 const LEET = { '0': 'o', '1': 'i', '!': 'i', '|': 'i', '3': 'e', '4': 'a', '@': 'a', '5': 's', '$': 's', '7': 't', '+': 't', '8': 'b', '9': 'g', '€': 'e' };
-const loose = (t) => String(t || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+const loose = (t) => plainText(String(t || '')).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
 // Word found with a normal check (what we highlight as you type).
 export function badWord(t) { const m = loose(t).replace(/[0-9!|@$+€]/g, (c) => LEET[c] || c).match(WRE); return m ? m[2] : ''; }
 // Stricter check used on submit: drop separators, undo l33t, squash repeated letters.
@@ -46,7 +48,19 @@ export function initKindGuard({ onBypass } = {}) {
     const now = Date.now(); tries = tries.filter((x) => now - x < 600000); tries.push(now);
     if (sneaky || tries.length >= 3) { tries = []; onBypass && onBypass({ text: String(text).slice(0, 280), word: sneaky || badWord(text), sneaky: !!sneaky }); }
   };
-  document.addEventListener('input', (e) => check(e.target), true);
+  // Modded / fancy-font keyboards: swap look-alike letters for regular ones right in the box (keeps the caret),
+  // so what gets saved is plain text. A mean word hidden in fancy letters counts as a workaround.
+  const note = (el) => { const h = hintFor(el); if (el.classList.contains('kind-bad')) return; h.hidden = false; h.innerHTML = '💜 Please use regular letters — we switched them for you.'; clearTimeout(el._kindNoteT); el._kindNoteT = setTimeout(() => { if (!el.classList.contains('kind-bad')) h.hidden = true; }, 3500); };
+  function unfancy(el) {
+    if (!el || !el.matches || !el.matches(FIELD) || el.readOnly || el.type === 'password' || el.type === 'email' || el.dataset.kindOff != null) return;
+    const v = el.value; if (!isFancy(v)) return;
+    const pos = el.selectionStart; const nv = plainText(v);
+    el.value = nv; try { if (pos != null) { const c = plainText(v.slice(0, pos)).length; el.setSelectionRange(c, c); } } catch (_) {}
+    note(el);
+    const w = badWord(nv) || sneakyWord(nv);
+    if (w && !el._kindFancyHit) { el._kindFancyHit = 1; setTimeout(() => { el._kindFancyHit = 0; }, 10000); blocked(el, nv, w); }
+  }
+  document.addEventListener('input', (e) => { if (!e.isComposing) unfancy(e.target); check(e.target); }, true);
   // Enter / submit / Send clicks while a nearby field has a bad word (or a sneaky one) are stopped.
   const guard = (el, e) => {
     if (!el || !el.matches || !el.matches(FIELD) || el.type === 'password' || el.type === 'email' || el.dataset.kindOff != null) return false;

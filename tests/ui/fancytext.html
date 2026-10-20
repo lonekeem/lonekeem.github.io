@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../../css/app.css"></head>
+<body><main style="padding:12px;display:grid;gap:10px">
+<form id="f1" class="card pad"><div class="field"><input id="i1" type="text" placeholder="Message…"></div><button type="submit">Send</button></form>
+<form id="f2" class="card pad"><div class="field"><input id="i2" type="text" placeholder="Message…"></div><button type="submit">Send</button></form>
+<form id="f3" class="card pad" style="background:#fff;color:#111"><p style="margin:0 0 6px">Light box</p><div class="field"><textarea id="i3" placeholder="Bio"></textarea></div><button type="submit">Save</button></form>
+</main>
+<script type="module">
+import { initKindGuard } from '../../js/kindguard.js';
+window.bypass = []; initKindGuard({ onBypass: (x) => window.bypass.push(x) });
+document.querySelectorAll('form').forEach((f) => f.onsubmit = (e) => e.preventDefault()); window.ready = true;
+</script></body></html>

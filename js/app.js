@@ -31,6 +31,7 @@ import { createLive } from './live.js';
 import { createModeration, BlockSet } from './moderation.js';
 import { initKindGuard } from './kindguard.js';
 import * as safety from './safety.js';
+import { initTranslate, settingsHtml as txSettingsHtml, wireSettings as txWireSettings } from './translate.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
@@ -287,6 +288,7 @@ initKindGuard({ onBypass: async ({ text, word, sneaky }) => {
   try { await setDoc(doc(db, 'bans', S.user.uid), { until: Timestamp.fromMillis(Date.now() + 3600e3 - 30e3), reason, permanent: false, hide: false, by: 'auto', at: serverTimestamp(), name: String(S.profile?.displayName || '').slice(0, 60), uname: String(S.profile?.username || '').slice(0, 30) }); } catch (e) { console.warn('auto timeout', e.code); }
   try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: S.user.uid, targetUid: S.user.uid, postId: '', reason: `🤖 Auto timeout (1 hour): ${reason}${word ? ` (“${word}”)` : ''}. Lift it or keep it.`, excerpt: text.slice(0, 300), status: 'open', createdAt: serverTimestamp() }); } catch (e) { console.warn('auto report', e.code); }
 } });
+initTranslate();
 // Moderators, reports inbox, suspensions (js/moderation.js).
 const mod = createModeration({ publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
   onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
@@ -1155,6 +1157,7 @@ async function pageSettings() {
     <button type="button" class="card pad set-link" data-watch-intro style="margin-top:16px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">🎬</span><span><b>Watch intro</b><br><span class="muted small">Replay Kemy’s welcome video anytime.</span></span></button>
     <button type="button" class="card pad set-link" data-watch-howto style="margin-top:12px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">📱</span><span><b>How to save Kemy</b><br><span class="muted small">Add Kemy to your phone’s home screen (iPhone &amp; Android).</span></span></button>
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
+    ${txSettingsHtml()}
     <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
       <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>
       <p class="muted small" style="margin:0 0 8px">Kemy’s theme plays softly on your profile, Pals and settings, and stops for videos, lives and games.</p>
@@ -1185,7 +1188,7 @@ async function pageSettings() {
       <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
     </section>`}`;
-  donate.mountSettings($('#set-donate'));
+  donate.mountSettings($('#set-donate')); txWireSettings(main);
   $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
   $('#s-autoplay-wifi').onchange = (e) => { setWifiOnly(e.target.checked); };
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));

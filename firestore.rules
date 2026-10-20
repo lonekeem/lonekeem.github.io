@@ -16,6 +16,8 @@ service cloud.firestore {
     function actingAs(uid) { return signedIn() && (uid == me() || (uid == 'studio' && isAdmin())); }
     function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
     function isStr(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    // Modded-keyboard tricks: zero-width / bidi / invisible fillers, or zalgo (3+ stacked combining marks). ZWJ (U+200D) stays for emoji.
+    function cleanStr(v, min, max) { return isStr(v, min, max) && !v.matches('(?s).*([\\x{200B}\\x{200C}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{FEFF}\\x{3164}\\x{115F}\\x{1160}\\x{FFA0}\\x{00AD}]|[\\x{0300}-\\x{036F}]{3,}).*'); }
     function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     // ---------- Moderators + bans ----------
@@ -66,9 +68,9 @@ service cloud.firestore {
         && validBirth(d)
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
-        && isStr(d.displayName, 1, 50)
+        && cleanStr(d.displayName, 1, 50)
         && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
-        && isStr(d.bio, 0, 160)
+        && cleanStr(d.bio, 0, 160)
         && (!('pronouns' in d) || isStr(d.pronouns, 0, 20))
         && (!('website' in d) || d.website == ''
             || (isStr(d.website, 12, 100) && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
@@ -184,14 +186,14 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/modInvites/$(me())).data.by == uid
           && request.resource.data.fromName == get(userPath(me())).data.displayName
           && request.resource.data.fromUsername == get(userPath(me())).data.username
-          && request.resource.data.postId == '' && isStr(request.resource.data.text, 0, 140)
+          && request.resource.data.postId == '' && cleanStr(request.resource.data.text, 0, 140)
           && request.resource.data.createdAt == request.time && request.resource.data.read == false;
         // Moderator notices ("Thanks, we took action" / warnings / suspensions), shown as "Kemy Moderators".
         allow create: if isMod() && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
           && request.resource.data.type == 'mod' && request.resource.data.fromUid == me()
           && request.resource.data.fromName == 'Kemy Moderators' && request.resource.data.fromUsername == ''
-          && isStr(request.resource.data.postId, 0, 100) && isStr(request.resource.data.text, 1, 400)
+          && isStr(request.resource.data.postId, 0, 100) && cleanStr(request.resource.data.text, 1, 400)
           && request.resource.data.createdAt == request.time && request.resource.data.read == false;
         allow update: if actingAs(uid)
           && changed().hasOnly(['read']) && request.resource.data.read is bool;
@@ -204,7 +206,7 @@ service cloud.firestore {
           && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName
           && request.resource.data.fromUsername == get(userPath(request.resource.data.fromUid)).data.username
           && isStr(request.resource.data.postId, 0, 100)
-          && isStr(request.resource.data.text, 0, 140)
+          && cleanStr(request.resource.data.text, 0, 140)
           && request.resource.data.createdAt == request.time
           && request.resource.data.read == false;
       }
@@ -268,7 +270,7 @@ service cloud.firestore {
         && d.type in ['text', 'link', 'media', 'movie', 'song']
         && ((d.type in ['movie', 'song']) == ('work' in d))
         && (!('work' in d) || validWork(d))
-        && isStr(d.text, 0, 2000)
+        && cleanStr(d.text, 0, 2000)
         && isStr(d.linkUrl, 0, 300)
         && isStr(d.mediaUrl, 0, 500)
         && (d.mediaType in ['', 'image', 'video'] || (d.mediaType == 'audio' && d.type == 'song'))
@@ -300,7 +302,7 @@ service cloud.firestore {
         && w.runtime is number && w.runtime >= 0 && w.runtime <= 86400
         && w.yt is string && (w.yt == '' || w.yt.matches('^[A-Za-z0-9_-]{11}$'))
         && (w.cover == '' || cloudinaryUrl(w.cover))
-        && isStr(d.text, 0, 1000)
+        && cleanStr(d.text, 0, 1000)
         && ((w.yt != '' && d.mediaUrl == '') || (w.yt == '' && cloudinaryUrl(d.mediaUrl) && (w.runtime <= 601)))
         && (d.type == 'movie'
               ? (w.genre in movieG && w.rating in ['all', '13', '16', '18'] && !w.keys().hasAny(['artist', 'lyrics', 'explicit'])
@@ -476,7 +478,7 @@ service cloud.firestore {
               && exists(/databases/$(database)/documents/users/$(me())/pets/$(m.petId))));
         }
         function validBody(d) {
-          return ('media' in d) ? (validMedia(d.media) && isStr(d.text, 0, 500)) : isStr(d.text, 1, 500);
+          return ('media' in d) ? (validMedia(d.media) && cleanStr(d.text, 0, 500)) : cleanStr(d.text, 1, 500);
         }
 
         allow read: if true;
@@ -568,7 +570,7 @@ service cloud.firestore {
         && d.height is int && d.height >= 0 && d.height <= 20000
         && d.duration is number && d.duration >= 0 && d.duration <= 16
         && (d.mediaType == 'video' || d.duration == 0)
-        && isStr(d.caption, 0, 120)
+        && cleanStr(d.caption, 0, 120)
         && isStr(d.cloudinaryPublicId, 1, 255)
         && d.cloudinaryPublicId.matches('^[A-Za-z0-9_./-]+$')
         && d.createdAt == request.time
@@ -699,7 +701,7 @@ service cloud.firestore {
           && request.resource.data.name == get(userPath(me())).data.displayName
           && request.resource.data.username == get(userPath(me())).data.username
           && isStr(request.resource.data.color, 1, 20)
-          && ((request.resource.data.type == 'msg' && isStr(request.resource.data.text, 1, 150) && request.resource.data.count == 0)
+          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && request.resource.data.count == 0)
               || (request.resource.data.type == 'star' && request.resource.data.text == ''
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
@@ -770,7 +772,7 @@ service cloud.firestore {
           && (!('viewed' in request.resource.data) || ('snap' in request.resource.data && request.resource.data.viewed == false))
           && request.resource.data.senderId in parts()
           && actingAs(request.resource.data.senderId)
-          && isStr(request.resource.data.text, 1, 1000)
+          && cleanStr(request.resource.data.text, 1, 1000)
           && request.resource.data.createdAt == request.time
           && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
           && getAfter(chatPath()).data.lastAt == request.time
@@ -1372,7 +1374,7 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.uid == me() || isMod());
       allow create: if signedIn() && fb().keys().hasOnly(['uid', 'name', 'kind', 'text', 'page', 'ua', 'status', 'note', 'createdAt'])
         && fb().uid == me() && isStr(fb().name, 0, 60) && fb().kind in ['bug', 'feedback', 'idea']
-        && isStr(fb().text, 1, 1500) && isStr(fb().page, 0, 200) && isStr(fb().ua, 0, 300)
+        && cleanStr(fb().text, 1, 1500) && isStr(fb().page, 0, 200) && isStr(fb().ua, 0, 300)
         && fb().status == 'new' && fb().note == '' && fb().createdAt == request.time;
       allow update: if isMod() && changed().hasOnly(['status', 'note', 'handledBy', 'handledAt'])
         && fb().status in ['new', 'progress', 'fixed', 'closed'] && isStr(fb().note, 0, 1000)
@@ -1400,7 +1402,7 @@ service cloud.firestore {
         function mm() { return request.resource.data; }
         allow read: if signedIn() && (uid == me() || isMod());
         allow create: if signedIn() && mm().keys().hasOnly(['from', 'by', 'byName', 'text', 'createdAt', 'ref'])
-          && mm().by == me() && isStr(mm().byName, 0, 60) && isStr(mm().text, 1, 1000) && isStr(mm().ref, 0, 120)
+          && mm().by == me() && isStr(mm().byName, 0, 60) && cleanStr(mm().text, 1, 1000) && isStr(mm().ref, 0, 120)
           && mm().createdAt == request.time
           && ((mm().from == 'mod' && isMod()) || (mm().from == 'user' && uid == me()))
           && getAfter(/databases/$(database)/documents/modThreads/$(uid)).data.lastAt == request.time;
@@ -1411,7 +1413,7 @@ service cloud.firestore {
       allow read: if isMod();
       allow create: if isMod() && request.resource.data.keys().hasOnly(['by', 'byName', 'text', 'done', 'createdAt'])
         && request.resource.data.by == me() && isStr(request.resource.data.byName, 0, 60)
-        && isStr(request.resource.data.text, 1, 1000) && request.resource.data.done == false && request.resource.data.createdAt == request.time;
+        && cleanStr(request.resource.data.text, 1, 1000) && request.resource.data.done == false && request.resource.data.createdAt == request.time;
       allow update: if isMod() && changed().hasOnly(['done']) && request.resource.data.done is bool;
       allow delete: if isAdmin() || (isMod() && resource.data.by == me());
     }

@@ -1647,3 +1647,7 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .ap-tap span{display:grid;place-items:center;width:78px;height:78px;border-radius:50%;background:rgba(0,0,0,.6);font-size:2rem}
 .ap-tap small{font:700 1rem system-ui;text-shadow:0 1px 3px #000}
 .vslide.yt-wait .vcard::after{content:'▶  Tap to play';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:18px 26px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font:800 1.15rem system-ui;pointer-events:none}
+/* Auto-translate line (inherits text color so it reads in light and dark boxes) */
+.tx-line { font-size: .74rem; opacity: .75; margin: 3px 0 0; color: inherit; }
+.tx-line .tx-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; font-weight: 600; }
+.bubble .tx-line { display: block; }
