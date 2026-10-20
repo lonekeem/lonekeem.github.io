@@ -1985,7 +1985,16 @@ service cloud.firestore {
       function deed() { return {'cottage': 'hs_cottage', 'twostory': 'hs_twostory', 'ranch': 'hs_ranch', 'manor': 'z_hs_manor'}[plotStyle()]; }
       function inv(it) { return exists(/databases/$(database)/documents/users/$(me())/inv/$(it)); }
       function garageOk() { return hd().garage == 0 || (hd().garage == 1 && (inv('gr_one') || inv('gr_two') || inv('z_gr_three'))) || (hd().garage == 2 && (inv('gr_two') || inv('z_gr_three'))) || (hd().garage == 3 && inv('z_gr_three')); }
-      function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at']) && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 3
+      function radioOk(r) { return r is map && r.keys().hasOnly(['k', 'url', 't', 's']) && r.k in ['link', 'kemy', 'off']
+        && (r.k != 'link' || (r.url is string && r.url.size() <= 300 && r.url.matches('^https://(open[.]spotify[.]com|embed[.]music[.]apple[.]com|music[.]apple[.]com)/.*')))
+        && (!('t' in r) || (r.t is int && r.t >= 0 && r.t < 50)) && (!('s' in r) || r.s is int); }
+      function extOk(e) { return e is map && e.keys().hasOnly(['w', 'r', 'd', 't']) && (!('w' in e) || isStr(e.w, 0, 9)) && (!('r' in e) || isStr(e.r, 0, 9)) && (!('d' in e) || isStr(e.d, 0, 9)) && (!('t' in e) || isStr(e.t, 0, 9)); }
+      function decorOk(d) { return d is map && d.keys().hasOnly(['wall', 'floor', 'ext', 'items', 'v']) && (!('wall' in d) || isStr(d.wall, 0, 9)) && (!('floor' in d) || d.floor in ['wood', 'dark', 'tile', 'carpet'])
+        && (!('items' in d) || isStr(d.items, 0, 2000)) && (!('ext' in d) || extOk(d.ext)) && (!('v' in d) || d.v is int); }
+      // open house / invites (uids + usernames for display), house radio, decor: owner-only, size-limited
+      function extrasOk() { return (!('open' in hd()) || hd().open is bool) && (!('inv' in hd()) || (hd().inv is list && hd().inv.size() <= 50)) && (!('invN' in hd()) || (hd().invN is list && hd().invN.size() <= 50))
+        && (!('radio' in hd()) || radioOk(hd().radio)) && (!('decor' in hd()) || decorOk(hd().decor)); }
+      function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor']) && extrasOk() && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 3
         && hd().name == get(/databases/$(database)/documents/users/$(me())).data.displayName && hd().at == request.time; }
       allow read: if signedIn();
       allow create: if signedIn() && notBanned() && plot.matches('^h[0-9]{2}$') && plotStyle() != null && shape() && hd().style == plotStyle() && inv(deed()) && garageOk()
@@ -2018,9 +2027,15 @@ service cloud.firestore {
     // ================= Pal Park presence: rooms of ~20, ~4 writes/s while moving, stale docs removable by anyone
     match /parkRooms/{room}/p/{uid} {
       function pp() { return request.resource.data; }
+      function cellNo() { return int(math.floor((float(pp().x - 1600) / 16.0 - 400.0) / 14.0)) + 8 * int(math.floor((float(pp().y - 1200) / 16.0 + 70.0) / 14.0)) + 1; }
+      function cellHouse() { return 'h' + (cellNo() < 10 ? '0' : '') + string(cellNo()); }
+      function hp(id) { return /databases/$(database)/documents/homes/$(id); }
+      function homeOk(id) { return !exists(hp(id)) || get(hp(id)).data.owner == me() || get(hp(id)).data.get('open', false) == true || me() in get(hp(id)).data.get('inv', []); }
       allow read: if signedIn();
       allow create, update: if signedIn() && notBanned() && uid == me() && room.matches('^r[0-9]{1,2}$')
-        && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at', 'h', 'r', 'dn', 'v'])
+        && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at', 'h', 'r', 'dn', 'v', 'in'])
+        // inside a house (interior strip x >= 8000): 'in' must be that cell's house and I need access (owner, open house, invited, or an unowned/NPC house)
+        && (!('in' in pp()) || isStr(pp().in, 3, 4)) && (pp().x < 8000 || ('in' in pp() && pp().in == cellHouse() && homeOk(pp().in)))
         // 3D park extras: height (dm), facing (deg), dance id, client version
         && (!('h' in pp()) || (pp().h is int && pp().h >= 0 && pp().h <= 2000))
         && (!('r' in pp()) || (pp().r is int && pp().r >= 0 && pp().r < 360))
