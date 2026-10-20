@@ -28,13 +28,13 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const std = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.8, metalness: o.m ?? 0, emissive: o.e || '#000', emissiveIntensity: o.ei ?? 1, vertexColors: !!o.vc, ...(o.x || {}) });
   const tmpM = new THREE.Matrix4(), tq = new THREE.Quaternion(), tv = new THREE.Vector3(), ts = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
   // ---------------------------------------------------------------- merged, vertex-coloured geometry batches
-  const batches = {}; const batch = (k) => (batches[k] = batches[k] || []);
+  const batches = {}; const batch = (k) => (batches[k] = batches[k] || []); let ptag = null; const tagged = new Map(); // tag 'h02|w' -> [{ m, s, n, orig }] (owner paint)
   function put(k, geo, color, x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) { const g = geo.index ? geo.toNonIndexed() : geo.clone(); tq.setFromEuler(new THREE.Euler(rx, ry, rz)); tmpM.compose(tv.set(x, y, z), tq, ts.set(sx, sy, sz)); g.applyMatrix4(tmpM);
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
-    const n = g.attributes.position.count, c = new Float32Array(n * 3); col.set(color); for (let i = 0; i < n; i++) { c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(c, 3)); batch(k).push(g); }
+    const n = g.attributes.position.count, c = new Float32Array(n * 3); col.set(color); for (let i = 0; i < n; i++) { c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(c, 3)); if (ptag) g.userData.tg = ptag; batch(k).push(g); }
   function flush(k, material, shadow = true, parent = root) { const gs = batches[k]; if (!gs || !gs.length) return null; let n = 0; gs.forEach((g) => (n += g.attributes.position.count));
     const out = new THREE.BufferGeometry(); for (const [a, s] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3]]) { const arr = new Float32Array(n * s); let o = 0; for (const g of gs) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; } out.setAttribute(a, new THREE.BufferAttribute(arr, s)); }
-    out.computeBoundingSphere(); const m = new THREE.Mesh(out, material); m.castShadow = shadow && !LOW; m.receiveShadow = true; parent.add(m); gs.forEach((g) => g.dispose()); delete batches[k]; return m; }
+    out.computeBoundingSphere(); const m = new THREE.Mesh(out, material); { let v = 0; for (const g of gs) { const c = g.attributes.position.count; if (g.userData.tg) { const L = tagged.get(g.userData.tg) || []; L.push({ m, s: v, n: c, orig: g.attributes.color.array.slice(0, 3) }); tagged.set(g.userData.tg, L); } v += c; } } m.castShadow = shadow && !LOW; m.receiveShadow = true; parent.add(m); gs.forEach((g) => g.dispose()); delete batches[k]; return m; }
   const G = { box: new THREE.BoxGeometry(1, 1, 1), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 12), cyl6: new THREE.CylinderGeometry(0.5, 0.5, 1, 6), prism: new THREE.CylinderGeometry(1, 1, 1, 3), cone4: new THREE.ConeGeometry(0.7071, 1, 4), cone: new THREE.ConeGeometry(0.5, 1, 16), sph: new THREE.SphereGeometry(0.5, 14, 10), plane: new THREE.PlaneGeometry(1, 1) };
   G.plane.rotateX(-Math.PI / 2);
 
@@ -69,13 +69,13 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   for (const h of HOUSES) { const r = rng(h.seed * 31 + 7); const TP = h.town && TOWN_PAL[h.town]; const wall = TP ? TP.wall[Math.floor(r() * TP.wall.length)] : WALL[Math.floor(r() * WALL.length)], roof = TP ? TP.roof[Math.floor(r() * TP.roof.length)] : ROOF[Math.floor(r() * ROOF.length)], trim = TRIM[r() < 0.8 ? 0 : 1];
     const f = h.face, x = h.x, z = h.z, y0 = FLAT; const W = h.w, D = h.d; const ry = f > 0 ? 0 : Math.PI; const two = h.style === 1 || h.style === 3; const Hh = two ? 5.6 : 3.4;
     const L = (lx, lz) => [x + (f > 0 ? lx : -lx), z + (f > 0 ? lz : -lz)]; // local (front = +lz) -> world
-    const TK = h.town ? '@' + h.town : ''; const P3 = (k, g, c, lx, ly, lz, sx, sy, sz, rot = 0, rx = 0) => { const [wx, wz] = L(lx, lz); put(k + TK, g, c, wx, y0 + ly, wz, ry + rot, sx, sy, sz, rx); };
+    const TK = h.town ? '@' + h.town : ''; const P3 = (k, g, c, lx, ly, lz, sx, sy, sz, rot = 0, rx = 0) => { const [wx, wz] = L(lx, lz); ptag = !h.sale ? null : k === 'wall' && c === wall ? h.id + '|w' : k === 'roof' ? h.id + '|r' : k === 'trim' && c === trim ? h.id + '|t' : null; put(k + TK, g, c, wx, y0 + ly, wz, ry + rot, sx, sy, sz, rx); };
     P3('wall', G.box, '#8b8378', 0, 0.2, 0, W + 0.4, 0.4, D + 0.4); // foundation
     P3('wall', G.box, wall, 0, 0.4 + Hh / 2, 0, W, Hh, D);
     if (h.style === 2) { P3('wall', G.box, wall, -W / 2 - 2.2, 0.4 + 1.5, -0.5, 4.4, 3, D - 1); P3('roof', G.cone4, roof, -W / 2 - 2.2, 0.4 + 3 + 0.8, -0.5, 6.4, 1.6, D + 0.4, Math.PI / 4); }
     if (h.style === 3) { P3('wall', G.cyl, wall, W / 2 - 0.4, 0.4 + (Hh + 1.6) / 2, D / 2 - 0.6, 2.6, Hh + 1.6, 2.6); P3('roof', G.cone, roof, W / 2 - 0.4, 0.4 + Hh + 1.6 + 1.4, D / 2 - 0.6, 3.4, 2.8, 3.4); }
     // gable roof: triangular prism along x
-    { const rh = two ? 2.4 : 2.2; const [wx, wz] = L(0, 0); put('roof' + TK, G.prism, roof, wx, y0 + 0.4 + Hh + rh * 0.25, wz, ry + Math.PI / 2, (D / 2 + 0.6) * 1.15, W + 0.8, rh * 0.75 * 1.15 / 0.75, Math.PI / 2, 0); }
+    { const rh = two ? 2.4 : 2.2; const [wx, wz] = L(0, 0); ptag = h.sale ? h.id + '|r' : null; put('roof' + TK, G.prism, roof, wx, y0 + 0.4 + Hh + rh * 0.25, wz, ry + Math.PI / 2, (D / 2 + 0.6) * 1.15, W + 0.8, rh * 0.75 * 1.15 / 0.75, Math.PI / 2, 0); }
     P3('wall', G.box, '#7c4a2a', W / 3, 0.4 + Hh + 1.6, -1, 0.8, 2.2, 0.8); // chimney
     // porch, steps, door frame, windows (glowing warm)
     P3('wall', G.box, '#a08c74', 0, 0.3, D / 2 + 1, 3.2, 0.25, 2); P3('wall', G.box, '#a08c74', 0, 0.12, D / 2 + 2.2, 2.4, 0.22, 0.6);
@@ -95,6 +95,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
       if (h.style === 2) { const b = box[box.length - 1]; if (f > 0) { b.x1 = cx + W / 2 + 0.1; b.x0 = cx - W / 2 - 4.5; } else { b.x0 = cx - W / 2 - 0.1; b.x1 = cx + W / 2 + 4.5; } }
       for (const sx of [-1.45, 1.45]) { const [px, pz] = L(sx, D / 2 + 1.8); cyl.push({ x: px, z: pz, r: 0.12, top: 99 }); }
       if (!h.sale) for (const side of [-1, 1]) { const len = W / 2 + 1.2; const [fx, fz] = L(side * (1.2 + len / 2), yardF - 0.2); box.push({ x0: fx - (f > 0 ? len : len) / 2, x1: fx + len / 2, z0: fz - 0.1, z1: fz + 0.1, top: FLAT + 1.05, bot: -99 }); } }
+    ptag = null;
     // door (animated, instanced below), decorations
     { const [dx, dz] = L(0, D / 2 + 0.07); const [hx, hz] = L(-0.7, D / 2 + 0.07); doors.push({ h, x: dx, z: dz, hx, hz, ry, a: 0, want: 0 }); }
     const nP = h.sale ? 2 : 2 + Math.floor(r() * 4 * det); for (let i = 0; i < nP; i++) { const side = i % 2 ? 1 : -1; const [px, pz] = i < 2 ? L(side * 1.1, D / 2 + 2.15 + (i > 1 ? 0.5 : 0)) : L(side * (2 + r() * (W / 2 - 1)), D / 2 + 2.5 + r() * 2.4); pumpkins.push({ x: px, z: pz, s: 0.5 + r() * 0.55, ry: ry + (r() - 0.5) * 0.8 }); }
@@ -114,6 +115,10 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const DCOL = ['#8a3ffc', '#e8434f', '#16a34a', '#2563eb', '#f59e0b', '#7c2d12']; doors.forEach((d, i) => { doorM.setColorAt(i, col.set(DCOL[i % DCOL.length])); });
   function poseDoor(i) { const d = doors[i]; tq.setFromAxisAngle(UP, d.ry - d.a * 1.6); tmpM.compose(tv.set(d.hx, FLAT + 0.42, d.hz), tq, ts.set(1, 1, 1)); doorM.setMatrixAt(i, tmpM); }
   doors.forEach((d, i) => poseDoor(i)); doorM.castShadow = !LOW; root.add(doorM);
+  // owner paint (homes/{plot}.decor.ext): recolour the tagged vertex ranges + the instanced front door; null restores
+  const paintHouse = (id, ext) => { const c2 = new THREE.Color(); for (const part of ['w', 'r', 't']) for (const R of tagged.get(id + '|' + part) || []) { const a = R.m.geometry.attributes.color; const want = ext && ext[part];
+      if (want) c2.set(want); else c2.setRGB(R.orig[0], R.orig[1], R.orig[2]); for (let i = R.s; i < R.s + R.n; i++) a.setXYZ(i, c2.r, c2.g, c2.b); a.needsUpdate = true; }
+    const di = doors.findIndex((d) => d.h.id === id); if (di >= 0) { doorM.setColorAt(di, col.set((ext && ext.d) || DCOL[di % DCOL.length])); doorM.instanceColor.needsUpdate = true; } };
 
   // ---------------------------------------------------------------- jack-o'-lanterns (friendly faces), ghosts, lights, hay, bats
   const faceTex = (() => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const x = cv.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 256, 128); x.fillStyle = '#fff';
@@ -348,7 +353,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   function spawnStreet() { P.x = GATE.x + (Math.random() - 0.5) * 3; P.z = GATE.z + 6 + Math.random() * 3; P.yaw = 0; P.y = ground(P.x, P.z); }
   function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
-  const W = { update: null, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
+  const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
   const D = attachDrive(api, W); W.drive = D;
   const E = attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots });
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });

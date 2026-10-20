@@ -19,7 +19,7 @@ import { emoteMs, EMOTE_BY_ID } from './emotes.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
 import { addParkHD } from './park-hd.js';
-import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; // Kemy World: Kemy Street district etc. (own module)
+import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; import { roomState } from '../world/layout.js'; // Kemy World: Kemy Street district etc. (own module)
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
@@ -345,7 +345,7 @@ export function createPark3D(ctx) {
       for (const c of cyl) if (c.top < 50 && Math.hypot(c.x - x, c.z - z) < c.r && c.top <= feet + STEP && c.top > f) f = c.top; return f; }
     function collide(x, z, feet) { // push out of anything taller than a step
       for (const c of cyl) { if (c.top <= feet + STEP) continue; const dx = x - c.x, dz = z - c.z, d = Math.hypot(dx, dz), m = c.r + RAD; if (d < m && d > 1e-4) { x = c.x + dx / d * m; z = c.z + dz / d * m; } }
-      for (const b of box) { if (b.top <= feet + STEP) continue; if (x > b.x0 - RAD && x < b.x1 + RAD && z > b.z0 - RAD && z < b.z1 + RAD) { const pl = x - (b.x0 - RAD), pr = (b.x1 + RAD) - x, pb = z - (b.z0 - RAD), pf = (b.z1 + RAD) - z; const mn = Math.min(pl, pr, pb, pf); if (mn === pl) x = b.x0 - RAD; else if (mn === pr) x = b.x1 + RAD; else if (mn === pb) z = b.z0 - RAD; else z = b.z1 + RAD; } }
+      for (const b of box) { if (b.top <= feet + STEP || (b.bot != null && b.bot > feet + 1.7)) continue; if (x > b.x0 - RAD && x < b.x1 + RAD && z > b.z0 - RAD && z < b.z1 + RAD) { const pl = x - (b.x0 - RAD), pr = (b.x1 + RAD) - x, pb = z - (b.z0 - RAD), pf = (b.z1 + RAD) - z; const mn = Math.min(pl, pr, pb, pf); if (mn === pl) x = b.x0 - RAD; else if (mn === pr) x = b.x1 + RAD; else if (mn === pb) z = b.z0 - RAD; else z = b.z1 + RAD; } }
       for (const e of [POND, LAKE]) if (inEll(e, x, z, -1.5)) { const d = ellD(e, x, z) || 1e-3; const k = (1 - 1.5 / Math.min(e.rx, e.rz)) / d; x = e.x + (x - e.x) * k * 1.001; z = e.z + (z - e.z) * k * 1.001; }
       return worldClamp(x, z); }
 
@@ -355,7 +355,7 @@ export function createPark3D(ctx) {
     const toggleCam = () => { pov = !pov; lss(CK, pov ? 'pov' : 'tp'); paintCam(); hint(pov ? 'First-person: you are your Pal 👀' : 'Third-person camera'); };
     const paintCam = () => { const b = tc && tc.root.querySelector('[data-b=cam]'); if (!b) return; b.setAttribute('aria-pressed', pov); b.classList.toggle('lock', pov); b.setAttribute('aria-label', pov ? 'Camera: first-person. Tap for third-person' : 'Camera: third-person. Tap for first-person'); };
     let tc = null;
-    function camBlocked(x, y, z) { if (y < ground(x, z) + 0.25) return true; for (const b of box) if (b.top > 50 && x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) return true; else if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && y < b.top) return true;
+    function camBlocked(x, y, z) { if (y < ground(x, z) + 0.25) return true; if (roomState.box && y > P.y + 2.85) return true; for (const b of box) if (b.bot != null && y < b.bot) continue; else if (b.top > 50 && x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) return true; else if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && y < b.top) return true;
       for (const c of cyl) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.15 && y < Math.min(c.top, 7)) return true; return false; }
     const tgt = new THREE.Vector3();
     function updateCam(dt) {
@@ -365,8 +365,8 @@ export function createPark3D(ctx) {
         cam.lookAt(cam.position.x + fx * Math.cos(pitch), cam.position.y - Math.sin(pitch), cam.position.z + fz * Math.cos(pitch)); if (cam.fov !== 70) { cam.fov = 70; cam.updateProjectionMatrix(); } return; }
       if (cam.fov !== 60) { cam.fov = 60; cam.updateProjectionMatrix(); }
       tgt.set(P.x, P.y + 1.2, P.z);
-      const dir = new THREE.Vector3(Math.sin(C.yaw) * Math.cos(C.pitch), Math.sin(C.pitch), Math.cos(C.yaw) * Math.cos(C.pitch));
-      let d = C.dist; for (let i = 1; i <= 28; i++) { const s = (i / 28) * C.dist; if (camBlocked(tgt.x + dir.x * s, tgt.y + dir.y * s, tgt.z + dir.z * s)) { d = Math.max(0.3, s - 0.3); break; } }
+      const inR = !!roomState.box, pit = inR ? Math.min(C.pitch, 0.22) : C.pitch; const dir = new THREE.Vector3(Math.sin(C.yaw) * Math.cos(pit), Math.sin(pit), Math.cos(C.yaw) * Math.cos(pit));
+      let d = inR ? Math.min(C.dist, 4.2) : C.dist; for (let i = 1; i <= 28; i++) { const s = (i / 28) * (inR ? Math.min(C.dist, 4.2) : C.dist); if (camBlocked(tgt.x + dir.x * s, tgt.y + dir.y * s, tgt.z + dir.z * s)) { d = Math.max(0.3, s - 0.3); break; } }
       C.cur += (d - C.cur) * Math.min(1, (d < C.cur ? 18 : 4) * dt);
       cam.position.copy(tgt).addScaledVector(dir, C.cur); cam.lookAt(tgt); }
 
@@ -404,10 +404,10 @@ export function createPark3D(ctx) {
     $('#park-room').textContent = `Room ${room.slice(1)}`;
     const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid); let extras = true;
     const base = () => { const [x, y] = toP(P.x, P.z); const o = { x: Math.max(0, Math.min(10000, x)), y: Math.max(0, Math.min(10000, y)), d: P.d, e: P.e, eAt: P.eAt, say: P.say, sayAt: P.sayAt, tgt: P.tgt, name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2', pal: palSnap, at: serverTimestamp() };
-      if (extras) { o.h = Math.max(0, Math.min(2000, Math.round(P.y * 10))); o.r = ((Math.round(P.yaw * 180 / Math.PI) % 360) + 360) % 360; o.dn = P.dance && Date.now() < P.danceUntil ? P.dance : ''; o.v = 3; } return o; };
+      if (extras) { o.h = Math.max(0, Math.min(2000, Math.round(P.y * 10))); o.r = ((Math.round(P.yaw * 180 / Math.PI) % 360) + 360) % 360; o.dn = P.dance && Date.now() < P.danceUntil ? P.dance : ''; o.v = 3; } if (inOk && roomState.inId) o.in = roomState.inId; return o; }; let inOk = true;
     let lastSend = 0, dirty = true, sending = false; const net = { ok: 0, err: '', snaps: 0, snapErr: '' };
     const send = async (force) => { const now = Date.now(); if (sending || (!force && (!dirty || now - lastSend < SEND_MS) && now - lastSend < HB_MS)) return; sending = true; lastSend = now; dirty = false;
-      try { await setDoc(meRef, base()); net.ok++; } catch (e) { net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; try { const q = base(); delete q.at; net.last = JSON.stringify(q).slice(0, 600); } catch { /* */ } if (e.code === 'permission-denied') { if (extras) { extras = false; dirty = true; lastSend = 0; } else lastSend = now + 300; } } sending = false; };
+      try { await setDoc(meRef, base()); net.ok++; } catch (e) { net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; try { const q = base(); delete q.at; net.last = JSON.stringify(q).slice(0, 600); } catch { /* */ } if (e.code === 'permission-denied') { if (inOk && roomState.inId) { inOk = false; dirty = true; lastSend = 0; } else if (extras) { extras = false; dirty = true; lastSend = 0; } else lastSend = now + 300; } } sending = false; };
     await send(true);
     const others = new Map(); const blocked = S.blocked || new Set(); const MK = 'kemy-park-muted-' + S.user.uid; const muted = new Set(JSON.parse(lsg(MK) || '[]'));
     const unsub = onSnapshot(collection(db, 'parkRooms', room, 'p'), (qs) => {
@@ -561,7 +561,7 @@ export function createPark3D(ctx) {
       W3.update(dt, now); if (!R.shadowMap.autoUpdate) R.shadowMap.needsUpdate = (++shN & 1) === 0; R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, scene: () => scene, merged: () => mergedInfo, gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
+    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, scene: () => scene, merged: () => mergedInfo, gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
