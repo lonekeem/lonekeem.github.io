@@ -47,27 +47,28 @@ try {
   for (const t of ['sa', 'sb', 'sc']) await P[t].waitForFunction(() => window.__show && window.__show.state && window.__show.state.ph, null, { timeout: 40000 });
   const s0 = await st('sa'); out.start = s0; out.players = s0.players; console.log('started', JSON.stringify(s0));
   const stops = [driver('sa'), driver('sb'), driver('sc', true)];
-  await P.sb.waitForFunction(() => window.__show.state.ph === 'play', null, { timeout: 30000 }); await sleep(4000); await P.sb.screenshot({ path: shot + '04-freeze-dash-green-pixel7.png' });
-  await P.sb.waitForFunction(() => window.__show.state.light === 'r', null, { timeout: 30000 }); await sleep(600); await P.sb.screenshot({ path: shot + '05-freeze-red-pixel7.png' });
-  await P.sc.waitForFunction(() => window.__show.state.me.out, null, { timeout: 30000 }); out.cheaterCaught = true; await sleep(800); await P.sc.screenshot({ path: shot + '06-caught-bubble-pixel7.png' });
+  await P.sb.waitForFunction(() => window.__show && window.__show.state && window.__show.state.ph === 'play', null, { timeout: 30000 }); await sleep(4000); await P.sb.screenshot({ path: shot + '04-freeze-dash-green-pixel7.png' });
+  for (const t of ['sa', 'sb']) await P[t].evaluate(() => window.__show.game._debug.tp(-4, -60)).catch(() => {});
+
+  await P.sb.waitForFunction(() => window.__show && window.__show.state && window.__show.state.light === 'r', null, { timeout: 30000 }); await sleep(600); await P.sb.screenshot({ path: shot + '05-freeze-red-pixel7.png' });
+  await P.sc.waitForFunction(() => window.__show && window.__show.state && window.__show.state.me.out, null, { timeout: 30000 }); out.cheaterCaught = true; await sleep(800); await P.sc.screenshot({ path: shot + '06-caught-bubble-pixel7.png' });
   await sleep(2500); await P.sc.screenshot({ path: shot + '07-cheer-zone-pixel7.png' }); out.cheerZone = await st('sc');
   await P.sc.evaluate(() => document.querySelector('[data-t="wheel"]').click()); await sleep(800); await P.sc.screenshot({ path: shot + '08-emote-wheel-pixel7.png' }); await P.sc.evaluate(() => document.querySelector('.ew-wheel button, .ew button[data-id], [data-emote]')?.click()); await P.sc.keyboard.press('Escape');
   // the honest racers: headless software GL runs ~2-5 fps, so hop them near the line, then they walk over it with real input on green
-  for (const t of ['sa', 'sb']) await P[t].evaluate(() => window.__show.game._debug.tp(-4, -64)).catch(() => {});
-  await P.sa.waitForFunction(() => { const s = window.__show.state; return s.ph !== 'play' || s.me.st !== 0; }, null, { timeout: 120000 }).catch(() => {});
+  await P.sa.waitForFunction(() => { const s = window.__show && window.__show.state; if (!s) return false; return s.ph !== 'play' || s.me.st !== 0; }, null, { timeout: 120000 }).catch(() => {});
   out.afterR1 = { sa: await st('sa'), sb: await st('sb') }; console.log('r1', JSON.stringify(out.afterR1));
-  await P.sa.waitForFunction(() => window.__show.state.ph === 'inter' || window.__show.state.ph === 'end', null, { timeout: 90000 }); await sleep(800); await P.sb.screenshot({ path: shot + '09-standings-pixel7.png' }); stops.forEach((f) => f());
+  await P.sa.waitForFunction(() => window.__show && window.__show.state && window.__show.state.ph === 'inter' || window.__show.state.ph === 'end', null, { timeout: 90000 }); await sleep(800); await P.sb.screenshot({ path: shot + '09-standings-pixel7.png' }); stops.forEach((f) => f());
   // round 2 (cookie on 6 contestants): pass both, then host migration — host (sa) closes the app
-  await P.sb.waitForFunction(() => window.__show.state.ph === 'play', null, { timeout: 40000 }); await sleep(2500); await P.sb.screenshot({ path: shot + '10-round2-pixel7.png' }); out.round2 = (await st('sb')).round;
+  await P.sb.waitForFunction(() => window.__show && window.__show.state && window.__show.state.ph === 'play', null, { timeout: 40000 }); await sleep(2500); await P.sb.screenshot({ path: shot + '10-round2-pixel7.png' }); out.round2 = (await st('sb')).round;
   await P.sb.evaluate(() => window.__show.game._debug.done(true)); await P.sa.evaluate(() => window.__show.game._debug.done(true)); await sleep(1500);
   await P.sa._ctx.close(); out.hostClosed = true; const t0 = Date.now();
-  await P.sb.waitForFunction(() => window.__show.state.host, null, { timeout: 40000 }); out.migrationSec = Math.round((Date.now() - t0) / 1000); console.log('migrated in', out.migrationSec);
+  await P.sb.waitForFunction(() => window.__show && window.__show.state && window.__show.state.host, null, { timeout: 40000 }); out.migrationSec = Math.round((Date.now() - t0) / 1000); console.log('migrated in', out.migrationSec);
   await P.sb.screenshot({ path: shot + '11-new-host-pixel7.png' });
   // fast-forward remaining rounds on the new host (bots + sb play; sb passes each round when possible)
   for (let i = 0; i < 60; i++) { const s = await st('sb'); if (!s || s.ph === 'end') break; if (s.ph === 'play' && s.round !== 'duel' && s.round !== 'tug' && s.me.st === 0 && !s.me.out) await P.sb.evaluate(() => window.__show.game._debug.done(true));
     if (s.ph === 'play' && s.round !== 'duel') { await P.sb.evaluate(() => window.__show.game._debug.passBots(0.6)); await sleep(1500); await P.sb.screenshot({ path: shot + `12-${s.round}-pixel7.png` }); }
     await P.sb.evaluate(() => window.__show.game._debug.skip()); await sleep(2500); }
-  await P.sb.waitForFunction(() => window.__show.state.ph === 'end', null, { timeout: 60000 }); await sleep(2000);
+  await P.sb.waitForFunction(() => window.__show && window.__show.state && window.__show.state.ph === 'end', null, { timeout: 60000 }); await sleep(2000);
   await P.sb.screenshot({ path: shot + '13-results-pixel7.png' }); await P.sc.screenshot({ path: shot + '14-results-spectator-pixel7.png' });
   out.endB = await st('sb'); out.endC = await st('sc');
   await P.sb.waitForFunction(() => /saved|limit|Could not/.test(document.querySelector('[data-dia]')?.textContent || ''), null, { timeout: 70000 }).catch(() => {}); out.diaText = await P.sb.textContent('[data-dia]').catch(() => '');

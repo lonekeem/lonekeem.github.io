@@ -148,7 +148,7 @@ export function createShowGame(ctx) {
     // hs (host): ph intro|play|inter|end, rd, plan, left, light g|t|r|f, lq, ll, alive, out, elim, teams, pairs, rope, seed, rev, nb, bots, bb, champ, casual, seq
     let hs = null; let phaseEnd = 0, lightEnd = 0, stSeen = -1, curRd = -1, curPh = '', lastLq = -1, redAt = 0, light = 'g';
     let endAt = 0, lightEndAt = 0; const botS = []; // host bot sims
-    const shared = () => (isHost() ? hs : (net && net.state) || hs);
+    const shared = () => (isHost() && hs ? hs : (net && net.state) || hs);
     const nameOf = (id) => { const v = ppl.get(id); if (v) return v.name; const p = net && net.players[id]; return (p && p.name) || 'Pal'; };
     // ------------------------------------------------------------ arenas (one per round, rebuilt between rounds)
     let arena = null, kind = '', obs = [], carts = [], tiles = [], plat = null, rope = null, watcher = null, platR = 9, cookieKind = 'circle';
