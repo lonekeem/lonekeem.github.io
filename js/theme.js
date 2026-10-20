@@ -10,12 +10,15 @@ export const THEME_CREDIT = `Theme song: ${THEME_TITLE} by ${THEME_ARTIST} — L
 // Track 3 title — change it here.
 export const THEME3_TITLE = 'Time';
 export const THEME3_ARTIST = 'Keem';
+export const THEME4_TITLE = 'Keep Me Alive';
+export const THEME4_ARTIST = 'Keem';
 export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
 // Theme playlist (original song files, unchanged). Track 1 is always the welcome / hatch song.
 export const TRACKS = [
   { title: THEME_TITLE, artist: 'Keem', src: THEME_SRC, dur: 124.8 },
   { title: 'Julian', artist: 'Keem', src: new URL('../assets/audio/julian.m4a', import.meta.url).href, dur: 161.2 },
   { title: THEME3_TITLE, artist: THEME3_ARTIST, src: new URL('../assets/audio/kemy-theme3.m4a?v=1', import.meta.url).href, dur: 167.6 },
+  { title: THEME4_TITLE, artist: THEME4_ARTIST, src: new URL('../assets/audio/kemy-theme4.m4a?v=1', import.meta.url).href, dur: 186.8 },
 ];
 export const PLAYLIST_CREDIT = `Theme songs: ${TRACKS.map((t) => `${t.title} by ${t.artist}`).join(', ')} — Lone Keem Studios`;
 const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)
