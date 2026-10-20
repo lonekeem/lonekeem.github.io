@@ -142,7 +142,9 @@ export function createPals(ctx) {
         if (A.mode === 'walk') { const d = A.tx - A.x; A.face = Math.sign(d) || A.face; A.x += Math.sign(d) * Math.min(Math.abs(d), A.mood.tired ? 0.35 : 0.7); if (Math.abs(d) < 1) { A.mode = 'idle'; A.until = t + 100; } }
       }
       if (play) stepPlay(t, c);
-      for (const A of [...all].sort((a, b) => a.size - b.size)) drawDancer(c, A.x, H - 8, A.size, A.guest ? { ...A.p, _others: 1, _off: 0.5 } : (isMine ? A.p : { ...A.p, _others: 1 }), { t, face: A.face, mode: A.mode, mood: { ...A.mood, sad: A.mood.sad && A.mode !== 'react' } });
+      // while Care / Talk / Dance shows this Pal in a sheet, the card behind it keeps only its stage (one Pal on screen)
+      const sheetUp = isMine && !!document.querySelector('.pal-sheet, .pal-talk, .pal-dance');
+      if (!sheetUp) for (const A of [...all].sort((a, b) => a.size - b.size)) drawDancer(c, A.x, H - 8, A.size, A.guest ? { ...A.p, _others: 1, _off: 0.5 } : (isMine ? A.p : { ...A.p, _others: 1 }), { t, face: A.face, mode: A.mode, mood: { ...A.mood, sad: A.mood.sad && A.mode !== 'react' } });
       if (guest) { c.fillStyle = 'rgba(255,255,255,.85)'; c.font = '600 10px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(guest.p.name, guest.x, H - 8 - guest.size - 4); c.textAlign = 'left'; }
       fx.draw(c);
     };
