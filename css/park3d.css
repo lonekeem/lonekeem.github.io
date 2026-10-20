@@ -58,3 +58,18 @@ body.p3-drive .gm-radio, body.p3-drive .gmp-card.min, body.p3-drive .gmr-toast {
   body.p3-drive .p3-log { left: 50%; transform: translateX(-50%); top: calc(max(8px, env(safe-area-inset-top)) + 46px); width: min(300px, 40vw); max-height: 54px; }
   body.p3-drive .p3-chat { width: min(360px, calc(100vw - 420px)); }
 }
+
+/* Park / 3D games: no music bars on screen, only the 🎵 button (+ its popover). The playlist embed keeps playing off-screen. */
+body.p3-on .gm-radio, html.kz-game .gm-radio, body.p3-on .gmr-toast { display: none !important; }
+body.p3-on .gmp-card, html.kz-game .gmp-card { left: -9999px !important; top: 0 !important; transform: none !important; opacity: 0; pointer-events: none; }
+/* nothing from the rest of the app floats over the Park (peeking Pal, Pal float, the app's own emote button) */
+body.p3-on .pal-pop, body.p3-on .pal-float, body.p3-on .ge-btn { display: none !important; }
+/* Respawn: small corner icon under ⚙️ (never in the middle of the screen); while driving it lives in the driving HUD */
+body.p3-on .rs-q { left: auto !important; right: max(10px, env(safe-area-inset-right)); top: calc(max(8px, env(safe-area-inset-top)) + 104px) !important; transform: none !important; width: 40px; height: 40px !important; padding: 0 !important; font-size: 0 !important; border-width: 1px !important; display: grid; place-items: center; }
+body.p3-on .rs-q::before { content: '↩️'; font-size: 18px; }
+body.p3-on .rs-q[hidden], body.p3-drive .rs-q { display: none !important; }
+@media (max-height: 500px) {
+  /* landscape: minimap top-right, left of ⚙️, out of the joystick/left-edge area */
+  body.p3-on .ks-map { left: auto !important; right: calc(max(8px, env(safe-area-inset-right)) + 56px) !important; top: calc(max(8px, env(safe-area-inset-top)) + 54px) !important; width: 56px !important; height: 56px !important; }
+  body.p3-on .kh-home, body.p3-on .ks-bagb { font-size: 13px !important; height: 34px !important; padding: 0 10px !important; }
+}

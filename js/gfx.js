@@ -56,14 +56,14 @@ export function makeSky(o = {}) {
           float n = fbm(q * .9) * .65 + fbm(q * 2.7 + 3.) * .35; float cv = smoothstep(1. - cloud, 1.05 - cloud * .55, n) * smoothstep(0., .18, d.y);
           vec3 cc = mix(cloudCol * .82, cloudCol * 1.04, smoothstep(.4, .8, n)) + sunCol * pow(s, 8.) * .25; c = mix(c, cc, cv * .9); }
         // horizon haze = fog colour, so terrain fading into the fog meets the sky without a seam
-        c = mix(c, fogC, (1. - smoothstep(0., .16, d.y)) * .85);
+        c = mix(c, fogC, pow(1. - smoothstep(0., .16, d.y), 1.5));
         if (mount > 0.) { vec2 az = normalize(d.xz + 1e-5);
           float r1 = .035 + .05 * fbm(az * 3.1 + 11.) + .02 * vn(az * 19. + 3.), r2 = .02 + .035 * fbm(az * 5.3 + 2.);
           float ey = d.y + .004;
           vec3 m1 = mix(fogC, vec3(.32, .42, .52) * (fogC * 1.1), .38), m2 = mix(fogC, vec3(.28, .4, .36) * (fogC * 1.2), .55);
           c = mix(c, m1 + vec3(1.) * pow(s, 12.) * .05, smoothstep(r1 + .002, r1 - .002, ey) * .9);
           c = mix(c, m2, smoothstep(r2 + .002, r2 - .002, ey) * .92); }
-        if (d.y < 0.) c = mix(mount > 0. ? mix(fogC, ground, .25) : hor, ground, min(1., -d.y * (mount > 0. ? 2. : 5.)));
+        if (d.y < 0.) c = mix(mount > 0. ? fogC : hor, ground, min(1., -d.y * (mount > 0. ? 2. : 5.)));
         gl_FragColor = vec4(c, 1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

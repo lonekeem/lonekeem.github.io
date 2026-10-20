@@ -192,6 +192,10 @@ export async function mountGameMusic(o = {}) {
     const panel = root.querySelector('.gm-panel'), fab = root.querySelector('.gm-fab');
     const setOpen = (v) => { panel.hidden = !v; fab.setAttribute('aria-expanded', v); root.classList.toggle('open', v); ls.set(K.open, v ? '1' : '0'); card?.classList.toggle('pnl', v); };
     fab.onclick = () => setOpen(panel.hidden);
+    // in the Park / 3D games the player is just the 🎵 button: the panel is a popover that closes on any tap outside it
+    const gameMode = () => document.body.classList.contains('p3-on') || document.documentElement.classList.contains('kz-game');
+    if (gameMode() && !panel.hidden) setOpen(false);
+    document.addEventListener('pointerdown', (e) => { if (!panel.hidden && gameMode() && !root.contains(e.target) && !(card && card.contains(e.target))) setOpen(false); }, true);
     root.querySelector('.gm-x').onclick = () => setOpen(false);
     root.querySelector('.gm-pp').onclick = () => (isPlaying() ? pause() : play());
     root.querySelector('.gm-next').onclick = () => next();
