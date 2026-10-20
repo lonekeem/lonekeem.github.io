@@ -40,18 +40,20 @@ export class BlockSet extends Set { constructor(it, hidden) { super(it); this._h
 
 export function createModeration(ctx) {
   const { S, db, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, onChange } = ctx;
-  S.mods = S.mods || new Set(); S.hidden = S.hidden || new Set(); S.ban = null; S.modOpen = 0;
+  S.mods = S.mods || new Set(); S.modsAI = S.modsAI || new Set(); S.hidden = S.hidden || new Set(); S.ban = null; S.modOpen = 0;
   let reportsUnsub = null;
   const $ = (s, r = document) => r.querySelector(s);
   const iAmMod = () => !!S.user && (isAdmin() || S.mods.has(S.user.uid));
   const isModUid = (uid) => S.mods.has(uid);
-  const badge = (uid) => (uid && S.mods.has(uid)) ? '<span class="badge mod-badge" data-modbadge role="button" tabindex="0" title="Kemy Moderator" aria-label="Kemy Moderator">✓</span>' : '';
+  const aiTag = (uid) => (uid && S.modsAI.has(uid)) ? '<span class="ai-tag" title="This moderator is an AI helper, not a person">🤖 AI Helper</span>' : '';
+  const badge = (uid) => (uid && S.mods.has(uid)) ? '<span class="badge mod-badge" data-modbadge role="button" tabindex="0" title="Kemy Moderator" aria-label="Kemy Moderator">✓</span>' + aiTag(uid) : '';
+  const isAIme = () => !!S.user && S.modsAI.has(S.user.uid) && !isAdmin();
   window.kemyModBadge = badge; window.kemyIsMod = isModUid;
   document.addEventListener('click', (e) => { const b = e.target.closest('[data-modbadge]'); if (!b) return; e.preventDefault(); e.stopPropagation(); toast('✓ Kemy Moderator · helps keep Kemy safe and kind'); }, true);
 
   // Public data, loaded for everyone (signed in or not).
   let rolesOk; const rolesReady = new Promise((r) => (rolesOk = r)); setTimeout(() => rolesOk(), 3000);
-  onSnapshot(collection(db, 'roles'), (qs) => { S.mods = new Set(qs.docs.filter((d) => d.data().mod).map((d) => d.id)); rolesOk(); if (S.user) watchReports(); onChange && onChange('mods'); }, () => rolesOk());
+  onSnapshot(collection(db, 'roles'), (qs) => { S.mods = new Set(qs.docs.filter((d) => d.data().mod).map((d) => d.id)); S.modsAI = new Set(qs.docs.filter((d) => d.data().mod && d.data().ai).map((d) => d.id)); rolesOk(); if (S.user) watchReports(); onChange && onChange('mods'); }, () => rolesOk());
   onSnapshot(collection(db, 'hiddenUsers'), (qs) => { S.hidden.clear(); qs.docs.forEach((d) => S.hidden.add(d.id)); }, () => {});
 
   const activeBan = (b) => b && b.until && b.until.toMillis() > Date.now() ? b : null;
@@ -173,16 +175,16 @@ export function createModeration(ctx) {
       <form id="mod-ban" style="text-align:left">
         <div class="mod-dur" role="radiogroup" aria-label="How long">
           <label><input type="radio" name="dur" value="1" checked> 1 day</label><label><input type="radio" name="dur" value="7"> 7 days</label>
-          <label><input type="radio" name="dur" value="30"> 30 days</label><label><input type="radio" name="dur" value="perm"> Permanent</label></div>
-        <label class="small" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="mod-hide"> Remove account: hide all their posts &amp; comments</label>
+          ${isAIme() ? '<span class="muted small">AI helper: up to 7 days</span></div>' : `<label><input type="radio" name="dur" value="30"> 30 days</label><label><input type="radio" name="dur" value="perm"> Permanent</label></div>
+        <label class="small" style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="mod-hide"> Remove account: hide all their posts &amp; comments</label>`}
         ${templatePicker(TEMPLATES.ban)}
         <div class="field"><label for="mod-ban-r">Reason (they will see this)</label><textarea id="mod-ban-r" maxlength="300" required>${esc(TEMPLATES.ban[0])}</textarea></div>
         <label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="mod-ban-n" checked> Send them a notice with the reason</label>
         <div class="btns"><button class="btn btn-danger" type="submit">Suspend</button><button class="btn btn-ghost" type="button" data-close>Cancel</button></div></form>`);
     const ta = $('#mod-ban-r'); wireTpl(TEMPLATES.ban, ta);
-    $('#mod-hide').onchange = (e) => { if (e.target.checked) document.querySelector('input[name=dur][value=perm]').checked = true; };
+    if ($('#mod-hide')) $('#mod-hide').onchange = (e) => { if (e.target.checked) document.querySelector('input[name=dur][value=perm]').checked = true; };
     return new Promise((res) => { $('#mod-ban').onsubmit = async (e) => {
-      e.preventDefault(); const v = document.querySelector('input[name=dur]:checked').value, hide = $('#mod-hide').checked, perm = v === 'perm' || hide, reason = ta.value.trim();
+      e.preventDefault(); const v = document.querySelector('input[name=dur]:checked').value, hide = !!($('#mod-hide') && $('#mod-hide').checked), perm = v === 'perm' || hide, reason = ta.value.trim();
       const until = perm ? FOREVER() : Timestamp.fromMillis(Date.now() + (+v) * DAY);
       try {
         await setDoc(doc(db, 'bans', uid), { until, reason, permanent: perm, hide, by: S.user.uid, at: serverTimestamp(), name: String(name || '').slice(0, 60), uname: String(uname || '').slice(0, 30) });
@@ -223,7 +225,7 @@ export function createModeration(ctx) {
   function userRow(u, { roles = false } = {}) {
     const mod = S.mods.has(u.uid);
     return `<div class="list-item mod-user" data-uid="${esc(u.uid)}">${avatar(u, '', false)}<div class="meta"><b>${esc(u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${mod ? ' · Moderator' : ''}</p>
-      <div class="mod-acts">${roles ? (mod ? '<button class="btn btn-sm btn-ghost" data-u="unmod">Remove moderator</button>' : u._inv === 'pending' ? '<span class="mod-st">⏳ Invite pending</span><button class="btn btn-sm btn-ghost" data-u="cancel">Cancel invite</button>' : `${u._inv === 'declined' ? '<span class="mod-st">✕ Declined</span>' : ''}<button class="btn btn-sm" data-u="mod">🛡️ ${u._inv === 'declined' ? 'Invite again' : 'Invite as moderator'}</button>`)
+      <div class="mod-acts">${roles ? (mod ? `<button class="btn btn-sm btn-ghost" data-u="unmod">Remove moderator</button><button class="btn btn-sm btn-ghost" data-u="ai">${S.modsAI.has(u.uid) ? 'Remove 🤖 AI Helper flag' : '🤖 Mark as AI Helper'}</button>` : u._inv === 'pending' ? '<span class="mod-st">⏳ Invite pending</span><button class="btn btn-sm btn-ghost" data-u="cancel">Cancel invite</button>' : `${u._inv === 'declined' ? '<span class="mod-st">✕ Declined</span>' : ''}<button class="btn btn-sm" data-u="mod">🛡️ ${u._inv === 'declined' ? 'Invite again' : 'Invite as moderator'}</button>`)
         : `<a class="btn btn-sm btn-ghost" href="#/u/${esc(u.username)}">Profile</a><button class="btn btn-sm btn-ghost" data-u="warn">Warn</button><button class="btn btn-sm btn-danger" data-u="ban">Suspend</button><button class="btn btn-sm btn-ghost" data-u="unban">Unsuspend</button>`}</div></div></div>`;
   }
   function wireUserList(box, users, { roles = false, onDone } = {}) {
@@ -231,6 +233,11 @@ export function createModeration(ctx) {
     box.onclick = async (e) => {
       const b = e.target.closest('[data-u]'); if (!b) return; const uid = b.closest('[data-uid]').dataset.uid; const u = users.find((x) => x.uid === uid); if (!u) return;
       const a = b.dataset.u;
+      if (a === 'ai') { if (!isAdmin()) return; const on = !S.modsAI.has(uid);
+        if (on && S.modsAI.size && !confirm('Kemy should have only ONE AI helper. Replace the current one?')) return;
+        try { if (on) for (const o of [...S.modsAI]) { const r = await getDoc(doc(db, 'roles', o)); if (r.exists()) await setDoc(doc(db, 'roles', o), { ...r.data(), ai: false, by: S.user.uid, at: serverTimestamp() }); }
+          const r = await getDoc(doc(db, 'roles', uid)); await setDoc(doc(db, 'roles', uid), { ...r.data(), ai: on, by: S.user.uid, at: serverTimestamp() }); if (on) S.modsAI.add(uid); else S.modsAI.delete(uid);
+          log(on ? 'make-ai' : 'remove-ai', uid, u.displayName); toast(on ? '🤖 Marked as the AI Helper' : 'AI flag removed'); wireUserList(box, users, { roles, onDone }); } catch (er) { toast(friendlyError(er)); } return; }
       if (a === 'mod' || a === 'unmod' || a === 'cancel') {
         if (!isAdmin()) return toast('Only the admin can change moderators');
         try {
@@ -288,8 +295,8 @@ export function createModeration(ctx) {
     if (!iAmMod()) { main.innerHTML = '<section class="card pad center" style="max-width:520px;margin:30px auto"><h1 class="page-title">🛡️ Moderators only</h1><p class="muted">This page is for Kemy moderators.</p><a class="btn btn-sm btn-ghost" href="#/watch">Back to Kemy</a></section>'; return; }
     watchCounts();
     tab = tab || 'home'; if (!TABS.some((t) => t[0] === tab) || (TABS.find((t) => t[0] === tab)[3] && !isAdmin())) tab = 'home';
-    main.innerHTML = `<div class="hub"><div class="hub-top"><h1 class="page-title">🛡️ Mod Hub</h1><span class="muted small">${isAdmin() ? 'Admin' : 'Moderator'} · ${esc(myName())}</span></div>
-      <nav class="hub-nav" aria-label="Mod Hub sections">${TABS.filter((t) => !t[3] || isAdmin()).map(([k, ic, l]) => `<a href="#/mod/${k}" class="${k === tab ? 'on' : ''}"><span aria-hidden="true">${ic}</span> ${l}${cnt[k] !== undefined ? `<span class="mod-count" data-hubcount="${k}" ${cnt[k] ? '' : 'hidden'}>${cnt[k]}</span>` : ''}</a>`).join('')}</nav>
+    main.innerHTML = `<div class="hub"><div class="hub-top"><h1 class="page-title">🛡️ Mod Hub</h1><span class="muted small">${isAdmin() ? 'Admin' : isAIme() ? 'AI Helper 🤖' : 'Moderator'} · ${esc(myName())}</span></div>
+      <nav class="hub-nav" aria-label="Mod Hub sections">${TABS.filter((t) => !t[3] || isAdmin()).filter((t) => !(isAIme() && t[0] === 'log')).map(([k, ic, l]) => `<a href="#/mod/${k}" class="${k === tab ? 'on' : ''}"><span aria-hidden="true">${ic}</span> ${l}${cnt[k] !== undefined ? `<span class="mod-count" data-hubcount="${k}" ${cnt[k] ? '' : 'hidden'}>${cnt[k]}</span>` : ''}</a>`).join('')}</nav>
       <div id="mod-body" class="hub-body"><div class="spinner"></div></div></div>`;
     paintCounts();
     const body = $('#mod-body'); setTimeout(() => main.querySelector('.hub-nav .on')?.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
@@ -307,9 +314,12 @@ export function createModeration(ctx) {
       countQ(query(collection(db, 'feedback'), where('status', 'in', ['new', 'progress'])))]);
     const tile = (n, l, href, ic) => `<a class="hub-tile" href="${href}"><span class="ic">${ic}</span><b>${n}</b><span>${l}</span></a>`;
     body.innerHTML = `<div class="hub-tiles">${tile(S.modOpen || 0, 'Open reports', '#/mod/reports', '🚩')}${tile(held, 'Held for review', '#/mod/queue', '🕒')}${tile(flags, 'Auto-flagged', '#/mod/queue', '🤖')}${tile(cnt.inbox, 'Unread messages', '#/mod/inbox', '💬')}${tile(newUsers, 'New users today', '#/mod/users', '🌱')}${tile(bans, 'Active suspensions', '#/mod/users', '⛔')}${tile(bugs, 'Open bugs & feedback', '#/mod/bugs', '🐞')}</div>
-      <h2 class="mod-h2">🕘 Recent actions</h2><div class="card" style="padding:6px" id="hub-recent"><div class="spinner"></div></div>
+      <h2 class="mod-h2">🤖 Helper summary</h2><div class="card" style="padding:6px" id="hub-ai"><div class="spinner"></div></div>
+      ${isAIme() ? '' : '<h2 class="mod-h2">🕘 Recent actions</h2><div class="card" style="padding:6px" id="hub-recent"><div class="spinner"></div></div>'}
       <h2 class="mod-h2">📝 Latest team notes</h2><div class="card" style="padding:6px" id="hub-notes"><div class="spinner"></div></div>`;
-    logList($('#hub-recent'), 8); notesList($('#hub-notes'), 4, true);
+    if ($('#hub-recent')) logList($('#hub-recent'), 8); notesList($('#hub-notes'), 4, true);
+    getDocs(query(collection(db, 'modNotes'), orderBy('createdAt', 'desc'), limit(40))).then((q) => { const xs = q.docs.map((d) => d.data()).filter((x) => S.modsAI.has(x.by)).slice(0, 5);
+      $('#hub-ai').innerHTML = xs.length ? xs.map((x) => `<div class="list-item"><div class="meta"><div><b>${esc(x.byName)}</b>${aiTag(x.by)} <span class="muted small">· ${esc(timeAgo(x.createdAt))}</span></div><p style="white-space:pre-wrap">${esc(x.text)}</p></div></div>`).join('') : `<div class="empty">${S.modsAI.size ? 'No helper notes yet.' : 'No AI helper set up yet.'}</div>`; }).catch(() => { $('#hub-ai').innerHTML = ''; });
   }
 
   // ---- Review queue (held + auto-flagged)
@@ -464,7 +474,7 @@ export function createModeration(ctx) {
     const un1 = onSnapshot(doc(db, 'modThreads', uid), (s) => { thread = s.exists() ? s.data() : null; if (thread && (asMod ? thread.unreadMod : thread.unreadUser)) updateDoc(doc(db, 'modThreads', uid), asMod ? { unreadMod: false } : { unreadUser: false }).catch(() => {}); }, () => {});
     const un2 = onSnapshot(query(collection(db, 'modThreads', uid, 'm'), orderBy('createdAt', 'asc'), limit(300)), (qs) => {
       logEl.innerHTML = qs.docs.length ? qs.docs.map((d) => { const m = d.data(); const mine = asMod ? m.from === 'mod' : m.from === 'user';
-        return `<div class="bubble ${mine ? 'mine' : ''}">${m.from === 'mod' && asMod ? `<small class="muted">${esc(m.byName)}</small><br>` : ''}${esc(m.text)}<time>${esc(timeAgo(m.createdAt))}${m.ref ? ' · ' + esc(m.ref) : ''}</time></div>`; }).join('')
+        return `<div class="bubble ${mine ? 'mine' : ''}">${m.from === 'mod' && asMod ? `<small class="muted">${esc(m.byName)}</small>${aiTag(m.by)}<br>` : m.from === 'mod' && S.modsAI.has(m.by) ? `${aiTag(m.by)}<br>` : ''}${esc(m.text)}<time>${esc(timeAgo(m.createdAt))}${m.ref ? ' · ' + esc(m.ref) : ''}</time></div>`; }).join('')
         : `<p class="muted small center">${asMod ? 'Start the conversation.' : 'No messages yet. The moderators will write here if they need you.'}</p>`;
       logEl.scrollTop = logEl.scrollHeight; }, (e) => { logEl.innerHTML = `<p class="muted small center">${esc(friendlyError(e))}</p>`; });
     S.unsubs.push(un1, un2);
@@ -480,7 +490,7 @@ export function createModeration(ctx) {
   async function notesList(box, n, compact) {
     const snap = await getDocs(query(collection(db, 'modNotes'), orderBy('createdAt', 'desc'), limit(n))).catch(() => null);
     const ns = snap ? snap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
-    box.innerHTML = ns.length ? ns.map((x) => `<div class="list-item ${x.done ? 'hub-done' : ''}" data-id="${esc(x.id)}"><div class="meta"><div><b>${esc(x.byName)}</b> <span class="muted small">· ${esc(timeAgo(x.createdAt))}</span></div><p style="white-space:pre-wrap">${esc(x.text)}</p>${compact ? '' : `<div class="mod-acts"><button class="btn btn-sm btn-ghost" data-n="done">${x.done ? '↩️ Reopen' : '✅ Done'}</button>${x.by === S.user.uid || isAdmin() ? '<button class="btn btn-sm btn-ghost" data-n="del">Delete</button>' : ''}</div>`}</div></div>`).join('') : '<div class="empty">No notes yet.</div>';
+    box.innerHTML = ns.length ? ns.map((x) => `<div class="list-item ${x.done ? 'hub-done' : ''}" data-id="${esc(x.id)}"><div class="meta"><div><b>${esc(x.byName)}</b>${aiTag(x.by)} <span class="muted small">· ${esc(timeAgo(x.createdAt))}</span></div><p style="white-space:pre-wrap">${esc(x.text)}</p>${compact ? '' : `<div class="mod-acts"><button class="btn btn-sm btn-ghost" data-n="done">${x.done ? '↩️ Reopen' : '✅ Done'}</button>${x.by === S.user.uid || isAdmin() ? '<button class="btn btn-sm btn-ghost" data-n="del">Delete</button>' : ''}</div>`}</div></div>`).join('') : '<div class="empty">No notes yet.</div>';
     box.onclick = async (e) => { const b = e.target.closest('[data-n]'); if (!b) return; const x = ns.find((y) => y.id === b.closest('[data-id]').dataset.id);
       try { if (b.dataset.n === 'done') await updateDoc(doc(db, 'modNotes', x.id), { done: !x.done }); else await deleteDoc(doc(db, 'modNotes', x.id)); notesList(box, n, compact); } catch (er) { toast(friendlyError(er)); } };
   }
@@ -492,7 +502,7 @@ export function createModeration(ctx) {
   }
 
   // ---- Audit log (admin) + recent actions
-  const ACT = { 'invite-mod': '✉️ invited as moderator', 'cancel-invite': '✕ cancelled moderator invite for', ban: '⛔ suspended', 'remove-account': '🗑️ removed account of', unban: '✅ unsuspended', warn: '⚠️ warned', message: '💬 messaged', remove: '🗑️ removed content by', dismiss: '👍 dismissed report about', review: '👀 is reviewing report about', 'make-mod': '✓ made moderator', 'remove-mod': '✕ removed moderator', restore: '✅ restored post by', hold: '🕒 held post by', feedback: '🐞 updated feedback from', feature: '★ featured', unfeature: '☆ unfeatured' };
+  const ACT = { 'make-ai': '🤖 marked as AI Helper', 'remove-ai': 'removed AI Helper flag from', 'auto-timeout': '⏳ auto timeout for', 'keep-timeout': '⏳ kept timeout for', 'invite-mod': '✉️ invited as moderator', 'cancel-invite': '✕ cancelled moderator invite for', ban: '⛔ suspended', 'remove-account': '🗑️ removed account of', unban: '✅ unsuspended', warn: '⚠️ warned', message: '💬 messaged', remove: '🗑️ removed content by', dismiss: '👍 dismissed report about', review: '👀 is reviewing report about', 'make-mod': '✓ made moderator', 'remove-mod': '✕ removed moderator', restore: '✅ restored post by', hold: '🕒 held post by', feedback: '🐞 updated feedback from', feature: '★ featured', unfeature: '☆ unfeatured' };
   async function logList(box, n) {
     try { const snap = await getDocs(query(collection(db, 'modLog'), orderBy('at', 'desc'), limit(n)));
       box.innerHTML = snap.docs.length ? snap.docs.map((d) => { const x = d.data(); return `<div class="list-item"><div class="meta"><div><b>${esc(x.byName)}</b> ${esc(ACT[x.action] || x.action)} <b>${esc(x.targetName || '')}</b> <span class="muted small">· ${esc(timeAgo(x.at))}</span></div>${x.detail ? `<p>${esc(x.detail)}</p>` : ''}</div></div>`; }).join('') : '<div class="empty">No moderator actions yet.</div>';
@@ -566,7 +576,7 @@ export function createModeration(ctx) {
             <button class="btn btn-sm btn-ghost" data-a="dismiss">👍 Dismiss</button>
             ${['user', 'live'].includes(t) ? '' : '<button class="btn btn-sm btn-danger" data-a="remove">🗑️ Remove content</button>'}
             ${tuid ? `<button class="btn btn-sm btn-ghost" data-a="warn">⚠️ Warn</button>${banned ? '<button class="btn btn-sm btn-ghost" data-a="unban">✅ Unsuspend</button>' : '<button class="btn btn-sm btn-danger" data-a="ban">⛔ Suspend</button>'}` : ''}
-            ${reporter ? '<button class="btn btn-sm btn-ghost" data-a="thank">💌 Reply to reporter</button>' : ''}</div>`;
+            ${/^🤖 Auto timeout/.test(r.reason || '') ? `${banned ? '<button class="btn btn-sm" data-a="lift">⏳ Lift timeout</button>' : ''}<button class="btn btn-sm btn-ghost" data-a="keep">✋ Keep</button>` : reporter && r.reporterId !== tuid ? '<button class="btn btn-sm btn-ghost" data-a="thank">💌 Reply to reporter</button>' : ''}</div>`;
       }
     };
     list.onclick = async (e) => {
@@ -580,6 +590,8 @@ export function createModeration(ctx) {
         else if (a === 'warn') { if (await messageDialog(r._t, tn, 'warn', { reportId: r.id })) await done('resolved', 'warned'); }
         else if (a === 'ban') { if (await banDialog(r._t, tn, r._tu, { reportId: r.id })) await done('resolved', 'suspended'); }
         else if (a === 'unban') await unban(r._t, tn);
+        else if (a === 'lift') { await deleteDoc(doc(db, 'bans', r._t)); await done('resolved', 'timeout lifted'); log('unban', r._t, tn, 'lifted auto timeout', r.id); notice(r._t, 'Your 1-hour pause was lifted early. Please keep Kemy kind! 💜').catch(() => {}); toast('Timeout lifted'); }
+        else if (a === 'keep') { await done('resolved', 'timeout kept'); log('keep-timeout', r._t, tn, r.reason, r.id); toast('Timeout kept'); }
         else if (a === 'thank') { const rp = await prof(r.reporterId); await messageDialog(r.reporterId, rp ? rp.displayName : 'reporter', 'thanks', { reportId: r.id }); return; }
         draw();
       } catch (er) { toast(friendlyError(er)); }
@@ -589,5 +601,5 @@ export function createModeration(ctx) {
     draw();
   }
 
-  return { rolesReady, iAmMod, badge, loadMine, watchReports, watchCounts, totalCount, page, adminSection, isSuspended, suspendedHtml, banDialog, messageDialog, holdOrSet, heldNotice, profileButton, invitePage, watchInvite, holdLivePost, supportPage, feedbackPage, watchMyThread };
+  return { aiTag, rolesReady, iAmMod, badge, loadMine, watchReports, watchCounts, totalCount, page, adminSection, isSuspended, suspendedHtml, banDialog, messageDialog, holdOrSet, heldNotice, profileButton, invitePage, watchInvite, holdLivePost, supportPage, feedbackPage, watchMyThread };
 }

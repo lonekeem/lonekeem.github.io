@@ -27,6 +27,7 @@ import {
 import { ICONS } from './icons.js';
 import { createLive } from './live.js';
 import { createModeration, BlockSet } from './moderation.js';
+import { initKindGuard } from './kindguard.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
@@ -268,6 +269,14 @@ const comments = createComments({
   toast: (m) => toast(m), friendlyError: (e) => friendlyError(e), isAdmin: () => isAdmin(),
   reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x)
 });
+// Kind-words filter on every text box; tricks / repeated tries => 1-hour timeout + Mod Hub item.
+initKindGuard({ onBypass: async ({ text, word, sneaky }) => {
+  toast('💜 Let’s keep it kind. Your account is paused for 1 hour.');
+  if (!S.user || isAdmin()) return;
+  const reason = sneaky ? 'Tried to sneak a mean word past the kind-words filter' : 'Kept trying to send mean words';
+  try { await setDoc(doc(db, 'bans', S.user.uid), { until: Timestamp.fromMillis(Date.now() + 3600e3 - 30e3), reason, permanent: false, hide: false, by: 'auto', at: serverTimestamp(), name: String(S.profile?.displayName || '').slice(0, 60), uname: String(S.profile?.username || '').slice(0, 30) }); } catch (e) { console.warn('auto timeout', e.code); }
+  try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: S.user.uid, targetUid: S.user.uid, postId: '', reason: `🤖 Auto timeout (1 hour): ${reason}${word ? ` (“${word}”)` : ''}. Lift it or keep it.`, excerpt: text.slice(0, 300), status: 'open', createdAt: serverTimestamp() }); } catch (e) { console.warn('auto report', e.code); }
+} });
 // Moderators, reports inbox, suspensions (js/moderation.js).
 const mod = createModeration({ publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
   onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
@@ -1277,7 +1286,7 @@ async function pageNotifications(asStudio, token) {
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
   const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', mod: '', mod_invite: '' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
-    if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
+    if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b>${esc(n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;

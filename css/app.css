@@ -1621,3 +1621,8 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .hub-thread { min-height: 60vh; } .hub-thread .mod-tpl { padding: 0 4px; }
 .mod-thread-row { display: flex; padding: 10px; background: linear-gradient(135deg, rgba(138,43,226,.25), rgba(77,163,255,.12)); border: 1px solid rgba(190,150,255,.3); }
 .hub-body textarea, .hub-body input[type=search] { color: #f4f1fa; }
+/* kind-words filter + AI helper label */
+.kind-bad, .kind-bad:focus { border-color: #ff6b8a !important; box-shadow: 0 0 0 3px rgba(255,107,138,.3) !important; }
+.kind-hint { margin: 6px 0 0; padding: 7px 11px; border-radius: 12px; font-size: .82rem; color: #fff; background: linear-gradient(135deg, rgba(138,43,226,.9), rgba(226,68,138,.85)); box-shadow: 0 4px 14px rgba(138,43,226,.35); width: 100%; flex-basis: 100%; }
+.kind-hint mark { background: #ffe066; color: #2a0f3d; border-radius: 4px; padding: 0 3px; font-weight: 800; }
+.ai-tag { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 999px; font-size: .68rem; font-weight: 800; vertical-align: 1px; color: #2a0f3d; background: #c9f2ff; white-space: nowrap; }
