@@ -3,7 +3,7 @@
 // without a purchase). Premium items: letters-only ids, bought with Star Coins through the normal shop purchase.
 import { HALLOWEEN } from './halloween.js';
 export const WSLOTS = ['head', 'hair', 'face', 'ears', 'neck', 'body', 'bottom', 'full', 'feet', 'back', 'bag', 'held', 'wrist', 'hand'];
-export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Hand Items', wrist: 'Bracelets & Watches', hand: 'Rings' };
+export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings & Headphones', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Hand Items', wrist: 'Bracelets & Watches', hand: 'Rings' };
 export const JEWELRY = ['ears', 'neck', 'wrist', 'hand', 'face', 'bag'];
 const C = { pink: '#f4a6c4', red: '#d9505c', blue: '#6f9fe0', navy: '#2f3d6e', green: '#6bb48a', yellow: '#f7d36b', purple: '#9a74d6', white: '#f7f3ee', black: '#34303f', orange: '#f29a5a', mint: '#9fdcc6', lilac: '#c9b3f0', gold: '#ffcf3a', silver: '#d0d8e8', rose: '#f0a0b0', teal: '#3fa6a6', sage: '#9db89a', cream: '#f3e9d6', denim: '#5b7bb0', camel: '#c8955f', mocha: '#8a6a58', blush: '#f2c4c4', butter: '#f6e3a1', sky: '#a9cdea', plum: '#7c4d7e', forest: '#3f6b52' };
 const T = { pink: 'Pink', red: 'Red', blue: 'Blue', navy: 'Navy', green: 'Green', yellow: 'Sunny', purple: 'Purple', white: 'White', black: 'Midnight', orange: 'Orange', mint: 'Mint', lilac: 'Lilac', gold: 'Gold', silver: 'Silver', rose: 'Rose Gold', teal: 'Teal' , sage: 'Sage', cream: 'Cream', denim: 'Denim', camel: 'Camel', mocha: 'Mocha', blush: 'Blush', butter: 'Butter', sky: 'Sky', plum: 'Plum', forest: 'Forest' };
@@ -22,6 +22,7 @@ const BASE = [
   ['heartshade', 'Heart Shades', 'face', 'heart', 'g', ['pink', 'red'], 90, 'r'], ['starshade', 'Star Shades', 'face', 'star', 'a', ['gold', 'purple'], 90, 'r'],
   ['studs', 'Stud Earrings', 'ears', 'stud', 'g', ['silver', 'gold', 'pink'], 0], ['hoops', 'Hoop Earrings', 'ears', 'hoop', 'g', ['gold', 'silver'], 80, 'r'],
   ['stardrop', 'Star Drops', 'ears', 'drop', 'g', ['gold', 'lilac'], 140, 'r'],
+  ['phones', 'Headphones', 'ears', 'phones', 'a', ['pink', 'blue', 'black', 'mint'], 0], ['badge', 'Star Badge', 'neck', 'badge', 'a', ['navy', 'red', 'purple'], 0],
   ['beads', 'Bead Necklace', 'neck', 'beads', 'g', ['pink', 'mint', 'lilac'], 0], ['chain', 'Chunky Chain', 'neck', 'chain', 'b', ['gold', 'silver'], 120, 'r'],
   ['locket', 'Heart Locket', 'neck', 'locket', 'g', ['gold', 'rose'], 160, 'r'], ['medal', 'Star Medal', 'neck', 'medal', 'a', ['gold', 'silver'], 0],
   ['scarf', 'Knit Scarf', 'neck', 'scarf', 'a', ['red', 'blue', 'yellow'], 0], ['tie', 'Neck Tie', 'neck', 'tie', 'b', ['red', 'navy'], 0], ['bowtie', 'Bow Tie', 'neck', 'bowtie', 'a', ['black', 'red', 'purple'], 0],

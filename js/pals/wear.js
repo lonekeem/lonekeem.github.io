@@ -1,6 +1,7 @@
 // Pal wearables, drawn in code in drawPal's local space (head centre (0, hy), radius 9.2; body centre (0, -5.5*bodyG)).
 // They fit every species because they are anchored to the shared head/body/feet layout.
 import { ITEM } from './catalog.js';
+import { WEAR_BY } from './wardrobe.js';
 const TAU = Math.PI * 2;
 function ell(c, x, y, rx, ry, r = 0) { c.beginPath(); c.ellipse(x, y, Math.abs(rx), Math.abs(ry), r, 0, TAU); }
 function shade(hex, k) { const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255; const f = (v) => Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k)); return '#' + ((1 << 24) | (f(r) << 16) | (f(g) << 8) | f(b)).toString(16).slice(1); }
@@ -10,8 +11,24 @@ const fs = (c, f, s) => { c.fillStyle = f; c.strokeStyle = s || shade(f, -0.45);
 export function drawWear(c, layer, outfit, g) {
   if (!outfit) return;
   const slots = layer === 'back' ? ['back'] : layer === 'feet' ? ['feet'] : layer === 'body' ? (g.feet ? ['body'] : ['feet', 'body']) : ['neck', 'face', 'head'];
-  for (const s of slots) { const it = ITEM[outfit[s]]; if (it && it.slot === s) { c.save(); c.lineWidth = 0.8; try { STYLE[it.st] && STYLE[it.st](c, it.col, g); } catch {} c.restore(); } }
+  for (const s of slots) { const it = ITEM[outfit[s]] || WEAR_BY[outfit[s]]; if (it && it.slot === s && !it.hw) { c.save(); c.lineWidth = 0.8; try { STYLE[it.st] && STYLE[it.st](c, it.col, g); } catch {} c.restore(); } }
+  // 💍 2D/flat fallback for jewelry & accessories (earrings, headphones, bracelets, watches, rings) on top of the head pass
+  if (layer === 'head') for (const s of ['ears', 'wrist', 'hand']) { const it = WEAR_BY[outfit[s]]; if (it && it.slot === s && JEWEL2D[it.st]) { c.save(); c.lineWidth = 0.7; try { JEWEL2D[it.st](c, it.col, g); } catch {} c.restore(); } }
 }
+const glint2 = (c, x, y, k, t) => { const v = 0.5 + 0.5 * Math.sin((t || 0) * 0.12 + x); c.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * v})`; starP(c, x, y, k * (0.6 + 0.6 * v), k * 0.2); c.fill(); };
+const gemC = (col) => (/ffcf3a/i.test(col) ? '#fff2a8' : /d0d8e8/i.test(col) ? '#e8f4ff' : col);
+const EARX = 9.5, wx = (g) => 6.9 * g.bodyG;
+const JEWEL2D = {
+  stud(c, col, g) { for (const s of [-1, 1]) { ell(c, s * EARX, g.hy + 1.6, 1.3, 1.3); fs(c, gemC(col), shade(col, -0.5)); glint2(c, s * EARX + 0.5, g.hy + 1.1, 1, g.t); } },
+  hoop(c, col, g) { c.strokeStyle = col; c.lineWidth = 0.9; for (const s of [-1, 1]) { ell(c, s * EARX, g.hy + 3.6, 1.9, 2.2); c.stroke(); } },
+  drop(c, col, g) { for (const s of [-1, 1]) { c.strokeStyle = shade(col, -0.3); c.beginPath(); c.moveTo(s * EARX, g.hy + 1.4); c.lineTo(s * EARX, g.hy + 3); c.stroke(); starP(c, s * EARX, g.hy + 4.4, 2); fs(c, col); glint2(c, s * EARX + 0.6, g.hy + 3.8, 0.9, g.t); } },
+  phones(c, col, g) { c.strokeStyle = col; c.lineWidth = 1.6; c.beginPath(); c.arc(0, g.hy, 10.2, Math.PI * 1.08, Math.PI * 1.92); c.stroke(); for (const s of [-1, 1]) { c.beginPath(); c.roundRect(s * EARX - 2, g.hy - 3, 4, 5.4, 1.6); fs(c, col); } },
+  bracelet(c, col, g) { c.beginPath(); c.roundRect(wx(g) - 0.4, -4.6, 3.4, 1.5, 0.7); fs(c, col); glint2(c, wx(g) + 1.3, -3.9, 0.8, g.t); },
+  beadband(c, col, g) { for (let i = 0; i < 4; i++) { ell(c, wx(g) + i * 0.9, -3.9, 0.6, 0.6); fs(c, i % 2 ? '#ffffff' : col); } },
+  watch(c, col, g) { c.beginPath(); c.roundRect(wx(g) - 0.4, -4.6, 3.4, 1.5, 0.6); fs(c, '#2a2438'); ell(c, wx(g) + 1.3, -3.85, 1.3, 1.3); fs(c, col, '#d0d8e8'); },
+  ring(c, col, g) { c.strokeStyle = col; c.lineWidth = 0.8; ell(c, wx(g) + 1.4, -1.6, 1.1, 1.1); c.stroke(); glint2(c, wx(g) + 2.1, -2.3, 0.7, g.t); },
+  gem(c, col, g) { c.strokeStyle = '#ffcf3a'; c.lineWidth = 0.8; ell(c, wx(g) + 1.4, -1.4, 1.1, 1.1); c.stroke(); c.beginPath(); c.moveTo(wx(g) + 1.4, -4); c.lineTo(wx(g) + 2.6, -2.8); c.lineTo(wx(g) + 1.4, -1.8); c.lineTo(wx(g) + 0.2, -2.8); c.closePath(); fs(c, gemC(col)); glint2(c, wx(g) + 2.2, -3.6, 0.9, g.t); },
+};
 const by = (g) => -5.5 * g.bodyG, bw = (g) => 6.9 * g.bodyG, bh = (g) => 5.3 * g.bodyG;
 function bodyClip(c, g) { ell(c, 0, by(g), bw(g), bh(g)); c.clip(); }
 // shoes sit on the rigged feet (g.feet = [{x,y,r}] from drawPal), or the classic spots
@@ -39,9 +56,15 @@ const STYLE = {
   scarf(c, col, g) { c.beginPath(); c.roundRect(-6.5, g.hy + 4.9, 13, 3, 1.5); fs(c, col); c.beginPath(); c.roundRect(2, g.hy + 6.5, 3, 6, 1.2); fs(c, col); },
   bowtie(c, col, g) { const y = g.hy + 7; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(0, y); c.lineTo(s * 3.6, y - 2); c.lineTo(s * 3.6, y + 2); c.closePath(); fs(c, col); } ell(c, 0, y, 1, 1); fs(c, col); },
   bandana(c, col, g) { const y = g.hy + 5.5; c.beginPath(); c.moveTo(-6, y); c.lineTo(6, y); c.lineTo(0, y + 6); c.closePath(); fs(c, col); c.fillStyle = '#fff'; for (const [x, yy] of [[-2.5, 1.2], [2, 1.4], [0, 3.4]]) { ell(c, x, y + yy, 0.5, 0.5); c.fill(); } },
+  beads(c, col, g) { for (let i = 0; i < 9; i++) { const a = Math.PI * (0.15 + i * 0.0875); ell(c, Math.cos(a) * 6.5, g.hy + 3 + Math.sin(a) * 4, 0.9, 0.9); fs(c, i % 2 ? '#ffffff' : col); } },
+  chain(c, col, g) { c.strokeStyle = col; c.lineWidth = 0.6; for (let i = 0; i < 10; i++) { const a = Math.PI * (0.12 + i * 0.084); ell(c, Math.cos(a) * 6.5, g.hy + 3 + Math.sin(a) * 4, 0.9, 0.6, a); c.stroke(); } },
+  locket(c, col, g) { STYLE.chain(c, col, g); const y = g.hy + 8.2; c.beginPath(); c.moveTo(0, y + 1.6); c.bezierCurveTo(2.6, y - 0.2, 1.2, -2 + y, 0, y - 0.6); c.bezierCurveTo(-1.2, -2 + y, -2.6, y - 0.2, 0, y + 1.6); fs(c, col); glint2(c, 0.8, y - 0.6, 0.9, g.t); },
+  medal(c, col, g) { c.strokeStyle = '#e8434f'; c.lineWidth = 0.9; c.beginPath(); c.moveTo(-5, g.hy + 4.5); c.lineTo(0, g.hy + 7.4); c.lineTo(5, g.hy + 4.5); c.stroke(); ell(c, 0, g.hy + 8.8, 1.9, 1.9); fs(c, col); c.fillStyle = '#fff'; starP(c, 0, g.hy + 8.8, 1.1); c.fill(); },
+  badge(c, col, g) { ell(c, 2.8, g.hy + 9.5, 2, 2); fs(c, col, '#ffcf3a'); c.fillStyle = '#fff'; starP(c, 2.8, g.hy + 9.5, 1.2); c.fill(); },
   pearls(c, col, g) { for (let i = 0; i < 9; i++) { const a = Math.PI * (0.15 + i * 0.0875); ell(c, Math.cos(a) * 6.5, g.hy + 3 + Math.sin(a) * 4, 0.9, 0.9); fs(c, col, '#c8b8a8'); } },
   bell(c, col, g) { c.beginPath(); c.roundRect(-6, g.hy + 5.5, 12, 1.8, 0.9); fs(c, '#e8434f'); ell(c, 0, g.hy + 8.4, 1.6, 1.6); fs(c, col); },
   // ---- face
+  lens(c, col, g) { for (const x of [g.eyeL, g.eyeR]) { ell(c, x, g.ey, 2.7, 2.4); fs(c, '#1a1428', col); } c.strokeStyle = col; c.beginPath(); c.moveTo(g.eyeL + 2.6, g.ey); c.lineTo(g.eyeR - 2.6, g.ey); c.stroke(); },
   round(c, col, g) { c.strokeStyle = col; c.lineWidth = 0.7; for (const x of [g.eyeL, g.eyeR]) { ell(c, x, g.ey, 2.6, 2.6); c.stroke(); } c.beginPath(); c.moveTo(g.eyeL + 2.6, g.ey); c.lineTo(g.eyeR - 2.6, g.ey); c.stroke(); },
   heart(c, col, g) { c.fillStyle = col; c.strokeStyle = shade(col, -0.4); c.lineWidth = 0.5; for (const x of [g.eyeL, g.eyeR]) { const r = 2.6, y = g.ey - 1; c.beginPath(); c.moveTo(x, y + r * 0.9); c.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.7, y - r * 1.3, x, y - r * 0.45); c.bezierCurveTo(x + r * 0.7, y - r * 1.3, x + r * 1.6, y - r * 0.2, x, y + r * 0.9); c.fill(); c.stroke(); } },
   star(c, col, g) { c.fillStyle = '#2a1458'; c.strokeStyle = col; c.lineWidth = 0.7; for (const x of [g.eyeL, g.eyeR]) { starP(c, x, g.ey, 3); c.fill(); c.stroke(); } },

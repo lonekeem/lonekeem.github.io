@@ -128,7 +128,7 @@ export function createZombieGame(ctx) {
     const blobTex = canvasTex(64, 64, (c) => { const g = c.createRadialGradient(32, 32, 4, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); });
     const blobMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false }); const blobGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     // ------------------------------------------------------------ player (your Pal)
-    const look = { ...pal, outfit: { ...(pal.outfit || {}) } }; delete look.outfit.held; delete look.outfit.hand;
+    const look = { ...pal, outfit: { ...(pal.outfit || {}) } }; delete look.outfit.held; // rings (left paw) stay on: the blaster is in the right paw
     const rig = palRig(look); const P3 = rig.obj; const pr0 = new THREE.Group(); pr0.add(P3); scene.add(pr0);
     P3.traverse((o) => { if (o.isMesh && o.material && o.material.isMeshPhysicalMaterial) { const m = o.material; o.material = new THREE.MeshLambertMaterial({ color: m.color, map: m.map, transparent: m.transparent, opacity: m.opacity, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, side: m.side }); m.dispose(); } o.castShadow = false;
       if (o.isMesh && o.geometry && o.geometry.parameters) { const g = o.geometry, q0 = g.parameters, k = g.type + JSON.stringify(q0); let n = LOD.get(k); // lighter copies for a full-screen phone game

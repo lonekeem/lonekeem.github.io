@@ -10,6 +10,7 @@ import { SPEC, SPECIES, stageOf } from './art.js';
 import { ITEM } from './catalog.js';
 import { WEAR_BY } from './wardrobe.js';
 import { dressHalloween } from './halloween3d.js';
+import { accAnchors, dressAccessories } from './acc3d.js';
 import { DANCES3D, clipFor } from './dances3d.js';
 import { gaitPose, jumpPose, plantFeet, springs, advancePhase } from './motion3d.js';
 
@@ -274,7 +275,8 @@ function build(pal) {
     J[n + 'UpperLeg'] = up; J[n + 'LowerLeg'] = lo; J[n + 'Foot'] = ft;
   }
   if (!legs) J.Hips.position.y = 0.95;
-  J.fit = { ar, lr, ua, la, ul, ll, legs, kind };
+  J.fit = { ar, lr, ua, la, ul, ll, legs, kind, bw, arm: armType };
+  accAnchors({ J, H, headR, kind, fit: J.fit, ears: sp.ears }); // 💍 jewelry anchors (ears, face, head, neck, wrist, hand, back) on every body shape
   // tail chain (3 bones) per species
   J.tail = []; const tl = sp.tail;
   if (tl !== 'none') {
@@ -311,10 +313,10 @@ function build(pal) {
     else { const g = mesh(sph(1), c, H); g.scale.set(0.42, 0.2, 0.42); g.position.y = 0.38; if (/top/.test(st)) { g.scale.set(0.26, 0.3, 0.26); g.position.y = 0.62; } } }
   const face = it('face'); if (face && headR && /round|monocle|goggles/.test(face.st || '')) for (const s of face.st === 'monocle' ? [1] : [-1, 1]) { const g = mesh(geo('rim', () => new THREE.TorusGeometry(0.11, 0.018, 8, 20)), mat(face.col || '#3a2a63', { cc: 1 }), H); g.position.set(s * 0.19, 0.06, fz + 0.03); }
   else if (face && headR) for (const s of [-1, 1]) { const g = mesh(geo('lens', () => new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16)), mat(face.col || '#222', { cc: 1 }), H); g.rotation.x = Math.PI / 2; g.position.set(s * 0.19, 0.06, fz + 0.04); }
-  const neck = it('neck'); if (neck) { const n = mesh(geo('scarf', () => new THREE.TorusGeometry(0.26, 0.06, 8, 20)), mat(neck.col || '#ff7ab8'), J.Neck); n.rotation.x = Math.PI / 2; n.position.y = -0.03; }
+  const neck = it('neck'); if (neck && !/pearls|bell/.test(neck.st || '')) { const n = mesh(geo('scarf', () => new THREE.TorusGeometry(0.26, 0.06, 8, 20)), mat(neck.col || '#ff7ab8'), J.Neck); n.rotation.x = Math.PI / 2; n.position.y = -0.03; }
   const body = it('body'); if (body && kind === 'blob') { const t = mesh(sph(1), mat(body.col || '#5aa8ff'), J.Spine); t.scale.set(0.43, 0.33, 0.38); t.position.y = 0.1; const t2 = mesh(sph(1), mat(body.col || '#5aa8ff'), J.Chest); t2.scale.set(0.37, 0.28, 0.32); }
   const feet = it('feet'); if (feet && legs) for (const n of ['Left', 'Right']) { const s = mesh(sph(1), mat(feet.col || '#ff5a6a', { cc: 0.5 }), J[n + 'Foot']); s.scale.set(0.125, 0.08, 0.17); s.position.set(0, -0.01, 0.06); }
-  wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex });
+  wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex, legacyNeck: neck && /pearls|bell/.test(neck.st || '') ? neck : null });
   const pt = pal.pattern; if (pt && pt.startsWith('pt_') && kind === 'blob') { const cols = pt === 'pt_rainbow' ? ['#ff6a7a', '#ffb34a', '#ffe64a', '#6ad870', '#4aa8ff', '#9a6aff'] : pt === 'pt_galaxy' ? ['#3a1a8a', '#ffffff', '#6a3aff'] : pt === 'pt_hearts' ? ['#ff6fae'] : ['#ffe680'];
     for (let i = 0; i < 14; i++) { const a = -1.2 + (i % 7) * 0.4, y = 0.02 + Math.floor(i / 7) * 0.2; const d = mesh(sph(1), mat(cols[i % cols.length], { em: pt === 'pt_galaxy' && i % 3 === 1 ? '#ffffff' : undefined }), J.Spine); d.scale.set(0.04, 0.04, 0.015); d.position.set(Math.sin(a) * 0.47, y, Math.cos(a) * 0.43); d.lookAt(Math.sin(a) * 2, y, Math.cos(a) * 2); } }
   // rare variants (shiny / glow / galaxy / gold / crystal)
@@ -468,7 +470,7 @@ export { DANCES3D };
 export const THREE_VERSION = THREE.REVISION;
 
 // Wardrobe pieces: each is parented to a rig bone, so it moves with every dance and walk.
-function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex }) {
+function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex, legacyNeck }) {
   const W = (s) => { const w = WEAR_BY[of[s]]; return w && !w.hw ? w : undefined; }; // 🎃 Halloween pieces are built by halloween3d.js
   const HX = (s) => { const w = WEAR_BY[of[s]]; return w && w.hw ? w : undefined; };
   if (Object.keys(of).some((s) => HX(s))) dressHalloween({ J, H, headR, fz, legs, kind, X: HX, taken: (s) => !!W(s), tier: gfxLevel() }); const M = (col, o = {}) => { const m = mat(col, { cc: 0.3, ...o }); m.userData.wear = 1; return m; };
@@ -484,19 +486,13 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex }) {
     else if (st === 'bun') mesh(sph(0.13), M(c), H).position.set(0, headR * 1.05, -0.05);
     else if (st === 'quiff') { const q = mesh(sph(1), M(c), H); q.scale.set(0.2, 0.1, 0.18); q.position.set(0, headR * 0.98, headR * 0.35); q.rotation.x = -0.4; } }
   // face
-  w = W('face'); if (w && hd) { const st = w.st, c = w.col; const m = st === 'round' ? metal(c) : M(c, { cc: 1 });
+  w = W('face'); if (w && (hd || (kind === 'jelly' && H))) { const st = w.st, c = w.col; const m = st === 'round' ? metal(c) : M(c, { cc: 1 });
     for (const s of [-1, 1]) { let g; if (st === 'round') { g = mesh(geo('rim2', () => new THREE.TorusGeometry(0.1, 0.016, 10, 24)), m, H); } else if (st === 'heart' || st === 'star') { const sh = new THREE.Shape(); if (st === 'heart') { sh.moveTo(0, -0.08); sh.bezierCurveTo(0.14, 0.02, 0.06, 0.12, 0, 0.05); sh.bezierCurveTo(-0.06, 0.12, -0.14, 0.02, 0, -0.08); } else for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.045 : 0.11; sh[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } g = mesh(geo('sh' + st, () => new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false })), m, H); } else { g = mesh(geo('lens2', () => new THREE.CylinderGeometry(0.1, 0.1, 0.025, 24)), M('#1a1428', { cc: 1 }), H); g.rotation.x = Math.PI / 2; const r = mesh(geo('rim3', () => new THREE.TorusGeometry(0.1, 0.014, 8, 24)), M(c), H); r.position.set(s * 0.19, 0.06, fz + 0.05); }
       g.position.set(s * 0.19, 0.06, fz + 0.05); }
     const br = mesh(cap(0.012, 0.08), m, H); br.rotation.z = Math.PI / 2; br.position.set(0, 0.07, fz + 0.06); }
-  // earrings (hang under the head sides)
-  w = W('ears'); if (w && hd) for (const s of [-1, 1]) { const m = metal(w.col); const y = -headR * 0.15, x = s * headR * 1.0;
-    if (w.st === 'hoop') { const h = mesh(geo('hoop', () => new THREE.TorusGeometry(0.05, 0.01, 8, 20)), m, H); h.position.set(x, y - 0.05, 0); h.rotation.y = Math.PI / 2; }
-    else if (w.st === 'drop') { mesh(sph(0.015), m, H).position.set(x, y, 0); const d = mesh(geo('drp', () => { const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.018 : 0.045; sh[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } return new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: false }); }), m, H); d.position.set(x, y - 0.07, 0); d.rotation.y = Math.PI / 2; }
-    else mesh(sph(0.025), m, H).position.set(x, y, 0.02); }
   // neck
   w = W('neck'); if (w) { const st = w.st, c = w.col, N = J.Neck;
-    if (st === 'beads' || st === 'chain') { const n = st === 'chain' ? 14 : 18; for (let i = 0; i < n; i++) { const a = -Math.PI * 0.9 + i * (Math.PI * 1.8) / (n - 1); const b = st === 'chain' ? mesh(geo('lnk', () => new THREE.TorusGeometry(0.03, 0.011, 8, 14)), metal(c), N) : mesh(sph(0.026), M(i % 2 ? '#ffffff' : c, { cc: 1 }), N); b.position.set(Math.sin(a) * 0.3, -0.06 - Math.cos(a) * 0.03 - (1 - Math.abs(a) / 3) * 0.06, Math.cos(a) * 0.29); b.rotation.y = a + (i % 2) * 1.57; } }
-    else if (st === 'locket' || st === 'medal') { const r = mesh(geo('cord', () => new THREE.TorusGeometry(0.28, 0.01, 6, 30)), st === 'medal' ? M('#e8434f') : metal(c), N); r.rotation.x = Math.PI / 2 + 0.25; r.position.y = -0.06; const p = mesh(st === 'medal' ? geo('mdl', () => new THREE.CylinderGeometry(0.06, 0.06, 0.015, 24)) : sph(0.05), metal(c), N); p.position.set(0, -0.2, 0.3); if (st === 'medal') p.rotation.x = Math.PI / 2; else p.scale.z = 0.4; }
+    if (['beads', 'chain', 'locket', 'medal', 'badge'].includes(st)) { /* 💍 built by acc3d.js */ }
     else if (st === 'scarf') { const n = mesh(geo('scarf2', () => new THREE.TorusGeometry(0.27, 0.07, 10, 24)), M(c), N); n.rotation.x = Math.PI / 2; n.position.y = -0.04; const t = mesh(cap(0.06, 0.18), M(c), N); t.position.set(0.12, -0.2, 0.28); t.rotation.z = 0.2; }
     else if (st === 'tie') { const t = mesh(cone(0.06, 0.3), M(c), N); t.rotation.x = Math.PI; t.position.set(0, -0.22, 0.34); t.scale.z = 0.3; mesh(sph(0.04), M(c), N).position.set(0, -0.06, 0.32); }
     else if (st === 'bowtie') for (const s of [-1, 1]) { const b = mesh(cone(0.06, 0.12), M(c), N); b.position.set(s * 0.055, -0.07, 0.31); b.rotation.z = s * Math.PI / 2; } }
@@ -543,11 +539,8 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex }) {
     else if (st === 'ball') mesh(sph(0.09), M(c, { cc: 0.7 }), g).position.y = 0.02;
     else if (st === 'mic') { mesh(cap(0.018, 0.12), M('#2a2438'), g).position.y = 0.04; mesh(sph(0.04), metal(c), g).position.y = 0.14; }
     else if (st === 'umbrella') { const s = mesh(cap(0.01, 0.5), M('#5a4a3a'), g); s.position.y = 0.25; const d = mesh(geo('umb', () => new THREE.SphereGeometry(0.3, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2)), M(c), g); d.material.side = THREE.DoubleSide; d.position.y = 0.5; } }
-  // wrist + ring (left arm so they show with a held item)
-  w = W('wrist'); if (w) for (const n of ['LeftLowerArm']) { const lo = J[n]; if (!lo) continue; const st = w.st, c = w.col;
-    if (st === 'beadband') for (let i = 0; i < 10; i++) { const a = i * 0.628; mesh(sph(0.018), M(i % 2 ? '#ffffff' : c, { cc: 1 }), lo).position.set(Math.sin(a) * 0.085, -0.22, Math.cos(a) * 0.085); }
-    else { const b = mesh(geo('brc', () => new THREE.TorusGeometry(0.085, 0.016, 8, 24)), st === 'watch' ? M('#2a2438') : metal(c), lo); b.rotation.x = Math.PI / 2; b.position.y = -0.22; if (st === 'watch') { const f = mesh(geo('wf', () => new THREE.CylinderGeometry(0.04, 0.04, 0.02, 20)), M(c, { em: c === '#8a55dc' ? c : undefined, cc: 1 }), lo); f.position.set(0, -0.22, 0.09); f.rotation.x = Math.PI / 2; } } }
-  w = W('hand'); if (w && J.LeftHand) { const r = mesh(geo('ring', () => new THREE.TorusGeometry(0.03, 0.009, 8, 18)), metal(w.st === 'gem' ? '#ffcf3a' : w.col), J.LeftHand); r.position.set(0, -0.1, 0.03); if (w.st === 'gem') mesh(sph(0.022), M(w.col, { cc: 1, em: w.col }), J.LeftHand).position.set(0, -0.07, 0.04); }
+  // 💍 jewelry & accessories (earrings/headphones, necklaces, bracelets/watches, rings): js/pals/acc3d.js
+  dressAccessories({ J, W, tier: gfxLevel(), fz, hat: !!(W('head') || HX('head')), clothed: !!(W('body') || W('full') || HX('full')), legacyNeck });
 }
 const C_RED = '#e8434f';
 // Store thumbnails: the REAL 3D item rendered on the user's own Pal (only that item worn), framed on the slot.

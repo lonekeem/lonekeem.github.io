@@ -533,7 +533,8 @@ export function createPark3D(ctx) {
       // others: interpolate, LOD (full rig near, simple pose far, hidden very far)
       const nowMs = Date.now(); for (const o of others3D()) {
         if (blocked.has(o.uid) || nowMs - o.at > STALE_MS * 2) { drop(o.uid); continue; }
-        if (!o.obj && o.pal) { try { o.obj = palObj(o.pal, !LOW); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
+        if (o.obj && o.pal) { const lk = JSON.stringify([o.pal.species, o.pal.variant || '', o.pal.outfit || {}]); if (o.objKey && o.objKey !== lk) { scene.remove(o.obj); o.obj = null; } } // re-dress when they change outfit/accessories
+        if (!o.obj && o.pal) { try { o.obj = palObj(o.pal, !LOW); o.objKey = JSON.stringify([o.pal.species, o.pal.variant || '', o.pal.outfit || {}]); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
         const k = Math.min(1, dt * 8); const px = o.x, pz = o.z; o.x += (o.tx - o.x) * k; o.z += (o.tz - o.z) * k; const mvd = Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
         const gy = floorAt(o.x, o.z, o.y + 0.3); o.y += ((o.th != null ? Math.max(o.th, gy - 0.05) : gy) - o.y) * Math.min(1, dt * 10);
         if (o.tr != null) { let dy = o.tr - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 10); } else if (mvd > 0.3) o.yaw = Math.atan2(o.x - px, o.z - pz);

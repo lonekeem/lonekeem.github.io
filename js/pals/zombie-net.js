@@ -22,7 +22,7 @@ export const zText = (em) => { if (em >= 500) { const d = EMOTE_BY_ID[zEmoteOf(e
 const CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 5 }, () => CH[Math.floor(Math.random() * CH.length)]).join('');
 export const cleanCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 5);
-export function palSnap(p) { const o = { ...(p.outfit || {}) }; delete o.held; delete o.hand;
+export function palSnap(p) { const o = { ...(p.outfit || {}) }; delete o.held; // rings stay (left paw)
   return { species: String(p.species || 'kemy').slice(0, 30), name: String(p.name || '').slice(0, 30), colors: p.colors || {}, outfit: o, level: Number(p.level) || 1, variant: p.variant || '', pattern: p.pattern || 'none' }; }
 const ms = (t) => (t && t.toMillis ? t.toMillis() : 0);
 export function createNet(db, uid) {

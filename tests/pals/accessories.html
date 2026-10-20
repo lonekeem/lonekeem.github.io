@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:0;background:#1f1040"><canvas id="c" width="1170" height="1600" style="width:100%"></canvas>
+<script type="module">
+// 💍 Jewelry & accessories grid. ?sp=a,b ?of=JSON-list of outfits ?ids=a,b (one item per cell) ?z=size ?h=cellH ?dy=feet offset ?yaw ?gfx=low|high|flat ?cols
+import { drawPal3D, setGfx } from '../../js/pals/pal3d.js';
+import { drawPal } from '../../js/pals/art.js';
+import { WEAR, WEAR_BY } from '../../js/pals/wardrobe.js';
+const q = new URLSearchParams(location.search); const gfx = q.get('gfx'); if (gfx) setGfx(gfx);
+const SP = (q.get('sp') || 'kemy,penguin,owl,jelly,starsprite,cloudpuff').split(',');
+const OFS = q.get('of') ? JSON.parse(q.get('of')) : (q.get('ids') || WEAR.filter((w) => ['ears', 'neck', 'wrist', 'hand', 'face'].includes(w.slot) && !w.hidden && !w.hw).map((w) => w.id).join(',')).split(',').map((id) => ({ [WEAR_BY[id].slot]: id }));
+const cols = +(q.get('cols') || 3), cv = document.getElementById('c'), W = cv.width / cols, Hh = +(q.get('h') || 380), SZ = +(q.get('z') || 200), DY = +(q.get('dy') || 0);
+const cells = q.get('cross') ? SP.flatMap((sp) => OFS.map((of) => [sp, of])) : OFS.map((of, i) => [SP[i % SP.length], of]);
+cv.height = Math.ceil(cells.length / cols) * Hh; const c = cv.getContext('2d'); c.font = '600 22px sans-serif';
+const done = []; let t = 0; const go = () => { t++; let all = true, n = 0;
+  cells.forEach(([sp, of], i) => { if (done[i]) return; if (n++ > 3) { all = false; return; } const x = (i % cols) * W, y = Math.floor(i / cols) * Hh;
+    c.save(); c.beginPath(); c.rect(x, y, W, Hh); c.clip(); const pal = { species: sp, level: 6, outfit: of };
+    let ok = gfx === 'flat' ? (drawPal(c, x + W / 2, y + Hh - 10 + DY, SZ, pal, { t: 30, mode: 'idle' }), true) : drawPal3D(c, x + W / 2, y + Hh - 10 + DY, SZ, pal, { t: 47, mode: 'idle', yaw: +(q.get('yaw') || 0.35) });
+    if (ok) { done[i] = 1; c.fillStyle = '#fff'; c.fillText(sp + ' · ' + Object.values(of).map((id) => (WEAR_BY[id] || {}).name || id).join(' + '), x + 8, y + 26); } else all = false; c.restore(); });
+  if (!all && t < 1200) requestAnimationFrame(go); else window.ready = true; };
+window.onerror = (m) => { window.err = (window.err || '') + m + '\n'; };
+setTimeout(go, 300);
+</script>
