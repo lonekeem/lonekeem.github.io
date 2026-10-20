@@ -527,7 +527,7 @@ export function createShowGame(ctx) {
     const onHash = () => { if (!/^#\/arcade\/show/.test(location.hash)) destroy(); }; addEventListener('hashchange', onHash);
     // host handoff while playing: if I become host without a local copy, adopt the shared state
     const adoptIv = setInterval(() => { if (destroy.done) return clearInterval(adoptIv); if (started && isHost() && !hs) adopt(); }, 1000);
-    window.__show = { get state() { const st = shared(); return st && { ph: st.ph, rd: st.rd, round: st.plan && st.plan[st.rd], light, alive: st.alive.length, out: st.out.length, me: { x: +me.x.toFixed(1), z: +me.z.toFixed(1), y: +me.y.toFixed(1), st: me.st, out: me.out, sc: me.sc }, host: isHost(), champ: st.champ, fps: dbg.fps, players: ppl.size, survived, dia: diaNow(st) }; }, result: null };
+    window.__show = { get state() { const st = shared(); return st && st.plan && { ph: st.ph, rd: st.rd, round: st.plan && st.plan[st.rd], light, alive: st.alive.length, out: st.out.length, me: { x: +me.x.toFixed(1), z: +me.z.toFixed(1), y: +me.y.toFixed(1), st: me.st, out: me.out, sc: me.sc }, host: isHost(), champ: st.champ, fps: dbg.fps, players: ppl.size, survived, dia: diaNow(st) }; }, result: null };
     raf = requestAnimationFrame(loop);
     const startMusic = () => import('../gamemusic.js').then(async (gm) => { await gm.mountGameMusic({ corner: 'top-right' }); const r = document.getElementById('game-music'); if (r) { r.style.zIndex = '950'; r.classList.add('top-right'); } if (gm.state().volume > 0.2) gm.setVolume(0.2); if (!gm.isPlaying()) { const b = document.querySelector('#game-music [data-st="theme"]'); if (b) b.click(); else gm.play(); } }).catch(() => {});
     C.tutorial().then(() => { begin(); startMusic(); });
