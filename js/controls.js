@@ -7,6 +7,8 @@
 // Keyboard + mouse also work (WASD/arrows, Shift run, Space jump, mouse drag to look).
 // Usage: const c = createControls(host, { buttons:[...], tutorialKey:'zombie', tips:[...] });
 //        each frame: c.move -> {x,y,mag}, c.takeLook() -> {dx,dy}, c.down('fire'); c.on('jump', fn); c.destroy().
+import { installNoZoom } from './no-zoom.js';
+installNoZoom();
 const KEY = 'kemy-controls';
 export const DEFAULTS = { size: 72, sens: 1, left: false, opacity: 0.75, haptics: true };
 export function loadSettings() { try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY)) || {}) }; } catch { return { ...DEFAULTS }; } }
