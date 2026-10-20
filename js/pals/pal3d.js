@@ -484,3 +484,9 @@ function grip(m, amt, mode, t) {
   if (J.twoHand && J.LeftUpperArm) { const k2 = 1 - Math.min(1, amt) * 0.7; J.LeftUpperArm.rotation.x += -0.9 * k2; J.LeftUpperArm.rotation.z += 0.55 * k2; J.LeftLowerArm.rotation.x += 1.1 * k2;
     J.RightLowerArm.rotation.x += Math.sin(t * 0.5) * 0.15 * k2; }
 }
+// A live rigged Pal for your own three.js scene (Pal Park 3D, arcade games). pose(mode, t, extra) applies the
+// everyday motions (idle/walk/hop/happy...) plus optional joint overrides in the dances3d.js format.
+export function palRig(pal) {
+  const m = build(pal);
+  return { obj: m, pose(mode = 'idle', t = 0, extra) { let P = modePose(mode, t); if (extra) P = { ...P, ...extra }; if (!sane(P)) P = modePose('idle', t); apply(m, P, t, mode); grip(m, 0, mode, t); } };
+}

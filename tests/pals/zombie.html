@@ -1,0 +1,9 @@
+<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Zombie harness</title>
+<body style="margin:0;background:#000"><script type="module">
+// Offline harness for Pal Zombie Survival (no account / Firebase writes): ?species=bear&inv=z_foam,z_star
+const q = new URLSearchParams(location.search); const { createZombieGame } = await import('../../js/pals/zombie.js');
+const inv = Object.fromEntries((q.get('inv') || '').split(',').filter(Boolean).map((k) => [k, 1]));
+if (q.get('armor')) localStorage.setItem('kemy-z-armor', q.get('armor'));
+const z = createZombieGame({ S: { user: { uid: 'harness' } }, db: null, toast: console.log });
+window.__zg = await z.open({ pal: { species: q.get('species') || 'bear', name: 'Test', level: 6, colors: {}, outfit: q.get('outfit') ? JSON.parse(q.get('outfit')) : {} }, inv });
+</script>

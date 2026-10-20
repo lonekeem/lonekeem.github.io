@@ -67,7 +67,11 @@ export const EARN = { daily: [50, 50], care: [5, 60], win: [25, 150], quest: [10
 export function shopDoc() {
   const prices = {}, kinds = {};
   for (const i of ITEMS) if (!i.ach) { prices[i.id] = i.p; kinds[i.id] = i.kind; }
-  return { prices, kinds, deals: DEALS, v: 1 };
+  const dprices = {}; for (const i of DITEMS) { dprices[i.id] = i.d; kinds[i.id] = i.kind; }
+  return { prices, kinds, deals: DEALS, dprices, v: 1 };
 }
 // Items registered at runtime (dances from js/pals/dance.js + data/pal-dances.json). They join shopDoc() too.
 export function addItems(list) { for (const it of list) if (!ITEM[it.id]) { ITEMS.push(it); ITEM[it.id] = it; } }
+// Diamond-priced items (Zombie Armory). Checked by firestore.rules against config/palShop.dprices.
+export const DITEMS = [];
+export function addDiamondItems(list) { for (const it of list) if (!DITEMS.some((x) => x.id === it.id)) DITEMS.push(it); }

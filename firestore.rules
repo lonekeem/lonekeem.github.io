@@ -1300,6 +1300,37 @@ service cloud.firestore {
         || (changed().hasOnly(['room', 'updatedAt']) && roomOk()));
       allow delete: if signedIn() && uid == me();
     }
+    // Diamonds (Pal Zombie Survival currency): earned once per finished run (max 250 per run, 1500 per day,
+    // one run reward every 45 s), spent only on config/palShop.dprices items (inv doc written in the same batch).
+    match /users/{uid}/pal/diamonds {
+      function d() { return request.resource.data; }
+      function od() { return resource.data; }
+      function dDay() { return int(request.time.toMillis() / 86400000); }
+      function dShop() { return get(/databases/$(database)/documents/config/palShop).data; }
+      function dShape() {
+        return d().keys().hasOnly(['d', 'total', 'day', 'today', 'last', 'lastBuy', 'paid', 'buyAt', 'updatedAt'])
+          && d().d is int && d().d >= 0 && d().total is int && d().day is int && d().today is int && d().paid is int
+          && d().lastBuy is string && d().updatedAt == request.time;
+      }
+      function dAmt() { return d().d - od().d; }
+      function dEarnOk() {
+        return dAmt() > 0 && dAmt() <= 250 && d().total == od().total + dAmt() && d().day == dDay() && d().last == request.time
+          && od().last + duration.value(45, 's') < request.time
+          && d().today == (od().day == dDay() ? od().today : 0) + dAmt() && d().today <= 1500;
+      }
+      function dBuyOk() {
+        return d().paid == od().d - d().d && d().paid > 0 && d().buyAt == request.time
+          && d().lastBuy in dShop().get('dprices', {}) && d().paid == dShop().dprices[d().lastBuy]
+          && getAfter(/databases/$(database)/documents/users/$(uid)/inv/$(d().lastBuy)).data.at == request.time;
+      }
+      allow read: if true;
+      allow create: if signedIn() && uid == me() && dShape() && d().d == 0 && d().total == 0 && d().today == 0 && d().paid == 0
+        && d().lastBuy == '' && d().last == request.time && d().day == dDay();
+      allow update: if signedIn() && uid == me() && dShape() && (
+        (changed().hasOnly(['d', 'total', 'day', 'today', 'last', 'updatedAt']) && dEarnOk())
+        || (changed().hasOnly(['d', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && dBuyOk()));
+      allow delete: if signedIn() && uid == me();
+    }
     // Talk to your Pal: short chat memory (last messages + a few facts), owner-only
     match /users/{uid}/pal/chat {
       allow read, delete: if signedIn() && uid == me();
@@ -1322,6 +1353,8 @@ service cloud.firestore {
       function oldN() { return resource == null ? 0 : resource.data.n; }
       function kind() { return get(/databases/$(database)/documents/config/palShop).data.kinds[item]; }
       function bought() { return getAfter(walletPath()).data.buyAt == request.time && getAfter(walletPath()).data.lastBuy == item; }
+      function dPath() { return /databases/$(database)/documents/users/$(uid)/pal/diamonds; }
+      function dBought() { return getAfter(dPath()).data.buyAt == request.time && getAfter(dPath()).data.lastBuy == item; }
       function achOk() {
         return oldN() == 0 && v().n == 1 && (
           (item == 'ach_glow' && v().proof is string && v().proof.matches('^p[1-6]$')
@@ -1338,6 +1371,8 @@ service cloud.firestore {
         && v().keys().hasOnly(['n', 'at', 'proof']) && v().n is int && v().at == request.time && (
           // bought: +1 together with the wallet purchase (wearables, decor and toys are one each)
           (v().n == oldN() + 1 && bought() && (kind() == 'snack' || v().n == 1))
+          // bought with Diamonds (Zombie Armory, one each)
+          || (v().n == 1 && oldN() == 0 && item.matches('^z_[a-z_]+$') && dBought())
           // used up a snack or toy
           || (resource != null && v().n == oldN() - 1 && v().n >= 0)
           // achievement reward, checked against real progress

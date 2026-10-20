@@ -35,7 +35,7 @@ export function createPark(ctx) {
   let stop = null;
   async function page() {
     if (!requireAuth()) return; if (stop) stop();
-    main.innerHTML = `<section class="park"><div class="park-top"><b>🌳 Pal Park</b><span id="park-zone" class="park-zone"></span><span id="park-room" class="muted small"></span><a class="btn btn-sm btn-ghost" href="#/pals">Leave</a></div>
+    main.innerHTML = `<section class="park"><div class="park-top"><b>🌳 Pal Park</b><span id="park-zone" class="park-zone"></span><span id="park-room" class="muted small"></span><a class="btn btn-sm" href="#/arcade" id="park-arcade">🎮 Arcade</a><a class="btn btn-sm btn-ghost" href="#/pals">Leave</a></div>
       <div class="park-view"><canvas id="park-cv" tabindex="0" aria-label="Pal Park. Use arrow keys or WASD to walk."></canvas>
         <div class="park-joy" id="park-joy" aria-hidden="true"><i></i></div>
         <div class="park-btns"><button class="btn btn-sm" id="pk-emote" aria-label="Emotes">😊</button><button class="btn btn-sm" id="pk-chat" aria-label="Chat">💬</button><button class="btn btn-sm" id="pk-act" aria-label="Pet nearby Pal" disabled>🐾</button></div>

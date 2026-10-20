@@ -581,6 +581,7 @@ const routes = [
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
   [/^#\/pals(?:\/(gallery|shop|store|store-bg))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
   [/^#\/park$/, () => park.page(), 'me'],
+  [/^#\/arcade(?:\/([\w-]+))?$/, (id) => import('./pals/minigames.js').then((m) => (arcade = arcade || m.createArcade({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal })).page(id)), 'games'],
   [/^#\/scores(?:\/([\w-]+))?(?:\?(.*))?$/, (g, q, t) => import('./leaderboard.js').then((m) => m.scoreboardPage(main, { game: g || 'all', tab: new URLSearchParams(q || '').get('tab') || 'all', S, stale: () => stale(t) })), 'games'],
   [/^#\/games\/pals(?:\/([\w-]+))?(?:\?(.*))?$/, (b, q) => palGames.page(b, Object.fromEntries(new URLSearchParams(q || ''))), 'games'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
@@ -672,6 +673,7 @@ const live = createLive({ palLive: (root, o) => pals.liveOverlay(root, o),
 });
 const pals = createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth, notify });
 const palGames = createPalGames({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal });
+let arcade = null;
 const park = createPark({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal });
 const games = createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile });
 const search = createSearch({
@@ -1257,13 +1259,14 @@ async function pageNotifications(asStudio, token) {
 // ---------------------------------------------------------------- admin
 // All shop items (base catalog + Pal Store outfits/looks/backgrounds/Rare Pals + dances), same doc the Dance Shop button writes.
 async function adminShopDoc() {
-  await import('./pals/store.js'); const du = await import('./pals/dance-ui.js'); await du.registerDanceItems();
+  await import('./pals/store.js'); await import('./pals/armory.js'); const du = await import('./pals/dance-ui.js'); await du.registerDanceItems();
   return (await import('./pals/catalog.js')).shopDoc();
 }
 async function adminShopStatus() {
   const want = await adminShopDoc(); const s = await getDoc(doc(db, 'config', 'palShop'));
-  const live = (s.exists() && s.data().prices) || {}; const ids = Object.keys(want.prices);
-  const missing = ids.filter((id) => !(id in live)), wrong = ids.filter((id) => id in live && live[id] !== want.prices[id]);
+  const lp = (s.exists() && s.data().prices) || {}, ld = (s.exists() && s.data().dprices) || {};
+  const live = { ...lp, ...Object.fromEntries(Object.entries(ld).map(([k, v]) => ['d:' + k, v])) }, wp = { ...want.prices, ...Object.fromEntries(Object.entries(want.dprices || {}).map(([k, v]) => ['d:' + k, v])) }; const ids = Object.keys(wp);
+  const missing = ids.filter((id) => !(id in live)), wrong = ids.filter((id) => id in live && live[id] !== wp[id]);
   return { want, total: ids.length, live: ids.length - missing.length, missing, wrong };
 }
 async function pageAdmin(token) {
@@ -1280,7 +1283,7 @@ async function pageAdmin(token) {
   main.innerHTML = `<h1 class="page-title">🛡️ Admin</h1>
     <p class="muted small">Signed in as ${esc(S.user.email)}. Only you can see this page.</p>
     <div class="card pad adm-tool" style="margin-bottom:14px;border:2px solid var(--blue)"><b style="font-size:1.15rem">🛍️ Publish shop prices</b>
-      <p class="muted small" style="margin:3px 0 8px">Sends every price in the app (dances, outfits, jewelry, looks, backgrounds, Rare Pals and pal items) to the live shop, so people can buy them.</p>
+      <p class="muted small" style="margin:3px 0 8px">Sends every price in the app (dances, outfits, jewelry, looks, backgrounds, Rare Pals, pal items and Zombie Armory items in ★ and 💎) to the live shop, so people can buy them.</p>
       <p class="small" id="shop-status">Checking the live shop…</p>
       <button class="btn" id="shop-pub" style="font-size:1.05rem;padding:12px 22px">Publish shop prices</button></div>
     ${big('founder', '👑', 'Kemy (Founder) Pal', 'Your admin-only Pal: the Kemy app-icon axolotl, 1.2x size, crown and sparkles. Keeps your Pal’s name, level and outfit. Only your verified admin account can use it.', '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" id="adm-founder">👑 Make my active Pal the Founder</button><button class="btn btn-sm btn-ghost" id="adm-founder-off">Switch back</button></div>')}
