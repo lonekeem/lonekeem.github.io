@@ -4,7 +4,7 @@ import { EMOTE_DANCES, allDances, ownsDance, setOwned, loadTrends } from './danc
 import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 // load which dances/emotes the player owns (inv dn_* and premium z_dn_*); cheap, cached per session
 let ownedP = null;
-export function loadOwnedEmotes(db, uid, force) { if (!uid) return Promise.resolve(); if (!ownedP || force) ownedP = Promise.all([loadTrends(), getDocs(collection(db, 'users', uid, 'inv'))]).then(([, s]) => { setOwned(s.docs.filter((d) => (d.id.startsWith('dn_') || d.id.startsWith('z_dn_')) && (d.data().n || 0) > 0).map((d) => d.id)); }).catch(() => {}); return ownedP; }
+export function loadOwnedEmotes(db, uid, force) { if (!uid || !db) return Promise.resolve(); if (!ownedP || force) ownedP = Promise.resolve().then(() => Promise.all([loadTrends(), getDocs(collection(db, 'users', uid, 'inv'))])).then(([, s]) => { setOwned(s.docs.filter((d) => (d.id.startsWith('dn_') || d.id.startsWith('z_dn_')) && (d.data().n || 0) > 0).map((d) => d.id)); }).catch(() => {}); return ownedP; }
 
 export const QUICK_TABS = [
   { id: 'hi', icon: '👋', name: 'Hi', list: ['Hi! 👋', 'Hello friend!', 'Hey there!', 'Good morning! ☀️', 'Good night! 🌙', 'Welcome!', 'Bye! 👋', 'See you soon!'] },

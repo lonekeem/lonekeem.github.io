@@ -306,8 +306,8 @@ export function createZombieGame(ctx) {
     // quick-chat / emote: speech bubble over your Pal, synced to the team through the em index (see zombie-net.js)
     let lastEm = 0;
     function zEm(i, text) { if (Date.now() - lastEm < 1200) return; lastEm = Date.now(); me.em = i; me.emAt = Date.now(); myBubble.material.map = nameTex(text); myBubble.visible = true; myBubT = 3; if (coop) sendMe(true); }
-    loadOwnedEmotes(db, uid);
-    $('[data-t="wheel"]').onclick = () => { $('.zg-emo').hidden = true; loadOwnedEmotes(db, uid).then(() => openWheel({ onEmote: (id) => { const i = zEmoteIdx(id); me.emo = id; me.emoUntil = performance.now() + emoteMs(id); if (i >= 0) zEm(i, zText(i)); }, onLocked: (d) => msg(`🔒 ${d.name}: unlock it in the Dance Shop`, 1.6) })); };
+    try { loadOwnedEmotes(db, uid)?.catch?.(() => {}); } catch {} // no db (offline/test page) → free emotes only
+    $('[data-t="wheel"]').onclick = () => { $('.zg-emo').hidden = true; Promise.resolve().then(() => loadOwnedEmotes(db, uid)).catch(() => {}).then(() => openWheel({ onEmote: (id) => { const i = zEmoteIdx(id); me.emo = id; me.emoUntil = performance.now() + emoteMs(id); if (i >= 0) zEm(i, zText(i)); }, onLocked: (d) => msg(`🔒 ${d.name}: unlock it in the Dance Shop`, 1.6) })); };
     // ------------------------------------------------------------ loop
     const zDummy = new THREE.Matrix4(), q = new THREE.Quaternion(), e3 = new THREE.Euler(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), M = new THREE.Matrix4(), pm = new THREE.Matrix4();
     let last = performance.now(), raf = 0, fpsT = 0, fpsN = 0, slowFor = 0;
