@@ -10,6 +10,7 @@ import { SPEC, SPECIES, stageOf } from './art.js';
 import { ITEM } from './catalog.js';
 import { WEAR_BY } from './wardrobe.js';
 import { DANCES3D, clipFor } from './dances3d.js';
+import { gaitPose, jumpPose, plantFeet, springs, advancePhase } from './motion3d.js';
 
 const D = Math.PI / 180;
 let R = null, scene, cam, keyL, shadowPlane;
@@ -273,8 +274,11 @@ const spring = new WeakMap();
 // breathing, blinks, foot-planted knee IK for crouches/weight shifts, and follow-through on head, ears, tail.
 function apply(rootObj, P, t, mode) {
   const { J, legs } = rootObj.userData; const L = J.legL;
-  J.Hips.position.set(P.hx || 0, (legs ? 0.64 : 0.95) + (P.hy || 0), P.hz || 0);
+  // standing knees keep a soft bend (hips 2 cm under full leg reach) so small hip rises never lift the feet
+  J.Hips.position.set(P.hx || 0, (legs ? 0.622 : 0.95) + (P.hy || 0), P.hz || 0);
   J.Hips.rotation.set(P.hrx || 0, P.hry || 0, P.hrz || 0);
+  const sq = clamp1(P.sq || 0); J.Hips.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5); // squash & stretch (jumps)
+  for (const [n, s, v] of [['Left', 1, P.shL], ['Right', -1, P.shR]]) if (J[n + 'Shoulder']) J[n + 'Shoulder'].rotation.set(v ? v[0] : 0, 0, v ? s * v[1] + (P.sh || 0) * 0 : 0); // shoulder rolls
   J.Spine.rotation.set(P.sx || 0, P.sy || 0, P.sz || 0); J.Chest.rotation.set(P.cx || 0, P.cy || 0, P.cz || 0);
   // head with lag (follow-through)
   const sp = spring.get(rootObj) || { hx: 0, hz: 0, e: 0, tl: 0 }; spring.set(rootObj, sp);
@@ -286,23 +290,25 @@ function apply(rootObj, P, t, mode) {
     const u = J[n + 'UpperArm']; u.rotation.set(-fw * D, tw * D * s, s * ab * D, 'ZXY');
     J[n + 'LowerArm'].rotation.set(-el * D, 0, 0); J[n + 'Hand'].rotation.set(0, 0, s * (P.wr || 0) * D);
   }
-  // legs: [lift°, spread°, extraKnee°], plus foot-planted IK from hip drop/shift
+  // legs: the dance's [lift°, spread°, extraKnee°] as FK, then IK plants the feet (motion3d.js plantFeet):
+  // planted feet stay locked on the ground through hip sway, dips and weight shifts; lifted feet follow the dance
+  void L;
   if (legs) for (const [n, s, lg] of [['Left', 1, P.lL], ['Right', -1, P.lR]]) {
     const [lift = 0, spr = 0, kn = 0] = lg || [];
-    const drop = Math.max(0, -(P.hy || 0) + s * (P.hx || 0) * 0.35); const a = Math.acos(Math.max(0.2, Math.min(1, (L - drop) / L)));
-    J[n + 'UpperLeg'].rotation.set(-a - lift * D, 0, s * spr * D - (P.hrz || 0));
-    J[n + 'LowerLeg'].rotation.set(2 * a + kn * D, 0, 0); J[n + 'Foot'].rotation.set(-a + (lift - kn) * D * 0.5, 0, 0);
+    J[n + 'UpperLeg'].rotation.set(-lift * D, 0, s * spr * D - (P.hrz || 0));
+    J[n + 'LowerLeg'].rotation.set(kn * D, 0, 0); J[n + 'Foot'].rotation.set((lift - kn) * D * 0.5, 0, 0);
   }
+  plantFeet(rootObj, P, legs);
   // life: breathing, blink, ears + tail spring
   const br = Math.sin(t * 0.05) * 0.015; J.Chest.scale.set(1 + br, 1 + br, 1 + br);
   const shut = (Math.floor(t / 4) % 55 === 0) || mode === 'sleep'; for (const e of J.eyes) { const l = e.userData.lid; if (l) { l.position.y += ((shut ? l.userData.shut : l.userData.open) - l.position.y) * 0.6; l.visible = l.position.y < l.userData.open * 0.95; } }
-  sp.e += ((-(P.hy || 0) * 3 + (P.hrz || 0)) - sp.e) * 0.15;
-  J.ears.forEach((e, i) => { e.rotation.x = sp.e * 0.4; e.rotation.y = e.userData.flap ? (i ? 1 : -1) * (Math.sin(t * 0.09) * 0.18 + (mode === 'react' ? Math.sin(t * 0.6) * 0.4 : 0)) : 0; e.userData.z ??= e.rotation.z; e.rotation.z = e.userData.z + Math.sin(t * 0.07 + i) * 0.04 + (i ? -1 : 1) * sp.e * 0.2; });
-  sp.tl += ((P.hrz || 0) * -2 + (P.hx || 0) * -2 - sp.tl) * 0.12;
-  J.tail.forEach((b, i) => { if (i) b.rotation.set(0.3, 0, Math.sin(t * (P.tw || 0.1) - i * 0.6) * 0.25 + sp.tl * 0.3); else b.rotation.z = Math.sin(t * (P.tw || 0.1)) * 0.3 + sp.tl; });
-  if (J.tent) J.tent.forEach((b, i) => { b.rotation.x = Math.sin(t * 0.12 + i) * 0.3; b.rotation.z = Math.cos(t * 0.1 + i) * 0.2; });
+  const sg = springs(rootObj, P); sp.e = sg.e[0] * 2.2 + (P.hrz || 0) * 0.3; // spring-driven floppy parts
+  J.ears.forEach((e, i) => { e.rotation.x = sp.e * 0.4 + sg.e[0] * 0.3; e.rotation.y = e.userData.flap ? (i ? 1 : -1) * (Math.sin(t * 0.09) * 0.18 + (mode === 'react' ? Math.sin(t * 0.6) * 0.4 : 0)) : 0; e.userData.z ??= e.rotation.z; e.rotation.z = e.userData.z + Math.sin(t * 0.07 + i) * 0.04 + (i ? -1 : 1) * sp.e * 0.2; });
+  sp.tl = sg.tl[0];
+  J.tail.forEach((b, i) => { if (i) b.rotation.set(0.3 + sg.tl[1] * 0.3 * i, 0, Math.sin(t * (P.tw || 0.1) - i * 0.6) * 0.25 + sp.tl * (0.3 + i * 0.12)); else { b.rotation.z = Math.sin(t * (P.tw || 0.1)) * 0.3 + sp.tl; b.rotation.x = sg.tl[1] * 0.3; } });
+  if (J.tent) J.tent.forEach((b, i) => { b.rotation.x = Math.sin(t * 0.12 + i) * 0.3 + sg.e[0] * 0.6; b.rotation.z = Math.cos(t * 0.1 + i) * 0.2 + sg.tl[0] * 0.25; });
   if (J.wings) J.wings.forEach((w, i) => { w.rotation.y = (i ? -1 : 1) * (0.4 + Math.sin(t * 0.3) * 0.3); });
-  if (J.trunk) { const up = mode === 'react' || mode === 'happy'; J.trunk.forEach((b, k) => { b.rotation.x = (up ? -0.45 : -(0.08 + k * 0.06)) + Math.sin(t * 0.08 - k * 0.55) * (0.07 + k * 0.012); b.rotation.z = Math.sin(t * 0.05 - k * 0.4) * 0.05 * k; }); }
+  if (J.trunk) { const up = mode === 'react' || mode === 'happy'; J.trunk.forEach((b, k) => { b.rotation.x = (up ? -0.45 : -(0.08 + k * 0.06)) + Math.sin(t * 0.08 - k * 0.55) * (0.07 + k * 0.012) + sg.e[0] * 0.12 * k; b.rotation.z = Math.sin(t * 0.05 - k * 0.4) * 0.05 * k + sg.e[1] * 0.1 * k; }); }
   J.mouth.scale.set(1, mode === 'eat' || mode === 'happy' ? 1.6 : 1, 1);
 }
 // everyday motions (idle, walk, wave, hop, happy, sleep, eat) in the same joint format
@@ -319,7 +325,11 @@ export function modePose(mode, t) {
   return P;
 }
 const sane = (P) => Object.values(P).every((v) => (Array.isArray(v) ? v.every(Number.isFinite) : typeof v !== 'number' || Number.isFinite(v)));
-function blend(a, b, k) { const o = {}; for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) { const x = a[key], y = b[key]; if (Array.isArray(x) || Array.isArray(y)) { const X = x || [14, 0, 10, 0], Y = y || [14, 0, 10, 0]; o[key] = X.map((v, i) => v + ((Y[i] ?? v) - v) * k); } else o[key] = (x || 0) + ((y || 0) - (x || 0)) * k; } return o; }
+const clamp1 = (v) => Math.max(-0.4, Math.min(0.4, v));
+const FT = new Set(['fL', 'fR']);
+function blend(a, b, k) { const o = {}; for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) { const x = a[key], y = b[key];
+    if (FT.has(key)) { if (x && y) o[key] = x.map((v, i) => v + (y[i] - v) * k); else if (x || y) { const z = x || y; const w = x ? 1 - k : k; o[key] = [z[0] * w, z[1] * w, z[2] * w, z[3] * w, z[4] * w]; } continue; }
+    if (key === 'slide') { o[key] = k > 0.5 ? y : x; continue; } if (Array.isArray(x) || Array.isArray(y)) { const X = x || [14, 0, 10, 0], Y = y || [14, 0, 10, 0]; o[key] = X.map((v, i) => v + ((Y[i] ?? v) - v) * k); } else o[key] = (x || 0) + ((y || 0) - (x || 0)) * k; } return o; }
 // ---------------------------------------------------------------- draw into a 2D canvas (same args as drawPal)
 let frameN = -1, frameCount = 0; const BUDGET = 8;
 let lastF = 0, slow = 0;
@@ -344,12 +354,17 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.variant || '', pal.pattern || '', stageOf(pal.level || 1)]);
   let m = cache.get(key); if (!m) { m = build(pal); cache.set(key, m); if (cache.size > 24) { const k0 = cache.keys().next().value; cache.delete(k0); } }
   const t = st.t || 0;
-  let P = modePose(st.mode || 'idle', t);
+  let P; const md = st.mode || 'idle', ud = m.userData, legs = !!(ud.J.fit && ud.J.fit.legs);
+  if (md === 'walk' || md === 'run' || st.speed != null && st.speed > 0.02) { // real gait (heel-strike, passing, push-off), walk -> run blend
+    const spd = st.speed != null ? st.speed : md === 'run' ? 2 : 1; const ph = advancePhase(ud, t, spd, ud.J.legL || 0.54);
+    P = gaitPose(ph, spd, st.turn || 0, ud.J.legL || 0.54, legs);
+  } else if (md === 'hop') P = jumpPose(((t % 72) + 72) % 72 / 72, 0.45);
+  else P = modePose(md, t);
   if (st.dance3d) { const D3 = clipFor(st.dance3d, m.userData.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
   if (!sane(P)) P = modePose('idle', t); // never leave a broken / T-pose on screen
   // overlap & follow-through: every joint eases toward its target (limbs a bit slower than the hips), so moves and
   // dance changes flow into each other instead of snapping
-  const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * 0.28 : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * 0.42 : b; } P = o; }
+  const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * 0.28 : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * 0.42 : b; } P = o; }
   m.userData.prev = P; m.userData.pt = t;
   if (m.userData.J && m.userData.J.spark) { const g = m.userData.J.spark; g.rotation.y = t * 0.012; g.children.forEach((o) => { const k = 0.6 + 0.5 * Math.sin(t * 0.08 + o.userData.ph); o.scale.setScalar(k); o.rotation.y = t * 0.05; }); }
   apply(m, P, t, st.mode); grip(m, st.dance3d ? st.amt ?? 1 : 0, st.mode, t);

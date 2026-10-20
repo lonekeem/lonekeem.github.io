@@ -3,6 +3,7 @@
 // cx..cz chest, nx/ny/nz head, aL/aR = [abduct°, forward°, elbow°, twist°], lL/lR = [lift°, spread°, extraKnee°],
 // ry whole-body turn. Every clip gets a natural groove layer: a knee bounce on the beat, hip/chest counter-rotation
 // and weight shift toward the supporting leg; the rig adds follow-through on head, ears and tail.
+import { grooveLayer } from './motion3d.js';
 const M = (p) => { const o = { ...p }; for (const [a, b] of [['aL', 'aR'], ['lL', 'lR']]) { o[a] = p[b]; o[b] = p[a]; } for (const k of ['hx', 'hrz', 'hry', 'cz', 'cy', 'nz', 'ny', 'sz', 'ry']) if (o[k]) o[k] = -o[k]; return o; }; // mirror
 const N = { aL: [24, 6, 14], aR: [24, 6, 14] };
 const K = (beats, keys, o = {}) => ({ beats, keys, ...o });
@@ -10,13 +11,13 @@ export const DANCES3D = {
   // ---------- basics
   bounce: K(1, [{ hy: -0.1, aL: [25, 20, 40], aR: [25, 20, 40], nx: 0.1 }, { hy: 0.02, aL: [30, 10, 30], aR: [30, 10, 30], nx: -0.05 }]),
   groove: K(2, [{ hx: -0.08, hrz: 0.08, hy: -0.06, aL: [30, 30, 70], aR: [20, -10, 40], lR: [10, 8, 15] }, { hy: -0.02 }, null, null], { mirror: 1 }),
-  twirl: K(2, [{ ry: 0, aL: [60, 0, 30], aR: [60, 0, 30] }, { ry: Math.PI, hy: 0.05, aL: [150, 0, 20], aR: [150, 0, 20] }, { ry: Math.PI * 2, aL: [60, 0, 30], aR: [60, 0, 30] }], { ease: 'linear' }),
+  twirl: K(2, [{ ry: 0, aL: [60, 0, 30], aR: [60, 0, 30] }, { ry: Math.PI, hy: 0.05, aL: [150, 0, 20], aR: [150, 0, 20] }, { ry: Math.PI * 2, aL: [60, 0, 30], aR: [60, 0, 30] }], { ease: 'spin' }),
   finwave: K(1, [{ aL: [160, 0, 20], aR: [70, 0, 60], hrz: 0.06, nz: -0.1 }, { aL: [70, 0, 60], aR: [160, 0, 20], hrz: -0.06, nz: 0.1 }]),
-  hula: K(2, [{ hx: -0.1, hrz: 0.12, cz: -0.1, aL: [95, 0, 30], aR: [80, 0, 40], hy: -0.05 }, { hx: 0.1, hrz: -0.12, cz: 0.1, aL: [80, 0, 40], aR: [95, 0, 30], hy: -0.05 }], { gentle: 1 }),
+  hula: K(2, [{ hx: -0.1, hrz: 0.12, cz: -0.1, aL: [72, 25, 45], aR: [60, 30, 55], hy: -0.05 }, { hx: 0.1, hrz: -0.12, cz: 0.1, aL: [60, 30, 55], aR: [72, 25, 45], hy: -0.05 }], { gentle: 1 }),
   beepboop: K(2, [{ aL: [90, 0, 90], aR: [10, 0, 0], ny: 0.4 }, { aL: [10, 0, 0], aR: [90, 0, 90], ny: -0.4 }, { aL: [90, 0, 90], aR: [90, 0, 90], hy: -0.04 }, { ...N, ny: 0 }], { ease: 'snap' }),
   hopclap: K(2, [{ hy: -0.14, aL: [30, 30, 40], aR: [30, 30, 40] }, { hy: 0.32, aL: [160, 10, 10], aR: [160, 10, 10], lL: [20, 5, 40], lR: [20, 5, 40] }, { hy: 0.3, aL: [172, 15, 5], aR: [172, 15, 5], lL: [20, 5, 40], lR: [20, 5, 40] }, { hy: -0.12, aL: [40, 40, 90], aR: [40, 40, 90] }]),
   shoulder: K(1, [{ aL: [40, 10, 100], aR: [30, 10, 100], cz: 0.1, hy: -0.05, nz: -0.08 }, { aL: [30, 10, 100], aR: [40, 10, 100], cz: -0.1, hy: -0.05, nz: 0.08 }]),
-  glide: K(4, [{ hx: 0.3, lL: [0, 0, 40] }, { hx: 0.1, lR: [0, 0, 40] }, { hx: -0.1, lL: [0, 0, 40] }, { hx: -0.3, lR: [0, 0, 40] }], { ease: 'linear', mirrorBack: 1 }),
+  glide: K(4, [{ hx: 0.3, lL: [0, 0, 40] }, { hx: 0.1, lR: [0, 0, 40] }, { hx: -0.1, lL: [0, 0, 40] }, { hx: -0.3, lR: [0, 0, 40] }], { ease: 'linear', mirrorBack: 1, slide: 1 }),
   ripple: K(2, [{ aL: [100, 0, 10], aR: [80, 0, 70], cz: 0.12, hrz: -0.06 }, { aL: [90, 0, 40], aR: [90, 0, 40], cz: 0, hy: -0.06 }, { aL: [80, 0, 70], aR: [100, 0, 10], cz: -0.12, hrz: 0.06 }, { aL: [90, 0, 40], aR: [90, 0, 40], hy: -0.06 }]),
   bodyroll: K(2, [{ cx: -0.2, nx: -0.2, hy: 0 }, { cx: 0.2, sx: 0.1, nx: 0.2, hy: -0.08, hz: 0.06 }, { cx: 0.05, sx: -0.15, hz: -0.06, hy: -0.12, hrx: -0.15 }, { cx: -0.1 }]),
   freeze: K(4, [N, { hy: 0.1, hrz: -0.15, aL: [165, 10, 5], aR: [70, -20, 30], lR: [45, 20, 70], nz: -0.2, star: 1 }, { hy: 0.1, hrz: -0.15, aL: [165, 10, 5], aR: [70, -20, 30], lR: [45, 20, 70], nz: -0.2 }, { hy: 0.1, hrz: -0.15, aL: [165, 10, 5], aR: [70, -20, 30], lR: [45, 20, 70], nz: -0.2 }], { ease: 'snap' }),
@@ -27,7 +28,7 @@ export const DANCES3D = {
   runman: K(2, [{ hy: -0.05, lL: [55, 0, 70], lR: [-12, 0, 12], aL: [20, 55, 90], aR: [20, -35, 60], cx: 0.1 }, { hy: -0.12, lL: [5, 0, 30], aL: [20, 0, 80], aR: [20, 0, 80] }], { mirror: 1 }),
   shuffle: K(1, [{ hx: 0.07, hry: 0.2, hy: -0.06, lL: [18, 25, 25], aL: [25, 25, 70], aR: [25, -15, 50] }, { hy: -0.02 }], { mirror: 1, ease: 'snap' }),
   robot: K(4, [{ aL: [90, 0, 90], aR: [15, 0, 0], ny: 0.5 }, { aL: [90, 0, 90], aR: [90, 0, 90], ny: 0 }, { aL: [15, 0, 0], aR: [90, 0, 90], ny: -0.5, hry: -0.15 }, { aL: [90, 60, 90], aR: [90, 60, 90], hy: -0.05 }], { ease: 'snap' }),
-  moonwalk: K(4, [{ hx: 0.35, lL: [0, 0, 45], aL: [20, -10, 30], aR: [20, 10, 30], ry: -0.6 }, { hx: 0.12, lR: [0, 0, 45], ry: -0.6 }, { hx: -0.12, lL: [0, 0, 45], ry: -0.6 }, { hx: -0.35, lR: [0, 0, 45], ry: -0.6 }], { ease: 'linear' }),
+  moonwalk: K(4, [{ hx: 0.35, lL: [0, 0, 45], aL: [20, -10, 30], aR: [20, 10, 30], ry: -0.6 }, { hx: 0.12, lR: [0, 0, 45], ry: -0.6 }, { hx: -0.12, lL: [0, 0, 45], ry: -0.6 }, { hx: -0.35, lR: [0, 0, 45], ry: -0.6 }], { ease: 'linear', slide: 1 }),
   sprinkler: K(4, [{ aL: [150, -20, 150], aR: [90, -40, 5], hry: -0.3, lR: [0, 10, 20] }, { aL: [150, -20, 150], aR: [90, -10, 5], hry: -0.15 }, { aL: [150, -20, 150], aR: [90, 20, 5], hry: 0 }, { aL: [150, -20, 150], aR: [90, 50, 5], hry: 0.2 }], { ease: 'snap', back: 1 }),
   wave: K(4, [{ aL: [100, 0, 0], aR: [80, 0, 60], cz: 0.1 }, { aL: [90, 0, 30], aR: [90, 0, 30], cz: 0.05, nz: 0.1, hy: -0.04 }, { aL: [80, 0, 60], aR: [100, 0, 0], cz: -0.1, nz: -0.1 }, { aL: [90, 0, 30], aR: [90, 0, 30], hrz: 0.1, hy: -0.04 }]),
   cabbage: K(2, [{ hx: -0.06, hy: -0.06, hrz: 0.08, aL: [35, 70, 105], aR: [30, 55, 115] }, { hx: 0, hy: -0.12, aL: [40, 85, 95], aR: [40, 85, 95] }, { hx: 0.06, hy: -0.06, hrz: -0.08, aL: [30, 55, 115], aR: [35, 70, 105] }, { hy: 0, aL: [35, 60, 110], aR: [35, 60, 110] }], { ease: 'smooth' }),
@@ -55,7 +56,7 @@ export const DANCES3D = {
 const N0 = [24, 6, 14, 0];
 // limbs never lock straight: elbows keep a soft bend, side-raised arms bend more (no stiff T-pose frames)
 function natural(p) {
-  for (const k of ['aL', 'aR']) { const a = p[k] || N0; const ab = Math.min(165, a[0]); let el = Math.max(22, Math.min(150, a[2])); if (ab > 60 && ab < 130) el = Math.max(el, 38); p[k] = [ab, a[1], el, a[3] || 0]; }
+  for (const k of ['aL', 'aR']) { const a = p[k] || N0; const ab = Math.min(165, a[0]); let el = Math.max(22, Math.min(150, a[2])); let fw = a[1]; if (ab > 60 && ab < 130) { const k2 = 1 - Math.abs(ab - 95) / 35; el = Math.max(el, 38 + 22 * k2); fw = Math.max(fw, 14 * k2); } p[k] = [ab, fw, el, a[3] || 0]; }
   return p;
 }
 const cr = (p0, p1, p2, p3, k) => { const k2 = k * k, k3 = k2 * k; return 0.5 * (2 * p1 + (-p0 + p2) * k + (2 * p0 - 5 * p1 + 4 * p2 - p3) * k2 + (-p0 + 3 * p1 - 3 * p2 + p3) * k3); };
@@ -84,13 +85,11 @@ export function clipFor(id) {
   return (beat) => {
     const n = d.keys.length, ph = (((beat % d.beats) + d.beats) % d.beats) / d.beats * n, i = Math.floor(ph), f = ph - i;
     const K4 = (j) => d.keys[((j % n) + n) % n];
-    const p = d.ease === 'linear' ? curve(K4(i), K4(i), K4(i + 1), K4(i + 1), f) : curve(K4(i - 1), K4(i), K4(i + 1), K4(i + 2), smooth(f) * 0.35 + f * 0.65);
-    // groove layer: knees bounce on every beat, hips sway + weight shift every 2 beats, head bobs just after the beat
-    const b = beat * Math.PI * 2, g = d.gentle ? 0.6 : 1;
-    p.hy = (p.hy || 0) - (1 - Math.cos(b)) * 0.03 * g;
-    p.hrz = (p.hrz || 0) + Math.sin(b / 2) * 0.05 * g; p.hx = (p.hx || 0) + Math.sin(b / 2) * 0.03 * g;
-    p.nx = (p.nx || 0) + Math.sin(b - 0.9) * 0.07 * g; p.nz = (p.nz || 0) - Math.sin(b / 2 - 0.5) * 0.05 * g;
-    p.cy = (p.cy || 0) - (p.hry || 0) * 0.6; p.sz = (p.sz || 0) - (p.hrz || 0) * 0.5; p.cz = (p.cz || 0) - (p.hrz || 0) * 0.35;
+    const p = d.ease === 'linear' ? curve(K4(i), K4(i), K4(i + 1), K4(i + 1), f) : d.ease === 'spin' ? curve(K4(i), K4(i), K4(i + 1), K4(i + 1), f * 0.4 + smooth(f) * 0.6) : curve(K4(i - 1), K4(i), K4(i + 1), K4(i + 2), smooth(f) * 0.35 + f * 0.65);
+    // groove layer (motion3d.js): knee bounce on the beat, weight shifts with hip sway, chest isolations, shoulder
+    // rolls and head nods/tilts/looks; IK keeps the planted feet locked while the body moves over them
+    grooveLayer(p, beat, d.gentle ? 0.6 : d.ease === 'snap' ? 0.8 : 1, (id.length % 5) * 0.7);
+    if (d.slide) p.slide = 1;
     p.tw = 0.25; return natural(p);
   };
 }
