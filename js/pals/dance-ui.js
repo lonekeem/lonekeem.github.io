@@ -1,3 +1,4 @@
+import { openBuySheet, coinBadge } from '../buy-sheet.js';
 // Dance picker + Dance Shop (Star Coins, the Pals' existing free currency) + the floating companion Pal.
 import { BASIC, TRENDING, PRICE, RARITY_NAME, allDances, danceById, itemId, isFree, loadTrends, tiktok, setOwned, ownsDance, favOf, setFav, drawDancer, forcePreview, busState, isDancing, danceEnabled, BASIC as B0 } from './dance.js';
 import { addItems, ITEM, shopDoc } from './catalog.js';
@@ -27,7 +28,7 @@ export function createDanceUI(ctx) {
     await registerDanceItems(); econ = econOf ? econOf() : econ; await refreshOwned();
     let coins = 0; try { coins = (await econ.wallet(true)).coins; } catch { /* signed out */ }
     let sel = favOf(pal), prev = null, confirm = null; const live = await pricesLive();
-    openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="pal-dance"><h2>💃 ${esc(pal.name)}’s dances</h2>
+    openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="pal-dance"><h2>💃 ${esc(pal.name)}’s dances</h2><div style="text-align:center" id="dc-coins">${coinBadge(coins)}</div>
       <div class="pal-dance-stage"></div><p class="small muted pal-dance-now"></p>
       <div class="pal-tabs" role="tablist"><button role="tab" data-dt="pick">Pick a dance</button><button role="tab" data-dt="shop">🛍️ Dance Shop</button><span class="pal-coins" title="Star Coins"><span class="coin">★</span>${coins.toLocaleString()}</span></div>
       <div class="pal-dance-body"></div></div>`);
@@ -70,7 +71,12 @@ export function createDanceUI(ctx) {
         ${isAdmin && isAdmin() ? '<p class="small"><button class="btn btn-sm btn-ghost" id="dc-sync">Admin: publish dance prices</button></p>' : ''}`;
       body.querySelectorAll('[data-pv]').forEach((b) => b.onclick = () => { prev = b.dataset.pv; });
       body.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { sel = b.dataset.pick; prev = null; setFav(pal, sel); render(tab); toast(sel === 'free' ? 'Freestyle on' : `${pal.name}’s favourite: ${danceById(sel).name}`); });
-      body.querySelectorAll('[data-ask]').forEach((b) => b.onclick = () => { prev = b.dataset.ask; if (!S.user) return toast('Sign in to unlock dances'); confirm = b.dataset.ask; render(tab); });
+      body.querySelectorAll('[data-ask]').forEach((b) => b.onclick = async () => { prev = b.dataset.ask; if (!S.user) return toast('Sign in to unlock dances'); const d = danceById(b.dataset.ask); const price = PRICE[d.r] || PRICE.r; const it = ITEM[itemId(d.id)];
+        if (!(it.id in live)) { toast('The Dance Shop is opening soon. Prices are being set up!'); if (isAdmin && isAdmin()) adminSync(); return; }
+        const ok = await openBuySheet({ name: d.name, price, icon: '💃', balance: coins, note: `${pal.name} can do it right away. Star Coins only, no real money.`, equipped: `${pal.name} will dance it next ✓`,
+          buy: async () => { try { const paid = await purchase(econ, it); coins -= paid; return coins; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message); } },
+          onSuccess: async () => { await refreshOwned(); sel = d.id; setFav(pal, d.id); } });
+        if (ok) { prev = null; const cc = document.getElementById('dc-coins'); if (cc) cc.innerHTML = coinBadge(coins); render('pick'); } });
       const sy = body.querySelector('#dc-sync'); if (sy) sy.onclick = adminSync;
     }
     root.querySelectorAll('[data-dt]').forEach((b) => b.onclick = () => { confirm = null; render(b.dataset.dt); });

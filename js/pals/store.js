@@ -1,3 +1,4 @@
+import { openBuySheet, buyButton } from '../buy-sheet.js';
 // Pal Store: Outfits, Jewelry & Accessories, Looks, Backgrounds, Dances, Pals (+ Rare Pals). Star Coins only.
 // Live 3D preview of everything (owned or not). Unowned premium items show "Preview" and are bought on Save.
 // Ownership is enforced by firestore.rules (inv docs created only together with a priced wallet purchase).
@@ -28,7 +29,7 @@ export function createPalStore(ctx) {
     const unowned = () => { const l = []; for (const id of Object.values(D.outfit)) if (id && !own(id)) l.push(WEAR_BY[id]); if (D.bg && !own(D.bg)) l.push(BG[D.bg]); if (D.variant && !own(D.variant)) l.push(RARE[D.variant]); const pt = PATTERNS.find((x) => x.id === D.pattern); if (pt && pt.p && !own(pt.id)) l.push(pt); return l.filter(Boolean); };
     main.innerHTML = `<section class="card pstore"><div class="ps-top"><h2>Pal Store</h2><span class="ps-coins">★ <b id="ps-c">${(e.w && e.w.coins) || 0}</b></span></div>
       <div class="ps-stage"><canvas id="ps-cv"></canvas><span class="ps-prev" id="ps-prev" hidden>Preview</span>
-        <button class="ps-bgbtn" id="ps-bgbtn" type="button" aria-label="Change background">🖼️</button><button class="ps-bgbtn ps-rot" id="ps-rot" type="button" aria-label="Spin">🔄</button></div>
+        <button class="ps-bgbtn" id="ps-bgbtn" type="button" aria-label="Change background">🖼️</button><button class="ps-bgbtn ps-rot" id="ps-rot" type="button" aria-label="Spin">🔄</button></div><div id="ps-buy"></div>
       <div class="ps-actions"><button class="btn btn-sm btn-ghost" id="ps-undo">↶ Undo</button><button class="btn btn-sm btn-ghost" id="ps-reset">Reset</button><button class="btn btn-sm btn-ghost" id="ps-rand">🎲 Random</button><button class="btn btn-sm" id="ps-save">💾 Save Look</button></div>
       <div class="ps-looks" id="ps-looks"></div>
       <div class="ps-tabs" role="tablist">${[['outfits', '👗 Outfits'], ['jewelry', '💍 Jewelry & Accessories'], ['hand', '🧸 Hand Items'], ['looks', '🎨 Looks'], ['bgs', '🖼️ Backgrounds'], ['dances', '💃 Dances'], ['pals', '🐾 Pals']].map(([k, n]) => `<button class="chip" data-tab="${k}" role="tab">${n}</button>`).join('')}</div>
@@ -44,7 +45,8 @@ export function createPalStore(ctx) {
     let t = 0; const frame = () => { if (!document.body.contains(cv)) return; t++; if (spin) yaw += 0.02; c.clearRect(0, 0, W, H);
       if (!drawBg(c, W, H, D.bg, t)) { c.fillStyle = '#2a1458'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill(); }
       drawDancer(c, W / 2, H - 12, 120 * zoom, { ...p, outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }, { t, mode: 'idle', yaw }); requestAnimationFrame(frame); }; frame();
-    const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; pv.textContent = u.length ? `Preview · ${u.length} to buy · ★${u.reduce((a, b) => a + (b.p || 0), 0)}` : ''; grid(); };
+    const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; pv.textContent = u.length ? `Preview · ${u.length} to buy · ★${u.reduce((a, b) => a + (b.p || 0), 0)}` : '';
+      const bb = $('#ps-buy'); bb.innerHTML = u.length ? buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: u.reduce((a, b) => a + (b.p || 0), 0), balance: (e.w && e.w.coins) || 0, id: 'ps-buynow' }) : ''; if (u.length) bb.querySelector('#ps-buynow').onclick = () => save(); grid(); };
     const tile = (id, name, price, r, emo, on, ownd, extra = '') => `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${extra} style="--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}"><span class="ps-emo" data-th="${esc(id)}">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : `★ ${price}`}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`;
     function filters() {
       const f = $('#ps-filters'); if (tab !== 'outfits' && tab !== 'jewelry' && tab !== 'hand') { f.innerHTML = ''; return; }
@@ -91,14 +93,16 @@ export function createPalStore(ctx) {
     $('#ps-rand').onclick = () => { snap(); const o = {}; for (const s of ['head', 'hair', 'face', 'neck', 'feet', 'held']) if (Math.random() < 0.6) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
       const fl = WEAR.filter((w) => w.slot === 'full' && w.free); if (Math.random() < 0.5) o.full = fl[Math.floor(Math.random() * fl.length)].id; else for (const s of ['body', 'bottom']) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
       D.outfit = o; const fb = BGS.filter((b) => !b.p); D.bg = fb[Math.floor(Math.random() * fb.length)].id; refresh(); };
+    const commitLook = async () => { await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); dispatchEvent(new Event('kemy:pal-changed')); };
     async function save() {
       const u = unowned(); const cost = u.reduce((a, b) => a + (b.p || 0), 0);
-      if (u.length) { const coins = (e.w && e.w.coins) || 0; if (coins < cost) return toast(`You need ★${cost} to buy ${u.length} item${u.length > 1 ? 's' : ''} (you have ★${coins}). Earn coins by caring, playing and daily bonuses!`);
-        const ok = await new Promise((res) => { openModal(`<h3>Buy and save?</h3><ul>${u.map((x) => `<li>${esc(x.name)} · ★${x.p}</li>`).join('')}</ul><p>Total: <b>★${cost}</b> Star Coins (no real money).</p><div class="row"><button class="btn" id="ps-yes">Buy & Save</button><button class="btn btn-ghost" id="ps-no">Not now</button></div>`); document.getElementById('ps-yes').onclick = () => { closeModal(); res(true); }; document.getElementById('ps-no').onclick = () => { closeModal(); res(false); }; });
-        if (!ok) return;
-        for (const x of u) { try { await e.buy(x.id); inv[x.id] = 1; } catch (er) { toast(er.code ? friendlyError(er) : er.message || 'Purchase failed'); return; } }
-        $('#ps-c').textContent = e.w.coins; }
-      try { await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); toast(`${p.name}'s look is saved ✨`); dispatchEvent(new Event('kemy:pal-changed')); refresh(); } catch (er) { toast(friendlyError(er)); }
+      if (u.length) { // one shared buy sheet: confirm, buy, then auto-equip (save the look)
+        await openBuySheet({ name: u.length === 1 ? u[0].name : `${u.length} items (${u.map((x) => x.name).join(', ')})`, price: cost, icon: u.length === 1 ? '🛍️' : '🛍️', balance: (e.w && e.w.coins) || 0,
+          note: 'Star Coins only, no real money.', equipped: `${p.name} is wearing it ✓`,
+          buy: async () => { for (const x of u) { if (inv[x.id]) continue; try { await e.buy(x.id); inv[x.id] = 1; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message || 'Purchase failed'); } } $('#ps-c').textContent = e.w.coins; return e.w.coins; },
+          onSuccess: commitLook });
+        refresh(); return; }
+      try { await commitLook(); toast(`${p.name}'s look is saved ✨`); refresh(); } catch (er) { toast(friendlyError(er)); }
     }
     $('#ps-save').onclick = save;
     // 3 saved look slots

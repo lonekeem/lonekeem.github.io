@@ -1,3 +1,5 @@
+import { openBuySheet, coinBadge } from '../buy-sheet.js';
+import { sfx, SPECIES_SOUND } from './voice.js';
 // Kemy Pals: original virtual pets that live next to your profile.
 import { playIntro } from '../theme.js';
 import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf, shade } from './art.js';
@@ -24,6 +26,7 @@ const ACC_LABEL = { none: 'None', bow: 'Bow', crown: 'Crown', shades: 'Star shad
 const PAT_LABEL = { none: 'Plain', spots: 'Spots', stripes: 'Stripes', sparkle: 'Sparkle' };
 // ---------------------------------------------------------------- tiny synth
 let ac = null;
+const TOYS = [['🧸', 'f_teddy'], ['🏀', 'f_bball'], ['🎈', 'f_balloon_red'], ['🪄', 'f_wand_gold'], ['🎸', 'bigguitar_red'], ['☎️', 'f_phone_purple']];
 function snd(kind) {
   if (localStorage.getItem('kemy-pals-mute') === '1') return;
   try { ac ||= new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
@@ -198,7 +201,7 @@ export function createPals(ctx) {
       <div class="pal-scene" style="position:relative"><button class="ps-bgbtn" data-store="bg" type="button" aria-label="Change background">🖼️</button><button class="ps-bgbtn ps-rot" data-store="outfits" type="button" aria-label="Dress up">👗</button></div><div class="pal-meters"></div><p class="pal-hint" aria-live="polite">Tap ${esc(p.name)} to play. Pick something to do below.</p>
       <div class="pal-acts">
         <button data-m="shower">🛁<span>Shower</span></button><button data-m="feed">🍓<span>Feed</span></button><button data-m="brush">🪮<span>Brush</span></button>
-        <button data-m="catch">⚾<span>Catch</span></button><button data-m="bed">🌙<span>Bed</span></button><button data-m="bandage">🩹<span>Bandage</span></button>
+        <button data-m="catch">⚾<span>Catch</span></button><button data-m="bed">🌙<span>Bed</span></button><button data-m="bandage">🩹<span>Bandage</span></button><button data-m="toys">🧸<span>Toys</span></button>
       </div>
       <p class="small" style="text-align:center"><a href="#/pals/shop" data-close>🛒 Food & treat shop (Star Coins)</a></p>
       <details class="pal-about"><summary>About Pals</summary><p>${esc(PALS_COPY)}</p><p class="small">${esc(SPEC[p.species].blurb)} Vibe: ${VIBES[SPEC[p.species].vibe].name}.</p></details>
@@ -213,7 +216,8 @@ export function createPals(ctx) {
       root.querySelector('[data-lv]').textContent = p.level; root.querySelector('.pal-xp i').style.width = (p.xp % 100) + '%';
       root.querySelector('[data-m=bandage]').classList.toggle('glow', mood.low); }
     meters();
-    const finish = (delta, xp, msg) => { for (const k in delta) st[k] = Math.max(5, Math.min(100, st[k] + delta[k])); mood = moodOf(st); meters(); hint(msg); G.mode = 'home'; commit(p, { stats: { ...st }, xpGain: xp }, meters); };
+    const cute = () => { try { if (localStorage.getItem('kemy-pals-mute') !== '1') sfx(SPECIES_SOUND[p.species] || 'chirp'); } catch { /* */ } };
+    const finish = (delta, xp, msg) => { cute(); G.react = 70; for (const k in delta) st[k] = Math.max(5, Math.min(100, st[k] + delta[k])); mood = moodOf(st); meters(); hint(msg); G.mode = 'home'; commit(p, { stats: { ...st }, xpGain: xp }, meters); };
     const near = (x, y, r = 50) => Math.hypot(x - G.palX, y - (PY - SIZE * 0.35)) < r;
     const mouth = () => ({ x: G.palX + 4, y: PY - SIZE * 0.3 });
     root.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => {
@@ -222,13 +226,15 @@ export function createPals(ctx) {
       if (md === 'feed') { hint(`Drag a snack to ${p.name}'s mouth. The gold one is ${p.name}'s favourite ${FOOD_EMO[FAV_FOOD(p.species)]}`); }
       if (md === 'brush') { G.brush = 0; hint('Brush ' + p.name + ' by rubbing back and forth.'); }
       if (md === 'catch') { G.throws = 0; G.catches = 0; G.ball = { x: 30, y: H - 30, vx: 0, vy: 0, fly: false }; hint('Flick the ball up into the air!'); }
-      if (md === 'bed') { G.sleepT = 0; snd('snore'); hint('Lights off… sweet dreams, ' + p.name + '. Tap to wake up.'); }
+      if (md === 'toys') { G.toy = null; hint('Pick a toy for ' + p.name + ' to play with!'); }
+      if (md === 'bed') { G.sleepT = 0; G.dim = 0; snd('snore'); hint('Lights off… sweet dreams, ' + p.name + '. Tap to wake up.'); }
       if (md === 'bandage') { if (!mood.low) { hint(p.name + ' is feeling great! No bandage needed.'); G.mode = 'home'; return; } G.drag = null; hint('Drag the bandage onto ' + p.name + '.'); }
     });
     const dbg = root.querySelector('[data-dbg]'); if (dbg) dbg.onclick = () => commit(p, { stats: { ...st }, xpGain: 60 }, meters);
     const pos = (e) => { const r = s.cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
     s.cv.addEventListener('pointerdown', (e) => { const q = pos(e); G.ptr = q; G.last = { ...q, t: performance.now() }; s.cv.setPointerCapture(e.pointerId);
-      if (G.mode === 'home' && near(q.x, q.y, 60)) { G.react = 90; fx.add(G.palX, PY - SIZE * 0.6, 'heart', 6); fx.add(G.palX, PY - SIZE * 0.6, 'star', 4); snd('happy'); }
+      if (G.mode === 'toys' && !G.toy) { TOYS.forEach((ty, i) => { if (Math.hypot(q.x - (40 + i * 44), q.y - 26) < 20) { G.toy = { id: ty[1], t: 0 }; snd('pop'); cute(); } }); }
+      if (G.mode === 'home' && near(q.x, q.y, 60)) { G.react = 90; cute(); fx.add(G.palX, PY - SIZE * 0.6, 'heart', 6); fx.add(G.palX, PY - SIZE * 0.6, 'star', 4); snd('happy'); }
       if (G.mode === 'feed') { for (let i = 0; i < 4; i++) if (Math.hypot(q.x - (40 + i * 30), q.y - 26) < 16) G.drag = { kind: i, x: q.x, y: q.y }; }
       if (G.mode === 'bandage' && Math.hypot(q.x - 34, q.y - 30) < 22) G.drag = { kind: 'b', x: q.x, y: q.y };
       if (G.mode === 'bed') { finish({ energy: Math.min(40, 8 + G.sleepT / 6), happy: 4 }, 8, p.name + ' feels rested!'); }
@@ -248,12 +254,16 @@ export function createPals(ctx) {
     const f = (t) => {
       G.t = t; const c = s.c; c.clearRect(0, 0, W, H);
       // room
-      if (p.bg && drawBg(c, W, H, p.bg, t)) { if (G.mode === 'bed') { c.fillStyle = 'rgba(10,6,40,.55)'; c.fillRect(0, 0, W, H); } } else {
+      G.dim = G.mode === 'bed' ? Math.min(1, (G.dim || 0) + 0.012) : Math.max(0, (G.dim || 0) - 0.04);
+      if (p.bg && drawBg(c, W, H, p.bg, t)) { /* dimmed below */ } else {
       const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, G.mode === 'bed' ? '#1a1240' : '#f6e8ff'); g.addColorStop(1, G.mode === 'bed' ? '#2a1a5a' : '#dcc8ff'); c.fillStyle = g; c.fillRect(0, 0, W, H);
       c.fillStyle = G.mode === 'shower' ? '#bfe6ff' : G.mode === 'bed' ? '#3a2a6a' : '#c7f0d4'; c.fillRect(0, H - 34, W, 34); }
       if (G.mode === 'shower') { c.fillStyle = '#fff'; c.strokeStyle = '#9fb8ff'; c.lineWidth = 2; c.beginPath(); c.roundRect(PX - 85, H - 46, 170, 34, 14); c.fill(); c.stroke(); }
       let mode = G.react > 0 ? 'react' : 'idle'; if (G.react > 0) G.react--;
       if (G.eat > 0) { G.eat--; mode = 'eat'; }
+      if (G.dim > 0) { c.fillStyle = `rgba(10,6,40,${0.62 * G.dim})`; c.fillRect(0, 0, W, H); if (G.mode === 'bed') { for (let i = 0; i < 12; i++) { c.fillStyle = `rgba(255,240,180,${G.dim * (0.4 + 0.4 * Math.sin(t * 0.05 + i))})`; c.beginPath(); c.arc((i * 71) % W, 12 + (i * 37) % 70, 1.6, 0, 7); c.fill(); } const lg = c.createRadialGradient(W - 30, 30, 2, W - 30, 30, 26); lg.addColorStop(0, `rgba(255,236,170,${G.dim})`); lg.addColorStop(1, 'rgba(255,236,170,0)'); c.fillStyle = lg; c.fillRect(W - 60, 0, 60, 60); } }
+      if (G.mode === 'toys') { if (!G.toy) TOYS.forEach((ty, i) => { const x = 40 + i * 44; c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.arc(x, 26, 19, 0, 7); c.fill(); c.font = '22px serif'; c.textAlign = 'center'; c.fillText(ty[0], x, 34); });
+        else { G.toy.t++; if (G.toy.t % 50 === 1) { fx.add(G.palX, PY - SIZE * 0.7, G.toy.t % 100 === 1 ? 'heart' : 'star', 3); snd('happy'); } if (G.toy.t > 220) { G.toy = null; finish({ happy: 12, energy: -4 }, 10, p.name + ' loved playing!'); } } }
       if (G.mode === 'bed') { mode = 'sleep'; G.sleepT++; if (G.sleepT > 300) finish({ energy: 40, happy: 5 }, 8, p.name + ' had a cozy nap!'); }
       if (G.shake > 0) { G.shake--; mode = 'shake'; if (G.shake % 6 === 0) fx.add(G.palX + (Math.random() - 0.5) * 60, PY - 60, 'drop', 3); if (G.shake === 1) { snd('sparkle'); fx.add(G.palX, PY - 80, 'star', 14); finish({ clean: 100, happy: 8 }, 15, p.name + ' is squeaky clean and sparkly!'); } }
       // catch game: Pal runs to the ball
@@ -265,7 +275,8 @@ export function createPals(ctx) {
         if (G.throws >= 5 && !b.fly) { G.ball = null; finish({ happy: 10 + G.catches * 2, energy: -8, hunger: -4 }, 12, `${p.name} caught ${G.catches} of 5! What a game.`); }
       }
       const faceTo = G.mode === 'catch' && G.ball ? Math.sign(G.ball.x - G.palX) || 1 : 1;
-      drawPal(c, G.palX, PY, SIZE, G.eat > 0 && G.eatFood ? { ...p, outfit: { ...(p.outfit || {}), held: 'f_food_' + G.eatFood } } : p, { t, mode: mode === 'idle' && G.mode === 'catch' ? 'idle' : mode, face: faceTo, mood: { dirty: mood.dirty && !(G.mode === 'shower' && G.lather > 0.3), sad: mood.sad && G.react <= 0, bandage: G.bandage || mood.low && G.mode === 'home' && false } });
+      const playing = G.mode === 'toys' && G.toy;
+      drawPal(c, G.palX, PY, SIZE, G.eat > 0 && G.eatFood ? { ...p, outfit: { ...(p.outfit || {}), held: 'f_food_' + G.eatFood } } : playing ? { ...p, outfit: { ...(p.outfit || {}), held: G.toy.id } } : p, playing ? { t, mode: 'idle', dance3d: 'happyshimmy', beat: t / 20, amt: 0.8, dance: 'happyshimmy' } : { t, mode: mode === 'idle' && G.mode === 'catch' ? 'idle' : mode, face: faceTo, mood: { dirty: mood.dirty && !(G.mode === 'shower' && G.lather > 0.3), sad: mood.sad && G.react <= 0, bandage: G.bandage || mood.low && G.mode === 'home' && false } });
       // shower layer
       if (G.mode === 'shower') {
         for (const bb of G.bubbles) drawBubble(c, bb.x + Math.sin(t * 0.05 + bb.r) * 0.6, bb.y, bb.r);
@@ -296,7 +307,7 @@ export function createPals(ctx) {
   function creator({ pal, slot, first, onDone }) {
     const d = pal ? { species: pal.species, name: pal.name, colors: { ...pal.colors }, pattern: pal.pattern, acc: pal.acc } : { species: 'kemy', name: '', colors: { body: SPEC.kemy.body, accent: SPEC.kemy.acc, eye: '#24133f' }, pattern: 'none', acc: 'none' };
     const chips = (key, list, lab) => list.map((v) => `<button type="button" class="pal-chip ${d[key] === v ? 'on' : ''}" data-${key}="${v}">${esc(lab[v])}</button>`).join('');
-    openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="pal-creator" id="pal-form"><h2>${pal ? 'Style ' + esc(pal.name) : first ? 'Meet your Pal!' : 'New Pal'}</h2>
+    openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="pal-creator" id="pal-form"><h2>${pal ? 'Style ' + esc(pal.name) : first ? 'Meet your Pal!' : 'New Pal'}</h2><div id="pal-coins" style="text-align:center"></div>
       <div class="pal-prev"></div>
       <div class="pal-l">${pal ? 'Change species <small class="muted">(keeps name, level and look)</small>' : `Choose your Pal <small class="muted">(${SPECIES.length} species · ${SPECIES.length * 3} colour styles)</small>`}</div>
       <input type="search" id="pal-q" placeholder="Search Pals… (cat, dino, sea…)" aria-label="Search Pals" style="width:100%">
@@ -318,7 +329,7 @@ export function createPals(ctx) {
     // 3 colour styles per species (original, pastel, night) = hundreds of Pals
     const styles = () => { const sp = SPEC[d.species]; const el = f.querySelector('#pal-styles'); if (!sp) { el.innerHTML = ''; return; } const hx = (c) => '#' + c.match(/\d+/g).slice(0, 3).map((v) => (+v).toString(16).padStart(2, '0')).join(''); const st = [['Original', sp.body, sp.acc], ['Pastel', hx(shade(sp.body, 0.45)), hx(shade(sp.acc, 0.35))], ['Night', hx(shade(sp.body, -0.45)), hx(shade(sp.acc, 0.2))]];
       el.innerHTML = st.map(([n, b, a]) => `<button type="button" class="pal-chip" data-sty="${b}|${a}" style="border-left:14px solid ${b}">${n}</button>`).join(''); };
-    styles(); let owned = {}; shop.econ() && shop.econ().inventory().then((i) => { owned = i || {}; }).catch(() => {});
+    styles(); if (shop.econ()) shop.econ().wallet().then((w) => { const el = f.querySelector('#pal-coins'); if (el) el.innerHTML = coinBadge(w.coins); }).catch(() => {}); let owned = {}; shop.econ() && shop.econ().inventory().then((i) => { owned = i || {}; }).catch(() => {});
     const draw = (t) => { s.c.clearRect(0, 0, 220, 150); if (d.species === 'mystery') { drawEgg(s.c, 110, 145, 120, RM() ? 0 : t); return; } drawPal(s.c, 110, 140, 120, { ...d, level: pal ? pal.level : 1 }, { t, mode: t % 300 < 90 ? 'react' : 'idle' }); }; draw.el = s.cv; loop(draw);
     f.addEventListener('click', (e) => { const b = e.target.closest('button[type=button]'); if (!b) return;
       for (const k of ['species', 'pattern', 'acc']) if (b.dataset[k]) { d[k] = b.dataset[k]; f.querySelectorAll(`[data-${k}]`).forEach((x) => x.classList.toggle('on', x === b)); if (k === 'species' && SPEC[d.species]) { d.colors.body = SPEC[d.species].body; d.colors.accent = SPEC[d.species].acc; } }
@@ -330,7 +341,10 @@ export function createPals(ctx) {
     f.onsubmit = async (e) => { e.preventDefault(); d.name = f.querySelector('#pal-name').value.trim().slice(0, 20); if (!d.name) return;
       if (d.species === 'mystery') { const pool = SPECIES.filter((x) => !x.rare); const r = pool[Math.floor(Math.random() * pool.length)]; d.species = r.id; d.colors.body = r.body; d.colors.accent = r.acc; toast(`Your mystery egg hatched into a ${r.name}!`); }
       const btn = f.querySelector('[type=submit]'); btn.disabled = true;
-      const rsp = SPEC[d.species]; if (rsp && rsp.rare && !owned['sp_' + rsp.id]) { try { await shop.econ().buy('sp_' + rsp.id); owned['sp_' + rsp.id] = 1; toast(`You got ${rsp.name}! ★`); } catch (er) { btn.disabled = false; toast(er.code ? friendlyError(er) : er.message || 'Not enough Star Coins yet'); return; } }
+      const rsp = SPEC[d.species]; if (rsp && rsp.rare && !owned['sp_' + rsp.id]) { const ec = shop.econ(); let bal = 0; try { bal = (await ec.wallet()).coins || 0; } catch { /* */ }
+        const ok = await openBuySheet({ name: rsp.name, price: rsp.rare, icon: '★', balance: bal, note: 'A rare Pal. Star Coins only, no real money.', equipped: pal ? `${d.name} is now a ${rsp.name} ✓` : 'Hatching now ✓',
+          buy: async () => { try { await ec.buy('sp_' + rsp.id); owned['sp_' + rsp.id] = 1; return ec.w.coins; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message || 'Purchase failed'); } } });
+        if (!ok) { btn.disabled = false; return; } }
       try { const m = await myPals(); let p;
         if (pal) { p = m.list.find((x) => x.id === pal.id); await m.store.save(p, { name: d.name, colors: d.colors, pattern: d.pattern, acc: d.acc, species: d.species }); }
         else { p = await m.store.create(slot, d); m.list.push(p); m.list.sort((a, b) => a.id.localeCompare(b.id)); if (first || !S.profile.activePet) { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); } }

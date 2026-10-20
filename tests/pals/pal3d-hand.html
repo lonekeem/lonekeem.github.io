@@ -3,7 +3,7 @@
 import { drawPal3D } from '../../js/pals/pal3d.js';
 const c = document.getElementById('c').getContext('2d'); c.font = '600 12px sans-serif';
 const J = [['tiger', 'f_handbag_pink', 'idle'], ['bear', 'f_phone_purple', 'idle'], ['kemy', 'f_bouquet_pink', 'idle'], ['elephant', 'f_bobatea_lilac', 'idle'], ['puppy', 'f_bball', 'idle'], ['fox', 'bigguitar_red', 'idle'],
-  ['bunny', 'f_icecream', 'idle'], ['panda', 'f_food_bamboo', 'eat'], ['kitten', 'f_food_fish', 'eat'], ['lion', 'f_wand_gold', 'dance'], ['bear', 'mic_gold', 'dance'], ['fox', 'bigguitar_red', 'dance']];
+  ['bunny', 'f_balloon_red', 'idle'], ['panda', 'f_food_bamboo', 'eat'], ['kitten', 'f_food_fish', 'eat'], ['lion', 'f_balloon_red', 'dance'], ['bear', 'mic_gold', 'dance'], ['fox', 'bigguitar_red', 'dance']];
 const done = []; let t = 0; const go = () => { t++; let all = true, n = 0;
   J.forEach(([sp, id, md], i) => { if (done[i] || n++ > 3) { all = all && !!done[i]; return; } const x = (i % 6) * 200, y = Math.floor(i / 6) * 300;
     if (drawPal3D(c, x + 100, y + 280, 120, { species: sp, level: 6, outfit: { held: id } }, { t: 40, mode: md === 'eat' ? 'eat' : 'idle', yaw: 0.5, dance3d: md === 'dance' ? 'renegroove' : null, beat: 1.6, amt: 1 })) { done[i] = 1; c.fillStyle = '#fff'; c.fillText(sp + ' · ' + id + ' · ' + md, x + 6, y + 16); } else all = false; });
