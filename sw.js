@@ -1,4 +1,4 @@
-const CACHE = 'lks-v149';
+const CACHE = 'lks-v151';
 // Small app shell only (other files are cached as they are used); a big precache on every version bump
 // slowed phones down on first open after each update.
 const CORE = [

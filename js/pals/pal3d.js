@@ -581,6 +581,7 @@ export function palRig(pal) {
 export function makePal3D(pal) { const m = build(pal); gameLite(m); m.userData.pal = pal; return m; }
 // game scenes (Pal Park, zombie): no floating motes; on 'low' also drop the filament cards (fewest draw calls)
 function gameLite(m) { const J = m.userData.J; if (J.spark) { J.spark.removeFromParent(); J.spark = null; } if (gfxLevel() === 'low') m.traverse((o) => { if (o.userData.fil) o.visible = false; }); }
+const sitPose = (t) => { const s = Math.sin; return { hy: -0.2, hrx: -0.08, cx: 0.06, nx: 0.05 + s(t * 0.02) * 0.03, nz: s(t * 0.011) * 0.08, ny: s(t * 0.007) * 0.2, aL: [16, 38, 50], aR: [16, 38, 50], lL: [84, 4, 80], lR: [84, 4, 80], slide: 1 }; };
 export function posePal3D(m, st = {}) {
   // st.t: your clock in 60 ticks/s; st.dt60: ticks since last call; st.speed: gait speed (1 walk, 1.6+ run); st.cadence: step-rate
   // multiplier (>1 = quicker steps to match a faster ground speed); st.turn -1..1; st.mode idle|walk|run|hop; st.jumpK 0..1
@@ -590,7 +591,8 @@ export function posePal3D(m, st = {}) {
     if (st.stride && st.stride !== 1) for (const k of ['fL', 'fR']) if (Array.isArray(P[k])) { P[k] = P[k].slice(); P[k][2] *= st.stride; P[k][1] *= Math.min(1.4, st.stride); } } // longer steps for big 3D Pals
   else if (md === 'hop') P = jumpPose(st.jumpK != null ? st.jumpK : ((t % 72) + 72) % 72 / 72, 0.45);
   else P = modePose(md, t);
-  if (st.dance3d) { const D3 = clipFor(st.dance3d, ud.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
+  if (st.dance3d === 'sit') P = sitPose(t); // seated (beds, chairs, couches in Kemy homes): thighs forward, feet hanging
+  else if (st.dance3d) { const D3 = clipFor(st.dance3d, ud.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
   if (st.extra) P = { ...P, ...st.extra };
   if (!sane(P)) P = modePose('idle', t);
   const pv = ud.prev; if (pv && Math.abs(t - (ud.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }

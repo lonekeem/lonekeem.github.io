@@ -14,7 +14,7 @@ export const DESERT = { x0: 244, x1: 382, z0: 222, z1: 330 };
 export const LAKE = { x: 245, z: 425, r: 34, y: 1.2 };
 export const SEA_Y = 1.0;
 // interiors live in a hidden strip east of the world (players are teleported in through the front door)
-export const ROOMS = { x0: 400, x1: 520, z0: -70, z1: 200, cell: 14 };
+export const ROOMS = { x0: 400, x1: 520, z0: -70, z1: 270, cell: 20, per: 6 }; // 6 per row: presence x (1600 + 16x) stays < 10000; firestore.rules cellNo() mirrors this
 export const roomState = { box: null };
 export const FLAT = 2.4;                                   // street level
 export const STREET = { z0: 77, z1: 170, x0: -95, x1: 95 };

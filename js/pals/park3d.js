@@ -503,6 +503,7 @@ export function createPark3D(ctx) {
         window.__p3.q = { dpr: +(DPR * dprK).toFixed(2), shadows: sun.castShadow, draw: Q.draw, step: qStep, tier: Q.tier, phone: !!Q.phone }; }
       // input -> move relative to the camera
       const mv = W3.move(jv.test ? { x: jv.x, y: jv.y, run: false } : tc.move); if (W3.driving()) jumpQ = false; let ix = mv.x, iz = mv.y; const lk = tc.takeLook(); if (lk.dx || lk.dy) { C.yaw -= lk.dx * 0.008; C.pitch = Math.max(pov ? -0.6 : -0.15, Math.min(pov ? 1.2 : 1.25, C.pitch + lk.dy * 0.006)); }
+      if (P.sit && (Math.hypot(ix, iz) > 0.3 || jumpQ)) { const f = P.sit.off; if (f) f(); else P.sit = null; jumpQ = false; ix = iz = 0; } // move/jump = stand up
       const im = Math.min(1, Math.hypot(ix, iz)); const running = runT || mv.run || keys.shift; const sp = (running ? RUN_V : WALK_W) * im;
       if (im > 0.08) { const a = Math.atan2(ix, iz) + C.yaw - Math.PI; const want = Math.atan2(-Math.sin(a), -Math.cos(a)); const mx = Math.sin(want), mz = Math.cos(want);
         let nx = P.x + mx * sp * dt, nz = P.z + mz * sp * dt; [nx, nz] = collide(nx, nz, P.y); P.x = nx; P.z = nz;
@@ -514,6 +515,7 @@ export function createPark3D(ctx) {
       P.vy -= GRAV * dt; P.y += P.vy * dt;
       if (P.y <= fl) { if (!P.onGround && P.vy < -2) dirty = true; P.y = fl; P.vy = 0; P.onGround = true; } else if (P.onGround && P.y - fl < 0.35 && P.vy <= 0) { P.y = fl; P.vy = 0; } else P.onGround = false;
       if (!P.onGround && P.y > fl + 0.35) P.onGround = false;
+      if (P.sit) { P.x = P.sit.x; P.z = P.sit.z; P.y = P.sit.y; P.yaw = P.sit.yaw; P.vy = 0; P.onGround = true; } // seated on a bed/chair/couch
       if (!P.onGround) dirty = true; // stream the jump arc (send() still caps it at ~4/s)
       if (P.danceUntil && Date.now() > P.danceUntil && P.dance) { P.dance = ''; dirty = true; } // tell others the dance ended
       me.position.set(P.x, P.y, P.z); me.rotation.y = P.yaw;
@@ -540,7 +542,7 @@ export function createPark3D(ctx) {
         if (o.tr != null) { let dy = o.tr - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 10); } else if (mvd > 0.3) o.yaw = Math.atan2(o.x - px, o.z - pz);
         if (!o.obj) continue; const dist = Math.hypot(o.x - P.x, o.z - P.z); o.obj.visible = dist < (LOW ? 60 : 110); o.obj.position.set(o.x, o.y, o.z); o.obj.rotation.y = o.yaw;
         const near = dist < (ULTRA ? 30 : LOW ? 12 : 20); o.t += dt * 60; o.lodN = (o.lodN || 0) + 1;
-        if (o.obj.visible && (near || o.lodN % 3 === 0)) { const air = o.th != null && o.th > gy + 0.3; const od = (o.dance && performance.now() < o.danceUntil) || o.dn ? (o.dn || o.dance) : '';
+        if (o.obj.visible && (near || o.lodN % 3 === 0)) { const air = o.th != null && o.th > gy + 0.3 && o.dn !== 'sit'; const od = (o.dance && performance.now() < o.danceUntil) || o.dn ? (o.dn || o.dance) : '';
           const run2 = mvd > 2.6; const g2 = gaitFor(o.obj, mvd, run2); const s2 = { mode: air ? 'hop' : mvd > 0.6 ? (run2 ? 'run' : 'walk') : 'idle', t: o.t, dt60: dt * 60 * (near ? 1 : 3), speed: mvd > 0.6 ? g2.speed : 0, cadence: g2.cadence, stride: g2.stride, extra: run2 ? { cx: 0.22, nx: -0.08 } : null, jumpK: 0.5 }; if (od && mvd < 0.6 && !air) { s2.dance3d = od; s2.beat = bt.beat; s2.amt = 1; } posePal3D(o.obj.userData.m, s2); }
         o.obj.traverse((c) => { if (c.isMesh) c.castShadow = near && !LOW; });
         placeTag(o, o.x, o.y + HEIGHT + 0.35, o.z, muted.has(o.uid) ? '' : clean(o.say || ''), o.sayAt || 0, !o.obj.visible || dist > 45); }

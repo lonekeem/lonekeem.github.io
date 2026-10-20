@@ -2054,7 +2054,7 @@ service cloud.firestore {
     // ================= Pal Park presence: rooms of ~20, ~4 writes/s while moving, stale docs removable by anyone
     match /parkRooms/{room}/p/{uid} {
       function pp() { return request.resource.data; }
-      function cellNo() { return int(math.floor((float(pp().x - 1600) / 16.0 - 400.0) / 14.0)) + 8 * int(math.floor((float(pp().y - 1200) / 16.0 + 70.0) / 14.0)) + 1; }
+      function cellNo() { return int(math.floor((float(pp().x - 1600) / 16.0 - 400.0) / 20.0)) + 6 * int(math.floor((float(pp().y - 1200) / 16.0 + 70.0) / 20.0)) + 1; } // js/world/layout.js ROOMS (20 m cells, 6 per row)
       function cellHouse() { return 'h' + (cellNo() < 10 ? '0' : '') + string(cellNo()); }
       function hp(id) { return /databases/$(database)/documents/homes/$(id); }
       function homeOk(id) { return !exists(hp(id)) || get(hp(id)).data.owner == me() || get(hp(id)).data.get('open', false) == true || me() in get(hp(id)).data.get('inv', []); }
