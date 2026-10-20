@@ -5,7 +5,10 @@
 // z_hw_* = 👑 premium, Diamonds (config/palShop.dprices) with a placeholder Play Billing productId (not used yet).
 // Full costumes ('full' slot) also add their matching set pieces (hair / hat / mask / tail / cape / prop) when that
 // slot is empty, so one tap gives the whole look. 3D models: js/pals/halloween3d.js.
-export const HW_ON = (d = new Date()) => d.getMonth() === 9; // the limited-time Halloween banner shows in October
+import { seasonId } from '../seasons.js';
+// the limited-time banner / countdown / first-tab treatment only in October (js/seasons.js, honours ?season=<id>);
+// the costumes themselves stay buyable all year in the store's 🎃 Seasonal section
+export const HW_ON = (d = new Date()) => seasonId(d) === 'halloween';
 export const HW_ENDS = (d = new Date()) => new Date(d.getFullYear(), 10, 1); // Nov 1, local time
 export const hwProduct = (id) => 'kemy_costume_' + id.replace(/^(z_|f_)?hw_/, ''); // placeholder productId
 const X = (id, name, slot, st, col, price, r, x = {}) => ({ id, name, kind: 'wear', slot, st, col, p: id.startsWith('z_') || id.startsWith('f_') ? 0 : price, r, g: 'a', hw: 1, free: id.startsWith('f_') || undefined, ...(id.startsWith('z_') ? { d: price, prem: 1, productId: hwProduct(id) } : {}), ...x });

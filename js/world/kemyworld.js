@@ -5,6 +5,8 @@
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
 import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL } from './layout.js';
 import { attachEast } from './east.js';
+import { currentSeason, SEASONS } from '../seasons.js';
+const SEASONS_T = Object.fromEntries(Object.values(SEASONS).filter((x) => x.treat).map((x) => [x.treat.id, x.treat]));
 import { attachHomes } from './homes.js';
 import { attachRespawn } from './respawn.js';
 import { buildCar, poseCar, CAR_IDX, CARS } from './cars.js';
@@ -19,7 +21,7 @@ export const CANDY = [{ id: 'star', name: 'Choco Star', e: '⭐' }, { id: 'moon'
 const GREET = ['Happy Halloween! 🎃', 'Ooh, great costume!', 'Here you go, sweetie! 🍬', 'Take two, you earned it!', 'Boo! Just kidding 😄', 'Stay safe out there!', 'What a cute Pal!', 'Trick or treat? Treat!'];
 export const KNOCK_CD_MS = 20 * 60 * 1000, KNOCK_DAY_CAP = 15, KNOCK_COINS = 5;
 
-export function attachWorld(api) {
+export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 'halloween';
   const { THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, sky, sun, hemi } = api;
   const ground = api.ground; const root = new THREE.Group(); root.name = 'kemy-world'; scene.add(root);
   const det = Q.detail || 1, R0 = rng(4242); const uid = (S.user && S.user.uid) || 'anon';
@@ -172,6 +174,46 @@ export function attachWorld(api) {
   // street name signs
   for (const [x, z, t] of [[-61, 103, 'Pumpkin Lane'], [61, 103, 'Lantern Way'], [3, 148, 'Candy Court'], [-61, 142, 'Moonbeam Ave']]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.6), new THREE.MeshBasicMaterial({ map: signTex(t, '#14532d', '#ffffff'), side: THREE.DoubleSide })); s.position.set(x, FLAT + 3.2, z); root.add(s); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), std('#4b5563')); p.position.set(x, FLAT + 1.6, z); root.add(p); cyl.push({ x, z, r: 0.08, top: 99 }); }
 
+  // ---------------------------------------------------------------- seasons (js/seasons.js): Halloween decor only in October, other holidays reuse
+  // the same spots (pumpkin places, string-light bulbs, the arch banner) with one instanced prop set + light colours
+  let seasonFx = null;
+  { const pc = SEA.pc || ['#ffffff']; const isPump = SEA.prop === 'pumpkin';
+    if (!HW) { ghostIM.count = 0; batIM.count = 0; ghostIM.visible = batIM.visible = false; }
+    if (!isPump) { pumpIM.visible = stemIM.visible = false; gate.traverse((o) => { if (o.geometry === pumpG) o.visible = false; }); }
+    else if (!HW) { pumpMat.emissiveMap = null; pumpMat.emissive.set('#000000'); pumpMat.color.set(pc[0]); }
+    bulbs.forEach((b, i) => bulbIM.setColorAt(i, col.set(HW ? b.c : SEA.lights[i % SEA.lights.length]).multiplyScalar(SEA.respectful ? 1.2 : 2))); if (bulbIM.instanceColor) bulbIM.instanceColor.needsUpdate = true;
+    if (!HW) gate.traverse((o) => { if (o.geometry && o.geometry.type === 'TorusGeometry') { o.material = o.material.clone(); o.material.color.set(pc[0]); o.material.emissive.set(pc[0]); o.material.emissiveIntensity = 0.25; } });
+    // the arch banner shows the season's text (first sign = street side)
+    { let k = 0; gate.traverse((o) => { if (o.isMesh && o.geometry.type === 'PlaneGeometry' && o.material.map && k++ === 0 && !HW) o.material.map = signTex(SEA.banner, SEA.respectful ? '#1e293b' : '#2b1d55', '#ffffff'); }); }
+    if (!isPump) { const geo = seasonProp(SEA.prop); const im = new THREE.InstancedMesh(geo, std('#fff', { r: 0.6, vc: true, ...(SEA.respectful ? {} : { e: '#000' }) }), pumpkins.length); im.castShadow = !LOW && !Q.phone;
+      pumpkins.forEach((p, i) => { tq.setFromAxisAngle(UP, p.ry); const sc = (SEA.prop === 'flag' || SEA.prop === 'banner' ? 1 : 0.8) * (0.8 + p.s * 0.5); tmpM.compose(tv.set(p.x, ground(p.x, p.z), p.z), tq, ts.set(sc, sc, sc)); im.setMatrixAt(i, tmpM); im.setColorAt(i, col.set(pc[i % pc.length])); });
+      townG._street.add(im); }
+    // fireworks (party days only, never on respectful days) / gentle snow: one pooled Points system each, around the player
+    if (SEA.fx && !SEA.respectful) { const N = SEA.fx === 'snow' ? (LOW ? 300 : 700) : (LOW ? 240 : 480); const pos = new Float32Array(N * 3), colA = new Float32Array(N * 3), vel = new Float32Array(N * 3), life = new Float32Array(N);
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(colA, 3));
+      const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: SEA.fx === 'snow' ? 0.18 : 0.5, vertexColors: true, transparent: true, depthWrite: false, fog: SEA.fx === 'snow' })); pts.frustumCulled = false; scene.add(pts);
+      const R3 = rng(321); let burstT = 0, bi = 0; for (let i = 0; i < N; i++) { pos[i * 3 + 1] = -999; colA[i * 3] = colA[i * 3 + 1] = colA[i * 3 + 2] = 1; }
+      seasonFx = { pts, update(dt) { const cx = P.x, cz = P.z;
+        if (SEA.fx === 'snow') { for (let i = 0; i < N; i++) { let y = pos[i * 3 + 1]; if (y < FLAT - 1) { pos[i * 3] = cx + (R3() - 0.5) * 60; pos[i * 3 + 2] = cz + (R3() - 0.5) * 60; y = FLAT + 4 + R3() * 18; } pos[i * 3 + 1] = y - dt * (1.2 + (i % 5) * 0.15); pos[i * 3] += Math.sin(y * 0.7 + i) * dt * 0.3; } }
+        else { burstT -= dt; if (burstT <= 0) { burstT = 0.9 + R3() * 1.2; const bx = cx + (R3() - 0.5) * 70, bz = cz + 40 + R3() * 50, by = FLAT + 28 + R3() * 18; const c = col.set(SEA.lights[Math.floor(R3() * SEA.lights.length)]); const per = 60;
+            for (let j = 0; j < per; j++) { const i = (bi++) % N; const a = R3() * TAU, e = Math.acos(2 * R3() - 1), sp = 9 + R3() * 3; pos[i * 3] = bx; pos[i * 3 + 1] = by; pos[i * 3 + 2] = bz; vel[i * 3] = Math.sin(e) * Math.cos(a) * sp; vel[i * 3 + 1] = Math.cos(e) * sp; vel[i * 3 + 2] = Math.sin(e) * Math.sin(a) * sp; life[i] = 1.6; colA[i * 3] = c.r * 2; colA[i * 3 + 1] = c.g * 2; colA[i * 3 + 2] = c.b * 2; } g.attributes.color.needsUpdate = true; }
+          for (let i = 0; i < N; i++) { if (life[i] <= 0) continue; life[i] -= dt; vel[i * 3 + 1] -= 6 * dt; for (let k = 0; k < 3; k++) { vel[i * 3 + k] *= 1 - dt * 1.2; pos[i * 3 + k] += vel[i * 3 + k] * dt; } if (life[i] <= 0) pos[i * 3 + 1] = -999; } }
+        g.attributes.position.needsUpdate = true; } }; } }
+  function seasonProp(kind) { const parts = []; const P2 = (g, c, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) => { g = g.index ? g.toNonIndexed() : g; g.scale(sx, sy, sz); g.translate(x, y, z); const n = g.attributes.position.count, a = new Float32Array(n * 3); col.set(c); for (let i = 0; i < n; i++) { a[i * 3] = col.r; a[i * 3 + 1] = col.g; a[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); parts.push(g); };
+    const W = '#ffffff', G2 = '#9ca3af', GR = '#4d7c0f';
+    if (kind === 'heart') { P2(new THREE.SphereGeometry(0.18, 10, 8), W, -0.12, 0.52, 0); P2(new THREE.SphereGeometry(0.18, 10, 8), W, 0.12, 0.52, 0); P2(new THREE.ConeGeometry(0.26, 0.4, 12), W, 0, 0.3, 0, 1, -1, 0.7); P2(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 5), GR, 0, 0.15, 0); }
+    else if (kind === 'egg') P2(new THREE.SphereGeometry(0.22, 12, 10), W, 0, 0.3, 0, 1, 1.35, 1);
+    else if (kind === 'shamrock') { for (let k = 0; k < 3; k++) { const a = k * TAU / 3 + Math.PI / 2; P2(new THREE.SphereGeometry(0.15, 8, 6), W, Math.cos(a) * 0.15, 0.55 + Math.sin(a) * 0.15, 0, 1, 1, 0.35); } P2(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 5), GR, 0, 0.25, 0); }
+    else if (kind === 'lantern') { P2(new THREE.SphereGeometry(0.28, 12, 8), W, 0, 0.62, 0, 1, 0.8, 1); P2(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 10), '#facc15', 0, 0.85, 0); P2(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 10), '#facc15', 0, 0.39, 0); P2(new THREE.CylinderGeometry(0.02, 0.02, 0.36, 5), '#7c2d12', 0, 0.18, 0); }
+    else if (kind === 'gift') { P2(new THREE.BoxGeometry(0.5, 0.42, 0.5), W, 0, 0.21, 0); P2(new THREE.BoxGeometry(0.52, 0.44, 0.08), '#fde68a', 0, 0.22, 0); P2(new THREE.BoxGeometry(0.08, 0.44, 0.52), '#fde68a', 0, 0.22, 0); P2(new THREE.TorusGeometry(0.08, 0.025, 6, 12), '#fde68a', 0, 0.48, 0); }
+    else if (kind === 'candle') { P2(new THREE.CylinderGeometry(0.06, 0.06, 0.55, 8), W, 0, 0.28, 0); P2(new THREE.SphereGeometry(0.05, 6, 5), '#fbbf24', 0, 0.6, 0, 1, 1.6, 1); P2(new THREE.CylinderGeometry(0.16, 0.18, 0.06, 10), G2, 0, 0.03, 0); }
+    else if (kind === 'flag') { P2(new THREE.CylinderGeometry(0.02, 0.025, 1.3, 6), G2, 0, 0.65, 0); P2(new THREE.BoxGeometry(0.55, 0.34, 0.02), W, 0.28, 1.1, 0); for (let k = 0; k < 3; k++) P2(new THREE.BoxGeometry(0.55, 0.05, 0.024), '#b91c1c', 0.28, 0.96 + k * 0.1, 0); P2(new THREE.BoxGeometry(0.22, 0.17, 0.028), '#1e3a8a', 0.12, 1.18, 0); }
+    else if (kind === 'banner') { for (const s of [-1, 1]) P2(new THREE.CylinderGeometry(0.025, 0.025, 1.2, 6), G2, s * 0.45, 0.6, 0); P2(new THREE.BoxGeometry(0.9, 0.36, 0.02), W, 0, 0.95, 0); }
+    else if (kind === 'sapling') { P2(new THREE.ConeGeometry(0.26, 0.6, 8), W, 0, 0.55, 0); P2(new THREE.CylinderGeometry(0.03, 0.04, 0.3, 6), '#7c4a2a', 0, 0.15, 0); P2(new THREE.CylinderGeometry(0.2, 0.16, 0.12, 10), '#a16207', 0, 0.06, 0); }
+    else if (kind === 'star') { P2(new THREE.OctahedronGeometry(0.26, 0), W, 0, 0.75, 0, 1, 1, 0.35); P2(new THREE.CylinderGeometry(0.02, 0.02, 0.6, 5), G2, 0, 0.3, 0); }
+    else { P2(new THREE.SphereGeometry(0.14, 8, 6), W, 0, 0.42, 0, 1, 0.6, 1); P2(new THREE.SphereGeometry(0.05, 6, 4), '#facc15', 0, 0.46, 0); P2(new THREE.CylinderGeometry(0.015, 0.015, 0.4, 4), GR, 0, 0.2, 0); } // flower
+    let n = 0; parts.forEach((g) => (n += g.attributes.position.count)); const out = new THREE.BufferGeometry(); for (const [a, sz] of [['position', 3], ['normal', 3], ['color', 3]]) { const arr = new Float32Array(n * sz); let o = 0; for (const g of parts) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; } out.setAttribute(a, new THREE.BufferAttribute(arr, sz)); } return out; }
+
   // ---------------------------------------------------------------- night sky (blends in as you walk into Kemy Street)
   const SU = sky.material.uniforms; const DAY = { top: SU.top.value.clone(), hor: SU.hor.value.clone(), ground: SU.ground.value.clone(), sunCol: SU.sunCol.value.clone(), cloud: SU.cloud.value, sun: sun.intensity, sunC: sun.color.clone(), hemi: hemi.intensity, hs: hemi.color.clone(), hg: hemi.groundColor.clone(), fog: scene.fog.color.clone(), env: scene.environmentIntensity, exp: R.toneMappingExposure };
   const NIGHT = { top: new THREE.Color('#1c1446'), hor: new THREE.Color('#7a4fb0'), ground: new THREE.Color('#2a2050'), sunCol: new THREE.Color('#e6e9ff'), cloud: 0.25, sun: 0.9, sunC: new THREE.Color('#aab8ff'), hemi: 1.15, hs: new THREE.Color('#9d8cff'), hg: new THREE.Color('#3a3060'), fog: new THREE.Color('#3b2d6b'), env: 0.18, exp: 1.12 };
@@ -229,16 +271,16 @@ export function attachWorld(api) {
   // candy bag (per account, on this device) + knock bookkeeping
   const BK = 'kemy-street-bag-' + uid, KK = 'kemy-street-knock-' + uid; const day = () => Math.floor(Date.now() / 86400000);
   let bag = {}; try { bag = JSON.parse(lsg(BK) || '{}') || {}; } catch { bag = {}; } let kn = {}; try { kn = JSON.parse(lsg(KK) || '{}') || {}; } catch { kn = {}; } if (kn.day !== day()) kn = { day: day(), n: 0, at: kn.at || {} };
-  const candyTotal = () => Object.values(bag).reduce((s, v) => s + (v | 0), 0); const paintBag = () => { bagB.textContent = '🍬 ' + candyTotal(); }; paintBag();
-  bagB.onclick = () => { const d = document.createElement('div'); d.className = 'ks-panel'; d.innerHTML = `<div class="ks-card"><h3>🍬 My Candy Bag</h3><p style="margin:0 0 10px;opacity:.85;font-size:14px">${candyTotal()} treats · ${Math.max(0, KNOCK_DAY_CAP - kn.n)} coin knocks left today</p><div class="ks-grid">${CANDY.map((c) => `<div><b>${c.e}</b>${c.name}<br>×${bag[c.id] | 0}</div>`).join('')}</div><button type="button" style="width:100%">Close</button></div>`; d.querySelector('button').onclick = () => d.remove(); d.onclick = (e) => { if (e.target === d) d.remove(); }; hud.appendChild(d); };
+  const candyTotal = () => Object.values(bag).reduce((s, v) => s + (v | 0), 0); const paintBag = () => { bagB.textContent = (HW ? '🍬 ' : SEA.treat.e + ' ') + candyTotal(); }; paintBag();
+  bagB.onclick = () => { const d = document.createElement('div'); d.className = 'ks-panel'; d.innerHTML = `<div class="ks-card"><h3>${HW ? '🍬 My Candy Bag' : SEA.treat.e + ' My Treat Bag'}</h3><p style="margin:0 0 10px;opacity:.85;font-size:14px">${candyTotal()} treats · ${Math.max(0, KNOCK_DAY_CAP - kn.n)} coin knocks left today</p><div class="ks-grid">${[...CANDY, ...Object.values(SEASONS_T)].filter((c, i, a) => a.findIndex((q) => q.id === c.id) === i && (HW && CANDY.includes(c) || (bag[c.id] | 0) > 0 || c === SEA.treat)).map((c) => `<div><b>${c.e}</b>${c.name}<br>×${bag[c.id] | 0}</div>`).join('')}</div><button type="button" style="width:100%">Close</button></div>`; d.querySelector('button').onclick = () => d.remove(); d.onclick = (e) => { if (e.target === d) d.remove(); }; hud.appendChild(d); };
   let knockAt = null; // { door idx, t }
   function knock(i) { const d = doors[i]; if (knockAt) return; const now = Date.now(); const last = kn.at[d.h.id] || 0;
-    if (now - last < KNOCK_CD_MS) { const m = Math.ceil((KNOCK_CD_MS - (now - last)) / 60000); say(`🕒 This neighbor gave you candy already. Come back in ${m} min!`); return; }
+    if (now - last < KNOCK_CD_MS) { const m = Math.ceil((KNOCK_CD_MS - (now - last)) / 60000); say(`🕒 This neighbor gave you a treat already. Come back in ${m} min!`); return; }
     knockAt = { i, t: 0, given: false }; d.want = 1; actB.hidden = true; try { api.sfx && api.sfx('knock'); } catch { /* */ } }
-  function giveCandy(i) { const d = doors[i]; const c = CANDY[Math.floor(Math.random() * CANDY.length)]; const n = 1 + Math.floor(Math.random() * 3); bag[c.id] = (bag[c.id] | 0) + n; lss(BK, JSON.stringify(bag)); paintBag();
-    kn.at[d.h.id] = Date.now(); let coins = 0; if (kn.n < KNOCK_DAY_CAP) { kn.n++; coins = KNOCK_COINS; dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: KNOCK_COINS, why: 'for trick-or-treating' } })); }
+  function giveCandy(i) { const d = doors[i]; const c = HW ? CANDY[Math.floor(Math.random() * CANDY.length)] : SEA.treat; const n = 1 + Math.floor(Math.random() * 3); bag[c.id] = (bag[c.id] | 0) + n; lss(BK, JSON.stringify(bag)); paintBag();
+    kn.at[d.h.id] = Date.now(); let coins = 0; if (kn.n < KNOCK_DAY_CAP) { kn.n++; coins = KNOCK_COINS; dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: KNOCK_COINS, why: HW ? 'for trick-or-treating' : 'for visiting neighbors' } })); }
     for (const k of Object.keys(kn.at)) if (Date.now() - kn.at[k] > KNOCK_CD_MS) delete kn.at[k]; kn.at[d.h.id] = Date.now(); lss(KK, JSON.stringify(kn));
-    say(`${GREET[Math.floor(Math.random() * GREET.length)]}\n+${n} ${c.e} ${c.name}${coins ? ` · +${coins} ⭐ Star Coins` : ' · (daily coin limit reached, candy only)'}`); window.__kw && (window.__kw.knocks = (window.__kw.knocks || 0) + 1); }
+    const GR2 = HW ? GREET : SEA.greet; say(`${GR2[Math.floor(Math.random() * GR2.length)]}\n+${n} ${c.e} ${c.name}${coins ? ` · +${coins} ⭐ Star Coins` : ' · (daily coin limit reached, candy only)'}`); window.__kw && (window.__kw.knocks = (window.__kw.knocks || 0) + 1); }
   actB.onclick = () => { const a = actB.dataset.a; if (a && a.startsWith('k')) knock(+a.slice(1)); else if (api.onAction) api.onAction(a); };
   // tags for bots
   function tag(o, text, x, y, z) { if (!o.tagEl) { o.tagEl = document.createElement('div'); o.tagEl.className = 'ks-tag'; o.tagEl.textContent = text; tagsEl.appendChild(o.tagEl); o.bubEl = document.createElement('div'); o.bubEl.className = 'ks-bub'; o.bubEl.hidden = true; tagsEl.appendChild(o.bubEl); }
@@ -260,8 +302,8 @@ export function attachWorld(api) {
   // ---------------------------------------------------------------- per-frame update
   let lightT = 0, mapT = 0, cullT = 0; const peds = () => { const out = [{ x: P.x, z: P.z }]; for (const o of api.others.values()) out.push({ x: o.x, z: o.z }); for (const b of bots) out.push({ x: b.x, z: b.z }); return out; };
   const titleEl = view.querySelector('.p3-top b'); let area = '';
-  function update(dt, now) { const tt = now / 1000; const inS = P.z > PARK.H - 14 && P.x < 392 ? sstep(PARK.H - 16, PARK.H + 14, P.z) * (1 - sstep(104, 124, P.x)) * (1 - sstep(PLAINS.z0 - 14, PLAINS.z0 + 8, P.z)) : 0; setNight(inS);
-    const ar = areaAt(P.x, P.z); if (ar !== area && titleEl) { area = ar; titleEl.textContent = ar; }
+  function update(dt, now) { const tt = now / 1000; const inS = P.z > PARK.H - 14 && P.x < 392 ? sstep(PARK.H - 16, PARK.H + 14, P.z) * (1 - sstep(104, 124, P.x)) * (1 - sstep(PLAINS.z0 - 14, PLAINS.z0 + 8, P.z)) * (SEA.night ? 1 : 0) : 0; if (seasonFx) seasonFx.update(dt); setNight(inS);
+    const ar = HW ? areaAt(P.x, P.z) : areaAt(P.x, P.z).replace('🎃', '🏡'); if (ar !== area && titleEl) { area = ar; titleEl.textContent = ar; }
     const cp = api.cam.position; moon.position.set(cp.x - 120, cp.y + 160, cp.z + 260); moon.lookAt(cp); stars.position.copy(cp); const near = P.z > PARK.H - 40;
     root.visible = true; // culling per object below
     if (now - cullT > 400) { cullT = now; const far = Q.draw * 0.75; for (const g of Object.values(townG)) g.visible = Math.hypot(g.userData.c[0] - P.x, g.userData.c[1] - P.z) < (g === townG._street ? Q.draw * 0.6 + 60 : Q.draw + 70); for (const c of cars) { const x = c.drive ? c.m.position.x : c.x, z = c.drive ? c.m.position.z : c.z; c.m.visible = Math.hypot(x - P.x, z - P.z) < (c.drive ? far : Math.min(far, Q.phone ? 60 : 110)); } }
@@ -285,7 +327,7 @@ export function attachWorld(api) {
     for (const c of cars) if (c.drive && c.m.visible) { const dx = P.x - c.x, dz = P.z - c.z, d = Math.hypot(dx, dz); if (d < 2.2 && d > 0.01) { P.x += dx / d * (2.2 - d) * 0.3; P.z += dz / d * (2.2 - d) * 0.3; } }
     // bots
     const bt = api.beatNow ? api.beatNow() : { beat: 0 }; for (const b of bots) { const [a, c] = b.seg; const L = Math.hypot(c[0] - a[0], c[1] - a[1]);
-      if (b.pause > 0) b.pause -= dt; else { let blocked = false; for (const p of ppl) if (p.x !== b.x && Math.hypot(p.x - b.x, p.z - b.z) < 0.9) blocked = true; if (!blocked) b.k += b.dir * b.v * dt / L; if (b.k > 1 || b.k < 0) { b.dir *= -1; b.k = clamp(b.k, 0, 1); } if (Math.random() < dt * 0.04) { b.pause = 2 + Math.random() * 3; if (Math.random() < 0.5) { b.say = BOTSAY[Math.floor(Math.random() * BOTSAY.length)]; b.sayAt = Date.now(); } } }
+      if (b.pause > 0) b.pause -= dt; else { let blocked = false; for (const p of ppl) if (p.x !== b.x && Math.hypot(p.x - b.x, p.z - b.z) < 0.9) blocked = true; if (!blocked) b.k += b.dir * b.v * dt / L; if (b.k > 1 || b.k < 0) { b.dir *= -1; b.k = clamp(b.k, 0, 1); } if (Math.random() < dt * 0.04) { b.pause = 2 + Math.random() * 3; if (Math.random() < 0.5) { { const L2 = HW ? BOTSAY : SEA.greet.concat(['Nice day for a walk!', 'Love your Pal!', 'Let’s go to the gazebo!']); b.say = L2[Math.floor(Math.random() * L2.length)]; } b.sayAt = Date.now(); } } }
       const nx = a[0] + (c[0] - a[0]) * b.k, nz = a[1] + (c[1] - a[1]) * b.k; const mv = Math.hypot(nx - b.x, nz - b.z) / Math.max(dt, 1e-3); if (mv > 0.05) b.yaw = Math.atan2(nx - b.x, nz - b.z); b.x = nx; b.z = nz;
       const d = Math.hypot(b.x - P.x, b.z - P.z); b.obj.visible = d < (LOW ? 45 : Q.phone ? 38 : 80); if (!b.obj.visible) { hideTag(b); continue; }
       b.obj.position.set(b.x, ground(b.x, b.z), b.z); b.obj.rotation.y = b.yaw; b.t += dt * 60; const nr = d < (LOW ? 14 : 26); b.n = (b.n || 0) + 1;
@@ -302,7 +344,7 @@ export function attachWorld(api) {
       if (candyFx.visible) { const k = clamp((knockAt.t - 1.4) / 0.8, 0, 1); candyFx.position.set(d.x + fx * (0.8 + k * 0.8), FLAT + 1.6 + Math.sin(k * Math.PI) * 1.2, d.z + fz * (0.8 + k * 0.8)); candyFx.rotation.y += dt * 6; if (k >= 1) candyFx.visible = false; }
       if (knockAt.t > 3.4) d.want = 0; if (knockAt.t > 4.4) { if (host) host.visible = false; knockAt = null; } }
     if ((mapT += dt) > 0.25) { mapT = 0; drawMap(); }
-    window.__kw = Object.assign(window.__kw || {}, { night: nk, bots: bots.length, cars: cars.length, houses: HOUSES.length, candy: candyTotal(), coinKnocks: kn.n, nearDoor: best }); }
+    window.__kw = Object.assign(window.__kw || {}, { season: SEA.id, night: nk, bots: bots.length, cars: cars.length, houses: HOUSES.length, candy: candyTotal(), coinKnocks: kn.n, nearDoor: best }); }
   function spawnStreet() { P.x = GATE.x + (Math.random() - 0.5) * 3; P.z = GATE.z + 6 + Math.random() * 3; P.yaw = 0; P.y = ground(P.x, P.z); }
   function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
