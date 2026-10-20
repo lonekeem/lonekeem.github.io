@@ -286,7 +286,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     kn.at[d.h.id] = Date.now(); let coins = 0; if (kn.n < KNOCK_DAY_CAP) { kn.n++; coins = KNOCK_COINS; dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: KNOCK_COINS, why: HW ? 'for trick-or-treating' : 'for visiting neighbors' } })); }
     for (const k of Object.keys(kn.at)) if (Date.now() - kn.at[k] > KNOCK_CD_MS) delete kn.at[k]; kn.at[d.h.id] = Date.now(); lss(KK, JSON.stringify(kn));
     const GR2 = HW ? GREET : SEA.greet; say(`${GR2[Math.floor(Math.random() * GR2.length)]}\n+${n} ${c.e} ${c.name}${coins ? ` · +${coins} ⭐ Star Coins` : ' · (daily coin limit reached, candy only)'}`); window.__kw && (window.__kw.knocks = (window.__kw.knocks || 0) + 1); }
-  actB.onclick = () => { const a = actB.dataset.a; if (a && a.startsWith('k')) knock(+a.slice(1)); else if (api.onAction) api.onAction(a); };
+  actB.onclick = () => { const a = actB.dataset.a; if (a && /^k\d+$/.test(a)) knock(+a.slice(1)); else if (api.onAction) api.onAction(a); };
   // tags for bots
   function tag(o, text, x, y, z) { if (!o.tagEl) { o.tagEl = document.createElement('div'); o.tagEl.className = 'ks-tag'; o.tagEl.textContent = text; tagsEl.appendChild(o.tagEl); o.bubEl = document.createElement('div'); o.bubEl.className = 'ks-bub'; o.bubEl.hidden = true; tagsEl.appendChild(o.bubEl); }
     tv.set(x, y, z).project(api.cam); const vis = tv.z < 1 && Math.abs(tv.x) < 1.05 && Math.abs(tv.y) < 1.05; o.tagEl.style.display = vis ? '' : 'none'; if (!vis) { o.bubEl.hidden = true; return; }
