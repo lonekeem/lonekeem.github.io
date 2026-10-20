@@ -106,7 +106,7 @@ export function createPalStore(ctx) {
     }
     $('#ps-save').onclick = save;
     // 3 saved look slots
-    async function looks() { let L = []; try { L = await e.looks(); } catch {} const el = $('#ps-looks');
+    async function looks() { let L = []; try { L = await e.looks(); } catch {} const el = $('#ps-looks'); if (!el) return; // left the store before the saved looks loaded
       el.innerHTML = ['l1', 'l2', 'l3'].map((id, i) => { const l = L.find((x) => x.id === id); return `<span class="ps-look"><button class="chip" data-load="${id}" ${l ? '' : 'disabled'}>${l ? esc(l.name) : 'Look ' + (i + 1)}</button><button class="chip" data-store="${id}" aria-label="Save to look ${i + 1}">⤓</button></span>`; }).join('');
       el.querySelectorAll('[data-load]').forEach((b) => b.onclick = () => { const l = L.find((x) => x.id === b.dataset.load); if (!l) return; snap(); D = { outfit: { ...l.outfit }, bg: l.bg || '', variant: l.variant || '', pattern: l.pattern || 'none' }; refresh(); toast(`Trying on ${l.name}. Tap Save Look to keep it.`); });
       el.querySelectorAll('[data-store]').forEach((b) => b.onclick = async () => { try { const i = b.dataset.store.slice(1); await e.saveLook(b.dataset.store, 'Look ' + i, D.outfit, { bg: D.bg, variant: D.variant, pattern: D.pattern }); toast(`Saved to Look ${i}`); looks(); } catch (er) { toast(friendlyError(er)); } }); }
