@@ -2,6 +2,7 @@
 // focus zoom while any game / 3D view is on screen, and auto-recovers if the
 // page ever ends up zoomed or scrolled. Idempotent; imported by app.html and
 // js/controls.js so every game (zombie, Pal Park, red-light, arcade) gets it.
+import './kb-lift.js'; // pins game chat inputs above the on-screen keyboard
 const GAME_SEL = '.zg, .p3-view, .kc, .rl, .rlgl, [data-kemy-game], [data-nozoom]';
 const VP_GAME = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
 
@@ -42,8 +43,9 @@ html.kz-game :is(.zg-panel,.zg-card,[class*=-scroll],[class*=-list],[class*=-log
     meta.setAttribute('content', gameVp.replace('maximum-scale=1', 'maximum-scale=1.0001'));
     requestAnimationFrame(() => { meta.setAttribute('content', on ? gameVp : baseVp); window.scrollTo(0, 0); if (d.scrollingElement) d.scrollingElement.scrollTop = 0; setTimeout(() => { resetting = false; relayout(manual === true); }, 60); });
   };
+  const typing = () => { const a = d.activeElement; return !!(a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !/^(range|checkbox|radio|color|file|button|submit)$/i.test(a.type || '')); };
   const recover = () => {
-    if (!on || resetting) return;
+    if (!on || resetting || typing()) return; // never scroll-reset / re-meta while the keyboard is up (kb-lift positions the bar)
     const v = window.visualViewport;
     if (v && Math.abs(v.scale - 1) > 0.01) { reset(); return; }
     if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
@@ -89,7 +91,7 @@ html.kz-game :is(.zg-panel,.zg-card,[class*=-scroll],[class*=-list],[class*=-log
   window.addEventListener('orientationchange', () => { setTimeout(recover, 60); setTimeout(recover, 400); });
   window.addEventListener('scroll', recover, { passive: true });
   d.addEventListener('focusout', () => setTimeout(recover, 80)); // keyboard close can leave page offset
-  d.addEventListener('focusin', () => setTimeout(recover, 300));
+  d.addEventListener('focusin', () => setTimeout(recover, 300)); // no-op while typing (see typing())
   d.addEventListener('visibilitychange', () => { if (!d.hidden) setTimeout(recover, 60); });
   // Safety net: if iOS still ends up magnified (user could not pinch back out), poll while in-game.
   setInterval(() => { if (on && !d.hidden) recover(); }, 1000); // cheap: reads only, writes only on real change
