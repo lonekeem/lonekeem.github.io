@@ -10,10 +10,8 @@ import { mountGameMusic, hideGameMusic } from './gamemusic.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
-import { createComposer } from './create.js';
 import { deliveryUrls, LIMITS, safePhotoURL, keepTrying } from './media-config.js';
 import { createStories } from './stories.js';
-import { createAvatarEditor } from './avatar-editor.js';
 import { createSearch, SEARCH_ICON } from './search.js';
 import { searchFields, userSearchFields, linkify } from './search-index.js';
 import { viewsHtml, trackVideo, trackVisible, fmtCount, EYE, recordView } from './views.js';
@@ -29,7 +27,6 @@ import {
   getAggregateFromServer, sum, limitToLast, deleteField
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { ICONS } from './icons.js';
-import { createLive } from './live.js';
 import { createModeration, BlockSet } from './moderation.js';
 import { initKindGuard } from './kindguard.js';
 import * as safety from './safety.js';
@@ -40,19 +37,20 @@ import { createDevices } from './devices.js';
 import { createComments } from './comments.js';
 import * as parental from './parental.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
-import { createGames, CONTROLLER as GAMES_ICON } from './games/index.js';
-import { createPals } from './pals/index.js';
-import { createPalGames } from './pals/games.js';
-import { createPark } from './pals/park.js';
+import { CONTROLLER as GAMES_ICON } from './games/art.js';
 import { initInterests, interestsPage, learnTap, pickTopics, topicChips } from './interests.js';
 import { createMusic } from './music.js';
 import { createDonate } from './donate.js';
 import * as loadScreen from './loadscreen.js';
 import { gameName, GAMES } from './games/art.js';
 import { loadDiscover } from './discover.js';
-import { danceEnabled, setDanceEnabled } from './pals/dance.js';
-import { keepOn as palKeepOn, setKeep as setPalKeep } from './pals/dance-ui.js';
 import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, getMode as themeMode, setMode as setThemeMode, getVolume as themeVol, setVolume as setThemeVol, THEME_CREDIT, THEME_TITLE, TRACKS as THEME_TRACKS, getPick as themePick, setPick as setThemePick, PLAYLIST_CREDIT } from './theme.js';
+// Heavy feature modules load on demand (their route, or idle time after the feed): calls are queued until the
+// module arrives, so the feed never downloads games, Pals, live streaming or three.js. Written by Lone Keem
+function lazyMod(load) {
+  let p = null; const get = () => (p = p || load().catch((e) => { p = null; throw e; }));
+  return new Proxy({}, { get: (_, k) => (k === 'then' ? undefined : k === 'load' ? get : (...a) => get().then((o) => o[k](...a))) });
+}
 
 // ---------------------------------------------------------------- state
 const S = {
@@ -748,7 +746,7 @@ async function route() {
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
       finally { if (gName && token === routeToken) requestAnimationFrame(() => requestAnimationFrame(() => loadScreen.hide())); }
       if (token === routeToken && S.profile && S.profile.welcomed === false && !/onboard|login|signup/.test(hash)) showWelcome();
-      else if (token === routeToken) pals.onRoute(hash);
+      else if (token === routeToken) palsOnRoute(hash);
       return;
     }
   }
@@ -788,16 +786,25 @@ const stories = createStories({
   openStory: () => composer.openStory(), sendMessage, refreshProfile,
   fs: { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, writeBatch, Timestamp, serverTimestamp }
 });
-const live = createLive({ palLive: (root, o) => pals.liveOverlay(root, o),
+const live = lazyMod(() => import('./live.js').then(({ createLive }) => createLive({ palLive: (root, o) => pals.liveOverlay(root, o),
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, isAdmin, STUDIO_UID, getProfile, followUser, stale, openModal, closeModal, reportDialog: (...x) => reportDialog(...x),
   fs: { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limitToLast, limit, onSnapshot, writeBatch, serverTimestamp, getCountFromServer }
-});
-const pals = createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth, notify });
-const palGames = createPalGames({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal });
+})));
+const pals = lazyMod(() => import('./pals/index.js').then(({ createPals }) => createPals({ S, db, esc, toast, openModal, closeModal, friendlyError, requireAuth, notify })));
+const palGames = lazyMod(() => import('./pals/games.js').then(({ createPalGames }) => createPalGames({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal })));
 let arcade = null;
+// Pals (floating Pal, first-hatch prompt) are not needed to use the feed: on the first screen they load a few
+// seconds after it is ready (idle time), then every later route goes straight to them.
+let palsWarm = false;
+function palsOnRoute(hash) {
+  if (palsWarm) return pals.onRoute(hash).catch(() => {});
+  const go = () => { palsWarm = true; pals.onRoute(location.hash || hash).catch(() => {}); };
+  if (/^#\/(pals|park|street|games\/pals)/.test(hash)) return go();
+  setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(go, { timeout: 4000 }) : go()), 3500);
+}
 const donate = createDonate({ db, esc, toast, friendlyError, openModal: (...a) => openModal(...a), closeModal: () => closeModal(), isAdmin: () => isAdmin() });
-const park = createPark({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal });
-const games = createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile });
+const park = lazyMod(() => import('./pals/park.js').then(({ createPark }) => createPark({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal })));
+const games = lazyMod(() => import('./games/index.js').then(({ createGames }) => createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile })));
 const search = createSearch({
   S, db, main, esc, $, avatar, badge, toast, friendlyError, requireAuth, followUser, gridTile: (p) => gridTile(p), postCard: (p) => postCard(p),
   STUDIO_UID, youTubeId, tikTokId, stale, canGoBack: () => navCount > 1,
@@ -890,7 +897,7 @@ const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${ava
 
 // ---------------------------------------------------------------- compose (Post tab)
 // Camera / photo / library flow lives in js/create.js; the text + link form stays here.
-const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends });
+const composer = lazyMod(() => import('./create.js').then(({ createComposer }) => createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends })));
 async function pageCompose(sub, qs, token) {
   if (!requireAuth()) return;
   if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; }
@@ -898,7 +905,7 @@ async function pageCompose(sub, qs, token) {
   if (pre.series) { pre.sid = pre.series; }
   if (sub === 'movie' || sub === 'song') return getWorks().composePage(sub, token, pre);
   if (sub === 'aimovie') { const { createMovieMaker } = await import('./moviemaker.js'); return createMovieMaker({ S, main, esc, toast, friendlyError, publishMovie: (o) => getWorks().publishMovie(o), series: getWorks().series(), pre, getPost: async (id) => { const d = await getDoc(doc(db, 'posts', id)); return d.exists() ? { id: d.id, ...d.data() } : null; } }).page(token); }
-  composer.render(token, { sub, textForm: (slot) => textComposeForm(slot, sub === 'text') });
+  await composer.render(token, { sub, textForm: (slot) => textComposeForm(slot, sub === 'text') });
 }
 async function postAuthor(asStudio) {
   const authorId = asStudio ? STUDIO_UID : S.user.uid;
@@ -1232,8 +1239,8 @@ async function pageSettings() {
     <section class="card pad" style="margin-top:16px" aria-labelledby="spals-h">
       <h2 id="spals-h" style="font-size:1.05rem">Pals</h2>
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-fx" ${fxOn() ? 'checked' : ''}> <span>Fancy effects<br><span class="muted small">Glass blur, 3D tilt and the animated background. Turn off for older phones.</span></span></label>
-      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-dance" ${danceEnabled() ? 'checked' : ''}> <span>Pals dance to music<br><span class="muted small">When the theme song, a song or a music video plays.</span></span></label>
-      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-keep" ${palKeepOn() ? 'checked' : ''}> <span>Keep Pal on screen while scrolling<br><span class="muted small">A small Pal in the corner. Double-tap it to hide, triple-tap the screen to bring it back, drag to move.</span></span></label>
+      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-dance" disabled> <span>Pals dance to music<br><span class="muted small">When the theme song, a song or a music video plays.</span></span></label>
+      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-keep" disabled> <span>Keep Pal on screen while scrolling<br><span class="muted small">A small Pal in the corner. Double-tap it to hide, triple-tap the screen to bring it back, drag to move.</span></span></label>
       <label for="s-pal-gfx" style="margin-top:8px">Pal graphics</label><select id="s-pal-gfx" style="width:100%"><option value="ultra">Ultra (sharpest 3D, opt-in)</option><option value="high">High (3D, default)</option><option value="low">Low (lighter 3D, saves battery)</option><option value="flat">2D art (no 3D)</option></select>
          <p class="small" style="margin:8px 0 0"><button type="button" class="btn btn-sm btn-ghost" id="s-dance-shop">💃 Dances &amp; Dance Shop</button></p>
     </section>
@@ -1255,10 +1262,14 @@ async function pageSettings() {
   if (sessionStorage.getItem('lks-focus-bio')) { sessionStorage.removeItem('lks-focus-bio'); setTimeout(() => { const t = $('#s-bio'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); } }, 60); }
   document.querySelectorAll('[name=s-theme-mode]').forEach((r) => { r.onchange = () => { setThemeMode(r.value, { start: r.value === 'play' }); toast(r.value === 'play' ? 'Theme song on' : r.value === 'mute' ? 'Theme song muted' : 'Theme song off'); }; });
   $('#s-fx').onchange = (e) => { setFx(e.target.checked); toast(e.target.checked ? 'Fancy effects on ✨' : 'Effects off (lighter)'); };
-  $('#s-pal-dance').onchange = (e) => { setDanceEnabled(e.target.checked); toast(e.target.checked ? 'Pals will dance to music 💃' : 'Pal dancing off'); };
-  $('#s-pal-keep').onchange = (e) => { setPalKeep(e.target.checked); toast(e.target.checked ? 'Your Pal will stay on screen' : 'Floating Pal off'); };
+  Promise.all([import('./pals/dance.js'), import('./pals/dance-ui.js')]).then(([{ danceEnabled, setDanceEnabled }, { keepOn: palKeepOn, setKeep: setPalKeep }]) => {
+    const d = $('#s-pal-dance'), k = $('#s-pal-keep'); if (!d || !k) return;
+    d.checked = danceEnabled(); k.checked = palKeepOn(); d.disabled = k.disabled = false;
+    d.onchange = (e) => { setDanceEnabled(e.target.checked); toast(e.target.checked ? 'Pals will dance to music 💃' : 'Pal dancing off'); };
+    k.onchange = (e) => { setPalKeep(e.target.checked); toast(e.target.checked ? 'Your Pal will stay on screen' : 'Floating Pal off'); };
+  }).catch(() => {});
   { const g = $('#s-pal-gfx'); import('./pals/pal3d.js').then((m) => { g.value = m.gfxLevel(); g.onchange = () => { m.setGfx(g.value); toast(g.value === 'flat' ? 'Pals use 2D art (reload to apply)' : 'Pal graphics: ' + g.value + (g.value === 'low' ? ' (lighter 3D)' : '')); }; }).catch(() => { g.value = 'low'; g.disabled = true; }); }
-  $('#s-dance-shop').onclick = () => dispatchEvent(new Event('kemy:dance-shop'));
+  $('#s-dance-shop').onclick = () => pals.load().then(() => dispatchEvent(new Event('kemy:dance-shop'))).catch((e) => toast(friendlyError(e)));
   { const sel = $('#s-theme-pick'); sel.value = themePick(); sel.onchange = () => { setThemePick(sel.value); toast(sel.value === 'shuffle' ? 'Shuffling theme songs' : sel.value === 'all' ? 'Playing all theme songs' : 'Playing ' + THEME_TRACKS[+sel.value].title); }; }
   $('#s-theme-vol').oninput = (e) => { const v = +e.target.value / 100; setThemeVol(v); $('#s-theme-vol-n').textContent = e.target.value + '%'; };
   { const b = $('#s-theme'); const paint = () => { b.textContent = themePlaying() ? '⏸ Stop theme' : '🎵 Play theme'; };
@@ -1275,12 +1286,13 @@ async function pageSettings() {
     const c = $('#av-change'); if (c) c.textContent = url ? 'Change profile photo' : 'Add a profile photo';
     const h = $('#av-edit p'); if (h) h.textContent = url ? 'Your photo shows everywhere your name does.' : 'Until you add one, your avatar uses your initials and the color below.';
   };
-  const editor = createAvatarEditor({
+  let editor = null; // photo editor loads when first opened
+  const openEditor = () => import('./avatar-editor.js').then(({ createAvatarEditor }) => (editor = editor || createAvatarEditor({
     esc, toast, friendlyError, getUid: () => S.user && S.user.uid,
     hasPhoto: () => !!safePhotoURL(S.profile.photoURL), onSaved: setPhoto, onRemoved: () => setPhoto('')
-  });
-  S.unsubs.push(editor.close);
-  $('#av-pick').onclick = editor.open; $('#av-change').onclick = editor.open;
+  })).open()).catch((e) => toast(friendlyError(e)));
+  S.unsubs.push(() => editor && editor.close());
+  $('#av-pick').onclick = openEditor; $('#av-change').onclick = openEditor;
   $('#s-reset').onclick = async () => { try { await sendPasswordResetEmail(auth, S.user.email); toast('Password reset email sent'); } catch (e) { toast(friendlyError(e)); } };
   $('#settings').onsubmit = async (ev) => {
     ev.preventDefault();

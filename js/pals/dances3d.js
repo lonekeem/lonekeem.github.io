@@ -3,7 +3,9 @@
 // cx..cz chest, nx/ny/nz head, aL/aR = [abduct°, forward°, elbow°, twist°], lL/lR = [lift°, spread°, extraKnee°],
 // ry whole-body turn. Every clip gets a natural groove layer: a knee bounce on the beat, hip/chest counter-rotation
 // and weight shift toward the supporting leg; the rig adds follow-through on head, ears and tail.
-import { grooveLayer } from './motion3d.js';
+// grooveLayer comes from motion3d.js (three.js) when a 3D Pal loads, so 2D Pal code never pulls three.js
+let grooveLayer = null;
+export function setGroove(fn) { grooveLayer = fn; }
 const M = (p) => { const o = { ...p }; for (const [a, b] of [['aL', 'aR'], ['lL', 'lR']]) { o[a] = p[b]; o[b] = p[a]; } for (const k of ['hx', 'hrz', 'hry', 'cz', 'cy', 'nz', 'ny', 'sz', 'ry']) if (o[k]) o[k] = -o[k]; return o; }; // mirror
 const N = { aL: [24, 6, 14], aR: [24, 6, 14] };
 const K = (beats, keys, o = {}) => ({ beats, keys, ...o });
@@ -88,7 +90,7 @@ export function clipFor(id) {
     const p = d.ease === 'linear' ? curve(K4(i), K4(i), K4(i + 1), K4(i + 1), f) : d.ease === 'spin' ? curve(K4(i), K4(i), K4(i + 1), K4(i + 1), f * 0.4 + smooth(f) * 0.6) : curve(K4(i - 1), K4(i), K4(i + 1), K4(i + 2), smooth(f) * 0.35 + f * 0.65);
     // groove layer (motion3d.js): knee bounce on the beat, weight shifts with hip sway, chest isolations, shoulder
     // rolls and head nods/tilts/looks; IK keeps the planted feet locked while the body moves over them
-    grooveLayer(p, beat, d.gentle ? 0.6 : d.ease === 'snap' ? 0.8 : 1, (id.length % 5) * 0.7);
+    if (grooveLayer) grooveLayer(p, beat, d.gentle ? 0.6 : d.ease === 'snap' ? 0.8 : 1, (id.length % 5) * 0.7);
     if (d.slide) p.slide = 1;
     p.tw = 0.25; return natural(p);
   };

@@ -1,6 +1,6 @@
 // Pal dances: a music bus (is anything playing? where is the beat?), the dance moves, and drawDancer(),
 // a drop-in wrapper around drawPal() that makes a Pal dance while music plays (drawPal's API is unchanged).
-import { drawPal, SPEC, SPECIES, stageOf, setPal3D, setPal3DWait } from './art.js';
+import { drawPal, SPEC, SPECIES, stageOf, setPal3D, setPal3DWait, onNeed3D } from './art.js';
 import { themeAnalyser, themeEl } from '../theme.js';
 import { register3D } from './dances3d.js';
 import { EMOTE_DANCES } from './emotes.js';
@@ -172,7 +172,7 @@ export function load3D(tries = 4) {
   loading = go(tries).finally(() => { loading = null; });
   return loading;
 }
-if (typeof window !== 'undefined') { setPal3DWait(glAvail()); setTimeout(load3D, 600); addEventListener('online', () => load3D()); }
+if (typeof window !== 'undefined') { setPal3DWait(glAvail()); onNeed3D(() => { if (!P3 && !loading) load3D(); }); addEventListener('online', () => load3D()); }
 export function drawDancer(c, x, y, size, pal, st = {}) {
   const b = tickBus(); const amt = st.dance ? 1 : b.amt;
   if (P3 && !st.flat) { // 3D Pal (lazy-loaded); falls back to the 2D rig when over budget / unavailable

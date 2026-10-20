@@ -189,3 +189,7 @@ export function springs(root, P) {
   }
   return st;
 }
+
+// hand the groove layer to dances3d.js (it no longer imports this file, which keeps three.js off the feed)
+import { setGroove } from './dances3d.js';
+setGroove(grooveLayer);
