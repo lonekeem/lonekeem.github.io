@@ -1,6 +1,7 @@
 // "Talk to your Pal": an AI companion chat. Free and keyless: Pollinations' public text endpoint
 // (text.pollinations.ai, rate-limited per IP), with a friendly scripted personality as the fallback.
 // Kid-safe: input + output filters, a strict system prompt, short replies, and no personal info.
+import { drawBg } from './bgs.js';
 import { doc, getDoc, setDoc, serverTimestamp, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { SPEC, VIBES, drawPal } from './art.js';
 import { drawDancer } from './dance.js';
@@ -122,7 +123,7 @@ export function openTalk(ctx, p, { owner, mine, visitorChat, onHappy, ownsVoice,
   const root = document.querySelector('.pal-talk'); const host = root.querySelector('.pal-talk-stage');
   const cv = document.createElement('canvas'); const d = Math.min(3, devicePixelRatio || 1); cv.width = 240 * d; cv.height = 170 * d; cv.style.width = '240px'; cv.style.height = '170px'; host.appendChild(cv); const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0);
   let talking = 0, emo = 'happy', emoT = 0, t = 0; const stats = liveStats(p); const mood = moodOf(stats);
-  const frame = () => { if (!document.body.contains(cv)) { stopSpeaking(); return; } t++; c.clearRect(0, 0, 240, 170);
+  const frame = () => { if (!document.body.contains(cv)) { stopSpeaking(); return; } t++; c.clearRect(0, 0, 240, 170); if (p.bg) drawBg(c, 240, 170, p.bg, t);
     let mode = 'idle'; if (talking > 0) { mode = 'eat'; talking--; } else if (emoT > 0) { emoT--; mode = emo === 'giggle' ? 'happy' : emo === 'sleepy' ? 'sleep' : emo === 'curious' ? 'walk' : 'happy'; }
     drawDancer(c, 120, 162, 128, p, { t, mode, mood, face: emo === 'curious' && emoT > 0 ? (Math.floor(t / 40) % 2 ? 1 : -1) : 1 });
     if (emoT > 0 && emo === 'giggle') { c.fillStyle = '#ff6fae'; c.font = 'bold 16px sans-serif'; c.fillText('hehe', 170, 50 - (emoT % 30)); }

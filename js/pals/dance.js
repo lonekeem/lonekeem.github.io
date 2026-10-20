@@ -1,6 +1,6 @@
 // Pal dances: a music bus (is anything playing? where is the beat?), the dance moves, and drawDancer(),
 // a drop-in wrapper around drawPal() that makes a Pal dance while music plays (drawPal's API is unchanged).
-import { drawPal, SPEC, SPECIES, stageOf, setPal3D } from './art.js';
+import { drawPal, SPEC, SPECIES, stageOf, setPal3D, setPal3DWait } from './art.js';
 import { themeAnalyser, themeEl } from '../theme.js';
 import { register3D } from './dances3d.js';
 
@@ -156,15 +156,27 @@ function sparkle(c, x, y, s, t) {
 // 3D Pals: lazy-load three.js only on capable devices (see js/pals/pal3d.js)
 let P3 = null;
 export const pal3dReady = () => !!P3;
-export function load3D() { return import('./pal3d.js').then((m) => { if (m.webglOK()) { P3 = m; setPal3D(m.drawPal3D); } return !!P3; }).catch(() => false); }
-if (typeof window !== 'undefined') setTimeout(load3D, 600);
+// Load with retries (slow phone networks / a module fetch that times out). While loading, Pals show a placeholder,
+// never the 2D art; 2D is only used when WebGL is really unavailable (or the user picked 2D in Settings).
+const glAvail = () => { try { if (localStorage.getItem('kemy-pal3d') === '0' || localStorage.getItem('kemy-pal-gfx') === 'flat') return false; } catch { /* */ } try { const cv = document.createElement('canvas'); const g = cv.getContext('webgl2') || cv.getContext('webgl'); g?.getExtension('WEBGL_lose_context')?.loseContext(); return !!g; } catch { return false; } };
+let loading = null, err3 = 0;
+export function load3D(tries = 4) {
+  if (P3) return Promise.resolve(true); if (loading) return loading;
+  if (!glAvail()) { setPal3DWait(false); return Promise.resolve(false); }
+  setPal3DWait(true);
+  const go = (n) => import('./pal3d.js' + (n < tries ? '?r=' + (tries - n) : '')).then((m) => { if (m.webglOK()) { P3 = m; setPal3DWait(false, m.drawLoading); setPal3D(m.drawPal3D); } else setPal3DWait(false); return !!P3; })
+    .catch((e) => { console.warn('3D Pals load failed, retrying', e); if (n <= 1) { setPal3DWait(false); return false; } return new Promise((r) => setTimeout(r, [0, 8000, 4000, 1500][n - 1] || 1500)).then(() => go(n - 1)); });
+  loading = go(tries).finally(() => { loading = null; });
+  return loading;
+}
+if (typeof window !== 'undefined') { setPal3DWait(glAvail()); setTimeout(load3D, 600); addEventListener('online', () => load3D()); }
 export function drawDancer(c, x, y, size, pal, st = {}) {
   const b = tickBus(); const amt = st.dance ? 1 : b.amt;
   if (P3 && !st.flat) { // 3D Pal (lazy-loaded); falls back to the 2D rig when over budget / unavailable
     const on = amt > 0.001 && (st.dance || danceEnabled()); const beat = st.beat ?? (b.beat + (pal._off || 0));
     const d = on ? danceFor(pal, beat, st.dance) : null;
     const g = RM() && d && !d.gentle ? danceById('hula') || d : d;
-    let ok3 = false; try { ok3 = P3.drawPal3D(c, x, y, size, pal, { ...st, dance3d: g ? g.id : null, beat, amt: on ? amt * (RM() ? 0.5 : 1) : 0 }); } catch (e) { console.warn('3D Pal off:', e); P3 = null; }
+    let ok3 = false; try { ok3 = P3.drawPal3D(c, x, y, size, pal, { ...st, dance3d: g ? g.id : null, beat, amt: on ? amt * (RM() ? 0.5 : 1) : 0 }); } catch (e) { console.warn('3D Pal draw error:', e); if (++err3 > 30) P3 = null; }
     if (ok3) {
       if (on && amt > 0.6 && !RM() && g) { const p = poseAt(g, beat); if (p.star) { const t = st.t || 0; sparkle(c, x - size * 0.5, y - size * 1.1, size * 0.09, t); sparkle(c, x + size * 0.5, y - size * 0.9, size * 0.07, t + 20); } }
       return;

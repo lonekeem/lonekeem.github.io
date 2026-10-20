@@ -43,8 +43,11 @@ export function drawBubble(c, x, y, r) { ell(c, x, y, r, r); const g = c.createR
 // st  = { t (frame), face (1|-1), mode: idle|walk|hop|happy|sleep|eat|shake|react, mood: { dirty, sad, bandage } }
 // One look everywhere: when the 3D renderer is loaded (js/pals/dance.js -> pal3d.js) every drawPal() call renders the
 // 3D model; the 2D art below is only the fallback (no WebGL / low-end / over the per-frame budget). st.flat forces 2D.
-let R3 = null;
+let R3 = null, wait3D = false, err3 = 0, LOADING = null;
 export const setPal3D = (fn) => { R3 = fn; };
+// while three.js is loading (or retrying) show a soft placeholder instead of the flat 2D art
+export const setPal3DWait = (on, loadingFn) => { wait3D = !!on; if (loadingFn) LOADING = loadingFn; };
+function drawWait(c, x, y, size) { const p = 0.5 + 0.5 * Math.sin(performance.now() / 260); c.save(); c.globalAlpha = 0.28 + p * 0.22; c.fillStyle = '#e9dcff'; c.beginPath(); c.ellipse(x, y - size * 0.42, size * 0.36, size * 0.42, 0, 0, 7); c.fill(); c.globalAlpha = 0.2; c.beginPath(); c.ellipse(x, y - 2, size * 0.34, size * 0.06, 0, 0, 7); c.fill(); c.restore(); }
 export const pal3DOn = () => !!R3;
 const thumbs = new Map();
 // Cached still image of a Pal (3D when available). Returns a canvas; re-renders once 3D becomes available.
@@ -56,7 +59,8 @@ export function getPalThumbnail(pal, px = 128) {
   thumbs.set(key, cv); if (thumbs.size > 60) thumbs.delete(thumbs.keys().next().value); return cv;
 }
 export function drawPal(c, x, y, size, pal, st = {}) {
-  if (R3 && !st.flat) { try { if (R3(c, x, y, size, pal, st)) return; } catch (e) { console.warn('3D Pal off:', e); R3 = null; } }
+  if (R3 && !st.flat) { try { if (R3(c, x, y, size, pal, st)) return; } catch (e) { console.warn('3D Pal draw error:', e); if (++err3 > 30) R3 = null; } }
+  else if (!R3 && wait3D && !st.flat) { (LOADING || drawWait)(c, x, y, size); return; }
   const sp = SPEC[pal.species] || SPECIES[0]; const col = pal.colors || {};
   const B = col.body || sp.body, A = col.accent || sp.acc, E = col.eye || '#24133f';
   const stage = stageOf(pal.level || 1); const t = st.t || 0; const face = st.face || 1; const mood = st.mood || {};

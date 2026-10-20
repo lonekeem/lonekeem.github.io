@@ -12,24 +12,28 @@ import { DANCES3D, clipFor } from './dances3d.js';
 
 const D = Math.PI / 180;
 let R = null, scene, cam, keyL, shadowPlane;
-// Graphics: 'ultra' (opt-in) | 'high' (default) | 'low' (= 2D art). Ultra steps down if FPS stays under ~30.
+// Graphics: 'ultra' (opt-in) | 'high' (default) | 'low' (light 3D: smaller, no shadows) | 'flat' (2D art, only by choice).
+// A sustained slow frame rate steps ultra -> high -> low for this visit only. It never drops to 2D.
 const GK = 'kemy-pal-gfx';
-export function gfxLevel() { if (autoG) return autoG; try { const v = localStorage.getItem(GK); if (v === 'ultra' || v === 'high' || v === 'low') return v; } catch { /* */ } const n = navigator; void n; return 'high'; }
+export function gfxLevel() { if (autoG) return autoG; try { const v = localStorage.getItem(GK); if (v === 'ultra' || v === 'high' || v === 'low' || v === 'flat') return v; } catch { /* */ } const n = navigator; if ((n.connection && n.connection.saveData) || (n.deviceMemory && n.deviceMemory < 2)) return 'low'; return 'high'; }
 let autoG = null; // auto step-down lasts for this visit only (never saved), so a slow moment doesn't stick forever
-export function setGfx(v, auto) { if (auto) autoG = v; else { autoG = null; try { localStorage.setItem(GK, v); } catch { /* */ } } if (R) { const r = v === 'ultra' ? 448 : 256; RES = r; R.setSize(r, r, false); keyL.shadow.mapSize.set(v === 'ultra' ? 1024 : 512, v === 'ultra' ? 1024 : 512); keyL.shadow.map?.dispose(); keyL.shadow.map = null; } }
+export function setGfx(v, auto) { if (auto) autoG = v; else { autoG = null; try { localStorage.setItem(GK, v); } catch { /* */ } } if (R) applyGfx(); }
+const resOf = (g) => (g === 'ultra' ? 448 : g === 'low' ? 176 : 256);
+function applyGfx() { const g = gfxLevel(); RES = resOf(g); R.setSize(RES, RES, false); R.shadowMap.enabled = g !== 'low'; keyL.castShadow = g !== 'low'; shadowPlane.visible = g !== 'low'; keyL.shadow.mapSize.set(g === 'ultra' ? 1024 : 512, g === 'ultra' ? 1024 : 512); keyL.shadow.map?.dispose(); keyL.shadow.map = null; }
 let RES = 448;
-const cache = new Map(); let lost = false;
+const cache = new Map(); let lost = false, lostAt = 0, rebuilds = 0;
 export function webglOK() {
   try { if (localStorage.getItem('kemy-pal3d') === '0') return false; } catch { /* */ }
-  if (gfxLevel() === 'low') return false;
-  const n = navigator; if (n.connection && n.connection.saveData) return false;
-  if (n.deviceMemory && n.deviceMemory < 2) return false;
+  if (gfxLevel() === 'flat') return false; // the user picked 2D art
   try { const cv = document.createElement('canvas'); return !!(cv.getContext('webgl2') || cv.getContext('webgl')); } catch { return false; }
 }
 function init() {
-  RES = gfxLevel() === 'ultra' ? 448 : 256; const cv = document.createElement('canvas'); cv.width = cv.height = RES;
+  RES = resOf(gfxLevel()); const cv = document.createElement('canvas'); cv.width = cv.height = RES;
   R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'low-power' });
-  cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; }); cv.addEventListener('webglcontextrestored', () => { lost = false; });
+  // iOS drops WebGL contexts when the app is backgrounded or memory is tight: show the loading placeholder, then
+  // rebuild (restored event, or a fresh renderer if it never comes back). Cached models are rebuilt on the new context.
+  cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; lostAt = performance.now(); });
+  cv.addEventListener('webglcontextrestored', () => { dropCache(); lost = false; });
   R.setPixelRatio(1); R.setSize(RES, RES, false); R.setClearColor(0, 0);
   R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
   R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.9; R.outputColorSpace = THREE.SRGBColorSpace;
@@ -42,6 +46,17 @@ function init() {
   const rim = new THREE.DirectionalLight(0xc9a8ff, 1.3); rim.position.set(-3, 2.5, -3); scene.add(rim);
   shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.ShadowMaterial({ opacity: 0.28 }));
   shadowPlane.rotation.x = -Math.PI / 2; shadowPlane.receiveShadow = true; scene.add(shadowPlane);
+  applyGfx();
+}
+function dropCache() { for (const m of cache.values()) m.traverse?.((o) => { o.geometry?.dispose?.(); }); cache.clear(); }
+function rebuild() { rebuilds++; try { dropCache(); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } R = null; lost = false; init(); }
+export const status3D = () => ({ ready: !!R && !lost, lost, rebuilds, gfx: gfxLevel(), res: RES });
+// test hook: simulate an iOS context loss (WEBGL_lose_context), used by the e2e tests
+export function _loseContext(restore = true) { const x = R && R.getContext().getExtension('WEBGL_lose_context'); if (!x) return false; x.loseContext(); if (restore) setTimeout(() => x.restoreContext(), 400); return true; }
+// soft pulsing silhouette shown while 3D loads or recovers (instead of switching to the flat 2D art)
+export function drawLoading(c, x, y, size) {
+  const p = 0.5 + 0.5 * Math.sin(performance.now() / 260); c.save(); c.globalAlpha = 0.28 + p * 0.22; c.fillStyle = '#e9dcff';
+  c.beginPath(); c.ellipse(x, y - size * 0.42, size * 0.36, size * 0.42, 0, 0, 7); c.fill(); c.globalAlpha = 0.2; c.beginPath(); c.ellipse(x, y - 2, size * 0.34, size * 0.06, 0, 0, 7); c.fill(); c.restore();
 }
 // ---------------------------------------------------------------- materials ("fur" = soft sheen PBR, "skin" = smooth clearcoat)
 let FUR = null;
@@ -287,12 +302,24 @@ function blend(a, b, k) { const o = {}; for (const key of new Set([...Object.key
 // ---------------------------------------------------------------- draw into a 2D canvas (same args as drawPal)
 let frameN = -1, frameCount = 0; const BUDGET = 8;
 let lastF = 0, slow = 0;
-function watchFps(now) { if (lastF) { const dt = now - lastF; if (dt > 34 && dt < 400) slow++; else if (dt < 25) slow = Math.max(0, slow - 2); if (slow > 120) { slow = 0; const g = gfxLevel(); if (g === 'ultra') setGfx('high', 1); else if (g === 'high') { setGfx('low', 1); lost = true; } } } lastF = now; }
+// FPS watch: ignores the first 6 s, the 3 s after any tab switch / backgrounding / rotation, and pauses (gaps > 100 ms).
+// Needs ~8 s of sustained slow frames, then steps down one level (ultra -> high -> low). Never switches to 2D.
+let firstF = 0, quietUntil = 0;
+if (typeof document !== 'undefined') { const q = () => { quietUntil = performance.now() + 3000; slow = 0; lastF = 0; }; document.addEventListener('visibilitychange', q); addEventListener('pageshow', q); addEventListener('resize', q); addEventListener('orientationchange', q); }
+function watchFps(now) {
+  if (!firstF) firstF = now;
+  if (document.hidden || now - firstF < 6000 || now < quietUntil) { lastF = now; return; }
+  if (lastF) { const dt = now - lastF; if (dt > 100) { /* pause, not slowness */ } else if (dt > 40) slow++; else if (dt < 25) slow = Math.max(0, slow - 3);
+    if (slow > 240) { slow = 0; quietUntil = now + 4000; const g = gfxLevel(); if (g === 'ultra') setGfx('high', 1); else if (g === 'high') setGfx('low', 1); } }
+  lastF = now;
+}
 export function drawPal3D(c, x, y, size, pal, st = {}) {
   const now = performance.now(), f = Math.floor(now / 16); if (f !== frameN) { frameN = f; frameCount = 0; watchFps(now); }
   if (++frameCount > BUDGET) return false; // too many Pals this frame: caller draws 2D
   if (!R) init();
-  if (lost) return false; // context lost (iOS memory pressure): caller draws the 2D Pal
+  if (lost) { // context lost (iOS backgrounding / memory): placeholder until restored, or rebuild after 2.5 s
+    if (now - lostAt > 2500 && !document.hidden) { if (rebuilds >= 6) return false; rebuild(); } else { drawLoading(c, x, y, size); return true; }
+  }
   const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.variant || '', pal.pattern || '', stageOf(pal.level || 1)]);
   let m = cache.get(key); if (!m) { m = build(pal); cache.set(key, m); if (cache.size > 24) { const k0 = cache.keys().next().value; cache.delete(k0); } }
   const t = st.t || 0;
@@ -305,7 +332,8 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   m.userData.prev = P; m.userData.pt = t;
   apply(m, P, t, st.mode); grip(m, st.dance3d ? st.amt ?? 1 : 0, st.mode, t);
   m.rotation.y = st.yaw != null ? st.yaw : ((st.face || 1) < 0 ? -0.28 : 0.28) + (P.ry || 0);
-  scene.add(m); R.render(scene, cam); scene.remove(m);
+  scene.add(m); try { R.render(scene, cam); } finally { scene.remove(m); }
+  if (R.getContext().isContextLost?.()) { if (!lost) { lost = true; lostAt = now; } drawLoading(c, x, y, size); return true; }
   const w = size * 1.65; c.drawImage(R.domElement, x - w / 2, y - w * 0.87, w, w);
   return true;
 }
