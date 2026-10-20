@@ -3,7 +3,7 @@
 // against config/palShop (prices / dprices), which the Admin page's "Publish shop prices" button writes.
 // Diamonds live in users/{uid}/pal/diamonds; owned items are users/{uid}/inv/z_* (same inventory as the Pal Store).
 import { doc, getDoc, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
-import { addItems, addDiamondItems, dayNo } from './catalog.js';
+import { addItems, addDiamondItems, DITEMS, dayNo } from './catalog.js';
 import { createEconomy } from './economy.js';
 export const ARMORY = [
   { id: 'z_foam', kind: 'zweapon', name: 'Foam Launcher', icon: '🧽', d: 80, desc: 'Bouncy foam balls that splash 3 zombies.' },
@@ -37,7 +37,7 @@ export function createDiamonds(db, uid) {
     const wait = 46000 - (Date.now() - last); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const next = { d: w.d + amt, total: w.total + amt, day: dayNo(), today: today + amt, last: serverTimestamp(), updatedAt: serverTimestamp() };
     const b = writeBatch(db); b.update(ref, next); await b.commit(); Object.assign(w, next); last = Date.now(); return amt; }
-  async function buy(id) { const it = ARM[id]; await get(true); if (!it || !it.d) throw new Error('That item can’t be bought with Diamonds.'); if (w.d < it.d) throw new Error('Not enough Diamonds yet. Play a run to earn more!');
+  async function buy(id) { const it = ARM[id] || DITEMS.find((x) => x.id === id); // Armory + premium dances (z_dn_*) await get(true); if (!it || !it.d) throw new Error('That item can’t be bought with Diamonds.'); if (w.d < it.d) throw new Error('Not enough Diamonds yet. Play a run to earn more!');
     const b = writeBatch(db); b.update(ref, { d: w.d - it.d, lastBuy: id, paid: it.d, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
     b.set(doc(db, 'users', uid, 'inv', id), { n: 1, at: serverTimestamp() }); await b.commit(); w.d -= it.d; return it.d; }
   return { get, earnRun, buy, get w() { return w; } };

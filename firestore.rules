@@ -1432,7 +1432,7 @@ service cloud.firestore {
             && zp().x is number && zp().y is number && zp().z is number && zp().f is number && zp().a is number
             && zp().x >= -60 && zp().x <= 60 && zp().z >= -60 && zp().z <= 60 && zp().y >= -5 && zp().y <= 20
             && zp().fire is bool && isStr(zp().w, 0, 10) && zp().hp is number && zp().hp >= 0 && zp().hp <= 200 && zp().down is bool
-            && isStr(zp().rev, 0, 128) && zp().em is int && zp().em >= -1 && zp().em <= 7 && zp().emAt is int
+            && isStr(zp().rev, 0, 128) && zp().em is int && zp().em >= -1 && zp().em <= 999 && zp().emAt is int
             && zp().hits is list && zp().hits.size() <= 45 && zp().hs is int && zp().at == request.time;
         }
         allow read: if signedIn();

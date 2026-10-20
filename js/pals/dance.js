@@ -3,6 +3,7 @@
 import { drawPal, SPEC, SPECIES, stageOf, setPal3D, setPal3DWait } from './art.js';
 import { themeAnalyser, themeEl } from '../theme.js';
 import { register3D } from './dances3d.js';
+import { EMOTE_DANCES } from './emotes.js';
 
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } } };
@@ -51,7 +52,8 @@ export const PRICE = { c: 80, r: 160, l: 320 };
 export const RARITY_NAME = { c: 'Common', r: 'Rare', l: 'Legendary' };
 let TIKTOK = [];
 export const tiktok = () => TIKTOK;
-export const allDances = () => [...BASIC, ...TRENDING, ...TIKTOK];
+export const allDances = () => [...BASIC, ...TRENDING, ...TIKTOK, ...EMOTE_DANCES];
+export { EMOTE_DANCES };
 export const danceById = (id) => allDances().find((d) => d.id === id);
 export const itemId = (id) => 'dn_' + id;
 export const isFree = (d) => BASIC.includes(d) || !!d.free;
@@ -69,7 +71,8 @@ TRENDING.forEach((d) => (d.group = 'trending')); BASIC.forEach((d) => (d.group =
 // owned dances (Pal Shop items dn_<id>) for the signed-in owner, set by the UI
 let owned = new Set();
 export const setOwned = (ids) => { owned = new Set(ids); };
-export const ownsDance = (d) => isFree(d) || owned.has(itemId(d.id));
+export const ownsDance = (d) => isFree(d) || owned.has(d.prem ? d.item : itemId(d.id));
+export const priceOf = (d) => (d.prem ? d.d : d.p || PRICE[d.r] || PRICE.r);
 const favKey = (pal) => 'kemy-pal-dance:' + (pal.id || '') + ':' + (pal.name || '');
 export const favOf = (pal) => ls.get(favKey(pal)) || 'free';
 export const setFav = (pal, id) => ls.set(favKey(pal), id);
@@ -140,7 +143,7 @@ export function danceFor(pal, beat, forced) {
   if (RM()) return BASIC.find((d) => d.id === (Math.floor(beat / 8) % 2 ? 'hula' : 'bounce'));
   const fav = pal._dance || favOf(pal); const fd = fav !== 'free' && danceById(fav);
   if (fd && ownsDance(fd)) return fd;
-  const mine = pal._others ? BASIC : allDances().filter(ownsDance);
+  const mine = pal._others ? BASIC : allDances().filter((d) => ownsDance(d) && d.cat !== 'quick');
   const pool = []; for (const d of mine) { pool.push(d); if (d.group !== 'basic') pool.push(d, d); }
   const phrase = Math.floor(beat / 8); const h = (seedOf(pal) + phrase * 2654435761) >>> 0;
   return pool[h % pool.length] || BASIC[0];

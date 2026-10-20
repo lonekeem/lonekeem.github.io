@@ -1,7 +1,8 @@
 import { openBuySheet, coinBadge } from '../buy-sheet.js';
 // Dance picker + Dance Shop (Star Coins, the Pals' existing free currency) + the floating companion Pal.
-import { BASIC, TRENDING, PRICE, RARITY_NAME, allDances, danceById, itemId, isFree, loadTrends, tiktok, setOwned, ownsDance, favOf, setFav, drawDancer, forcePreview, busState, isDancing, danceEnabled, BASIC as B0 } from './dance.js';
-import { addItems, ITEM, shopDoc } from './catalog.js';
+import { EMOTE_DANCES, priceOf, BASIC, TRENDING, PRICE, RARITY_NAME, allDances, danceById, itemId, isFree, loadTrends, tiktok, setOwned, ownsDance, favOf, setFav, drawDancer, forcePreview, busState, isDancing, danceEnabled, BASIC as B0 } from './dance.js';
+import { addItems, addDiamondItems, ITEM, shopDoc } from './catalog.js';
+import { createDiamonds } from './armory.js';
 import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -9,6 +10,9 @@ const R2 = { c: 'c', r: 'r', l: 'l' };
 export async function registerDanceItems() {
   await loadTrends();
   addItems([...TRENDING, ...tiktok()].filter((d) => !isFree(d)).map((d) => ({ id: itemId(d.id), name: d.name, kind: 'dance', p: PRICE[d.r] || PRICE.r, r: R2[d.r] || 'r', dance: d.id })));
+  // emotes: Star Coin ones join the Pal Shop items; premium ones are Diamond items (config/palShop.dprices)
+  addItems(EMOTE_DANCES.filter((d) => !d.free && !d.prem).map((d) => ({ id: itemId(d.id), name: d.name, kind: 'dance', p: d.p, r: R2[d.r] || 'c', dance: d.id })));
+  addDiamondItems(EMOTE_DANCES.filter((d) => d.prem).map((d) => ({ id: d.item, name: d.name, kind: 'dance', d: d.d, productId: d.productId })));
 }
 // Payment methods. Only 'coins' (free Star Coins) exists; a real-money method could be added here later
 // (it would grant the same inv item after a verified receipt). No real-money code is shipped.
@@ -20,13 +24,14 @@ function canvasEl(w, h) { const cv = document.createElement('canvas'); const d =
 export function createDanceUI(ctx) {
   const { S, db, esc, toast, openModal, closeModal, friendlyError, isAdmin } = ctx;
   let econ = null;
-  async function refreshOwned() { if (!econ) return; try { const inv = await econ.inventory(true); setOwned(Object.keys(inv).filter((k) => k.startsWith('dn_') && inv[k] > 0)); } catch { /* */ } }
-  async function pricesLive() { try { const s = await getDoc(doc(db, 'config', 'palShop')); const pr = (s.exists() && s.data().prices) || {}; return pr; } catch { return {}; } }
+  async function refreshOwned() { if (!econ) return; try { const inv = await econ.inventory(true); setOwned(Object.keys(inv).filter((k) => (k.startsWith('dn_') || k.startsWith('z_dn_')) && inv[k] > 0)); } catch { /* */ } }
+  async function pricesLive() { try { const s = await getDoc(doc(db, 'config', 'palShop')); const dt = s.exists() ? s.data() : {}; return { ...(dt.prices || {}), ...(dt.dprices || {}) }; } catch { return {}; } }
 
   // the modal: tabs "Pick a dance" / "Dance Shop"
   async function open(pal, { tab = 'pick', econOf } = {}) {
     await registerDanceItems(); econ = econOf ? econOf() : econ; await refreshOwned();
     let coins = 0; try { coins = (await econ.wallet(true)).coins; } catch { /* signed out */ }
+    let dia = null, gems = 0; if (S.user) { try { dia = createDiamonds(db, S.user.uid); gems = (await dia.get(true)).d || 0; } catch { /* */ } }
     let sel = favOf(pal), prev = null, confirm = null; const live = await pricesLive();
     openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="pal-dance"><h2>💃 ${esc(pal.name)}’s dances</h2><div style="text-align:center" id="dc-coins">${coinBadge(coins)}</div>
       <div class="pal-dance-stage"></div><p class="small muted pal-dance-now"></p>
@@ -41,11 +46,16 @@ export function createDanceUI(ctx) {
       root.querySelector('.pal-dance-now').textContent = prev ? `Preview: ${danceById(prev).name}` : d ? `Favourite: ${d.name}` : 'Freestyle: mixes all your moves to the beat';
       requestAnimationFrame(frame); };
     requestAnimationFrame(frame);
-    const tile = (d) => { const own = ownsDance(d); const price = PRICE[d.r] || PRICE.r; const picked = sel === d.id;
-      return `<div class="pal-dtile ${own ? 'own' : 'lock'} ${picked ? 'on' : ''} r-${d.r || 'c'}"><b>${esc(d.name)}</b>${d.tag ? `<small class="pal-tt">${esc(d.tag)}</small>` : ''}${d.credit ? `<small class="muted pal-credit">${esc(d.credit)}</small>` : ''}${!isFree(d) ? `<small class="rar r-${d.r}">${RARITY_NAME[d.r]}</small>` : ''}
-        <span class="pal-dbtns"><button class="btn btn-sm btn-ghost" data-pv="${d.id}" aria-label="Preview ${esc(d.name)}">▶</button>${own ? `<button class="btn btn-sm" data-pick="${d.id}">${picked ? '✓ Picked' : 'Pick'}</button>` : `<button class="btn btn-sm" data-ask="${d.id}">🔒 ★${price}</button>`}</span></div>`; };
+    const tile = (d) => { const own = ownsDance(d); const price = priceOf(d); const picked = sel === d.id; const cur = d.prem ? '💎' : '★';
+      return `<div class="pal-dtile ${own ? 'own' : 'lock'} ${picked ? 'on' : ''} r-${d.r || 'c'} ${d.prem ? 'prem' : ''}">${d.prem ? '<small class="pal-prem">👑 PREMIUM</small>' : ''}<b>${d.icon ? d.icon + ' ' : ''}${esc(d.name)}</b>${d.tag ? `<small class="pal-tt">${esc(d.tag)}</small>` : ''}${d.credit ? `<small class="muted pal-credit">${esc(d.credit)}</small>` : ''}${!isFree(d) && !d.prem ? `<small class="rar r-${d.r}">${RARITY_NAME[d.r]}</small>` : ''}${d.free && d.emote ? '<small class="rar">Free</small>' : ''}
+        <span class="pal-dbtns"><button class="btn btn-sm btn-ghost" data-pv="${d.id}" aria-label="Preview ${esc(d.name)}">▶</button>${own ? `<button class="btn btn-sm" data-pick="${d.id}">${picked ? '✓ Picked' : 'Pick'}</button>` : `<button class="btn btn-sm" data-ask="${d.id}">🔒 ${cur}${price}</button>`}</span></div>`; };
     function render(which) { tab = which; root.querySelectorAll('[data-dt]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.dt === tab)));
       const tt = tiktok();
+      const EM = (c, prem) => EMOTE_DANCES.filter((d) => d.cat === c && !d.prem), PR = () => EMOTE_DANCES.filter((d) => d.prem);
+      const EMS = () => `<h3 class="pal-sub pal-gold">👑 Premium dances</h3><p class="small muted">The showstoppers. Diamonds for now (earn them in Pal Zombie Survival).</p><div class="pal-dgrid">${PR().map(tile).join('')}</div>
+        <h3 class="pal-sub">😊 Quick emotes</h3><div class="pal-dgrid">${EM('quick').map(tile).join('')}</div>
+        <h3 class="pal-sub">💃 Kemy dances</h3><div class="pal-dgrid">${EM('dance').map(tile).join('')}</div>
+        <h3 class="pal-sub">🤪 Silly</h3><div class="pal-dgrid">${EM('silly').map(tile).join('')}</div>`;
       const TR = () => tt.filter((d) => d.group === 'trending'), HH = () => [...TRENDING.filter((d) => d.group !== 'classic'), ...tt.filter((d) => d.group === 'hiphop')], CL = () => [...TRENDING.filter((d) => d.group === 'classic'), ...tt.filter((d) => d.group === 'classic')], LN = () => tt.filter((d) => d.group === 'line');
       if (confirm) { const d = danceById(confirm); const price = PRICE[d.r] || PRICE.r;
         body.innerHTML = `<div class="pal-confirm"><p><b>Unlock ${esc(d.name)}</b> for <span class="coin">★</span>${price}?</p><p class="small muted">You have ★${coins.toLocaleString()}. Star Coins are free and can’t be bought. ${esc(pal.name)} can do it right away.</p>
@@ -57,13 +67,14 @@ export function createDanceUI(ctx) {
           catch (er) { ev.target.disabled = false; toast(er.code ? friendlyError(er) : er.message); } };
         return; }
       if (tab === 'pick') body.innerHTML = `<div class="pal-dtile free ${sel === 'free' ? 'on' : ''}"><b>🎲 Freestyle</b><small>Mixes your moves to the beat</small><span class="pal-dbtns"><button class="btn btn-sm" data-pick="free">${sel === 'free' ? '✓ Picked' : 'Pick'}</button></span></div>
+        ${EMS()}
         <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TR().map(tile).join('')}</div>
         <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${CL().map(tile).join('')}</div>
         <h3 class="pal-sub">👟 Hip-Hop &amp; Footwork</h3><div class="pal-dgrid">${HH().map(tile).join('')}</div>
         <h3 class="pal-sub">🤠 Country &amp; Line</h3><div class="pal-dgrid">${LN().map(tile).join('')}</div>
         <h3 class="pal-sub">💜 Pal Originals</h3><div class="pal-dgrid">${BASIC.map(tile).join('')}</div>
         <p class="small muted">Pals dance whenever music plays: the theme song, songs, music videos. ${danceEnabled() ? '' : '<b>Dancing is off in Settings.</b>'}</p>`;
-      else body.innerHTML = `<p class="small muted">Unlock famous moves with free Star Coins. Tap ▶ to preview first.</p>
+      else body.innerHTML = `<p class="small muted">Unlock emotes and dances with free Star Coins or 💎 Diamonds. Tap ▶ to preview on your Pal first. ${dia ? `<b>💎 ${gems.toLocaleString()}</b>` : ''}</p>${EMS()}
         <h3 class="pal-sub">🔥 Trending</h3><div class="pal-dgrid">${TR().map(tile).join('')}</div>
         <h3 class="pal-sub">🕺 Classics</h3><div class="pal-dgrid">${CL().map(tile).join('')}</div>
         <h3 class="pal-sub">👟 Hip-Hop &amp; Footwork</h3><div class="pal-dgrid">${HH().map(tile).join('')}</div>
@@ -71,7 +82,13 @@ export function createDanceUI(ctx) {
         ${isAdmin && isAdmin() ? '<p class="small"><button class="btn btn-sm btn-ghost" id="dc-sync">Admin: publish dance prices</button></p>' : ''}`;
       body.querySelectorAll('[data-pv]').forEach((b) => b.onclick = () => { prev = b.dataset.pv; });
       body.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { sel = b.dataset.pick; prev = null; setFav(pal, sel); render(tab); toast(sel === 'free' ? 'Freestyle on' : `${pal.name}’s favourite: ${danceById(sel).name}`); });
-      body.querySelectorAll('[data-ask]').forEach((b) => b.onclick = async () => { prev = b.dataset.ask; if (!S.user) return toast('Sign in to unlock dances'); const d = danceById(b.dataset.ask); const price = PRICE[d.r] || PRICE.r; const it = ITEM[itemId(d.id)];
+      body.querySelectorAll('[data-ask]').forEach((b) => b.onclick = async () => { prev = b.dataset.ask; if (!S.user) return toast('Sign in to unlock dances'); const d = danceById(b.dataset.ask); const price = priceOf(d);
+        if (d.prem) { if (!(d.item in live)) { toast('The Dance Shop is opening soon. Prices are being set up!'); if (isAdmin && isAdmin()) adminSync(); return; }
+          const ok = await openBuySheet({ name: d.name, price, icon: d.icon || '👑', balance: gems, currency: '💎', note: `👑 Premium dance. ${pal.name} can do it right away. Diamonds only, no real money.`, equipped: `${pal.name} will dance it next ✓`, earn: [{ label: '🧟 Earn Diamonds in Pal Zombie Survival', href: '#/arcade' }],
+            buy: async () => { try { const paid = await dia.buy(d.item); gems -= paid; return gems; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message); } },
+            onSuccess: async () => { await refreshOwned(); sel = d.id; setFav(pal, d.id); } });
+          if (ok) { prev = null; render('pick'); } return; }
+        const it = ITEM[itemId(d.id)];
         if (!(it.id in live)) { toast('The Dance Shop is opening soon. Prices are being set up!'); if (isAdmin && isAdmin()) adminSync(); return; }
         const ok = await openBuySheet({ name: d.name, price, icon: '💃', balance: coins, note: `${pal.name} can do it right away. Star Coins only, no real money.`, equipped: `${pal.name} will dance it next ✓`,
           buy: async () => { try { const paid = await purchase(econ, it); coins -= paid; return coins; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message); } },

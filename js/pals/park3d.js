@@ -13,6 +13,8 @@ import { getActivePal } from './core.js';
 import { clean, checkInput } from './talk.js';
 import { treasures, EMOTES, PHRASES, PORTALS } from './park.js';
 import { createControls } from '../controls.js';
+import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
+import { emoteMs, EMOTE_BY_ID } from './emotes.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
 
@@ -384,8 +386,13 @@ export function createPark3D(ctx) {
     function say(t) { const now = Date.now(); burst = burst.filter((x) => now - x < 30000); if (now - lastSay < 2500 || burst.length >= 6) { toast('Slow down a little 🙂'); return false; } lastSay = now; burst.push(now); P.say = clean(t).slice(0, 60); P.sayAt = now; dirty = true; send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color); return true; }
     $('#p3-chat').onsubmit = (e) => { e.preventDefault(); const inp = $('#p3-t'); const v = inp.value.trim(); if (!v) { inp.blur(); return; } if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } if (say(v)) { inp.value = ''; inp.blur(); } };
     const panel = $('#park-panel'); const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };
-    $('#p3-quick').onclick = () => { if (!toggle('c')) return; panel.innerHTML = PHRASES.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join(''); };
-    function openEmotes() { if (!toggle('e')) return; panel.innerHTML = '<div class="p3-ph">Tap to emote. With music on, your Pal dances to the beat!</div>' + EMOTES.map((x) => `<button class="pk-e" data-e="${x}">${x}</button>`).join(''); }
+    // quick chat: tabbed tap-to-say phrases (greetings, teamwork, GG, compliments, park, emoji); the text bar stays too
+    $('#p3-quick').onclick = () => { if (!toggle('c')) return; renderQuickChat(panel, (x) => { if (say(x)) panel.hidden = true; }); };
+    // emote wheel: 8 favourite slots (player picks), the classic emoji reactions underneath, shop shortcut
+    loadOwnedEmotes(db, S.user.uid);
+    function openEmotes() { panel.hidden = true; loadOwnedEmotes(db, S.user.uid).then(() => openWheel({ onEmote: emoteDance, reactions: EMOTES, onReact: (x) => emote(x), onShop: () => dispatchEvent(new Event('kemy:dance-shop')), onLocked: (d) => { toast(`🔒 ${d.name} is in the Dance Shop`); dispatchEvent(new Event('kemy:dance-shop')); } })); }
+    // a wheel emote/dance: synced to everyone through the existing dance-name field (dn), cleared when it ends
+    function emoteDance(id) { const d = EMOTE_BY_ID[id]; P.dance = id; P.danceUntil = Date.now() + emoteMs(id); P.tgt = ''; dirty = true; send(true); hint(`${(d && d.icon) || '💃'} ${(d && d.name) || 'Dance!'}`); }
     panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
     function emote(x, tgt = '') { P.e = x; P.eAt = Date.now(); P.tgt = tgt; if (EMO_DANCE[x]) { P.dance = EMO_DANCE[x]; P.danceUntil = Date.now() + 6000; } dirty = true; send(true); }
     function playerCard(o) {
@@ -475,7 +482,7 @@ export function createPark3D(ctx) {
       R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
+    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);

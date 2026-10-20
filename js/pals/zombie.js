@@ -8,7 +8,11 @@ import { getActivePal } from './core.js';
 import { createControls, buzz } from '../controls.js';
 import { ARM, createDiamonds, equippedArmor, RUN_CAP } from './armory.js';
 import { createEconomy } from './economy.js';
-import { EMOTES } from './zombie-net.js';
+import { ZTABS, zSayIdx, zEmoteIdx, zEmoteOf, zText } from './zombie-net.js';
+import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
+import { emoteMs } from './emotes.js';
+import { clipFor } from './dances3d.js';
+const EBEAT = () => performance.now() / 1000 * 116 / 60; // emotes dance at a steady 116 BPM in the game
 const TAU = Math.PI * 2, rnd = (a, b) => a + Math.random() * (b - a), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const WEAPONS = {
   goo: { name: 'Goo Blaster', icon: '🟢', rate: 0.16, dmg: 12, spd: 30, ammo: 30, rel: 1.1, col: 0x6dff5a, r: 0.16, free: 1 },
@@ -46,7 +50,7 @@ const CSS = `.zg{position:fixed;inset:0;z-index:900;background:#140f2e;overflow:
 .zg-card h2{margin:0 0 6px;font-size:28px}.zg-card .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}.zg-card button,.zg-card a{min-height:56px;padding:0 22px;border-radius:16px;border:0;font-size:18px;font-weight:800;background:#ffd23f;color:#2b1d55;text-decoration:none;display:inline-flex;align-items:center}
 .zg-card .ghost{background:rgba(255,255,255,.15);color:#fff}.zg-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.zg-stats div{background:rgba(255,255,255,.1);border-radius:12px;padding:8px}.zg-stats b{display:block;font-size:22px}
 .zg-team{position:absolute;left:10px;top:calc(max(8px,env(safe-area-inset-top)) + 96px);z-index:6;display:flex;flex-direction:column;gap:4px;pointer-events:none;font-size:13px;font-weight:800}.zg-team div{background:rgba(0,0,0,.45);border-radius:10px;padding:3px 8px;min-width:120px}.zg-team i{display:block;height:6px;border-radius:9px;background:#7ee08a;margin-top:2px}.zg-team .dn{color:#ffb3c9}
-.zg-emo{position:absolute;right:62px;top:calc(max(8px,env(safe-area-inset-top)) + 56px);z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:6px}.zg-emo button{min-height:48px;padding:0 12px;border-radius:14px;border:0;background:rgba(43,29,85,.92);color:#fff;font-weight:800;font-size:15px}
+.zg-emo{position:absolute;right:62px;top:calc(max(8px,env(safe-area-inset-top)) + 56px);z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:6px}.zg-emo button{min-height:48px;padding:0 12px;border-radius:14px;border:0;background:rgba(43,29,85,.92);color:#fff;font-weight:800;font-size:15px}.zg-emo{display:block;width:min(340px,80vw);background:rgba(27,18,51,.94);padding:8px;border-radius:16px}.zg-emo .qc-list button{min-height:42px;background:#fff;color:#2b1d55}
 .zg-rev{position:absolute;left:50%;top:58%;width:160px;height:14px;margin-left:-80px;border-radius:99px;background:rgba(0,0,0,.5);border:2px solid #fff;z-index:6;overflow:hidden}.zg-rev i{display:block;height:100%;width:0;background:#7ee08a}
 .zg-dmg{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 80px rgba(255,80,160,.0);transition:box-shadow .2s;z-index:5}`;
 export function createZombieGame(ctx) {
@@ -70,8 +74,8 @@ export function createZombieGame(ctx) {
     // ------------------------------------------------------------ DOM
     const el = document.createElement('div'); el.className = 'zg'; el.innerHTML = `<canvas class="zv"></canvas><div class="zg-dmg"></div><div class="zg-cross"></div>
       <div class="zg-hud"><div class="zg-col"><div class="zg-hp"><i></i></div><span class="zg-pill" data-h="wpn"></span></div><div class="zg-col"><span class="zg-pill" data-h="wave">Wave 1</span><span class="zg-pill" data-h="score">0</span></div><div class="zg-col"><span class="zg-pill" data-h="dia">💎 0</span><span class="zg-pill" data-h="pu" hidden></span></div></div>
-      <div class="zg-tb"><button type="button" data-t="pov" aria-label="Switch camera">👁️</button><button type="button" data-t="pause" aria-label="Pause">⏸️</button>${coop ? '<button type="button" data-t="chat" aria-label="Quick chat">💬</button>' : ''}</div>
-      <div class="zg-team" ${coop ? '' : 'hidden'}></div><div class="zg-emo" hidden>${EMOTES.map((e, i) => `<button type="button" data-em="${i}">${e}</button>`).join('')}</div><div class="zg-rev" hidden><i></i></div>
+      <div class="zg-tb"><button type="button" data-t="pov" aria-label="Switch camera">👁️</button><button type="button" data-t="pause" aria-label="Pause">⏸️</button><button type="button" data-t="wheel" aria-label="Emote wheel">😊</button>${coop ? '<button type="button" data-t="chat" aria-label="Quick chat">💬</button>' : ''}</div>
+      <div class="zg-team" ${coop ? '' : 'hidden'}></div><div class="zg-emo" hidden></div><div class="zg-rev" hidden><i></i></div>
       <div class="zg-boss" hidden><span>👑 Big Boss Zombie</span><div><i></i></div></div><div class="zg-msg"></div>`;
     document.body.appendChild(el); document.documentElement.style.overflow = 'hidden';
     const $ = (s) => el.querySelector(s), H = (k) => el.querySelector(`[data-h="${k}"]`);
@@ -165,7 +169,7 @@ export function createZombieGame(ctx) {
     let zid = 0, teamN = coop ? Math.max(1, Math.min(4, (net.state && net.state.n) || Object.keys(net.players).length || 1)) : 1, kmap = {}, dmap = {}, hitSeq = 0, myHits = [], slamSeq = 0, sendT = 0, stateT = 0, migT = 0, revT = 0, downT = 0, wipeT = 0, lastWaveSeen = 0;
     const team = new Map();
     let pitch = 0.32, pov = false, zs = [], projs = [], pickups = [], bomb = null, wave = 0, toSpawn = 0, spawnT = 0, breakT = 2.5, score = 0, kills = 0, dias = 0, over = false, paused = false, buffs = { zoom: 0, shield: 0, dia2: 0 }, boss = null, msgT = 0, lastGroan = 0;
-    const dbg = { fps: 0, frames: 0 }; window.__zombie = { get state() { return { wave, score, kills, dias, hp: Math.round(me.hp), down: me.down, zombies: zs.length, fps: dbg.fps, pr, over, weapon: cur, coop, host: isHost(), team: [...team.values()].map((t) => ({ name: t.name, hp: Math.round(t.hp), down: t.down, x: +t.x.toFixed(1), z: +t.z.toFixed(1) })) }; }, game: null };
+    const dbg = { fps: 0, frames: 0 }; window.__zombie = { get state() { return { wave, score, kills, dias, hp: Math.round(me.hp), down: me.down, zombies: zs.length, fps: dbg.fps, pr, over, weapon: cur, coop, host: isHost(), team: [...team.values()].map((t) => ({ name: t.name, hp: Math.round(t.hp), down: t.down, x: +t.x.toFixed(1), z: +t.z.toFixed(1), emo: performance.now() < (t.emoUntil || 0) ? t.emo : '', em: t.emSeen })), emo: performance.now() < (me.emoUntil || 0) ? me.emo : '' }; }, game: null };
     const msg = (t, s = 1.6) => { const m = $('.zg-msg'); m.innerHTML = t; m.style.opacity = 1; msgT = s; };
     // ------------------------------------------------------------ controls
     const C = createControls(el, { tutorialKey: 'zombie', tutorialTitle: '🧟 Pal Zombie Survival',
@@ -230,7 +234,7 @@ export function createZombieGame(ctx) {
           const sh = new THREE.Mesh(blobGeo, blobMat); sh.scale.setScalar(1.3); scene.add(sh);
           t = { rig: r, g, label, bub, sh, x: d.x, z: d.z, y: d.y, f: d.f, emSeen: d.emAt, fireCd: 0, name: d.name || 'Pal', t: 0 }; team.set(u, t); msg(`👋 ${esc2(t.name)} joined`, 1.2); }
         Object.assign(t, { tx: d.x, tz: d.z, ty: d.y, tf: d.f, a: d.a, fire: d.fire, w: d.w, hp: d.hp, down: d.down, rev: d.rev });
-        if (d.em >= 0 && d.emAt !== t.emSeen) { t.emSeen = d.emAt; t.bub.material.map = nameTex(EMOTES[d.em] || ''); t.bub.visible = true; t.bubT = 3; }
+        if (d.em >= 0 && d.emAt !== t.emSeen) { t.emSeen = d.emAt; t.bub.material.map = nameTex(zText(d.em)); t.bub.visible = true; t.bubT = 3; const eid = zEmoteOf(d.em); if (eid) { t.emo = eid; t.emoUntil = performance.now() + emoteMs(eid); } }
         // host: apply this teammate's new zombie hits (rolling window, deduped by sequence number)
         if (isHost() && Array.isArray(d.hits)) { const seen = t.hitSeen || 0; let top = seen; for (let i = 0; i + 2 < d.hits.length; i += 3) { const sq = d.hits[i]; if (sq <= seen) continue; top = Math.max(top, sq); const z = zs.find((q) => q.id === d.hits[i + 1]); if (!z || z.dead) continue; const code = d.hits[i + 2] % 10; hit(z, Math.floor(d.hits[i + 2] / 10), 0, 0, code === 1 ? WEAPONS.freeze : code === 2 ? WEAPONS.bubble : null, u); } t.hitSeen = top; } }
       for (const [u, t] of team) if (!P[u]) { scene.remove(t.g, t.label, t.bub, t.sh); team.delete(u); msg(`👋 ${esc2(t.name)} left`, 1.2); }
@@ -275,13 +279,18 @@ export function createZombieGame(ctx) {
       else if (performance.now() - migT > 2000) { migT = performance.now(); net.maybeTakeOver().then((took) => { if (took) { msg('👑 You’re the host now', 1.6); const st = net.state || {}; kmap = { ...(st.kills || {}) }; dmap = { ...(st.dia || {}) }; score = st.score || score; for (const z of zs) { z.spd = z.t.spd * (1 + Math.min(0.6, wave * 0.035)); z.slam = 3.5; } } }); }
       if (!coop || teamN <= 1) return; if (me.down && !team.size) gameOver(); }
     function drawTeam() { for (const [, t] of team) { t.g.position.set(t.x, t.y, t.z); t.g.rotation.set(t.down ? -1.3 : 0, t.f, 0); const mv = Math.hypot(t.tx - t.x, t.tz - t.z) > 0.05;
-      t.rig.pose(t.down ? 'sleep' : t.y > 0.05 ? 'hop' : mv ? 'walk' : 'idle', t.t * 60, t.fire ? { aR: [20, 85, 8] } : null);
+      const tEmo = !t.down && !mv && !t.fire && t.y <= 0.05 && t.emo && performance.now() < t.emoUntil;
+      t.rig.pose(t.down ? 'sleep' : t.y > 0.05 ? 'hop' : mv ? 'walk' : 'idle', t.t * 60, tEmo ? clipFor(t.emo)(EBEAT()) : t.fire ? { aR: [20, 85, 8] } : null);
       t.label.position.set(t.x, t.y + 2.05, t.z); t.bub.position.set(t.x, t.y + 2.5, t.z); t.sh.position.set(t.x, 0.02, t.z); }
       myBubble.position.set(me.x, me.y + 2.4, me.z); }
     let netOff = null;
     if (coop) { netOff = net.on((k) => { if (k === 'players') syncTeam(); else if (k === 'state') applyState(); else if (k === 'lobby' && !net.lobby && !over) { msg('The team ended', 2); gameOver(true); } }); syncTeam(); applyState();
-      $('[data-t="chat"]').onclick = () => { const e = $('.zg-emo'); e.hidden = !e.hidden; };
-      el.querySelectorAll('[data-em]').forEach((b) => (b.onclick = () => { me.em = Number(b.dataset.em); me.emAt = Date.now(); $('.zg-emo').hidden = true; myBubble.material.map = nameTex(EMOTES[me.em]); myBubble.visible = true; myBubT = 3; sendMe(true); })); }
+      $('[data-t="chat"]').onclick = () => { const e = $('.zg-emo'); e.hidden = !e.hidden; if (!e.hidden) renderQuickChat(e, (x) => { const i = zSayIdx(x); if (i < 0) return; e.hidden = true; zEm(i, x); }, ZTABS); }; }
+    // quick-chat / emote: speech bubble over your Pal, synced to the team through the em index (see zombie-net.js)
+    let lastEm = 0;
+    function zEm(i, text) { if (Date.now() - lastEm < 1200) return; lastEm = Date.now(); me.em = i; me.emAt = Date.now(); myBubble.material.map = nameTex(text); myBubble.visible = true; myBubT = 3; if (coop) sendMe(true); }
+    loadOwnedEmotes(db, uid);
+    $('[data-t="wheel"]').onclick = () => { $('.zg-emo').hidden = true; loadOwnedEmotes(db, uid).then(() => openWheel({ onEmote: (id) => { const i = zEmoteIdx(id); me.emo = id; me.emoUntil = performance.now() + emoteMs(id); if (i >= 0) zEm(i, zText(i)); }, onLocked: (d) => msg(`🔒 ${d.name}: unlock it in the Dance Shop`, 1.6) })); };
     // ------------------------------------------------------------ loop
     const zDummy = new THREE.Matrix4(), q = new THREE.Quaternion(), e3 = new THREE.Euler(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), M = new THREE.Matrix4(), pm = new THREE.Matrix4();
     let last = performance.now(), raf = 0, fpsT = 0, fpsN = 0, slowFor = 0;
@@ -342,7 +351,8 @@ export function createZombieGame(ctx) {
       // player
       pr0.position.set(me.x, me.y, me.z); pr0.rotation.y = me.face; pShadow.position.set(me.x, 0.02, me.z); pShadow.scale.setScalar(1.3 - Math.min(0.6, me.y * 0.3));
       const moving = C.move.mag > 0.05; const firing = C.down('fire') && !WEAPONS[cur].melee; const swing = me.swing > 0 ? (me.swing / 0.3) : 0;
-      pr0.rotation.x = me.down ? -1.3 : 0; rig.pose(me.down ? 'sleep' : me.y > 0.05 ? 'hop' : moving ? 'walk' : 'idle', me.t * 60 * (C.move.run ? 1.4 : 1), firing || swing ? { aR: swing ? [40, 150 - (1 - swing) * 160, 20] : [20, 85, 8] } : null);
+      pr0.rotation.x = me.down ? -1.3 : 0; const myEmo = !me.down && !moving && !firing && !swing && me.y <= 0.05 && me.emo && performance.now() < me.emoUntil;
+      rig.pose(me.down ? 'sleep' : me.y > 0.05 ? 'hop' : moving ? 'walk' : 'idle', me.t * 60 * (C.move.run ? 1.4 : 1), myEmo ? clipFor(me.emo)(EBEAT()) : firing || swing ? { aR: swing ? [40, 150 - (1 - swing) * 160, 20] : [20, 85, 8] } : null);
       P3.visible = !pov; shieldM.visible = buffs.shield > 0; shieldM.position.set(me.x, me.y + 0.8, me.z);
       if (me.inv > 0 && !pov) P3.visible = Math.floor(me.t * 20) % 2 === 0 || me.dodge > 0;
       if (coop) drawTeam();

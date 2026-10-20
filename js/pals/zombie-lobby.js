@@ -1,7 +1,8 @@
 // Pal Zombie Survival lobby: Play Solo, Create Team (short code + invite via Messages), Join with Code, Quick Match.
 // Team room shows each player's Pal (with outfit), a ready check, and the host's Start once 2-4 are ready.
 import { collection, getDocs, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
-import { createNet, palSnap, cleanCode, MAX_TEAM } from './zombie-net.js';
+import { createNet, palSnap, cleanCode, MAX_TEAM, ZTABS, zSayIdx, zText } from './zombie-net.js';
+import { renderQuickChat } from './emote-wheel.js';
 import { getActivePal } from './core.js';
 const CSS = `.zl{max-width:620px;margin:0 auto;padding:14px;color:#fff}.zl-card{background:linear-gradient(160deg,#2b1d55,#1b1240);border-radius:22px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
 .zl h2{margin:0 0 4px;font-size:26px}.zl .sub{opacity:.8;margin:0 0 14px}.zl-btns{display:grid;gap:10px}.zl-b{min-height:64px;border:0;border-radius:18px;font-size:19px;font-weight:800;display:flex;align-items:center;gap:12px;padding:0 18px;cursor:pointer;color:#2b1d55;background:#ffd23f;text-align:left}
@@ -11,7 +12,7 @@ const CSS = `.zl{max-width:620px;margin:0 auto;padding:14px;color:#fff}.zl-card{
 .zl-row button{min-height:48px;border-radius:14px;border:0;padding:0 16px;font-weight:800;background:rgba(255,255,255,.14);color:#fff}
 .zl-ps{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.zl-p{background:rgba(255,255,255,.08);border-radius:16px;padding:8px;text-align:center;border:3px solid transparent}.zl-p.rdy{border-color:#7ee08a}.zl-p canvas{width:100%;max-width:150px;aspect-ratio:1;display:block;margin:0 auto}
 .zl-p b{display:block}.zl-p .st{font-size:13px;font-weight:800}.zl-empty{opacity:.45;display:flex;align-items:center;justify-content:center;min-height:120px;border:2px dashed rgba(255,255,255,.3)}
-.zl-err{color:#ffb3c9;font-weight:700;min-height:1.2em;margin:8px 0 0}.zl-inv{display:grid;gap:6px;margin-top:8px}.zl-inv button{min-height:48px;border-radius:12px;border:0;background:#3d2a7a;color:#fff;font-weight:700;display:flex;justify-content:space-between;align-items:center;padding:0 14px}`;
+.zl-qc{margin-top:8px;background:#2b1d55;border-radius:14px;padding:8px}.zl-say{display:inline-block;margin-top:4px;background:#fff;color:#2b1d55;border-radius:12px;padding:3px 9px;font-weight:800;font-size:13px}.zl-err{color:#ffb3c9;font-weight:700;min-height:1.2em;margin:8px 0 0}.zl-inv{display:grid;gap:6px;margin-top:8px}.zl-inv button{min-height:48px;border-radius:12px;border:0;background:#3d2a7a;color:#fff;font-weight:700;display:flex;justify-content:space-between;align-items:center;padding:0 14px}`;
 export function createZombieLobby(ctx) {
   const { S, db, main, esc, toast } = ctx; let sess = null, starting = false;
   const css = () => { if (!document.getElementById('zl-css')) { const s = document.createElement('style'); s.id = 'zl-css'; s.textContent = CSS; document.head.appendChild(s); } };
@@ -38,12 +39,12 @@ export function createZombieLobby(ctx) {
   function room(code, me) {
     const uid = S.user.uid; sess = createNet(db, uid).session(code); starting = false;
     main.innerHTML = `<section class="zl"><div class="zl-card"><h2>👥 Your team</h2><p class="sub">Share this code. 2-4 players, everyone taps Ready, then the host starts.</p>
-      <div class="zl-code" data-code>${code}</div><div class="zl-row"><button data-x="copy">📋 Copy code</button><button data-x="invite">✉️ Invite friends</button><button data-x="leave">🚪 Leave</button></div>
+      <div class="zl-code" data-code>${code}</div><div class="zl-row"><button data-x="copy">📋 Copy code</button><button data-x="invite">✉️ Invite friends</button><button data-x="leave">🚪 Leave</button><button data-x="qc">💬 Quick chat</button></div><div class="zl-qc" hidden></div>
       <div class="zl-inv" hidden></div><div class="zl-ps"></div><div class="zl-btns"><button class="zl-b alt" data-x="ready">✅ I’m ready!</button><button class="zl-b" data-x="start" hidden>▶ Start the game</button></div><p class="zl-err" role="alert"></p></div></section>`;
     const $ = (s) => main.querySelector(s); const thumbs = new Map();
     const render = () => { if (!sess) return; const P = sess.players; const L = sess.lobby; if (!L) { $('.zl-err').textContent = 'This team was closed.'; return; }
       const list = Object.entries(P).sort((a, b) => a[1].slot - b[1].slot); const host = L.host;
-      $('.zl-ps').innerHTML = [...list.map(([u, d]) => `<div class="zl-p ${d.ready ? 'rdy' : ''}" data-u="${esc(u)}"><canvas width="180" height="180"></canvas><b>${esc(d.name)}${(window.kemyModBadge ? window.kemyModBadge(u) : '')}${u === host ? ' 👑' : ''}${u === uid ? ' (you)' : ''}</b><span class="st">${d.ready ? '✅ Ready' : '⏳ Not ready'}</span></div>`),
+      $('.zl-ps').innerHTML = [...list.map(([u, d]) => `<div class="zl-p ${d.ready ? 'rdy' : ''}" data-u="${esc(u)}"><canvas width="180" height="180"></canvas><b>${esc(d.name)}${(window.kemyModBadge ? window.kemyModBadge(u) : '')}${u === host ? ' 👑' : ''}${u === uid ? ' (you)' : ''}</b><span class="st">${d.ready ? '✅ Ready' : '⏳ Not ready'}</span>${d.em >= 0 && Date.now() - (d.emAt || 0) < 8000 && zText(d.em) ? `<span class="zl-say">${esc(zText(d.em))}</span>` : ''}</div>`),
         ...Array.from({ length: Math.max(0, MAX_TEAM - list.length) }, () => '<div class="zl-p zl-empty">Waiting for a friend…</div>')].join('');
       main.querySelectorAll('.zl-p[data-u]').forEach((card) => { const d = P[card.dataset.u]; const c = card.querySelector('canvas'); const x = c.getContext('2d');
         import('./pal3d.js').then((m) => { x.clearRect(0, 0, 180, 180); if (!m.drawPal3D(x, 90, 150, 82, { ...d.pal }, { mode: d.ready ? 'happy' : 'idle', t: performance.now() / 16 })) import('./art.js').then((a) => a.drawPal && a.drawPal(x, 90, 150, 70, d.pal)); }).catch(() => {}); });
@@ -55,6 +56,8 @@ export function createZombieLobby(ctx) {
     const go = async () => { starting = true; off(); const g = await game(); const s0 = sess; sess = null; g.open({ pal: me.rawPal, net: s0, name: me.name }); };
     $('[data-x=copy]').onclick = () => { navigator.clipboard?.writeText(code).then(() => toast('Code copied: ' + code), () => toast('Code: ' + code)); };
     $('[data-x=leave]').onclick = async () => { off(); const s0 = sess; sess = null; await s0.leave(); page({}); };
+    // lobby quick chat: same phrases as in-game (speech bubble on your card, synced via em/emAt)
+    let lastQ = 0; $('[data-x=qc]').onclick = () => { const b = $('.zl-qc'); b.hidden = !b.hidden; if (!b.hidden) renderQuickChat(b, (x) => { const i = zSayIdx(x); if (i < 0 || Date.now() - lastQ < 1200) return; lastQ = Date.now(); b.hidden = true; sess.send({ em: i, emAt: Date.now() }); setTimeout(render, 8100); }, ZTABS); };
     $('[data-x=ready]').onclick = () => { const m = sess.players[uid]; sess.send({ ready: !(m && m.ready) }); };
     $('[data-x=start]').onclick = async () => { const n = Object.keys(sess.players).length; if (n < 2) return; $('[data-x=start]').disabled = true;
       try { sess.sendState({ wave: 0, zs: [], score: 0, kills: {}, dia: {}, over: false, slam: [], seq: 0, n, ts: 0, brk: 2.5, bm: 0 }); await new Promise((r) => setTimeout(r, 400)); await sess.setLobby({ status: 'playing', n }); }

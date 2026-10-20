@@ -12,6 +12,8 @@ import { doc as fdoc, getDoc as fget, setDoc as fset, serverTimestamp as fts } f
 import { roomOf } from './economy.js';
 import { DECOR } from './wear.js';
 import { drawDancer } from './dance.js';
+import { openWheel, wheelButton, loadOwnedEmotes } from './emote-wheel.js';
+import { emoteMs } from './emotes.js';
 import { createDanceUI, initFloat, registerDanceItems } from './dance-ui.js';
 import { ITEM } from './catalog.js';
 import { createStore, liveStats, moodOf, patPal, readPet, firstPet, formName, isNight, xpToLevel, MAX_PALS, tsMs, listPals, getActivePal, playdate, newPlaydates } from './core.js';
@@ -211,6 +213,8 @@ export function createPals(ctx) {
       ${debug() ? '<button class="btn btn-sm btn-ghost" data-dbg>Test: +60 XP</button>' : ''}</div>`);
     const root = document.querySelector('.pal-sheet'); root.querySelectorAll('[data-store]').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); sessionStorage.setItem('kemy-store-pal', p.id); closeModal(); location.hash = b.dataset.store === 'bg' ? '#/pals/store-bg' : '#/pals/store'; }); const W = Math.min(320, root.clientWidth || 320), H = 250; const s = stage(root.querySelector('.pal-scene'), W, H);
     const fx = particles(); const PX = W / 2, PY = H - 30, SIZE = 140;
+    // emote wheel on the Care stage: your Pal does the emote right here (favourites + shop shortcut)
+    wheelButton(root.querySelector('.pal-scene'), { left: '8px', bottom: '8px', width: '48px', height: '48px', fontSize: '24px' }, () => loadOwnedEmotes(db, S.user.uid).then(() => openWheel({ onEmote: (id) => { G.mode = 'home'; G.emo = id; G.emoUntil = performance.now() + emoteMs(id); }, onShop: () => { closeModal(); danceOpen(p, 'shop'); }, onLocked: (d) => { toast(`🔒 ${d.name} is in the Dance Shop`); closeModal(); danceOpen(p, 'shop'); } })));
     const st = liveStats(p); let mood = moodOf(st);
     const G = { mode: 'home', t: 0, react: 0, bubbles: [], drops: [], lather: 0, rinse: false, shake: 0, ptr: null, drag: null, brush: 0, ball: null, throws: 0, catches: 0, palX: PX, sleepT: 0, eat: 0, bandage: false, last: null };
     const hint = (h) => { root.querySelector('.pal-hint').textContent = h; };
@@ -285,7 +289,7 @@ export function createPals(ctx) {
       }
       const faceTo = G.mode === 'catch' && G.ball ? Math.sign(G.ball.x - G.palX) || 1 : 1;
       const playing = G.mode === 'toys' && G.toy;
-      drawPal(c, G.palX, PY, SIZE, G.eat > 0 && G.eatFood ? { ...p, outfit: { ...(p.outfit || {}), held: 'f_food_' + G.eatFood } } : playing ? { ...p, outfit: { ...(p.outfit || {}), held: G.toy.id } } : p, playing ? { t, mode: 'idle', dance3d: 'happyshimmy', beat: t / 20, amt: 0.8, dance: 'happyshimmy' } : { t, mode: mode === 'idle' && G.mode === 'catch' ? 'idle' : mode, face: faceTo, mood: { dirty: mood.dirty && !(G.mode === 'shower' && G.lather > 0.3), sad: mood.sad && G.react <= 0, bandage: G.bandage || mood.low && G.mode === 'home' && false } });
+      drawPal(c, G.palX, PY, SIZE, G.eat > 0 && G.eatFood ? { ...p, outfit: { ...(p.outfit || {}), held: 'f_food_' + G.eatFood } } : playing ? { ...p, outfit: { ...(p.outfit || {}), held: G.toy.id } } : p, G.emo && G.mode === 'home' && performance.now() < G.emoUntil ? { t, mode: 'idle', dance3d: G.emo, beat: performance.now() / 1000 * 116 / 60, amt: 1, dance: G.emo } : playing ? { t, mode: 'idle', dance3d: 'happyshimmy', beat: t / 20, amt: 0.8, dance: 'happyshimmy' } : { t, mode: mode === 'idle' && G.mode === 'catch' ? 'idle' : mode, face: faceTo, mood: { dirty: mood.dirty && !(G.mode === 'shower' && G.lather > 0.3), sad: mood.sad && G.react <= 0, bandage: G.bandage || mood.low && G.mode === 'home' && false } });
       // shower layer
       if (G.mode === 'shower') {
         for (const bb of G.bubbles) drawBubble(c, bb.x + Math.sin(t * 0.05 + bb.r) * 0.6, bb.y, bb.r);

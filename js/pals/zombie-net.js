@@ -9,6 +9,16 @@ import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, 
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 export const MAX_TEAM = 4, STALE_MS = 30 * 60e3, QUIET_MS = 8000;
 export const EMOTES = ['👋 Hi!', '👍 Nice!', '🆘 Help!', '🤝 Revive me!', '🧟 Behind you!', '➡️ Follow me!', '⭐ Wow!', '🎉 GG!'];
+// em codec (int, rules allow -1..999): 0..499 = quick-chat phrase index into ZSAY (the 8 classics first, append-only),
+// 500+ = emote/dance index into EMOTE_IDX (append-only)
+import { ALL_PHRASES, QUICK_TABS } from './emote-wheel.js';
+import { EMOTE_IDX, EMOTE_BY_ID } from './emotes.js';
+export const ZSAY = [...EMOTES, ...ALL_PHRASES.filter((p) => !EMOTES.includes(p))];
+export const ZTABS = [{ id: 'z', icon: '⚡', name: 'Quick', list: EMOTES }, ...QUICK_TABS];
+export const zSayIdx = (text) => ZSAY.indexOf(text);
+export const zEmoteIdx = (id) => { const i = EMOTE_IDX.indexOf(id); return i < 0 ? -1 : 500 + i; };
+export const zEmoteOf = (em) => (em >= 500 ? EMOTE_IDX[em - 500] || '' : '');
+export const zText = (em) => { if (em >= 500) { const d = EMOTE_BY_ID[zEmoteOf(em)]; return d ? `${d.icon} ${d.name}` : ''; } return ZSAY[em] || ''; };
 const CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 5 }, () => CH[Math.floor(Math.random() * CH.length)]).join('');
 export const cleanCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 5);
