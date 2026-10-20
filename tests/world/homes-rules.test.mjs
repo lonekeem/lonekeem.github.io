@@ -1,0 +1,46 @@
+// Rules tests: Kemy World homes (big world plots, estates, admin palace, parked-car list, orphan cleanup, presence ranges).
+// Run: firebase emulators:exec --config firebase.emu.json --only firestore "node tests/world/homes-rules.test.mjs"
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+const env = await initializeTestEnvironment({ projectId: 'demo-homes', firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, String(e.message).slice(0, 300)); } };
+await env.withSecurityRulesDisabled(async (c) => { const d = c.firestore();
+  for (const [u, n] of [['boss', 'Lone Keem'], ['kid', 'Kid'], ['pal', 'Pal']]) await setDoc(doc(d, `users/${u}`), { displayName: n, username: u });
+  for (const it of ['hs_cottage', 'hs_twostory', 'hs_ranch', 'z_hs_manor', 'z_hs_mansion', 'gr_one', 'z_gr_five', 'z_gr_seven']) await setDoc(doc(d, `users/kid/inv/${it}`), { n: 1 });
+  await setDoc(doc(d, 'homes/h300'), { owner: 'ghost', name: 'Gone', style: 'manor', garage: 0 }); });
+const ADM = env.authenticatedContext('boss', { email: 'lillykemoy1@gmail.com', email_verified: true }).firestore();
+const KID = env.authenticatedContext('kid').firestore(); const PAL = env.authenticatedContext('pal').firestore();
+const buy = (db, u, plot, style, extra = {}) => { const b = writeBatch(db); b.set(doc(db, 'homes', plot), { owner: u, name: u === 'kid' ? 'Kid' : 'Pal', style, garage: 0, at: serverTimestamp(), ...extra }); b.set(doc(db, `users/${u}/pal/home`), { plot, at: serverTimestamp() }); return b.commit(); };
+const upd = (db, u, plot, style, extra) => setDoc(doc(db, 'homes', plot), { owner: u, name: u === 'kid' ? 'Kid' : u === 'boss' ? 'Lone Keem' : 'Pal', style, garage: 0, at: serverTimestamp(), ...extra }, { merge: true });
+// plot 99 = first Maplewood plot: j0 s-1 k0 -> sale; style 99 % 4 = 3 = manor. plot 100 (k1) not for sale.
+await ok('old plot h02 still buyable (manor)', assertSucceeds(buy(KID, 'kid', 'h02', 'manor')));
+await env.withSecurityRulesDisabled(async (c) => { await deleteDoc(doc(c.firestore(), 'homes/h02')); await deleteDoc(doc(c.firestore(), 'users/kid/pal/home')); });
+await ok('city plot h99 buyable with the formula style', assertSucceeds(buy(KID, 'kid', 'h99', 'manor')));
+await ok('wrong style on a city plot fails', assertFails(buy(PAL, 'pal', 'h103', 'ranch')));
+await ok('non-sale city plot h100 fails', assertFails(buy(PAL, 'pal', 'h100', 'cottage')));
+await ok('owner writes parked cars', assertSucceeds(upd(KID, 'kid', 'h99', 'manor', { cars: 'pip.6;star.0.KEMY1.3.0.7.2' })));
+await ok('bad car string rejected', assertFails(upd(KID, 'kid', 'h99', 'manor', { cars: 'pip.6;<script>' })));
+await ok('lowercase plate rejected', assertFails(upd(KID, 'kid', 'h99', 'manor', { cars: 'star.0.kemy.3.0.7.2' })));
+await ok('others cannot write my cars', assertFails(upd(PAL, 'pal', 'h99', 'manor', { cars: 'pip.1' })));
+await ok('garage tier 5 with item', assertSucceeds(upd(KID, 'kid', 'h99', 'manor', { garage: 5 })));
+await ok('garage tier 7 on a normal house fails', assertFails(upd(KID, 'kid', 'h99', 'manor', { garage: 7 })));
+await ok('per-room walls + new floor', assertSucceeds(upd(KID, 'kid', 'h99', 'manor', { decor: { walls: 'L:#fde7c7,K:#dbeafe', floor: 'marble', v: 1 } })));
+await ok('estate h483 needs the mansion deed (kid has it)', assertSucceeds((async () => { await env.withSecurityRulesDisabled(async (c) => { await deleteDoc(doc(c.firestore(), 'homes/h99')); await deleteDoc(doc(c.firestore(), 'users/kid/pal/home')); }); await buy(KID, 'kid', 'h483', 'mansion'); })()));
+await ok('estate garage 7 (15 cars)', assertSucceeds(upd(KID, 'kid', 'h483', 'mansion', { garage: 7 })));
+await ok('pal cannot buy estate without deed', assertFails(buy(PAL, 'pal', 'h484', 'estate')));
+await ok('nobody but admin can create the palace', assertFails(setDoc(doc(KID, 'homes/h489'), { owner: 'kid', name: 'Kid', style: 'estate', garage: 0, at: serverTimestamp() })));
+await ok('admin creates the palace', assertSucceeds(setDoc(doc(ADM, 'homes/h489'), { owner: 'boss', name: 'Lone Keem', style: 'estate', garage: 0, at: serverTimestamp() })));
+await ok('admin parks 50 cars', assertSucceeds(upd(ADM, 'boss', 'h489', 'estate', { cars: Array.from({ length: 50 }, (_, i) => 'pip.' + (i % 12)).join(';') })));
+await ok('51 cars rejected', assertFails(upd(ADM, 'boss', 'h489', 'estate', { cars: Array.from({ length: 51 }, () => 'pip.1').join(';') })));
+await ok('kid cannot edit the palace', assertFails(upd(KID, 'kid', 'h489', 'estate', { cars: 'pip.1' })));
+await ok('kid cannot delete the palace', assertFails(deleteDoc(doc(KID, 'homes/h489'))));
+await ok('orphan home (owner gone) can be cleared by anyone', assertSucceeds(deleteDoc(doc(PAL, 'homes/h300'))));
+await ok('a live owner home cannot be cleared by others', assertFails(deleteDoc(doc(PAL, 'homes/h483'))));
+const pres = (db, u, o) => setDoc(doc(db, `parkRooms/r1/p/${u}`), { x: 100, y: 100, d: 1, e: '', eAt: 0, say: '', sayAt: 0, tgt: '', name: 'Pal', uname: 'pal', color: '#fff', pal: {}, at: serverTimestamp(), ...o });
+await ok('presence far west + south allowed', assertSucceeds(pres(PAL, 'pal', { x: Math.round(-1200 * 16 + 1600), y: Math.round(1400 * 16 + 1200) })));
+await ok('presence inside h150 (cell 150) allowed', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); const c = 149; const xm = 400 + 10 + (c % 6) * 20, zm = -70 + 10 + Math.floor(c / 6) * 20; await pres(PAL, 'pal', { x: Math.round(xm * 16 + 1600), y: Math.round(zm * 16 + 1200), in: 'h150' }); })()));
+await ok('presence inside the palace (mansion cell 6)', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { x: Math.round(420 * 16 + 1600), y: Math.round(660 * 16 + 1200), in: 'h489' }); })()));
+await ok('wrong house id for the cell rejected', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { x: Math.round(420 * 16 + 1600), y: Math.round(660 * 16 + 1200), in: 'h488' }); })()));
+await ok('world save in the far south', assertSucceeds(setDoc(doc(PAL, 'users/pal/pal/world'), { x: -900, z: 1300, yaw: 0, cars: [], street: null, at: serverTimestamp() })));
+console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);
