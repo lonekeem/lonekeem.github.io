@@ -12,6 +12,17 @@ const SRC = 'game-music';
 // Kemy Radio = the 'theme' station (js/theme.js TRACKS, files exactly as recorded, loaded only when played).
 // Compact pill (equalizer, scrolling title, prev/play/next) + a radio section in the panel. Remembered on this device.
 const RK = { shuf: 'kemy-radio-shuffle', rep: 'kemy-radio-repeat', trk: 'kemy-radio-track', off: 'kemy-radio-off' };
+// My Playlist: saved Spotify / Apple Music links (this device only), played in a mini card via the official embeds.
+const PK = 'kemy-radio-playlists';
+let pl = null, card = null;
+export function playlistLink(url) {
+  const e = musicEmbed(url); if (!e) return null;
+  if (e.service === 'spotify' && !['playlist', 'album', 'track'].includes(e.kind)) return null;
+  if (e.service === 'apple' && !['playlist', 'album', 'song'].includes(e.kind)) return null;
+  return e;
+}
+export const playlists = () => { try { const a = JSON.parse(ls.get(PK) || '[]'); return Array.isArray(a) ? a.filter((p) => p && p.id && playlistLink(p.url)) : []; } catch { return []; } };
+const savePl = (a) => ls.set(PK, JSON.stringify(a.slice(0, 30)));
 let themeTracks = [], toastT = 0, lastToast = '';
 const isRadio = () => st?.id === 'theme';
 const shuffleOn = () => ls.get(RK.shuf) === '1';
@@ -90,7 +101,7 @@ export const audioEl = () => audio;
 export const isPlaying = () => !!audio && !audio.paused;
 export const state = () => ({ playing: isPlaying(), station: st?.id || '', title: st?.tracks[idx]?.title || '', volume: audio ? audio.volume : vol(), embed: embed?.service || '' });
 
-function closeEmbed() { if (embed) { embed.destroy(); embed = null; } const b = root?.querySelector('.gm-embed'); if (b) b.innerHTML = ''; }
+function closeEmbed() { if (embed) { embed.destroy(); embed = null; } pl = null; if (card) { card.hidden = true; card.querySelector('.gmp-box').innerHTML = ''; } const b = root?.querySelector('.gm-embed'); if (b) b.innerHTML = ''; }
 function openLink(url) {
   const e = musicEmbed(url); const err = root.querySelector('.gm-err');
   if (!e) { err.textContent = 'Paste an Apple Music or Spotify song, album or playlist link.'; return; }
@@ -99,16 +110,44 @@ function openLink(url) {
   paint();
 }
 
+function addPlaylist(url) {
+  const e = playlistLink(url), err = root.querySelector('.gmp-err');
+  if (!e) { err.textContent = 'Hmm, that link didn’t work. Paste a Spotify or Apple Music playlist, album or song link (like open.spotify.com/playlist/…).'; return; }
+  const a = playlists(); const name = (e.service === 'apple' ? 'Apple Music ' : 'Spotify ') + e.kind.replace('song', 'song').replace(/^./, (c) => c.toUpperCase()) + ' ' + (a.length + 1);
+  const p = { id: 'p' + Date.now().toString(36), name, url: e.url };
+  savePl([...a, p]); err.textContent = ''; root.querySelector('#gmp-url').value = ''; drawPl(); playPlaylist(p.id);
+}
+function drawPl() {
+  const a = playlists(), ul = root.querySelector('.gmp-list');
+  ul.innerHTML = a.length ? a.map((p) => `<li data-pid="${esc(p.id)}"><button type="button" class="gmp-play" aria-label="Play ${esc(p.name)}">${playlistLink(p.url).service === 'apple' ? '🍎' : '🟢'} <b>${esc(p.name)}</b></button><button type="button" class="gmp-ren" aria-label="Rename ${esc(p.name)}">✏️</button><button type="button" class="gmp-del" aria-label="Remove ${esc(p.name)}">🗑️</button></li>`).join('') : '<li class="small muted gmp-none">No playlists yet. Paste one above!</li>';
+  paint();
+}
+export function playPlaylist(id) {
+  const p = playlists().find((x) => x.id === id); const e = p && playlistLink(p.url); if (!e) return;
+  pause(); closeEmbed();
+  if (!card) {
+    card = document.createElement('div'); card.className = 'gmp-card'; card.setAttribute('role', 'region'); card.setAttribute('aria-label', 'My Playlist player');
+    card.innerHTML = '<div class="gmp-head"><span class="gmr-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><b class="gmp-name"></b><button type="button" class="gmp-min" aria-label="Shrink player">▴</button><button type="button" class="gmp-close" aria-label="Stop playlist">✕</button></div><div class="gmp-box"></div>';
+    document.body.appendChild(card);
+    card.querySelector('.gmp-close').onclick = () => { closeEmbed(); paint(); };
+    card.querySelector('.gmp-min').onclick = () => { const m = card.classList.toggle('min'); card.querySelector('.gmp-min').textContent = m ? '▾' : '▴'; card.querySelector('.gmp-min').setAttribute('aria-label', m ? 'Show player' : 'Shrink player'); };
+  }
+  card.classList.toggle('top-right', root.classList.contains('top-right'));
+  card.classList.toggle('pnl', root.classList.contains('open')); card.hidden = false; card.querySelector('.gmp-name').textContent = p.name;
+  embed = mountMusicEmbed(card.querySelector('.gmp-box'), { ...e, height: e.service === 'apple' ? 175 : 152 }, { source: SRC + '-playlist' });
+  pl = p; paint();
+}
+
 function paint() {
   if (!root) return;
   const t = st?.tracks[idx]; const on = isPlaying();
-  root.classList.toggle('playing', on || !!embed);
+  root.classList.toggle('playing', on || !!embed); root.classList.toggle('radio-on', on || !!pl);
   root.querySelector('.gm-fab').setAttribute('aria-label', on ? 'Game music playing: open player' : 'Game music: open player');
   root.querySelector('.gm-pp').textContent = on ? '⏸' : '▶'; root.querySelector('.gm-pp').setAttribute('aria-label', on ? 'Pause music' : 'Play music');
   root.querySelector('.gm-now').innerHTML = embed ? `${embed.service === 'apple' ? 'Apple Music' : 'Spotify'} link` : t ? `<b>${esc(t.title)}</b><small>${esc(t.artist)}${t.license ? ' · CC0' : ''}</small>` : (st?.id === 'kemy' ? '<small>No Kemy songs yet</small>' : '<small>Pick a station</small>');
   const rp = root.querySelector('.gm-radio'), radio = isRadio();
-  root.classList.toggle('radio-off', radioOff() && !(on && !radio)); root.classList.toggle('radio-on', on);
-  const label = embed ? 'Music link' : t ? `Now playing: ${t.title} – ${t.artist}` : 'Kemy Radio';
+  root.classList.toggle('radio-off', radioOff() && !(on && !radio) && !pl);
+  const label = pl ? `🎧 My Playlist: ${pl.name}` : embed ? 'Music link' : t ? `Now playing: ${t.title} – ${t.artist}` : 'Kemy Radio';
   const mq = rp.querySelector('.gmr-t'); if (mq.dataset.l !== label) { mq.dataset.l = label; mq.innerHTML = `<span>${esc(label)}</span><span aria-hidden="true">${esc(label)}</span>`; }
   rp.querySelector('.gmr-info').setAttribute('aria-label', `${label}. Open Kemy Radio`);
   rp.querySelector('.gmr-pp').textContent = on ? '⏸' : '▶'; rp.querySelector('.gmr-pp').setAttribute('aria-label', on ? 'Pause' : 'Play Kemy Radio');
@@ -116,6 +155,7 @@ function paint() {
   const sh = root.querySelector('.gmr-shuf'); sh.setAttribute('aria-pressed', String(shuffleOn())); sh.classList.toggle('on', shuffleOn());
   const rm = repeatMode(), re = root.querySelector('.gmr-rep'); re.textContent = rm === 'one' ? '🔂 Repeat one' : rm === 'off' ? '➡️ Repeat off' : '🔁 Repeat all'; re.classList.toggle('on', rm !== 'off');
   root.querySelector('.gmr-off').textContent = radioOff() ? '📻 Radio on' : '⏻ Radio off';
+  root.querySelectorAll('[data-pid]').forEach((li) => li.classList.toggle('on', li.dataset.pid === pl?.id));
   root.querySelectorAll('[data-st]').forEach((b) => { const a = b.dataset.st === st?.id; b.classList.toggle('on', a); b.setAttribute('aria-pressed', a); });
   const r = root.querySelector('.gm-vol'); if (document.activeElement !== r) r.value = String(Math.round((audio ? audio.volume : vol()) * 100));
 }
@@ -135,6 +175,11 @@ export async function mountGameMusic(o = {}) {
         <ol class="gmr-list">${themeTracks.map((t, i) => `<li><button type="button" data-rt="${i}"><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.dur ? ` · ${Math.floor(t.dur / 60)}:${String(Math.round(t.dur % 60)).padStart(2, '0')}` : ''}</small></button></li>`).join('')}</ol>
         <div class="gmr-opts"><button type="button" class="gmr-shuf" aria-pressed="false">🔀 Shuffle</button><button type="button" class="gmr-rep">🔁 Repeat all</button><button type="button" class="gmr-off">⏻ Radio off</button></div>
         <label class="gm-vrow"><span aria-hidden="true">🔉</span><span class="sr-only">Music volume</span><input class="gm-vol" type="range" min="0" max="100" step="1"></label>
+        <div class="gm-top gm-more"><b>🎧 My Playlist</b></div>
+        <form class="gmp-add"><label for="gmp-url" class="sr-only">Paste playlist link</label><input id="gmp-url" type="url" inputmode="url" placeholder="Paste playlist link (Spotify / Apple Music)" autocomplete="off"><button class="btn btn-sm" type="submit">Save</button></form>
+        <p class="gmp-err gm-err small" role="alert"></p>
+        <ul class="gmp-list"></ul>
+        <p class="gm-cr small muted">Saved on this device only. Previews for everyone; full songs if you’re signed in to Spotify Premium or Apple Music.</p>
         <div class="gm-top gm-more"><b>More game music</b></div>
         <div class="gm-st">${stations.map((s) => `<button type="button" data-st="${s.id}" aria-pressed="false">${s.emoji} ${esc(s.name)}</button>`).join('')}</div>
         <div class="gm-row"><button type="button" class="gm-pp" aria-label="Play music">▶</button><button type="button" class="gm-next" aria-label="Skip track">⏭</button><div class="gm-now"></div></div>
@@ -145,7 +190,7 @@ export async function mountGameMusic(o = {}) {
       </section>`;
     document.body.appendChild(root);
     const panel = root.querySelector('.gm-panel'), fab = root.querySelector('.gm-fab');
-    const setOpen = (v) => { panel.hidden = !v; fab.setAttribute('aria-expanded', v); root.classList.toggle('open', v); ls.set(K.open, v ? '1' : '0'); };
+    const setOpen = (v) => { panel.hidden = !v; fab.setAttribute('aria-expanded', v); root.classList.toggle('open', v); ls.set(K.open, v ? '1' : '0'); card?.classList.toggle('pnl', v); };
     fab.onclick = () => setOpen(panel.hidden);
     root.querySelector('.gm-x').onclick = () => setOpen(false);
     root.querySelector('.gm-pp').onclick = () => (isPlaying() ? pause() : play());
@@ -160,12 +205,19 @@ export async function mountGameMusic(o = {}) {
     root.querySelector('.gmr-off').onclick = () => (radioOff() ? radioPlay() : turnRadioOff());
     root.querySelector('.gm-st').onclick = async (e) => { const b = e.target.closest('[data-st]'); if (!b) return; if (b.dataset.st === 'theme' && radioOff() && !e.isTrusted) { await pick('theme'); return; } await pick(b.dataset.st); startTrack(); };
     root.querySelector('.gm-vol').oninput = (e) => setVolume(e.target.value / 100);
+    root.querySelector('.gmp-add').onsubmit = (e) => { e.preventDefault(); addPlaylist(root.querySelector('#gmp-url').value); };
+    root.querySelector('.gmp-list').onclick = (e) => {
+      const li = e.target.closest('[data-pid]'); if (!li) return; const id = li.dataset.pid;
+      if (e.target.closest('.gmp-play')) playPlaylist(id);
+      else if (e.target.closest('.gmp-del')) { if (pl?.id === id) closeEmbed(); savePl(playlists().filter((p) => p.id !== id)); drawPl(); }
+      else if (e.target.closest('.gmp-ren')) { const a = playlists(), p = a.find((x) => x.id === id); const n = prompt('Rename playlist', p.name); if (n && n.trim()) { p.name = n.trim().slice(0, 40); savePl(a); if (pl?.id === id) { pl = p; card.querySelector('.gmp-name').textContent = p.name; } drawPl(); } }
+    };
     root.querySelector('.gm-link').onsubmit = (e) => { e.preventDefault(); openLink(root.querySelector('#gm-url').value); };
     // Videos / other players starting take over; the tab going hidden pauses (resumes when back if it was playing).
     addEventListener('kemy:media-play', (e) => { const s = e.detail?.source || ''; if (!s.startsWith(SRC) && isPlaying()) { pause(); } });
     let resume = false;
     document.addEventListener('visibilitychange', () => { if (document.hidden) { resume = isPlaying(); if (resume) audio.pause(); } else if (resume) { resume = false; startTrack(); } });
-    await pick(ls.get(K.st) || 'chill');
+    await pick(ls.get(K.st) || 'chill'); drawPl();
   }
   root.hidden = false; root.classList.toggle('top-right', opts.corner === 'top-right'); paint();
   return root;
