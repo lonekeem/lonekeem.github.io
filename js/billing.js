@@ -6,7 +6,8 @@
 // IMPORTANT: this file NEVER credits Star Coins or Diamonds. Crediting must happen SERVER-SIDE
 // (Cloud Function / backend) after verifying the purchase token with the Google Play Developer API
 // (purchases.products.get, then consume/acknowledge) or a Stripe webhook (checkout.session.completed).
-// Firestore rules must keep wallet/diamonds writes away from clients for paid credit. (future)
+// Server side lives in functions/ (verifyPlayPurchase callable + stripeWebhook); firestore.rules only let clients
+// earn capped amounts and spend, so paid credit can only come from those functions.
 export const PACKS = [
   { id: 'stars_100', cur: 'star', amount: 100, bonus: 0, usd: 0.99 },
   { id: 'stars_550', cur: 'star', amount: 500, bonus: 50, usd: 4.99 },
@@ -24,7 +25,17 @@ export const PACKS = [
 export const CONFIG = { PLAY_ENABLED: false, PLAY_METHOD: 'https://play.google.com/billing', STRIPE_LINKS: {} };
 
 let playSvc = null, playDetails = null;
-export const inTwa = () => typeof window !== 'undefined' && 'getDigitalGoodsService' in window;
+export const inTwa = () => typeof window !== 'undefined' && ('getDigitalGoodsService' in window
+  || (typeof document !== 'undefined' && document.referrer.startsWith('android-app://com.lonekeemstudios.kemy')));
+// Play policy: inside the Android app only Google Play Billing may sell digital goods, so Stripe is web only.
+const cardOk = () => !inTwa() && Object.keys(CONFIG.STRIPE_LINKS).length > 0;
+const FB = 'https://www.gstatic.com/firebasejs/12.4.0/';
+// Lazily loads the Functions SDK and asks the server to verify + credit (us-central1).
+async function verifyPlay(sku, purchaseToken) {
+  const [{ getApp }, { getFunctions, httpsCallable }] = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-functions.js')]);
+  const fn = httpsCallable(getFunctions(getApp(), 'us-central1'), 'verifyPlayPurchase');
+  return (await fn({ sku, purchaseToken })).data;
+}
 async function play() {
   if (!CONFIG.PLAY_ENABLED || !inTwa()) return null;
   if (playSvc) return playSvc;
@@ -33,7 +44,7 @@ async function play() {
 }
 // Which providers can sell right now: { play: bool, card: bool, ready: bool }
 export async function status() {
-  const svc = await play(); const card = Object.keys(CONFIG.STRIPE_LINKS).length > 0;
+  const svc = await play(); const card = cardOk();
   if (svc && !playDetails) { try { playDetails = await svc.getDetails(PACKS.map((p) => p.id)); } catch (e) { playDetails = []; } }
   return { play: !!svc, card, ready: !!svc || card };
 }
@@ -46,12 +57,14 @@ export async function buy(p, uid) {
   const svc = await play();
   if (svc) {
     const req = new PaymentRequest([{ supportedMethods: CONFIG.PLAY_METHOD, data: { sku: p.id } }], { total: { label: 'Total', amount: { currency: 'USD', value: '0' } } });
-    const res = await req.show(); const token = res.details && res.details.purchaseToken; await res.complete('success');
-    // FUTURE: POST { uid, sku: p.id, token } to a backend that verifies with Google Play, credits the
-    // wallet server-side, then consumes the purchase. Until then nothing is credited.
-    return { ok: true, provider: 'play', token };
+    const res = await req.show(); const token = res.details && res.details.purchaseToken;
+    // Server verifies with Google Play, credits the wallet once (purchases/{token}) and consumes the purchase.
+    let v = null, error = null;
+    try { v = await verifyPlay(p.id, token); await res.complete('success'); }
+    catch (e) { error = e && e.message; try { await res.complete('fail'); } catch (e2) {} }
+    return { ok: !!v, provider: 'play', token, verified: v, error };
   }
-  const link = CONFIG.STRIPE_LINKS[p.id];
+  const link = cardOk() ? CONFIG.STRIPE_LINKS[p.id] : null;
   if (link) { const u = new URL(link); if (uid) u.searchParams.set('client_reference_id', uid); location.href = u.toString(); return { ok: true, provider: 'card' }; }
   return { ok: false, provider: null };
 }
