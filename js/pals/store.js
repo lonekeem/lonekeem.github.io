@@ -33,7 +33,7 @@ export function createPalStore(ctx) {
     let D = saved(); const hist = []; let tab = 'outfits', slot = 'all', gf = 'a', yaw = 0, zoom = 1;
     const snap = () => { hist.push(JSON.stringify(D)); if (hist.length > 30) hist.shift(); };
     const unowned = () => { const l = []; for (const id of Object.values(D.outfit)) if (id && !own(id)) l.push(WEAR_BY[id]); if (D.bg && !own(D.bg)) l.push(BG[D.bg]); if (D.variant && !own(D.variant)) l.push(RARE[D.variant]); const pt = PATTERNS.find((x) => x.id === D.pattern); if (pt && pt.p && !own(pt.id)) l.push(pt); return l.filter(Boolean); };
-    main.innerHTML = `<section class="card pstore"><div class="ps-top"><h2>Pal Store</h2><span class="ps-coins">★ <b id="ps-c">${(e.w && e.w.coins) || 0}</b></span></div>
+    main.innerHTML = `<section class="card pstore"><div class="ps-top"><h2>Pal Store</h2><span class="ps-coins">★ <b id="ps-c">${((e.w && e.w.coins) || 0).toLocaleString()}</b></span></div>
       <div class="ps-stage"><canvas id="ps-cv"></canvas><span class="ps-prev" id="ps-prev" hidden>Preview</span>
         <button class="ps-bgbtn" id="ps-bgbtn" type="button" aria-label="Change background">🖼️</button><button class="ps-bgbtn ps-rot" id="ps-rot" type="button" aria-label="Spin">🔄</button></div><div id="ps-buy"></div>
       <div class="ps-actions"><button class="btn btn-sm btn-ghost" id="ps-undo">↶ Undo</button><button class="btn btn-sm btn-ghost" id="ps-reset">Reset</button><button class="btn btn-sm btn-ghost" id="ps-rand">🎲 Random</button><button class="btn btn-sm" id="ps-save">💾 Save Look</button></div>
@@ -118,7 +118,7 @@ export function createPalStore(ctx) {
       if (u.length) { // one shared buy sheet: confirm, buy, then auto-equip (save the look)
         await openBuySheet({ name: u.length === 1 ? u[0].name : `${u.length} items (${u.map((x) => x.name).join(', ')})`, price: cost, icon: u.length === 1 ? '🛍️' : '🛍️', balance: (e.w && e.w.coins) || 0,
           note: 'Star Coins only, no real money.', equipped: `${p.name} is wearing it ✓`,
-          buy: async () => { for (const x of u) { if (inv[x.id]) continue; try { await e.buy(x.id); inv[x.id] = 1; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message || 'Purchase failed'); } } $('#ps-c').textContent = e.w.coins; return e.w.coins; },
+          buy: async () => { for (const x of u) { if (inv[x.id]) continue; try { await e.buy(x.id); inv[x.id] = 1; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message || 'Purchase failed'); } } $('#ps-c').textContent = e.w.coins.toLocaleString(); return e.w.coins; },
           onSuccess: commitLook });
         refresh(); return; }
       try { await commitLook(); toast(`${p.name}'s look is saved ✨`); refresh(); } catch (er) { toast(friendlyError(er)); }

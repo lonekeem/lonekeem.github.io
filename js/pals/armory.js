@@ -4,7 +4,7 @@
 // Diamonds live in users/{uid}/pal/diamonds; owned items are users/{uid}/inv/z_* (same inventory as the Pal Store).
 import { doc, getDoc, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { addItems, addDiamondItems, DITEMS, dayNo } from './catalog.js';
-import { createEconomy } from './economy.js';
+import { createEconomy, isAdminUid } from './economy.js';
 export const ARMORY = [
   { id: 'z_foam', kind: 'zweapon', name: 'Foam Launcher', icon: '🧽', d: 80, desc: 'Bouncy foam balls that splash 3 zombies.' },
   { id: 'z_bubble', kind: 'zweapon', name: 'Bubble Cannon', icon: '🫧', d: 150, desc: 'Big slow bubbles that float zombies away.' },
@@ -31,14 +31,17 @@ export function createDiamonds(db, uid) {
   const ref = doc(db, 'users', uid, 'pal', 'diamonds'); let w = null, last = 0;
   async function get(force) { if (w && !force) return w; const s = await getDoc(ref);
     if (!s.exists()) { await setDoc(ref, { d: 0, total: 0, day: dayNo(), today: 0, last: serverTimestamp(), lastBuy: '', paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() }); w = { d: 0, total: 0, day: dayNo(), today: 0 }; last = Date.now(); }
-    else { w = s.data(); last = w.last && w.last.toMillis ? w.last.toMillis() : 0; } return w; }
+    else { w = s.data(); last = w.last && w.last.toMillis ? w.last.toMillis() : 0; }
+    if (isAdminUid(uid)) w = { ...w, d: Infinity, admin: true }; return w; }
   // one reward per finished run; clamps to the per-run + per-day caps; waits out the 45 s gap if needed
-  async function earnRun(n) { await get(true); const today = w.day === dayNo() ? w.today : 0; const amt = Math.max(0, Math.min(Math.round(n), RUN_CAP, DAY_CAP - today)); if (!amt) return 0;
+  async function earnRun(n) { await get(true); if (w.admin) return 0; const today = w.day === dayNo() ? w.today : 0; const amt = Math.max(0, Math.min(Math.round(n), RUN_CAP, DAY_CAP - today)); if (!amt) return 0;
     const wait = 46000 - (Date.now() - last); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const next = { d: w.d + amt, total: w.total + amt, day: dayNo(), today: today + amt, last: serverTimestamp(), updatedAt: serverTimestamp() };
     const b = writeBatch(db); b.update(ref, next); await b.commit(); Object.assign(w, next); last = Date.now(); return amt; }
   async function buy(id) { const it = ARM[id] || DITEMS.find((x) => x.id === id); await get(true); // Armory + premium dances (z_dn_*), Halloween costumes (z_hw_*)
     if (!it || !it.d) throw new Error('That item can’t be bought with Diamonds.'); if (w.d < it.d) throw new Error('Not enough Diamonds yet. Play a run to earn more!');
+    if (w.admin) { const b = writeBatch(db); b.update(ref, { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      b.set(doc(db, 'users', uid, 'inv', id), { n: 1, at: serverTimestamp() }); await b.commit(); return 0; }
     const b = writeBatch(db); b.update(ref, { d: w.d - it.d, lastBuy: id, paid: it.d, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
     b.set(doc(db, 'users', uid, 'inv', id), { n: 1, at: serverTimestamp() }); await b.commit(); w.d -= it.d; return it.d; }
   return { get, earnRun, buy, get w() { return w; } };
@@ -60,7 +63,7 @@ export function createArmory(ctx) {
     const refresh = async () => { try { const [w, d, i] = await Promise.all([econ.wallet(true), dia.get(true), econ.inventory(true)]); coins = w.coins; dias = d.d; inv = i; } catch (e) { console.warn('armory', e.code || e.message); } };
     await refresh();
     const render = () => {
-      main.innerHTML = `<section class="za"><div class="za-top"><h2>🛡️ Zombie Armory</h2><span class="za-bal">💎 ${dias} · ★ ${coins}</span></div>
+      main.innerHTML = `<section class="za"><div class="za-top"><h2>🛡️ Zombie Armory</h2><span class="za-bal">💎 ${dias.toLocaleString()} · ★ ${coins.toLocaleString()}</span></div>
         <p class="muted small">Tap an item to preview it. Earn 💎 Diamonds by surviving waves in Pal Zombie Survival.</p>
         <div class="za-tabs">${[['zweapon', '🔫 Weapons'], ['zup', '⬆️ Upgrades'], ['zarmor', '🛡️ Armor']].map(([k, n]) => `<button class="chip${k === tab ? ' on' : ''}" data-tab="${k}">${n}</button>`).join('')}</div>
         <div class="za-grid">${ARMORY.filter((a) => a.kind === tab).map((a) => `<div class="za-it" data-id="${a.id}" role="button" tabindex="0"><div class="ic">${a.icon}</div><b>${esc(a.name)}</b>${inv[a.id] ? `<span class="za-own">${a.kind === 'zarmor' && equippedArmor() === a.id ? 'Wearing ✓' : 'Owned ✓'}</span>` : `<span class="pr">${a.d ? '💎 ' + a.d : '★ ' + a.p}</span>`}</div>`).join('')}</div>

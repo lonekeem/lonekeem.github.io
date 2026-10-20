@@ -1687,6 +1687,10 @@ service cloud.firestore {
           && (w().paid == shop().prices[w().lastBuy] || w().paid == shop().deals[dayNow() % shop().deals.size()].get(w().lastBuy, -1))
           && getAfter(invPath(w().lastBuy)).data.at == request.time;
       }
+      function adminBuyOk() {
+        return w().paid == 0 && w().buyAt == request.time && w().lastBuy in shop().prices
+          && getAfter(invPath(w().lastBuy)).data.at == request.time;
+      }
       function roomOk() {
         return (w().room.size() < 1 || exists(invPath(w().room[0]))) && (w().room.size() < 2 || exists(invPath(w().room[1])))
           && (w().room.size() < 3 || exists(invPath(w().room[2])));
@@ -1697,6 +1701,8 @@ service cloud.firestore {
       allow update: if signedIn() && uid == me() && walletShape() && (
         (changed().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'updatedAt']) && earnOk())
         || (changed().hasOnly(['coins', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && buyOk())
+        // owner/admin: unlimited Star Coins - records a valid shop purchase (paid 0) without touching the balance
+        || (isAdmin() && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && adminBuyOk())
         || (changed().hasOnly(['room', 'updatedAt']) && roomOk()));
       allow delete: if signedIn() && uid == me();
     }
@@ -1728,7 +1734,11 @@ service cloud.firestore {
         && d().lastBuy == '' && d().last == request.time && d().day == dDay();
       allow update: if signedIn() && uid == me() && dShape() && (
         (changed().hasOnly(['d', 'total', 'day', 'today', 'last', 'updatedAt']) && dEarnOk())
-        || (changed().hasOnly(['d', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && dBuyOk()));
+        || (changed().hasOnly(['d', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && dBuyOk())
+        // owner/admin: unlimited Diamonds - records a valid Diamond purchase (paid 0) without touching the balance
+        || (isAdmin() && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && d().paid == 0 && d().buyAt == request.time
+            && d().lastBuy in dShop().get('dprices', {})
+            && getAfter(/databases/$(database)/documents/users/$(uid)/inv/$(d().lastBuy)).data.at == request.time));
       allow delete: if signedIn() && uid == me();
     }
     // ================= Pal Zombie Survival co-op lobbies (2-4 players)
