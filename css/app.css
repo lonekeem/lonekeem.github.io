@@ -1604,3 +1604,20 @@ body.game-mode .park-panel { bottom: calc(max(20px, env(safe-area-inset-bottom))
 #mod-fab { display: none; }
 body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; top: calc(env(safe-area-inset-top, 0px) + 64px); right: 12px; padding: 8px 10px; }
 .app-header .mod-pill { white-space: nowrap; flex-shrink: 0; width: auto; height: 34px; padding: 0 10px; border-radius: 999px; }
+/* ---------- Mod Hub ---------- */
+.hub-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.hub-nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px 2px 10px; margin: 0 -2px 6px; position: sticky; top: 56px; z-index: 5; background: linear-gradient(180deg, rgba(14,8,28,.92), rgba(14,8,28,.6)); backdrop-filter: blur(10px); }
+.hub-nav::-webkit-scrollbar { display: none; }
+.hub-nav a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 14px; text-decoration: none; color: var(--text); font-weight: 700; font-size: .86rem; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
+.hub-nav a.on { background: linear-gradient(135deg, #8a2be2, #4da3ff); border-color: transparent; color: #fff; box-shadow: 0 4px 14px rgba(138,43,226,.4); }
+.hub-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.hub-tile { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 18px; text-decoration: none; color: var(--text); background: linear-gradient(160deg, rgba(138,43,226,.28), rgba(30,16,60,.6)); border: 1px solid rgba(190,150,255,.28); backdrop-filter: blur(10px); }
+.hub-tile .ic { font-size: 1.3rem; } .hub-tile b { font-size: 1.7rem; line-height: 1.1; } .hub-tile span:last-child { font-size: .8rem; color: var(--muted); }
+.q-prev { display: flex; gap: 10px; align-items: flex-start; } .q-prev img { width: 84px; height: 112px; object-fit: cover; border-radius: 12px; flex-shrink: 0; } .q-prev > div { min-width: 0; flex: 1; }
+.hub-urow { width: 100%; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.hub-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 2px; } .hub-stats span { padding: 6px 10px; border-radius: 12px; background: rgba(255,255,255,.07); font-size: .8rem; }
+.hub-h3 { font-size: .95rem; margin: 14px 0 6px; } .hub-hist { margin: 0 0 6px; padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.hub-done { opacity: .55; } .hub-done p { text-decoration: line-through; }
+.hub-thread { min-height: 60vh; } .hub-thread .mod-tpl { padding: 0 4px; }
+.mod-thread-row { display: flex; padding: 10px; background: linear-gradient(135deg, rgba(138,43,226,.25), rgba(77,163,255,.12)); border: 1px solid rgba(190,150,255,.3); }
+.hub-body textarea, .hub-body input[type=search] { color: #f4f1fa; }

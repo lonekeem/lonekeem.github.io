@@ -151,6 +151,15 @@ service cloud.firestore {
 
       match /notifications/{nid} {
         allow read, delete: if actingAs(uid);
+        // The invited user tells the admin who invited them how they answered.
+        allow create: if signedIn() && request.resource.data.type == 'mod_invite' && request.resource.data.fromUid == me()
+          && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && exists(/databases/$(database)/documents/modInvites/$(me()))
+          && get(/databases/$(database)/documents/modInvites/$(me())).data.by == uid
+          && request.resource.data.fromName == get(userPath(me())).data.displayName
+          && request.resource.data.fromUsername == get(userPath(me())).data.username
+          && request.resource.data.postId == '' && isStr(request.resource.data.text, 0, 140)
+          && request.resource.data.createdAt == request.time && request.resource.data.read == false;
         // Moderator notices ("Thanks, we took action" / warnings / suspensions), shown as "Kemy Moderators".
         allow create: if isMod() && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
@@ -299,6 +308,10 @@ service cloud.firestore {
 
       allow read: if true;
       allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data);
+      // Moderator "Restore": an exact copy of the held post, moved out of heldPosts in the same batch.
+      allow create: if isMod() && exists(/databases/$(database)/documents/heldPosts/$(postId))
+        && request.resource.data == get(/databases/$(database)/documents/heldPosts/$(postId)).data.post
+        && !existsAfter(/databases/$(database)/documents/heldPosts/$(postId));
       // Search-index backfill by the author (or admin): only keywords / hashtags.
       function searchChange() {
         return changed().hasOnly(['keywords', 'hashtags'])
@@ -1190,6 +1203,31 @@ service cloud.firestore {
         && request.resource.data.mod == true
         && isStr(request.resource.data.name, 0, 60) && isStr(request.resource.data.uname, 0, 30)
         && request.resource.data.by == me() && request.resource.data.at == request.time;
+      // Accepting an invite: the invited user creates their own role in the same batch that flips
+      // their pending invite to accepted.
+      allow create: if signedIn() && uid == me()
+        && request.resource.data.keys().hasOnly(['mod', 'name', 'uname', 'by', 'at'])
+        && request.resource.data.mod == true
+        && isStr(request.resource.data.name, 0, 60) && isStr(request.resource.data.uname, 0, 30)
+        && exists(/databases/$(database)/documents/modInvites/$(uid))
+        && get(/databases/$(database)/documents/modInvites/$(uid)).data.status == 'pending'
+        && getAfter(/databases/$(database)/documents/modInvites/$(uid)).data.status == 'accepted'
+        && request.resource.data.by == get(/databases/$(database)/documents/modInvites/$(uid)).data.by
+        && request.resource.data.at == request.time;
+      allow delete: if isAdmin();
+    }
+    // Moderator invites: only the admin creates / cancels; the invited user can only answer their own
+    // pending invite (accepted / declined).
+    match /modInvites/{uid} {
+      function iv() { return request.resource.data; }
+      allow read: if signedIn() && (uid == me() || isAdmin());
+      allow create, update: if isAdmin() && uid != me()
+        && iv().keys().hasOnly(['status', 'by', 'at', 'name', 'uname', 'answeredAt'])
+        && iv().status in ['pending', 'cancelled'] && iv().by == me() && iv().at == request.time
+        && isStr(iv().name, 0, 60) && isStr(iv().uname, 0, 30) && !('answeredAt' in iv());
+      allow update: if signedIn() && uid == me() && resource.data.status == 'pending'
+        && changed().hasOnly(['status', 'answeredAt']) && iv().status in ['accepted', 'declined']
+        && iv().answeredAt == request.time;
       allow delete: if isAdmin();
     }
     // Suspensions. Readable by the person themselves and moderators. Moderators can't suspend
@@ -1212,9 +1250,76 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['by', 'at']) && request.resource.data.by == me() && request.resource.data.at == request.time;
       allow delete: if isMod();
     }
-    // Audit log of moderator actions: append-only, readable by the admin.
+    // ---------- Mod Hub ----------
+    // Held posts: auto-flagged posts never go into posts/ until a moderator restores them, so nobody
+    // else can read them. Readable by the author ("being reviewed") and moderators.
+    match /heldPosts/{pid} {
+      function hp() { return request.resource.data; }
+      function livePost() { return /databases/$(database)/documents/posts/$(pid); }
+      allow read: if signedIn() && (resource.data.authorId == me() || isMod());
+      allow create: if signedIn() && notBanned()
+        && hp().keys().hasOnly(['post', 'reason', 'level', 'authorId', 'createdAt', 'by'])
+        && hp().post is map && hp().authorId == hp().post.authorId
+        && isStr(hp().reason, 1, 200) && hp().level in ['bad', 'borderline', 'mod']
+        && hp().createdAt == request.time
+        && ((hp().level != 'mod' && !('by' in hp()) && actingAs(hp().authorId) && validNewPost(hp().post))
+            // a moderator pulls a live post into review
+            || (hp().level == 'mod' && isMod() && hp().by == me() && exists(livePost())
+                && hp().post == get(livePost()).data && !existsAfter(livePost())));
+      allow delete: if signedIn() && (isMod() || resource.data.authorId == me());
+    }
+    // Bug reports & feedback from anyone signed in; moderators triage them.
+    match /feedback/{id} {
+      function fb() { return request.resource.data; }
+      allow read: if signedIn() && (resource.data.uid == me() || isMod());
+      allow create: if signedIn() && fb().keys().hasOnly(['uid', 'name', 'kind', 'text', 'page', 'ua', 'status', 'note', 'createdAt'])
+        && fb().uid == me() && isStr(fb().name, 0, 60) && fb().kind in ['bug', 'feedback', 'idea']
+        && isStr(fb().text, 1, 1500) && isStr(fb().page, 0, 200) && isStr(fb().ua, 0, 300)
+        && fb().status == 'new' && fb().note == '' && fb().createdAt == request.time;
+      allow update: if isMod() && changed().hasOnly(['status', 'note', 'handledBy', 'handledAt'])
+        && fb().status in ['new', 'progress', 'fixed', 'closed'] && isStr(fb().note, 0, 1000)
+        && fb().handledBy == me() && fb().handledAt == request.time;
+      allow delete: if isAdmin();
+    }
+    // Two-way "Kemy Moderators" thread per user: modThreads/{uid} + /m/{mid}. The user reads/writes
+    // only their own (suspended users too, so they can appeal); moderators read and write all.
+    match /modThreads/{uid} {
+      function th() { return request.resource.data; }
+      function thShape() {
+        return th().keys().hasOnly(['uid', 'name', 'uname', 'lastAt', 'lastText', 'lastFrom', 'unreadUser', 'unreadMod', 'ref'])
+          && th().uid == uid && isStr(th().name, 0, 60) && isStr(th().uname, 0, 30) && th().lastAt == request.time
+          && isStr(th().lastText, 0, 200) && th().unreadUser is bool && th().unreadMod is bool && isStr(th().ref, 0, 120);
+      }
+      allow read: if signedIn() && (uid == me() || isMod());
+      allow create, update: if signedIn() && thShape() && (
+        (isMod() && th().lastFrom == 'mod')
+        || (uid == me() && th().lastFrom == 'user' && th().unreadMod == true && th().unreadUser == false && exists(/databases/$(database)/documents/modThreads/$(uid))));
+      // marking read (no new message)
+      allow update: if signedIn() && changed().hasOnly(['unreadUser', 'unreadMod'])
+        && ((uid == me() && th().unreadUser == false && th().unreadMod == resource.data.unreadMod)
+            || (isMod() && th().unreadMod == false && th().unreadUser == resource.data.unreadUser));
+      match /m/{mid} {
+        function mm() { return request.resource.data; }
+        allow read: if signedIn() && (uid == me() || isMod());
+        allow create: if signedIn() && mm().keys().hasOnly(['from', 'by', 'byName', 'text', 'createdAt', 'ref'])
+          && mm().by == me() && isStr(mm().byName, 0, 60) && isStr(mm().text, 1, 1000) && isStr(mm().ref, 0, 120)
+          && mm().createdAt == request.time
+          && ((mm().from == 'mod' && isMod()) || (mm().from == 'user' && uid == me()))
+          && getAfter(/databases/$(database)/documents/modThreads/$(uid)).data.lastAt == request.time;
+      }
+    }
+    // Mod team notes / handoff board.
+    match /modNotes/{id} {
+      allow read: if isMod();
+      allow create: if isMod() && request.resource.data.keys().hasOnly(['by', 'byName', 'text', 'done', 'createdAt'])
+        && request.resource.data.by == me() && isStr(request.resource.data.byName, 0, 60)
+        && isStr(request.resource.data.text, 1, 1000) && request.resource.data.done == false && request.resource.data.createdAt == request.time;
+      allow update: if isMod() && changed().hasOnly(['done']) && request.resource.data.done is bool;
+      allow delete: if isAdmin() || (isMod() && resource.data.by == me());
+    }
+    // Audit log of moderator actions: append-only. Moderators read it for user history; the full log tab is admin-only in the app.
     match /modLog/{id} {
-      allow read: if isAdmin();
+      allow read: if isMod();
       allow create: if isMod()
         && request.resource.data.keys().hasOnly(['by', 'byName', 'action', 'targetUid', 'targetName', 'reportId', 'detail', 'at'])
         && request.resource.data.by == me() && isStr(request.resource.data.byName, 0, 60)

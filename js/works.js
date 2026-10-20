@@ -201,7 +201,7 @@ export function createWorks(ctx) {
           const artist = ($('#w-artist').value.trim() || author.displayName).slice(0, 50);
           const text = `🎵 ${title.slice(0, 80)} — ${artist}${desc ? '\n' + desc.slice(0, 800) : ''}\n${me.url}`;
           const ref = doc(collection(db, 'posts')); const b = writeBatch(db);
-          b.set(ref, { authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color, type: 'text', text, linkUrl: '', mediaUrl: '', mediaType: '', poster: '',
+          (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, { authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color, type: 'text', text, linkUrl: '', mediaUrl: '', mediaType: '', poster: '',
             cat: 'music', ...searchFields({ text: [title, desc, genre, artist].join(' '), authorName: author.displayName, authorUsername: author.username }),
             createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false });
           b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
@@ -241,7 +241,7 @@ export function createWorks(ctx) {
         else work.rating = main.querySelector('input[name=rating]:checked').value;
         const ref = doc(collection(db, 'posts'));
         const b = writeBatch(db);
-        b.set(ref, {
+        (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, {
           authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
           type: kind, text: desc.slice(0, 1000), linkUrl: yt ? `https://www.youtube.com/watch?v=${yt}` : '', mediaUrl, mediaType, poster: isSong ? '' : poster,
           work, ...(pickedCat(main, 'w-cat') ? { cat: pickedCat(main, 'w-cat') } : {}), ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
@@ -504,7 +504,7 @@ export function createWorks(ctx) {
     const work = { title: String(title).slice(0, 80), genre: GENRES.movie.includes(genre) ? genre : 'Animation', aiTools: aiTools.slice(0, 100), runtime: rt, yt: '', cover: '', rights: true, rating };
     const ref = doc(collection(db, 'posts'));
     const b = writeBatch(db);
-    b.set(ref, {
+    (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, {
       authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
       type: 'movie', text: String(desc).slice(0, 1000), linkUrl: '', mediaUrl: d.mediaUrl, mediaType: 'video', poster: d.posterUrl,
       work, ...searchFields({ text: [work.title, desc, work.genre, aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),

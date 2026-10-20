@@ -269,7 +269,7 @@ const comments = createComments({
   reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x)
 });
 // Moderators, reports inbox, suspensions (js/moderation.js).
-const mod = createModeration({ S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
+const mod = createModeration({ publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
   onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
 const addComment = (p, text) => comments.addComment(p, text);
 const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c === 'string' ? { id: c } : c);
@@ -295,7 +295,7 @@ function adminMediaCleanup(urls) {
 }
 let works = null;
 function getWorks() {
-  if (!works) works = createWorks({ db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
+  if (!works) works = createWorks({ holdOrSet: (...x) => mod.holdOrSet(...x), db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
   return works;
 }
 const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
@@ -553,7 +553,7 @@ function renderChrome(name) {
   const searchBtn = `<a class="icon-btn" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>`;
   if (S.user && S.profile) {
     ha.innerHTML = `${searchBtn}
-      ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${S.modOpen ? `, ${S.modOpen} open reports` : ''}">🛡️ Mod${S.modOpen ? `<span class="mod-count">${S.modOpen > 99 ? '99+' : S.modOpen}</span>` : ''}</a>` : ''}
+      ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${mod.totalCount() ? `, ${mod.totalCount()} need attention` : ''}">🛡️ Mod${mod.totalCount() ? `<span class="mod-count">${mod.totalCount() > 99 ? '99+' : mod.totalCount()}</span>` : ''}</a>` : ''}
       ${isAdmin() ? `<a class="icon-btn" href="#/admin" aria-label="Admin">${ICON.shield}</a>` : ''}
       <a class="icon-btn" href="#/notifications" aria-label="Notifications">${ICON.bell}${S.unreadNotes ? '<span class="dot"></span>' : ''}</a>
       ${avatar({ ...S.profile, uid: S.user.uid }, 'sm')}`;
@@ -568,7 +568,7 @@ function renderChrome(name) {
   let fab = document.getElementById('mod-fab');
   if (mod && mod.iAmMod() && S.profile) {
     if (!fab) { fab = document.createElement('a'); fab.id = 'mod-fab'; fab.className = 'mod-pill'; fab.href = '#/mod'; document.body.appendChild(fab); }
-    fab.innerHTML = `🛡️${S.modOpen ? `<span class="mod-count">${S.modOpen > 99 ? '99+' : S.modOpen}</span>` : ''}`; fab.setAttribute('aria-label', `Moderator Tools${S.modOpen ? `, ${S.modOpen} open reports` : ''}`);
+    fab.innerHTML = `🛡️${mod.totalCount() ? `<span class="mod-count">${mod.totalCount() > 99 ? '99+' : mod.totalCount()}</span>` : ''}`; fab.setAttribute('aria-label', `Moderator Tools${mod.totalCount() ? `, ${mod.totalCount()} need attention` : ''}`);
   } else if (fab) fab.remove();
 }
 
@@ -603,7 +603,10 @@ const routes = [
   [/^#\/music$/, (t) => music.page(t), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
-  [/^#\/mod(?:\/(users|log))?$/, (tab, t) => mod.page(tab, t, stale), ''],
+  [/^#\/mod(?:\/(\w+))?(?:\?.*)?$/, (tab, t) => mod.page(tab, t, stale), ''],
+  [/^#\/support$/, () => mod.supportPage(main), 'messages'],
+  [/^#\/mod-invite$/, () => mod.invitePage(main), 'me'],
+  [/^#\/feedback$/, () => mod.feedbackPage(main), 'me'],
   [/^#\/login(?:\?.*)?$/, pageLogin, 'me'],
   [/^#\/signup$/, pageSignup, 'me'],
   [/^#\/reset$/, pageReset, 'me'],
@@ -638,7 +641,7 @@ async function route() {
       document.body.classList.toggle('game-mode', /^#\/(park|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
       window.scrollTo(0, 0);
       gameMusicFor(hash);
-      if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
+      if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset|support|feedback)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
       if (token === routeToken && S.profile && S.profile.welcomed === false && !/onboard|login|signup/.test(hash)) showWelcome();
@@ -819,7 +822,7 @@ function textComposeForm(slot, open) {
       const { authorId, author } = await postAuthor(asStudio);
       const ref = doc(collection(db, 'posts'));
       const b = writeBatch(db);
-      b.set(ref, {
+      mod.holdOrSet(b, ref, {
         authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
         type: linkUrl ? 'link' : 'text', text, linkUrl, mediaUrl: '', mediaType: '', poster: '', ...(pickedCat(main, 'post-cat') ? { cat: pickedCat(main, 'post-cat') } : {}),
         ...searchFields({ text, authorName: author.displayName, authorUsername: author.username }),
@@ -827,7 +830,7 @@ function textComposeForm(slot, open) {
       });
       b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
       await b.commit();
-      toast('Posted!');
+      toast(S.lastHeld === ref.id ? 'Your post is being reviewed 🕒' : 'Posted!');
       location.hash = '#/post/' + ref.id;
     } catch (e) {
       err.textContent = e.code === 'permission-denied' ? 'You can post once every 20 seconds. Please wait a moment and try again.' : friendlyError(e);
@@ -844,7 +847,7 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
   const b = writeBatch(db);
   const n = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
   const duration = urls.mediaType === 'video' ? Math.min(LIMITS.maxVideoSeconds + 1, Math.round((Number(upload.duration) || Number(info.duration) || 0) * 10) / 10) : 0;
-  b.set(ref, {
+  mod.holdOrSet(b, ref, {
     authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
     type: 'media', text: caption.slice(0, LIMITS.captionMax), linkUrl: '',
     mediaUrl: urls.mediaUrl, mediaType: urls.mediaType, poster: urls.posterUrl, posterUrl: urls.posterUrl,
@@ -887,7 +890,7 @@ async function saveStory({ upload, info, caption, asStudio }) {
 async function pagePost(postId, token) {
   const snap = await getDoc(doc(db, 'posts', postId));
   if (stale(token)) return;
-  if (!snap.exists()) { main.innerHTML = '<div class="empty">This post was removed or doesn’t exist. <a href="#/explore">Explore</a></div>'; return; }
+  if (!snap.exists()) { const held = await mod.heldNotice(postId); main.innerHTML = held || '<div class="empty">This post was removed or doesn’t exist. <a href="#/explore">Explore</a></div>'; return; }
   const p = { id: snap.id, ...snap.data() };
   main.innerHTML = `<div id="post-slot"></div>
     <section class="card pad" aria-labelledby="c-title">
@@ -955,11 +958,11 @@ async function pageProfile(username, tab, token) {
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
-        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${S.modOpen ? ` <span class="mod-count">${S.modOpen}</span>` : ''}</a>` : ''}
+        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && !blocked && !(uid === STUDIO_UID && isAdmin()) ? `<a class="btn btn-sm btn-ghost" href="#/chat/${esc(uid)}" id="msg">Message</a>` : ''}
-        ${!mine && S.user && uid !== STUDIO_UID ? `<button class="btn btn-sm btn-ghost" id="report-user">Report</button>` : ''}
+        ${!mine && S.user && uid !== STUDIO_UID ? `<button class="btn btn-sm btn-ghost" id="report-user">Report</button>` : ''}${!mine && isAdmin() && uid !== STUDIO_UID ? '<span id="p-modinv"></span>' : ''}
         ${!mine && S.user && uid !== STUDIO_UID ? (blocked ? `<button class="btn btn-sm btn-danger" id="unblock">Unblock</button>` : `<button class="btn btn-sm btn-danger" id="block">Block</button>`) : ''}
       </div>
     </section>
@@ -972,6 +975,7 @@ async function pageProfile(username, tab, token) {
   if (!blocked) pals.renderProfile($('#ppal'), uid, u, mine);
   if (!blocked) live.renderProfile($('#pav'), $('.profile-actions'), uid, mine || (uid === STUDIO_UID && isAdmin()), token);
   $('#report-user')?.addEventListener('click', () => reportDialog('user', uid, '', '@' + u.username));
+  mod.profileButton(uid, u, $('#p-modinv'));
   $('#block')?.addEventListener('click', () => blockUser(uid, u.username));
   $('#unblock')?.addEventListener('click', () => unblockUser(uid, u.username));
   $('#msg')?.addEventListener('click', (e) => { if (!S.user) { e.preventDefault(); requireAuth(); } });
@@ -1054,7 +1058,8 @@ async function pageSettings() {
   const p = S.profile;
   main.innerHTML = `
     <h1 class="page-title">Edit profile</h1>
-    ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Moderator Tools${S.modOpen ? ` <span class="mod-count">${S.modOpen}</span>` : ''}</a>` : ''}
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><a class="btn btn-sm btn-ghost" href="#/feedback" id="set-feedback">🐞 Report a bug / Send feedback</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
+    ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Mod Hub${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
     ${isAdmin() ? '<a class="btn btn-block" href="#/admin" id="set-admin" style="margin-bottom:14px">🛡️ Admin tools (publish shop prices, reports, studio)</a>' : ''}
     <form id="settings" class="card pad">
       <div class="av-edit" id="av-edit">
@@ -1185,6 +1190,7 @@ async function pageInbox(asStudio) {
   main.innerHTML = `
     <div class="row" style="flex-wrap:wrap"><h1 class="page-title">Messages</h1><span class="spacer"></span>
     ${isAdmin() ? `<nav class="tabs" style="margin:0;border:0"><a href="#/messages" class="${me === STUDIO_UID ? '' : 'active'}">Mine</a><a href="#/messages/studio" class="${me === STUDIO_UID ? 'active' : ''}">Studio inbox</a></nav>` : ''}</div>
+    ${me === S.user.uid ? `<a class="list-item card mod-thread-row ${S.modThreadUnread ? 'unread' : ''}" href="#/support" style="margin-bottom:10px"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div class="row"><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${S.modThreadUnread ? '<span class="mod-count" style="margin-left:6px">new</span>' : ''}</div><p>${S.modThreadExists ? 'Messages from the Kemy safety team' : 'The safety team will write here if they need you'}</p></div></a>` : ''}
     <div class="card" style="padding:6px" id="inbox"><div class="spinner"></div></div>
     <p class="muted small" style="margin-top:14px">Start a chat from anyone’s profile with the <b>Message</b> button.</p>`;
   const unsub = onSnapshot(query(collection(db, 'chats'), where('participants', 'array-contains', me), orderBy('lastAt', 'desc'), limit(50)), async (qs) => {
@@ -1269,9 +1275,9 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', mod: '' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', mod: '', mod_invite: '' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
-    if (n.type === 'mod') return `<div class="list-item mod-note ${n.read ? '' : 'unread'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></div>`;
+    if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b>${esc(n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
@@ -1538,6 +1544,8 @@ async function loadSession() {
   S.saved = new Set(sav.docs.map((d) => d.id));
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = [];
   await mod.loadMine();
+  mod.watchInvite();
+  mod.watchMyThread((unread, exists) => { S.modThreadUnread = unread; S.modThreadExists = exists; document.getElementById('msg-dot').hidden = !(S.unreadChats || unread); });
   S.globalUnsubs.push(onSnapshot(query(collection(db, 'users', uid, 'notifications'), where('read', '==', false), limit(1)), (qs) => {
     S.unreadNotes = !qs.empty;
     if (S.ready) renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav);
@@ -1545,7 +1553,7 @@ async function loadSession() {
   S.globalUnsubs.push(onSnapshot(query(collection(db, 'chats'), where('participants', 'array-contains', uid), orderBy('lastAt', 'desc'), limit(20)), (qs) => {
     const seen = seenMap();
     S.unreadChats = qs.docs.some((d) => d.data().lastSender !== uid && (d.data().lastAt?.toMillis?.() || 0) > (seen[d.id] || 0) && !location.hash.includes(d.data().participants.find((x) => x !== uid)));
-    document.getElementById('msg-dot').hidden = !S.unreadChats;
+    document.getElementById('msg-dot').hidden = !(S.unreadChats || S.modThreadUnread);
   }, () => {}));
 }
 
