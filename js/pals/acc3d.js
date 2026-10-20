@@ -29,10 +29,17 @@ const grp = (p, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.positio
 const isGold = (c) => /ffcf3a|ffd34d|d4a020/i.test(c);
 
 // Anchors on every body shape. J.acc = { earL, earR, face, head, neck, wristL, handL, back }
-export function accAnchors({ J, H, headR, kind, fit, ears }) {
+export function accAnchors({ J, H, headR, kind, fit, ears, snout, fz }) {
   const hr = headR || (kind === 'jelly' ? 0.58 : 0.45), A = {}; J.acc = A; A.hr = hr; A.kind = kind;
   if (H) { const gl = ears === 'gills' || ears === 'big' || ears === 'floppy', ey = -hr * (gl ? 0.38 : 0.2), ex = hr * (gl ? 1.0 : 1.1), ez = hr * (gl ? 0.32 : 0.1); // gills/big/floppy ears cover the sides: hang lower + further forward
     A.earL = grp(H, ex, ey, ez); A.earR = grp(H, -ex, ey, ez); A.face = grp(H, 0, 0.06, 0); A.head = grp(H, 0, hr, 0); }
+  // 👃 nose anchor per snout type (matches pal3d.js snout meshes) + per body-shape scale; ring hangs from the right nostril
+  if (H) { const z = fz || hr * 0.9, sn = snout || 'smile', kS = kind === 'jelly' ? 1.25 : kind === 'cloud' ? 1.1 : kind === 'star' ? 0.95 : 1;
+    const NP = { muzzle: [0.032, -0.072, z * 0.95 + 0.115, 1], nose: [0.032, -0.072, z * 0.95 + 0.115, 1], whiskers: [0.032, -0.072, z * 0.95 + 0.115, 1],
+      pig: [0.035, -0.118, z + 0.095, 1.05], beak: [0.03, -0.035, z + 0.085, 0.85], duckbill: [0.06, -0.04, z + 0.075, 0.9], trunk: [0.035, -0.095, z * 0.86 + 0.13, 1] };
+    const [nx, ny, nz, ns] = NP[sn] || [0.025, -0.05, z * 1.03 + 0.01, 0.95];
+    A.nose = grp(H, nx, ny, nz); A.noseS = 1.25 * ns * kS * Math.max(0.8, Math.min(1.4, hr / 0.45)); A.nose.scale.setScalar(A.noseS);
+    if (sn === 'trunk' && J.trunk && J.trunk.length) { const tb = J.trunk[J.trunk.length - 1]; A.nose.removeFromParent(); A.nose.position.set(0.05, -0.078 - 0.02, 0.02); tb.add(A.nose); } }
   // neck ring radius per body shape (blob torso scales with its body width)
   const bw = (fit && fit.bw) || 1; A.neckR = kind === 'jelly' ? 0.47 : kind === 'cloud' ? 0.38 : kind === 'star' ? 0.34 : 0.29 * Math.max(0.9, bw); A.neckY = kind === 'blob' ? -0.06 : kind === 'jelly' ? -0.55 : -0.1;
   if (J.Neck) A.neck = grp(J.Neck, 0, A.neckY, 0);
@@ -56,6 +63,19 @@ export function dressAccessories({ J, W, tier, fz, hat, clothed, legacyNeck }) {
       if (st === 'hoop') { add(ball(0.022, lo), m, a); const h = add(torus(0.085, 0.017, 28, lo), m, a, s * 0.005, -0.09, 0); h.rotation.y = Math.PI / 2; }
       else if (st === 'drop') { add(ball(0.03, lo), m, a); add(cylG(0.008, 0.05, lo), m, a, 0, -0.04, 0); const d = add(shapeG('drop', star(0.09, 0.04), 0.03), gem(c, lo), a, s * 0.01, -0.11, 0); d.rotation.y = s * Math.PI / 2; glint(a, s * 0.03, -0.1, 0.03, 1.1, C); }
       else { add(ball(0.04, lo), m, a); const g = add(facet(0.062, lo), gem(st === 'stud' && isGold(c) ? '#fff6d8' : c === '#d0d8e8' ? '#e8f4ff' : c, lo), a, s * 0.02, 0, 0); g.scale.set(0.7, 1, 1); glint(a, s * 0.05, 0.02, 0.03, 0.8, C); } } }
+  // ---- 👃 nose rings (cartoon clip-on look, hang from the nostril, face the camera)
+  w = W('nose'); if (w && A.nose) { const st = w.st, c = w.col, N = A.nose, m = metal(c, lo); add(ball(0.016, lo), m, N);
+    const hoop = (r, t, x = 0, mat = m) => { const h = add(torus(r, t, 28, lo), mat, N, x, -r + 0.006, 0.004); h.rotation.y = 0.35; return h; };
+    if (st === 'nhoop') { hoop(0.05, 0.012); add(ball(0.014, lo), m, N, 0, -0.1, 0.01); glint(N, 0.03, -0.02, 0.03, 0.6, C); }
+    else if (st === 'ndouble') { hoop(0.042, 0.011); hoop(0.06, 0.011, 0.024); glint(N, 0.04, -0.03, 0.03, 0.6, C); }
+    else if (st === 'nstud') { add(facet(0.034, lo), gem(c, lo), N, 0, 0, 0.012).scale.set(1, 1, 0.75); glint(N, 0.02, 0.02, 0.04, 0.7, C); }
+    else if (st === 'nstar') { add(shapeG('nstar', star(0.045, 0.02), 0.014), m, N, 0, 0, 0.012); glint(N, 0.025, 0.025, 0.04, 0.7, C); }
+    else if (st === 'nheart') { hoop(0.04, 0.01); const hh = add(shapeG('nheart', heart(0.5), 0.016), gem('#ff7fb0', lo), N, 0, -0.088, 0.012); hh.scale.setScalar(1); glint(N, 0.02, -0.08, 0.03, 0.6, C); }
+    else if (st === 'nchain') { add(ball(0.02, lo), m, N, 0.1, 0.03, -0.02); for (let i = 0; i < (lo ? 5 : 7); i++) { const f = (i + 1) / ((lo ? 5 : 7) + 1), x = 0.1 * f, y = 0.03 * f - Math.sin(f * Math.PI) * 0.06; const l = add(torus(0.013, 0.005, 10, lo), m, N, x, y, -0.01 * f); l.rotation.y = i % 2 ? Math.PI / 2 : 0; } hoop(0.03, 0.009); }
+    else if (st === 'nrainbow') { const RB = ['#ff5a5a', '#ff9f3a', '#ffd93a', '#5ccf6a', '#4aa8ff', '#a070ff'], r = 0.052, n = RB.length;
+      for (let i = 0; i < n; i++) { const g = geo(`nrb${i}${lo}`, () => new THREE.TorusGeometry(r, 0.013, lo ? 6 : 10, lo ? 4 : 8, TAU / n + 0.02)); const a = add(g, plain(RB[i], { r: 0.3, em: RB[i], ei: 0.25 }), N, 0, -r + 0.006, 0.004); a.rotation.set(0, 0.35, Math.PI / 2 + i * TAU / n); } glint(N, 0.03, -0.03, 0.03, 0.7, C); }
+    else if (st === 'ncrystal') { hoop(0.048, 0.011, 0, metal('#d0d8e8', lo)); add(facet(0.03, lo), gem(c, lo), N, 0, -0.1, 0.012).scale.set(0.9, 1.25, 0.8); add(shapeG('ncst', star(0.022, 0.01), 0.01), metal('#ffcf3a', lo), N, 0.0, 0.0, 0.02); glint(N, 0.02, -0.09, 0.04, 1, C); glint(N, -0.01, 0.02, 0.04, 0.6, C); }
+    else hoop(0.05, 0.012); }
   // ---- necklaces, chains, pendants, badges (neck slot; scarf/tie/bowtie stay in pal3d.js)
   w = W('neck') || legacyNeck; if (w && A.neck && ['beads', 'chain', 'locket', 'medal', 'pearls', 'bell', 'badge'].includes(w.st)) { const st = w.st, c = w.col, R = A.neckR + (clothed ? 0.035 : 0.01), N = A.neck;
     const along = (n, fn) => { for (let i = 0; i < n; i++) { const a = -Math.PI * 0.92 + i * (Math.PI * 1.84) / (n - 1); const sag = (1 - Math.abs(a) / Math.PI) * 0.07; fn(Math.sin(a) * R, -sag, Math.cos(a) * R * 0.95, a, i); } };

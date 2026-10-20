@@ -13,12 +13,21 @@ export function drawWear(c, layer, outfit, g) {
   const slots = layer === 'back' ? ['back'] : layer === 'feet' ? ['feet'] : layer === 'body' ? (g.feet ? ['body'] : ['feet', 'body']) : ['neck', 'face', 'head'];
   for (const s of slots) { const it = ITEM[outfit[s]] || WEAR_BY[outfit[s]]; if (it && it.slot === s && !it.hw) { c.save(); c.lineWidth = 0.8; try { STYLE[it.st] && STYLE[it.st](c, it.col, g); } catch {} c.restore(); } }
   // 💍 2D/flat fallback for jewelry & accessories (earrings, headphones, bracelets, watches, rings) on top of the head pass
-  if (layer === 'head') for (const s of ['ears', 'wrist', 'hand']) { const it = WEAR_BY[outfit[s]]; if (it && it.slot === s && JEWEL2D[it.st]) { c.save(); c.lineWidth = 0.7; try { JEWEL2D[it.st](c, it.col, g); } catch {} c.restore(); } }
+  if (layer === 'head') for (const s of ['ears', 'nose', 'wrist', 'hand']) { const it = WEAR_BY[outfit[s]]; if (it && it.slot === s && JEWEL2D[it.st]) { c.save(); c.lineWidth = 0.7; try { JEWEL2D[it.st](c, it.col, g); } catch {} c.restore(); } }
 }
 const glint2 = (c, x, y, k, t) => { const v = 0.5 + 0.5 * Math.sin((t || 0) * 0.12 + x); c.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * v})`; starP(c, x, y, k * (0.6 + 0.6 * v), k * 0.2); c.fill(); };
 const gemC = (col) => (/ffcf3a/i.test(col) ? '#fff2a8' : /d0d8e8/i.test(col) ? '#e8f4ff' : col);
 const EARX = 9.5, wx = (g) => 6.9 * g.bodyG;
+const NX = 1.0, NY = (g) => g.hy + 1.3; // 👃 flat nose-ring spot (just right of the nose on the shared head layout)
+const nh = (c, col, g, r = 1.2, x = NX) => { c.strokeStyle = col; c.lineWidth = 0.6; ell(c, x, NY(g) + r * 0.9, r, r); c.stroke(); };
 const JEWEL2D = {
+  nhoop(c, col, g) { nh(c, col, g); }, ndouble(c, col, g) { nh(c, col, g, 1); nh(c, col, g, 1.4, NX + 0.6); },
+  nstud(c, col, g) { ell(c, NX, NY(g), 0.8, 0.8); fs(c, col); glint2(c, NX + 0.4, NY(g) - 0.4, 0.6, g.t); },
+  nstar(c, col, g) { starP(c, NX, NY(g), 1.1); fs(c, col); glint2(c, NX + 0.4, NY(g) - 0.4, 0.6, g.t); },
+  nheart(c, col, g) { nh(c, col, g, 0.9); ell(c, NX, NY(g) + 2, 0.7, 0.6); fs(c, '#ff7fb0'); },
+  nchain(c, col, g) { c.strokeStyle = col; c.lineWidth = 0.5; c.setLineDash([0.6, 0.4]); c.beginPath(); c.moveTo(NX, NY(g)); c.quadraticCurveTo(NX + 2.5, NY(g) + 2.2, NX + 5, NY(g) - 0.5); c.stroke(); c.setLineDash([]); nh(c, col, g, 0.7); },
+  nrainbow(c, col, g) { ['#ff5a5a', '#ffd93a', '#5ccf6a', '#4aa8ff', '#a070ff'].forEach((k, i) => { c.strokeStyle = k; c.lineWidth = 0.6; c.beginPath(); c.arc(NX, NY(g) + 1.1, 1.2, i * TAU / 5, (i + 1) * TAU / 5); c.stroke(); }); },
+  ncrystal(c, col, g) { nh(c, '#d0d8e8', g); ell(c, NX, NY(g) + 2.4, 0.7, 0.9); fs(c, col); glint2(c, NX + 0.4, NY(g) + 2, 0.7, g.t); },
   stud(c, col, g) { for (const s of [-1, 1]) { ell(c, s * EARX, g.hy + 1.6, 1.3, 1.3); fs(c, gemC(col), shade(col, -0.5)); glint2(c, s * EARX + 0.5, g.hy + 1.1, 1, g.t); } },
   hoop(c, col, g) { c.strokeStyle = col; c.lineWidth = 0.9; for (const s of [-1, 1]) { ell(c, s * EARX, g.hy + 3.6, 1.9, 2.2); c.stroke(); } },
   drop(c, col, g) { for (const s of [-1, 1]) { c.strokeStyle = shade(col, -0.3); c.beginPath(); c.moveTo(s * EARX, g.hy + 1.4); c.lineTo(s * EARX, g.hy + 3); c.stroke(); starP(c, s * EARX, g.hy + 4.4, 2); fs(c, col); glint2(c, s * EARX + 0.6, g.hy + 3.8, 0.9, g.t); } },

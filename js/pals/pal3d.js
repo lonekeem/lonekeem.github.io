@@ -276,7 +276,7 @@ function build(pal) {
   }
   if (!legs) J.Hips.position.y = 0.95;
   J.fit = { ar, lr, ua, la, ul, ll, legs, kind, bw, arm: armType };
-  accAnchors({ J, H, headR, kind, fit: J.fit, ears: sp.ears }); // 💍 jewelry anchors (ears, face, head, neck, wrist, hand, back) on every body shape
+  accAnchors({ J, H, headR, kind, fit: J.fit, ears: sp.ears, snout: sp.snout, fz }); // 💍 jewelry anchors (ears, face, head, neck, wrist, hand, back) on every body shape
   // tail chain (3 bones) per species
   J.tail = []; const tl = sp.tail;
   if (tl !== 'none') {
@@ -544,7 +544,7 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex, legacyNeck }) {
 }
 const C_RED = '#e8434f';
 // Store thumbnails: the REAL 3D item rendered on the user's own Pal (only that item worn), framed on the slot.
-const FOCUS = { head: [0, -0.06, 1, 0.6], hair: [0, -0.06, 1, 0.6], face: [0.15, 0.1, 0.7, 0.45], ears: [0.1, 0.1, 0.8, 0.5], neck: [0.15, 0.25, 0.7, 0.45], feet: [0.15, 0.72, 0.7, 0.3], hand: [0.6, 0.45, 0.5, 0.32], wrist: [0.6, 0.42, 0.5, 0.32] };
+const FOCUS = { head: [0, -0.06, 1, 0.6], hair: [0, -0.06, 1, 0.6], face: [0.15, 0.1, 0.7, 0.45], ears: [0.1, 0.1, 0.8, 0.5], nose: [0.2, 0.12, 0.6, 0.4], neck: [0.15, 0.25, 0.7, 0.45], feet: [0.15, 0.72, 0.7, 0.3], hand: [0.6, 0.45, 0.5, 0.32], wrist: [0.6, 0.42, 0.5, 0.32] };
 export function renderItemThumb(pal, slot, id, px = 96, opt = {}) {
   if (!R) init(); if (lost || !R) return null;
   const p2 = { ...pal, outfit: id ? { [slot]: id } : {}, variant: opt.variant != null ? opt.variant : '', pattern: opt.pattern || 'none' };

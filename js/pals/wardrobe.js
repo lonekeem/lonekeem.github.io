@@ -2,9 +2,9 @@
 // g = 'g' | 'b' | 'a' only drives the Girls / Boys / All filter. Free items: id 'f_*' (rules let them be worn
 // without a purchase). Premium items: letters-only ids, bought with Star Coins through the normal shop purchase.
 import { HALLOWEEN } from './halloween.js';
-export const WSLOTS = ['head', 'hair', 'face', 'ears', 'neck', 'body', 'bottom', 'full', 'feet', 'back', 'bag', 'held', 'wrist', 'hand'];
-export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings & Headphones', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Hand Items', wrist: 'Bracelets & Watches', hand: 'Rings' };
-export const JEWELRY = ['ears', 'neck', 'wrist', 'hand', 'face', 'bag'];
+export const WSLOTS = ['head', 'hair', 'face', 'ears', 'neck', 'body', 'bottom', 'full', 'feet', 'back', 'bag', 'held', 'wrist', 'hand', 'nose'];
+export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings & Headphones', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Hand Items', wrist: 'Bracelets & Watches', hand: 'Rings', nose: 'Nose Rings' };
+export const JEWELRY = ['ears', 'nose', 'neck', 'wrist', 'hand', 'face', 'bag'];
 const C = { pink: '#f4a6c4', red: '#d9505c', blue: '#6f9fe0', navy: '#2f3d6e', green: '#6bb48a', yellow: '#f7d36b', purple: '#9a74d6', white: '#f7f3ee', black: '#34303f', orange: '#f29a5a', mint: '#9fdcc6', lilac: '#c9b3f0', gold: '#ffcf3a', silver: '#d0d8e8', rose: '#f0a0b0', teal: '#3fa6a6', sage: '#9db89a', cream: '#f3e9d6', denim: '#5b7bb0', camel: '#c8955f', mocha: '#8a6a58', blush: '#f2c4c4', butter: '#f6e3a1', sky: '#a9cdea', plum: '#7c4d7e', forest: '#3f6b52' };
 const T = { pink: 'Pink', red: 'Red', blue: 'Blue', navy: 'Navy', green: 'Green', yellow: 'Sunny', purple: 'Purple', white: 'White', black: 'Midnight', orange: 'Orange', mint: 'Mint', lilac: 'Lilac', gold: 'Gold', silver: 'Silver', rose: 'Rose Gold', teal: 'Teal' , sage: 'Sage', cream: 'Cream', denim: 'Denim', camel: 'Camel', mocha: 'Mocha', blush: 'Blush', butter: 'Butter', sky: 'Sky', plum: 'Plum', forest: 'Forest' };
 // [base id, name, slot, style, g, colours, premium price (0 = free), rarity]
@@ -57,6 +57,11 @@ const BASE = [
   ['bracelet', 'Bracelet', 'wrist', 'bracelet', 'g', ['gold', 'silver', 'pink'], 0], ['beadband', 'Bead Bracelet', 'wrist', 'beadband', 'a', ['mint', 'lilac'], 0],
   ['watch', 'Watch', 'wrist', 'watch', 'b', ['black', 'blue', 'silver'], 0], ['smartwatch', 'Glow Watch', 'wrist', 'watch', 'a', ['purple'], 110, 'r'],
   ['ring', 'Ring', 'hand', 'ring', 'a', ['gold', 'silver'], 0], ['gemring', 'Gem Ring', 'hand', 'gem', 'g', ['pink', 'blue', 'purple'], 140, 'r'], ['starring', 'Superstar Ring', 'hand', 'gem', 'a', ['gold'], 500, 'l'],
+  // 👃 nose rings ('nose' slot, 3D in acc3d.js on a per-snout nose anchor; cartoon, oversized, clip-on look)
+  ['nosehoop', 'Nose Hoop', 'nose', 'nhoop', 'a', ['gold', 'silver'], 90, 'r'], ['nosegem', 'Gem Nose Stud', 'nose', 'nstud', 'a', ['pink', 'blue', 'mint'], 110, 'r'],
+  ['nosestar', 'Star Nose Stud', 'nose', 'nstar', 'a', ['gold'], 120, 'r'], ['nosedouble', 'Double Nose Hoop', 'nose', 'ndouble', 'a', ['gold'], 140, 'r'],
+  ['noseheart', 'Heart Charm Nose Ring', 'nose', 'nheart', 'g', ['rose'], 150, 'r'], ['nosechain', 'Chain Link Nose Ring', 'nose', 'nchain', 'a', ['silver'], 180, 'e'],
+  ['noserainbow', 'Rainbow Nose Hoop', 'nose', 'nrainbow', 'a', ['white'], 220, 'e'],
 ];
 // retired (looked tacky): still render for anyone already wearing them, but no longer listed in the store
 const RETIRED = new Set(['helmet', 'pigtails']);
@@ -70,6 +75,8 @@ for (const [id, st, col] of [['f_food_berry', 'berry', '#ff4f6f'], ['f_food_cook
   WEAR.push({ id, name: st, kind: 'wear', slot: 'held', st, col, p: 0, r: 'c', g: 'a', free: true, hidden: true });
 // 🎃 Halloween costume collection (js/pals/halloween.js): free f_hw_*, Star Coins hw_*, Diamonds z_hw_*
 for (const w of HALLOWEEN) WEAR.push(w);
+// 👑 Diamond nose ring (config/palShop.dprices)
+WEAR.push({ id: 'z_nosecrystal', name: 'Crystal Star Nose Ring', kind: 'wear', slot: 'nose', st: 'ncrystal', col: '#bfe8ff', p: 0, d: 300, prem: 1, r: 'l', g: 'a' });
 export const WEAR_BY = Object.fromEntries(WEAR.map((w) => [w.id, w]));
 // Looks: premium patterns and Rare Pal variants (needs users/{uid}/inv/{id})
 export const PATTERNS = [
