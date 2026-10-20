@@ -18,7 +18,6 @@ export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.ur
 // Theme playlist (original song files, unchanged). Track 1 is always the welcome / hatch song.
 export const TRACKS = [
   { title: THEME_TITLE, artist: 'Keem', src: THEME_SRC, dur: 124.8 },
-  { title: 'Julian', artist: 'Keem', src: new URL('../assets/audio/julian.m4a', import.meta.url).href, dur: 161.2 },
   { title: THEME3_TITLE, artist: THEME3_ARTIST, src: new URL('../assets/audio/kemy-theme3.m4a?v=1', import.meta.url).href, dur: 167.6 },
   { title: THEME4_TITLE, artist: THEME4_ARTIST, src: new URL('../assets/audio/kemy-theme4.m4a?v=1', import.meta.url).href, dur: 186.8 },
   { title: THEME5_TITLE, artist: THEME5_ARTIST, src: new URL('../assets/audio/kemy-theme5.m4a?v=1', import.meta.url).href, dur: 229.2 },
@@ -32,6 +31,8 @@ export const currentTrack = () => cur;
 const MODE = 'kemy-theme-mode', VOLK = 'kemy-theme-vol', OLD = 'kemy-theme-bgm';
 export const DEFAULT_VOL = 0.2, FADE = 1.5;
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } } };
+// One-time migration: track 2 was removed from TRACKS, so saved indices shift (1 -> reset, 2+ -> minus 1).
+(() => { try { if (localStorage.getItem('kemy-tracks-mig1')) return; for (const k of ['kemy-theme-track', 'kemy-radio-track']) { const v = localStorage.getItem(k); if (v == null || !/^\d+$/.test(v)) continue; const n = +v; if (n === 1) localStorage.removeItem(k); else if (n > 1) localStorage.setItem(k, String(n - 1)); } localStorage.setItem('kemy-tracks-mig1', '1'); } catch { /* */ } })();
 // '' = not asked yet, 'play', 'mute' (paused, tap to resume), 'off' (never starts, button hidden)
 export function getMode() { const m = ls.get(MODE); if (m === 'play' || m === 'mute' || m === 'off') return m; if (ls.get(OLD) === '1') return 'play'; return ''; }
 export function getVolume() { const v = parseFloat(ls.get(VOLK)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : DEFAULT_VOL; }
