@@ -1066,6 +1066,7 @@ async function pageSettings() {
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-autoplay-wifi" ${wifiOnly() ? 'checked' : ''} ${autoplayEnabled() ? '' : 'disabled'}> <span>Autoplay on Wi-Fi only</span></label>
       <p class="muted small" id="s-ap-note">Videos start muted as you scroll. ${saveData() ? 'Data Saver is on, so videos wait for a tap.' : ''}${canDetectWifi() ? '' : ' (This browser can’t tell Wi-Fi from mobile data, so Wi-Fi only has no effect here.)'}</p>
     </section>
+    <button type="button" class="card pad set-link" data-watch-intro style="margin-top:16px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">🎬</span><span><b>Watch intro</b><br><span class="muted small">Replay Kemy’s welcome video anytime.</span></span></button>
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
     <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
       <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>
