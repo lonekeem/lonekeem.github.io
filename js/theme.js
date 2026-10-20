@@ -7,8 +7,8 @@ export const THEME_FILE = 'kemy-theme.m4a?v=2'; // "Kemy on the Screen" by Keem,
 export const THEME_TITLE = 'Kemy on the Screen';
 export const THEME_ARTIST = 'Keem';
 export const THEME_CREDIT = `Theme song: ${THEME_TITLE} by ${THEME_ARTIST} — Lone Keem Studios`;
-// Track 3 title (placeholder) — change it here.
-export const THEME3_TITLE = 'Kemy Theme 3';
+// Track 3 title — change it here.
+export const THEME3_TITLE = 'Time';
 export const THEME3_ARTIST = 'Keem';
 export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
 // Theme playlist (original song files, unchanged). Track 1 is always the welcome / hatch song.
