@@ -43,7 +43,17 @@ export async function openCoinShop(tab = 'get') {
       <h3 class="cs-sec">💎 Diamonds</h3><div class="cs-grid">${PACKS.filter((p) => p.cur === 'diamond').map(card).join('')}</div>
       <div class="cs-note">${st.ready ? '' : '🔒 Buying is coming soon. '}A grown-up must say yes before any purchase. You can always earn ⭐ for free by playing games and caring for your Pal.</div>`;
     body.querySelectorAll('.cs-buy').forEach((b) => b.onclick = () => gate(PACKS.find((p) => p.id === b.dataset.id))); }
-  function gate(p) { const a = 12 + Math.floor(Math.random() * 8), b = 6 + Math.floor(Math.random() * 7);
+  function gate(p) {
+    // Parental Controls (js/parental.js): when on, the parent PIN (or a block) replaces the math check.
+    const kp = window.kemyParental;
+    if (kp && kp.enabled && kp.enabled()) {
+      if (!kp.canPurchase()) { body.insertAdjacentHTML('beforeend', '<div class="cs-gate"><b>🛡️ Purchases are turned off in Parental Controls.</b></div>'); body.lastElementChild.scrollIntoView({ block: 'center' }); return; }
+      kp.requirePin(`Buying ${(p.amount + p.bonus).toLocaleString()} for ${priceOf(p)}. A grown-up needs to enter the parent PIN.`).then(async (ok) => { if (!ok) return;
+        body.insertAdjacentHTML('beforeend', '<div class="cs-gate"><b>Starting purchase…</b></div>'); const g = body.lastElementChild;
+        try { const r = await buy(p, walletState().uid); g.innerHTML = r.ok ? '<b>Thanks! Your purchase is being checked. It will appear in your wallet soon.</b>' : '<b>Buying is coming soon.</b>'; } catch (e) { g.innerHTML = '<b>Purchase cancelled.</b>'; } });
+      return;
+    }
+    const a = 12 + Math.floor(Math.random() * 8), b = 6 + Math.floor(Math.random() * 7);
     body.insertAdjacentHTML('beforeend', `<div class="cs-gate"><b>👪 Grown-ups only</b><p>Buying ${(p.amount + p.bonus).toLocaleString()} ${em(p.cur)} for ${priceOf(p)}. Please ask a parent. What is ${a} × ${b}?</p><input inputmode="numeric" aria-label="Answer"><button class="cs-buy">Continue</button></div>`);
     const g = body.lastElementChild; g.scrollIntoView({ block: 'center' });
     g.querySelector('.cs-buy').onclick = async () => { if (Number(g.querySelector('input').value) !== a * b) { g.querySelector('p').textContent = 'That is not right. Please ask a grown-up.'; return; }

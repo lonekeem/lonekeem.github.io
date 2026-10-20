@@ -37,6 +37,7 @@ import { initMediaScan, takeHold } from './mediascan.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createDevices } from './devices.js';
 import { createComments } from './comments.js';
+import * as parental from './parental.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
 import { createGames, CONTROLLER as GAMES_ICON } from './games/index.js';
 import { createPals } from './pals/index.js';
@@ -476,7 +477,7 @@ document.addEventListener('click', closeMenus);
 
 function renderPosts(container, posts, emptyMsg) {
   container.innerHTML = '';
-  const visible = posts.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
+  const visible = posts.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !parental.hidePost(p));
   if (!visible.length) { container.innerHTML = `<div class="empty">${emptyMsg}</div>`; return; }
   visible.forEach((p) => container.appendChild(postCard(p)));
 }
@@ -665,6 +666,7 @@ const routes = [
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/rules$/, () => safety.rulesPage(main), 'me'],
   [/^#\/settings$/, pageSettings, 'me'],
+  [/^#\/settings\/parental$/, () => parental.page(main), 'me'],
   [/^#\/settings\/interests$/, (t) => interestsPage({ main, esc, toast, getDoc, doc, db, loadDiscover, stale, token: t }), 'me'],
   [/^#\/music$/, (t) => music.page(t), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
@@ -691,7 +693,7 @@ let routeToken = 0, navCount = 0;
 // In-game music player: shown on every game screen (#/games…, #/game/…, Pal games), hidden elsewhere.
 const kemySongsForGames = async () => {
   const snap = await getDocs(query(collection(db, 'posts'), where('type', '==', 'song'), orderBy('createdAt', 'desc'), limit(25)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.mediaUrl && !(p.work && p.work.explicit) && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p))
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.mediaUrl && !(p.work && p.work.explicit) && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !parental.hidePost(p))
     .map((p) => ({ title: (p.work && p.work.title) || 'Song', artist: (p.work && p.work.artist) || p.authorName || 'Kemy', url: p.mediaUrl }));
 };
 function gameMusicFor(hash) {
@@ -736,6 +738,7 @@ async function route() {
       window.scrollTo(0, 0);
       gameMusicFor(hash);
       if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset|support|feedback)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
+      { const pb = parental.routeBlock(hash); if (pb) { main.innerHTML = pb; document.body.classList.remove('feed-mode', 'game-mode'); return; } }
       const gName = gameLoadName(hash); if (gName) loadScreen.show(gName); else loadScreen.hide();
       try { await fn(...m.slice(1), token); }
       catch (e) { console.error(e); if (token === routeToken) main.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
@@ -1037,6 +1040,7 @@ async function pageProfile(username, tab, token) {
   if (stale(token)) return;
   if (!u) { main.innerHTML = '<div class="empty">This profile is not available.</div>'; return; }
   const mine = !!(S.user && uid === S.user.uid);
+  if (!mine && !isAdmin() && await parental.profileHidden(u, uid)) { if (!stale(token)) main.innerHTML = parental.privateProfileHtml(u.username); return; }
   const blocked = S.blocked.has(uid);
   const [fers, fing, pc, tot] = await Promise.all([
     getCountFromServer(query(collection(db, 'follows'), where('followee', '==', uid))),
@@ -1154,7 +1158,7 @@ function gridTile(p) {
     ${viewsHtml(p.viewCount, p.id, 'gviews')}</a>`;
 }
 function renderGrid(container, posts, emptyMsg) {
-  const visible = posts.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
+  const visible = posts.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !parental.hidePost(p));
   container.innerHTML = visible.length ? `<div class="pgrid">${visible.map(gridTile).join('')}</div>` : `<div class="empty">${emptyMsg}</div>`;
 }
 async function pageFollowList(kind, uid, token) {
@@ -1206,6 +1210,7 @@ async function pageSettings() {
     <button type="button" class="card pad set-link" data-watch-intro style="margin-top:16px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">🎬</span><span><b>Watch intro</b><br><span class="muted small">Replay Kemy’s welcome video anytime.</span></span></button>
     <button type="button" class="card pad set-link" data-watch-howto style="margin-top:12px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">📱</span><span><b>How to save Kemy</b><br><span class="muted small">Add Kemy to your phone’s home screen (iPhone &amp; Android).</span></span></button>
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
+    ${parental.settingsLink()}
     ${devices.settingsHtml()}
     <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
       <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>

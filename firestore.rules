@@ -55,6 +55,16 @@ service cloud.firestore {
       let d = get(userPath(u)).data;
       return isAdmin() || u == 'studio' || (ageOkData(d) && d.get('rulesAt', null) is timestamp && !exists(u13Path(u)));
     }
+    // Parental Controls (js/parental.js): users/{uid}.pc flags. Read from the already-fetched profile
+    // doc so these checks add no extra lookups. pcOff(d, k): that feature was switched off by a parent.
+    function validPc(m) {
+      return m is map && m.keys().hasOnly(['chat', 'dm', 'live', 'cmt', 'buy', 'time', 'vis', 'safe'])
+        && m.get('chat', true) is bool && m.get('live', true) is bool && m.get('cmt', true) is bool && m.get('safe', true) is bool
+        && m.get('dm', 'friends') in ['off', 'friends', 'everyone'] && m.get('buy', 'pin') in ['block', 'pin', 'open']
+        && m.get('time', 0) in [0, 30, 60, 120] && m.get('vis', 'public') in ['private', 'friends', 'public'];
+    }
+    function pcOff(d, k) { return d.get('pc', {}).get(k, true) == false; }
+    function pcNoDm(d) { return d.get('pc', {}).get('dm', 'friends') == 'off'; }
     function validBirth(d) {
       return !('birthY' in d) || (d.birthY is int && d.get('birthM', 0) is int && d.birthY >= 1900 && d.birthY <= 2100 && d.birthM >= 1 && d.birthM <= 12);
     }
@@ -79,7 +89,8 @@ service cloud.firestore {
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
                                'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt',
-                               'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter'])
+                               'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter', 'pc'])
+        && (!('pc' in d) || validPc(d.pc))
         && validBirth(d)
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
@@ -597,7 +608,8 @@ service cloud.firestore {
           && (!('parentId' in request.resource.data) || validReplyTo(request.resource.data.parentId))
           && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount + 1
           && getAfter(postPath()).data.lastCommentId == cid
-          && (isAdmin() || getAfter(userPath(me())).data.lastCommentAt == request.time);
+          && (isAdmin() || getAfter(userPath(me())).data.lastCommentAt == request.time)
+          && !pcOff(getAfter(userPath(me())).data, 'cmt');
         allow update: if signedIn() && (cLikeChange() || replyChange() || softDelete());
         // Hard delete: the author, the admin or the post's owner. Replies update their parent's
         // count (unless the parent is gone); a comment with replies must be blanked instead.
@@ -757,7 +769,8 @@ service cloud.firestore {
       function liveOn() { return live().status == 'live'; }
 
       allow read: if true;
-      allow create: if signedIn() && actingAs(request.resource.data.hostId) && validNewLive(request.resource.data) && canCreate(request.resource.data.hostId);
+      allow create: if signedIn() && actingAs(request.resource.data.hostId) && validNewLive(request.resource.data) && canCreate(request.resource.data.hostId)
+        && !pcOff(get(userPath(request.resource.data.hostId)).data, 'live');
       allow update: if signedIn() && (hostLiveUpdate() || adminEndsLive());
       allow delete: if signedIn() && (actingAs(resource.data.hostId) || isAdmin());
 
@@ -806,7 +819,8 @@ service cloud.firestore {
               || (request.resource.data.type == 'star' && request.resource.data.text == ''
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
-          && getAfter(userPath(me())).data.lastMessageAt == request.time;
+          && getAfter(userPath(me())).data.lastMessageAt == request.time
+          && !pcOff(getAfter(userPath(me())).data, 'chat');
         allow delete: if signedIn() && (isHost() || isMod() || resource.data.authorId == me());
       }
     }
@@ -851,6 +865,8 @@ service cloud.firestore {
         && request.resource.data.lastSender in request.resource.data.participants
         && actingAs(request.resource.data.lastSender)
         && exists(userPath(otherOf(request.resource.data.lastSender)))
+        && !pcNoDm(get(userPath(otherOf(request.resource.data.lastSender))).data)
+        && !pcNoDm(getAfter(userPath(request.resource.data.lastSender)).data)
         && !isBlocked(otherOf(request.resource.data.lastSender), request.resource.data.lastSender)
         // DMs are friends-only: a new chat needs follows both ways (or the studio / a moderator).
         && ('studio' in request.resource.data.participants || isMod()
@@ -884,7 +900,9 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
           && getAfter(chatPath()).data.lastAt == request.time
-          && getAfter(userPath(request.resource.data.senderId)).data.lastMessageAt == request.time;
+          && getAfter(userPath(request.resource.data.senderId)).data.lastMessageAt == request.time
+          && !pcNoDm(getAfter(userPath(request.resource.data.senderId)).data)
+          && !pcNoDm(get(userPath(otherOf(request.resource.data.senderId))).data);
         // View-once snap: only the recipient can open it, which removes the media link for good.
         allow update: if inChat()
           && resource.data.get('viewed', true) == false
@@ -1130,7 +1148,7 @@ service cloud.firestore {
       // Quick-chat emotes from players and signed-in spectators (preset ids only).
       match /chat/{cid} {
         allow read: if true;
-        allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
+        allow create: if signedIn() && !pcOff(get(userPath(me())).data, 'chat') && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
           && request.resource.data.uid == me() && request.resource.data.e is int
           && ((request.resource.data.e >= 0 && request.resource.data.e <= 9) || (request.resource.data.e >= 100 && request.resource.data.e <= 199)) && request.resource.data.at == request.time; // 100+: Pal emote (game-emotes.js)
         allow delete: if isAdmin();
@@ -1868,6 +1886,15 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
     // owner's Pal settings that visitors may read (e.g. 'let visitors chat with my Pal')
+    // Parental Controls PIN: only a salted SHA-256 hash, readable/writable by the account owner only.
+    match /parental/{uid} {
+      allow read, delete: if signedIn() && uid == me();
+      allow create, update: if signedIn() && uid == me()
+        && request.resource.data.keys().hasOnly(['salt', 'hash', 'updatedAt'])
+        && request.resource.data.salt is string && request.resource.data.salt.matches('^[0-9a-f]{32}$')
+        && request.resource.data.hash is string && request.resource.data.hash.matches('^[0-9a-f]{64}$')
+        && request.resource.data.updatedAt == request.time;
+    }
     match /users/{uid}/pal/settings {
       allow read: if true;
       allow write: if signedIn() && uid == me() && request.resource.data.keys().hasOnly(['visitorChat', 'updatedAt'])
@@ -2046,6 +2073,8 @@ service cloud.firestore {
         && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && isStr(pp().tgt, 0, 128)
         && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
         && pp().uname == get(/databases/$(database)/documents/users/$(uid)).data.username
+        // Parental Controls: chat off means no new 'say' text (same profile doc as above, no extra lookup)
+        && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || !pcOff(get(/databases/$(database)/documents/users/$(uid)).data, 'chat'))
         && pp().pal is map && pp().at == request.time
         && (resource == null || resource.data.at + duration.value(200, 'ms') < request.time);
       allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(2, 'm'));
