@@ -65,8 +65,8 @@ export function createDevices({ auth, db, isPrivileged, toast }) {
       else {
         others = (await getDocs(collection(db, 'users', uid, 'devices'))).size;
         // The very first device on an account is just "you" (no alert); every later new one is flagged.
-        await setDoc(ref, { label, firstSeen: serverTimestamp(), lastSeen: serverTimestamp(), ack: others === 0 });
-        isNew = others > 0;
+        try { await setDoc(ref, { label, firstSeen: serverTimestamp(), lastSeen: serverTimestamp(), ack: others === 0 }); isNew = others > 0; }
+        catch (e) { console.warn('device create failed, retrying as update', e.code); await updateDoc(ref, { lastSeen: serverTimestamp() }); }
       }
     } catch (e) { console.warn('device record failed', e); }
     if (st.uid !== uid) return;
@@ -87,11 +87,14 @@ export function createDevices({ auth, db, isPrivileged, toast }) {
   async function signOutEverywhere() {
     if (!st.uid) return;
     if (!confirm('Sign out on every device, including this one? You’ll need to sign in again everywhere.')) return;
+    const uid = st.uid, sess = st.authMs;
     try {
-      await updateDoc(doc(db, 'users', st.uid), { sessionsValidAfter: serverTimestamp() });
-      await Promise.all(st.devices.filter((d) => !d.ack).map((d) => updateDoc(doc(db, 'users', st.uid, 'devices', d.id), { ack: true }).catch(() => {})));
+      // Clear the alerts first: once sessionsValidAfter is set, this (older) session can't write them any more.
+      await Promise.all(st.devices.filter((d) => !d.ack).map((d) => updateDoc(doc(db, 'users', uid, 'devices', d.id), { ack: true }).catch(() => {})));
+      await updateDoc(doc(db, 'users', uid), { sessionsValidAfter: serverTimestamp() });
     } catch (e) { toast && toast('Couldn’t sign out everywhere: ' + (e.code || e.message)); return; }
-    kick('Signed out everywhere. Sign in again on the devices you trust.');
+    // The live listener usually signs us out first; don't sign out a newer session that started meanwhile.
+    if (st.uid === uid && st.authMs === sess) kick('Signed out everywhere. Sign in again on the devices you trust.');
   }
   const ackAll = () => Promise.all(pending().map((d) => updateDoc(doc(db, 'users', st.uid, 'devices', d.id), { ack: true }).catch(() => {})));
   async function remove(id) {
@@ -116,7 +119,7 @@ export function createDevices({ auth, db, isPrivileged, toast }) {
     });
     const box = document.getElementById('sec-devices');
     if (box) box.innerHTML = st.devices.length ? st.devices.map((d) => `<div class="list-item sec-dev"><span style="font-size:1.3rem" aria-hidden="true">${/iPhone|Android phone/.test(d.label) ? '📱' : /iPad|tablet/.test(d.label) ? '📲' : '💻'}</span>
-      <div class="meta"><b>${esc(d.label)}</b>${d.id === st.mine ? ' <span class="badge">This device</span>' : ''}${!d.ack && d.id !== st.mine ? ' <span class="mod-count">new</span>' : ''}<div class="muted small">Last seen ${esc(when(d.lastSeen))} · first ${esc(when(d.firstSeen))}</div></div>
+      <div class="meta"><b>${esc(d.label)}</b>${d.id === st.mine ? ' <span class="sec-this">This device</span>' : ''}${!d.ack && d.id !== st.mine ? ' <span class="mod-count">new</span>' : ''}<div class="muted small">Last seen ${esc(when(d.lastSeen))} · first ${esc(when(d.firstSeen))}</div></div>
       <button class="btn btn-sm btn-ghost" type="button" data-sec-remove="${esc(d.id)}">Remove</button></div>`).join('') : '<p class="muted small">No devices recorded yet.</p>';
     const cb = document.getElementById('s-sec-alerts'); if (cb) cb.checked = alertsOn();
   }

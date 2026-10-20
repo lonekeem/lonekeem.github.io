@@ -1669,3 +1669,4 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .feed-skel .sk-line{height:14px;width:70%;border-radius:8px}.feed-skel .sk-line.short{width:40%}
 .feed-skel>div{background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(255,255,255,.14),rgba(255,255,255,.06));background-size:200% 100%;animation:skel 1.2s linear infinite}
 @keyframes skel{to{background-position:-200% 0}}
+.sec-this { font-size: .72rem; padding: 2px 8px; border-radius: 999px; background: rgba(77,163,255,.18); color: #9cc9ff; margin-left: 4px; white-space: nowrap; }
