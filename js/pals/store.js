@@ -93,7 +93,7 @@ export function createPalStore(ctx) {
     $('#ps-rand').onclick = () => { snap(); const o = {}; for (const s of ['head', 'hair', 'face', 'neck', 'feet', 'held']) if (Math.random() < 0.6) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
       const fl = WEAR.filter((w) => w.slot === 'full' && w.free); if (Math.random() < 0.5) o.full = fl[Math.floor(Math.random() * fl.length)].id; else for (const s of ['body', 'bottom']) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
       D.outfit = o; const fb = BGS.filter((b) => !b.p); D.bg = fb[Math.floor(Math.random() * fb.length)].id; refresh(); };
-    const commitLook = async () => { await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); dispatchEvent(new Event('kemy:pal-changed')); };
+    const commitLook = async () => { const ok = await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); if (ok === false) throw new Error('Couldn’t save the look. Try again.'); dispatchEvent(new Event('kemy:pal-changed')); };
     async function save() {
       const u = unowned(); const cost = u.reduce((a, b) => a + (b.p || 0), 0);
       if (u.length) { // one shared buy sheet: confirm, buy, then auto-equip (save the look)

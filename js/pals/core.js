@@ -1,5 +1,5 @@
 // Kemy Pals - data: Firestore users/{uid}/pets/{petId}, stats decay computed client-side.
-import { doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, increment, deleteDoc }
+import { doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, increment, deleteDoc, deleteField }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { SPEC } from './art.js';
 export const MAX_PALS = 6;
@@ -36,8 +36,10 @@ export function createStore(db, uid) {
       const xp = Math.min(p.xp + Math.min(60, Math.max(0, patch.xpGain || 0)), 4900);
       const data = { stats: patch.stats || liveStats(p), xp, level: xpToLevel(xp), at: serverTimestamp(), updatedAt: serverTimestamp() };
       for (const k of ['name', 'colors', 'pattern', 'acc', 'species', 'outfit', 'voice', 'bg', 'variant']) if (patch[k] !== undefined) data[k] = patch[k];
+      // the rules only accept a real background id; "Plain Stage" (no background) removes the field instead of saving ''
+      const noBg = data.bg === ''; if (noBg) data.bg = deleteField();
       lastWrite = Date.now(); await updateDoc(ref(p.id), data);
-      Object.assign(p, data, { at: Date.now() }); return p;
+      Object.assign(p, data, { at: Date.now() }); if (noBg) p.bg = ''; return p;
     },
     async remove(id) { const pats = await getDocs(collection(db, 'users', uid, 'pets', id, 'pats')); const pd = await getDocs(collection(db, 'users', uid, 'pets', id, 'playdates')); const b = writeBatch(db); pats.docs.forEach((d) => b.delete(d.ref)); pd.docs.forEach((d) => b.delete(d.ref)); b.delete(ref(id)); await b.commit(); },
     async setActive(id) { await updateDoc(doc(db, 'users', uid), { activePet: id }); }
