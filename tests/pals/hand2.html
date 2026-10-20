@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#1a0c3a"><canvas id="c" width="1200" height="660"></canvas>
+<script type="module">
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { loadTrends } from '../../js/pals/dance.js'; await loadTrends();
+const c = document.getElementById('c').getContext('2d'); c.font = '600 12px sans-serif';
+const SP = ['bear', 'kemy', 'elephant', 'penguin', 'corgi', 'rxdragon'], IT = ['f_phone_purple', 'f_bobatea_lilac', 'mic_gold'];
+const J = []; IT.forEach((id, r) => SP.forEach((sp, k) => J.push([sp, id, r, k])));
+const done = []; let t = 0; const go = () => { t++; let all = true, n = 0;
+  J.forEach(([sp, id, r, k], i) => { if (done[i]) return; if (n++ > 3) { all = false; return; } const x = k * 200, y = r * 220;
+    if (drawPal3D(c, x + 100, y + 210, 140, { species: sp, level: 6, outfit: { held: id } }, { t: 40, mode: 'idle', yaw: 0.5, dance3d: k % 2 ? 'renegroove' : null, beat: 1.6, amt: 1 })) { done[i] = 1; c.fillStyle = '#fff'; c.fillText(sp + ' · ' + id + (k % 2 ? ' · dance' : ''), x + 6, y + 14); } else all = false; });
+  if (!all && t < 300) requestAnimationFrame(go); else window.ready = true; };
+setTimeout(go, 300);
+</script>
