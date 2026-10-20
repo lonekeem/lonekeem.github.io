@@ -1,8 +1,8 @@
-const CACHE = 'lks-v153';
+const CACHE = 'lks-v154';
 // Small app shell only (other files are cached as they are used); a big precache on every version bump
 // slowed phones down on first open after each update.
 const CORE = [
-  './', 'index.html', 'app.html', 'css/app.css', 'css/polish.css', 'js/app.js', 'js/home.js', 'js/firebase-init.js',
+  './', 'index.html', 'app.html', 'css/app.css', 'css/polish.css', 'js/app.js', 'js/home.js', 'js/firebase-init.js', 'js/fs-cache.js',
   'js/watch.js', 'js/discover.js', 'js/loadscreen.js', 'kemy-logo.png', 'favicon-32.png', 'icon-192.png'
 ];
 self.addEventListener('install', e => {
