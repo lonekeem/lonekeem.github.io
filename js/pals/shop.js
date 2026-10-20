@@ -4,6 +4,7 @@ import { drawItemIcon } from './wear.js';
 import { drawPal } from './art.js';
 import { drawDancer } from './dance.js';
 import { createEconomy } from './economy.js';
+import { HW_ON, HALLOWEEN } from './halloween.js';
 import { getAggregateFromServer, query, collection, where, sum } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function cvs(el, w, h) { const cv = document.createElement('canvas'); const d = Math.min(3, devicePixelRatio || 1); cv.width = w * d; cv.height = h * d; cv.style.width = w + 'px'; cv.style.height = h + 'px'; const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); el.innerHTML = ''; el.appendChild(cv); return { cv, c }; }
@@ -72,7 +73,7 @@ export function createShopUI(ctx) {
       const achs = ITEMS.filter((i) => i.ach);
       main.innerHTML = `<section class="card pad pal-box pal-shop"><div class="pal-box-head"><h1>Pal Shop</h1><span class="pal-coins" title="Star Coins">${coinTxt(w.coins)}</span></div>
         <p class="muted small">Star Coins are free: daily bonus, caring for your Pal, winning games, Bubble Quest stars, gold stars on your posts and Pal Park treasures. They can’t be bought.</p>
-        <h2 class="pal-sub">🔥 Daily Deals <small class="muted">new every day</small></h2><div class="pal-deals">${Object.entries(deals).map(([id, pr]) => card(ITEM[id], pr)).join('')}</div>
+        ${HW_ON() ? `<a href="#/pals/store" style="display:block;text-decoration:none;color:#fff;border-radius:16px;padding:12px 14px;margin:8px 0;background:linear-gradient(135deg,#2a1450,#5b2a8a 55%,#ff8a1e)"><b style="display:block;font-size:1.05rem">🎃 Halloween Costume Shop · limited time</b><small style="color:#ffe8c8">${HALLOWEEN.length} costumes, ${HALLOWEEN.filter((w) => w.free).length} FREE. Tap to dress up your Pal →</small></a>` : ''}<h2 class="pal-sub">🔥 Daily Deals <small class="muted">new every day</small></h2><div class="pal-deals">${Object.entries(deals).map(([id, pr]) => card(ITEM[id], pr)).join('')}</div>
         <p><button class="btn btn-sm" type="button" id="dance-shop-link">💃 Dance Shop: Trending, Classics, Hip-Hop &amp; Country moves</button></p><div class="pal-tabs">${[['wear', '👒 Clothes'], ['decor', '🏡 Decor'], ['toy', '🧸 Toys'], ['snack', '🍓 Snacks'], ['voice', '🎤 Voices'], ['ach', '🏆 Achievements']].map(([k, l]) => `<button data-cat="${k}" aria-selected="${cat === k}">${l}</button>`).join('')}</div>
         ${cat === 'ach' ? `<div class="pal-shopgrid">${achs.map((i) => `<div class="pal-shopitem r-${i.r}"><i class="pal-ic" data-ic="${i.id}"></i><b>${esc(i.name)}</b><small class="rar" style="color:${RARITY[i.r].col}">${RARITY[i.r].name} · achievement</small><small>${esc(i.how)}</small>${inv[i.id] ? '<span class="pal-owned">Earned</span>' : `<button class="btn btn-sm btn-ghost" data-claim="${i.ach}">Claim</button>`}</div>`).join('')}</div>`
           : `<div class="pal-shopgrid">${list.map((i) => card(i)).join('')}</div>`}

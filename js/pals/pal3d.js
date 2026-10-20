@@ -9,6 +9,7 @@ import * as THREE from '../vendor/three-0.170.0.module.min.js';
 import { SPEC, SPECIES, stageOf } from './art.js';
 import { ITEM } from './catalog.js';
 import { WEAR_BY } from './wardrobe.js';
+import { dressHalloween } from './halloween3d.js';
 import { DANCES3D, clipFor } from './dances3d.js';
 import { gaitPose, jumpPose, plantFeet, springs, advancePhase } from './motion3d.js';
 
@@ -468,7 +469,9 @@ export const THREE_VERSION = THREE.REVISION;
 
 // Wardrobe pieces: each is parented to a rig bone, so it moves with every dance and walk.
 function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex }) {
-  const W = (s) => WEAR_BY[of[s]]; const M = (col, o = {}) => { const m = mat(col, { cc: 0.3, ...o }); m.userData.wear = 1; return m; };
+  const W = (s) => { const w = WEAR_BY[of[s]]; return w && !w.hw ? w : undefined; }; // 🎃 Halloween pieces are built by halloween3d.js
+  const HX = (s) => { const w = WEAR_BY[of[s]]; return w && w.hw ? w : undefined; };
+  if (Object.keys(of).some((s) => HX(s))) dressHalloween({ J, H, headR, fz, legs, kind, X: HX, taken: (s) => !!W(s), tier: gfxLevel() }); const M = (col, o = {}) => { const m = mat(col, { cc: 0.3, ...o }); m.userData.wear = 1; return m; };
   const metal = (col) => { const m = mat(col, { cc: 1, sheen: 0 }); m.metalness = 0.8; m.roughness = 0.25; m.userData.wear = 1; return m; };
   const hd = headR && H;
   // head

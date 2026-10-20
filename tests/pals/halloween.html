@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#1f1040"><canvas id="c" width="1200" height="1600"></canvas>
+<script type="module">
+// 🎃 Halloween costume grid: ?sp=a,b (cycled), ?ids=x,y (default: all), ?cols=6, ?gfx=low|high|ultra, ?mode=dance
+import { drawPal3D, setGfx } from '../../js/pals/pal3d.js';
+import { HALLOWEEN } from '../../js/pals/halloween.js';
+const q = new URLSearchParams(location.search); if (q.get('gfx')) setGfx(q.get('gfx'));
+const SP = (q.get('sp') || 'kemy,bear,cat,bunny,fox,penguin,dragon,elephant,owl,frog,jelly,corgi').split(',');
+const IDS = q.get('ids') ? q.get('ids').split(',') : HALLOWEEN.map((w) => w.id);
+const cols = +(q.get('cols') || 6), W = 1200 / cols, Hh = +(q.get('h') || 230), SZ = +(q.get('z') || 120);
+const cv = document.getElementById('c'); const cells = []; IDS.forEach((id, i) => { const w = HALLOWEEN.find((x) => x.id === id); const sp = q.get('one') ? q.get('one') : SP[i % SP.length]; cells.push([sp, { [w.slot]: id }, w.name]); });
+if (q.get('one') === 'all') { cells.length = 0; SP.forEach((sp) => cells.push([sp, { [HALLOWEEN.find((x) => x.id === IDS[0]).slot]: IDS[0] }, sp])); }
+cv.height = Math.ceil(cells.length / cols) * Hh; const c = cv.getContext('2d'); c.font = '600 13px sans-serif';
+const done = []; let t = 0; const go = () => { t++; let all = true, n = 0;
+  cells.forEach(([sp, of, label], i) => { if (done[i]) return; if (n++ > 3) { all = false; return; } const x = (i % cols) * W, y = Math.floor(i / cols) * Hh;
+    if (drawPal3D(c, x + W / 2, y + Hh - 10, SZ, { species: sp, level: 6, outfit: of }, { t: 47, mode: 'idle', yaw: +(q.get('yaw') || 0.35), dance3d: q.get('mode') === 'dance' ? 'monstermash' : null, beat: 1.2, amt: 1 })) { done[i] = 1; c.fillStyle = '#fff'; c.fillText(label, x + 6, y + 16); } else all = false; });
+  if (!all && t < 900) requestAnimationFrame(go); else window.ready = true; };
+window.onerror = (m) => { window.err = (window.err || '') + m + '\n'; };
+setTimeout(go, 300);
+</script>

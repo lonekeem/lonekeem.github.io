@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/polish.css"><link rel="stylesheet" href="../../css/pals.css">
+<body><main id="main" style="padding:8px"></main>
+<script type="module">
+// Offline Pal Store harness (no Firebase): stubbed wallet + inventory, opens the 🎃 Halloween tab
+import { createPalStore } from '../../js/pals/store.js';
+const pal = { id: 'p1', name: 'Bloop', species: new URLSearchParams(location.search).get('sp') || 'bear', level: 6, outfit: { full: 'hw_stitchdoll' }, colors: {} };
+const econ = { w: { coins: 640 }, wallet: async () => econ.w, inventory: async () => ({}), looks: async () => [], buy: async () => 0, saveLook: async () => {} };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const st = createPalStore({ S: { user: { uid: 'u' } }, db: null, esc, toast: (m) => console.log('toast', m), openModal: () => {}, closeModal: () => {}, friendlyError: (e) => String(e), requireAuth: () => true, econ: () => econ, myPals: async () => ({ list: [pal] }), activeOf: (m) => m.list[0], commit: async () => true });
+location.hash = '#halloween'; await st.page(document.getElementById('main')); setTimeout(() => { window.ready = true; }, 6000);
+</script>

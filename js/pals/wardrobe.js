@@ -1,6 +1,7 @@
 // Wardrobe + Jewelry & Accessories: original designs (no characters, logos or brands). Anyone can wear anything;
 // g = 'g' | 'b' | 'a' only drives the Girls / Boys / All filter. Free items: id 'f_*' (rules let them be worn
 // without a purchase). Premium items: letters-only ids, bought with Star Coins through the normal shop purchase.
+import { HALLOWEEN } from './halloween.js';
 export const WSLOTS = ['head', 'hair', 'face', 'ears', 'neck', 'body', 'bottom', 'full', 'feet', 'back', 'bag', 'held', 'wrist', 'hand'];
 export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Hand Items', wrist: 'Bracelets & Watches', hand: 'Rings' };
 export const JEWELRY = ['ears', 'neck', 'wrist', 'hand', 'face', 'bag'];
@@ -66,6 +67,8 @@ for (const [id, name, slot, st, g, cols, p, r] of BASE) for (const k of cols) {
 // Care food held in the paws while eating (not sold here; the food shop sells snacks)
 for (const [id, st, col] of [['f_food_berry', 'berry', '#ff4f6f'], ['f_food_cookie', 'cookie', '#e0a060'], ['f_food_cake', 'cake', '#ffc6f0'], ['f_food_apple', 'apple', '#ffcf3a'], ['f_food_carrot', 'carrot', '#ff8a2a'], ['f_food_fish', 'fish', '#7ab8e8'], ['f_food_bamboo', 'bamboo', '#7ad070'], ['f_food_honey', 'honey', '#ffb31a'], ['f_food_leaf', 'leaf', '#4ab070'], ['f_food_seed', 'seed', '#d8b080']])
   WEAR.push({ id, name: st, kind: 'wear', slot: 'held', st, col, p: 0, r: 'c', g: 'a', free: true, hidden: true });
+// 🎃 Halloween costume collection (js/pals/halloween.js): free f_hw_*, Star Coins hw_*, Diamonds z_hw_*
+for (const w of HALLOWEEN) WEAR.push(w);
 export const WEAR_BY = Object.fromEntries(WEAR.map((w) => [w.id, w]));
 // Looks: premium patterns and Rare Pal variants (needs users/{uid}/inv/{id})
 export const PATTERNS = [

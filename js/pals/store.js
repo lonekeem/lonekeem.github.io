@@ -4,13 +4,19 @@ import { openBuySheet, buyButton } from '../buy-sheet.js';
 // Ownership is enforced by firestore.rules (inv docs created only together with a priced wallet purchase).
 import { WEAR, WEAR_BY, WSLOTS, WSLOT_NAMES, JEWELRY, PATTERNS, RARES, RARE } from './wardrobe.js';
 import { BGS, BG, drawBg } from './bgs.js';
-import { addItems, RARITY } from './catalog.js';
+import { addItems, addDiamondItems, RARITY } from './catalog.js';
+import { HALLOWEEN, HW_ON, HW_ENDS } from './halloween.js';
 import { drawDancer } from './dance.js';
 import { SPECIES } from './art.js';
 import { RARE_SPECIES } from './species.js';
 // premium items join the shop catalog (config/palShop prices) so purchases validate server-side
 addItems([...WEAR.filter((w) => w.p), ...BGS.filter((b) => b.p).map((b) => ({ ...b, kind: 'bg' })),
   ...PATTERNS.filter((p) => p.p).map((p) => ({ ...p, kind: 'look', r: p.r || 'r' })), ...RARES.map((r) => ({ ...r, kind: 'rare' })), ...RARE_SPECIES.map((sp) => ({ id: 'sp_' + sp.id, name: sp.name, kind: 'pal', p: sp.rare, r: sp.rare >= 1500 ? 'l' : 'e' }))]);
+// 🎃 Halloween premium costumes are Diamond items (config/palShop.dprices, placeholder productIds, no real money)
+addDiamondItems(HALLOWEEN.filter((w) => w.d).map((w) => ({ id: w.id, name: w.name, kind: 'wear', d: w.d, productId: w.productId })));
+const HWCSS = `.hw-banner{position:relative;overflow:hidden;border-radius:16px;padding:12px 14px;margin:4px 0 10px;background:linear-gradient(135deg,#2a1450,#5b2a8a 55%,#ff8a1e);color:#fff;box-shadow:0 4px 16px rgba(60,20,90,.35)}.hw-banner b{font-size:1.1rem;display:block}.hw-banner small{color:#ffe8c8;display:block;margin-top:2px}.hw-banner .hw-tag{display:inline-block;background:#ffcf3a;color:#1a1028;font-weight:800;border-radius:999px;padding:2px 10px;font-size:.78rem;margin-bottom:4px}
+.hw-h{width:100%;grid-column:1/-1;margin:10px 0 2px;font-size:1rem}.ps-tile .hw-free{position:absolute;top:6px;left:6px;background:#3fbf6a;color:#06210f;font-weight:800;font-size:.7rem;border-radius:999px;padding:2px 8px;z-index:1}.ps-tile .hw-prem{position:absolute;top:6px;left:6px;background:#ffcf3a;color:#1a1028;font-weight:800;font-size:.7rem;border-radius:999px;padding:2px 8px;z-index:1}.ps-tile{position:relative}`;
+const hwCss = () => { if (document.getElementById('hw-css')) return; const st = document.createElement('style'); st.id = 'hw-css'; st.textContent = HWCSS; document.head.appendChild(st); };
 const EMO = { cap: '🧢', beanie: '🧶', bucket: '👒', tiara: '👸', crown: '👑', tophat: '🎩', helmet: '⛑️', earband: '🐱', wizard: '🧙', santa: '🎅', flowers: '🌸', bow: '🎀', bow2: '🎀', clips: '⭐', pigtails: '💇', bun: '🍡', quiff: '💈',
   round: '👓', lens: '🕶️', heart: '💖', star: '🌟', stud: '💎', hoop: '⭕', drop: '✨', beads: '📿', chain: '⛓️', locket: '💝', medal: '🏅', scarf: '🧣', tie: '👔', bowtie: '🎀', tee: '👕', hoodie: '🧥', jersey: '🎽', sweater: '🧶', puffer: '🧥', blouse: '👚',
   shorts: '🩳', skirt: '👗', tutu: '🩰', pants: '👖', dress: '👗', gown: '👸', overalls: '👖', pjs: '🌙', suit: '🤵', kit: '⚽', uniform: '🏫', coat: '🧥', swim: '🩱', dino: '🦖', astro: '🧑‍🚀', hero: '🦸', xmas: '🎄',
@@ -32,7 +38,7 @@ export function createPalStore(ctx) {
         <button class="ps-bgbtn" id="ps-bgbtn" type="button" aria-label="Change background">🖼️</button><button class="ps-bgbtn ps-rot" id="ps-rot" type="button" aria-label="Spin">🔄</button></div><div id="ps-buy"></div>
       <div class="ps-actions"><button class="btn btn-sm btn-ghost" id="ps-undo">↶ Undo</button><button class="btn btn-sm btn-ghost" id="ps-reset">Reset</button><button class="btn btn-sm btn-ghost" id="ps-rand">🎲 Random</button><button class="btn btn-sm" id="ps-save">💾 Save Look</button></div>
       <div class="ps-looks" id="ps-looks"></div>
-      <div class="ps-tabs" role="tablist">${[['outfits', '👗 Outfits'], ['jewelry', '💍 Jewelry & Accessories'], ['hand', '🧸 Hand Items'], ['looks', '🎨 Looks'], ['bgs', '🖼️ Backgrounds'], ['dances', '💃 Dances'], ['pals', '🐾 Pals']].map(([k, n]) => `<button class="chip" data-tab="${k}" role="tab">${n}</button>`).join('')}</div>
+      <div class="ps-tabs" role="tablist">${[['halloween', '🎃 Halloween'], ['outfits', '👗 Outfits'], ['jewelry', '💍 Jewelry & Accessories'], ['hand', '🧸 Hand Items'], ['looks', '🎨 Looks'], ['bgs', '🖼️ Backgrounds'], ['dances', '💃 Dances'], ['pals', '🐾 Pals']].map(([k, n]) => `<button class="chip" data-tab="${k}" role="tab">${n}</button>`).join('')}</div>
       <div id="ps-filters" class="ps-filters"></div><div id="ps-grid" class="ps-grid"></div></section>`;
     const $ = (s) => main.querySelector(s);
     // stage: background + 3D Pal, drag to rotate, wheel/pinch to zoom
@@ -45,8 +51,8 @@ export function createPalStore(ctx) {
     let t = 0; const frame = () => { if (!document.body.contains(cv) || !loopTok.on) return; t++; if (spin) yaw += 0.02; c.clearRect(0, 0, W, H);
       if (!drawBg(c, W, H, D.bg, t)) { c.fillStyle = '#2a1458'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill(); }
       drawDancer(c, W / 2, H - 12, 120 * zoom, { ...p, outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }, { t, mode: 'idle', yaw }); requestAnimationFrame(frame); }; frame();
-    const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; pv.textContent = u.length ? `Preview · ${u.length} to buy · ★${u.reduce((a, b) => a + (b.p || 0), 0)}` : '';
-      const bb = $('#ps-buy'); bb.innerHTML = u.length ? buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: u.reduce((a, b) => a + (b.p || 0), 0), balance: (e.w && e.w.coins) || 0, id: 'ps-buynow' }) : ''; if (u.length) bb.querySelector('#ps-buynow').onclick = () => save(); grid(); };
+    const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; const uc0 = u.filter((x) => !x.d), ud0 = u.filter((x) => x.d); pv.textContent = u.length ? `Preview · ${u.length} to buy${uc0.length ? ` · ★${uc0.reduce((a, b) => a + (b.p || 0), 0)}` : ''}${ud0.length ? ` · 💎${ud0.reduce((a, b) => a + b.d, 0)}` : ''}` : '';
+      const bb = $('#ps-buy'); bb.innerHTML = u.length ? (ud0.length && !uc0.length ? buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: ud0.reduce((a, b) => a + b.d, 0), balance: 0, id: 'ps-buynow' }).replace(/★(\d)/, '💎$1').replace(/<small[^>]*>[^<]*<\/small>/, '<small style="display:block;font-weight:600;color:#f1e6ff">👑 Premium · Diamonds</small>') : buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: uc0.reduce((a, b) => a + (b.p || 0), 0), balance: (e.w && e.w.coins) || 0, id: 'ps-buynow' }) + (ud0.length ? '<small style="display:block;text-align:center">+ 💎 premium items (paid next)</small>' : '')) : ''; if (u.length) bb.querySelector('#ps-buynow').onclick = () => save(); grid(); };
     const tile = (id, name, price, r, emo, on, ownd, extra = '') => `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${extra} style="--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}"><span class="ps-emo" data-th="${esc(id)}">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : `★ ${price}`}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`;
     function filters() {
       const f = $('#ps-filters'); if (tab !== 'outfits' && tab !== 'jewelry' && tab !== 'hand') { f.innerHTML = ''; return; }
@@ -69,6 +75,14 @@ export function createPalStore(ctx) {
       if (tab === 'outfits' || tab === 'jewelry' || tab === 'hand') { const sl = tab === 'hand' ? ['held'] : tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s) && s !== 'held');
         const list = WEAR.filter((w) => !w.hidden && sl.includes(w.slot) && (slot === 'all' || w.slot === slot) && (gf === 'a' || w.g === gf || w.g === 'a'));
         h = list.map((w) => tile(w.id, w.name, w.p, w.r, EMO[w.st] || '✨', D.outfit[w.slot] === w.id, own(w.id), `data-slot="${w.slot}" style="--ic:${w.col}"`)).join(''); }
+      if (tab === 'halloween') { hwCss(); const on = HW_ON(); const days = Math.max(1, Math.ceil((HW_ENDS() - Date.now()) / 86400000));
+        const T2 = (w) => { const ow = own(w.id); const pr = w.free ? 'Free' : ow ? '✓ Owned' : w.d ? `💎 ${w.d}` : `★ ${w.p}`; return `<button class="ps-tile ${D.outfit[w.slot] === w.id ? 'on' : ''}" data-id="${esc(w.id)}" data-slot="${w.slot}" style="--rc:${RARITY[w.r] ? RARITY[w.r].col : '#9aa3b5'};--ic:${w.col}">${w.free ? '<span class="hw-free">FREE</span>' : w.d ? '<span class="hw-prem">👑 PREMIUM</span>' : ''}<span class="ps-emo" data-th="${esc(w.id)}">${w.icon || '🎃'}</span><b>${esc(w.name)}</b><small>${pr}${!w.free && RARITY[w.r] && w.r !== 'c' ? ` · ${RARITY[w.r].name}` : ''}</small>${w.set ? `<small class="hw-set">+ ${esc(w.set)}</small>` : ''}</button>`; };
+        const sec = (t, l) => (l.length ? `<h3 class="ps-h hw-h">${t}</h3>` + l.map(T2).join('') : '');
+        const L = HALLOWEEN.filter((w) => !w.hidden);
+        h = `<div class="hw-banner" style="grid-column:1/-1">${on ? `<span class="hw-tag">⏳ LIMITED TIME · ${days} day${days === 1 ? '' : 's'} left</span>` : '<span class="hw-tag">🎃 Halloween collection</span>'}<b>🎃 Halloween Costume Shop</b><small>${HALLOWEEN.length} spooky-fun costumes for every Pal. Wear them in Pal Park, Zombie Survival, the Challenge Show and your Pal Box. Free ones are yours to keep!</small></div>`
+          + sec('🆓 Free costumes', L.filter((w) => w.free)) + sec('🎭 Full costume sets', L.filter((w) => !w.free && !w.d && w.slot === 'full'))
+          + sec('🦇 Masks, hats &amp; capes', L.filter((w) => !w.free && !w.d && ['face', 'head', 'back'].includes(w.slot))) + sec('🪓 Toy props', L.filter((w) => !w.free && !w.d && w.slot === 'held'))
+          + sec('👑 Premium (💎 Diamonds)', L.filter((w) => w.d)) + '<p class="small" style="grid-column:1/-1">Full costumes add their matching hat, mask or prop when that spot is empty. Every prop is a soft toy. 💎 Diamonds are earned in Pal Zombie Survival, no real money.</p>'; }
       if (tab === 'bgs') h = `<button class="ps-tile ${!D.bg ? 'on' : ''}" data-bg=""><span class="ps-emo">🟪</span><b>Plain Stage</b><small>Free</small></button>` + BGS.map((b) => `<button class="ps-tile ps-bgt ${D.bg === b.id ? 'on' : ''}" data-bg="${b.id}" style="--rc:${RARITY[b.r].col}"><canvas width="96" height="64"></canvas><b>${esc(b.name)}</b><small>${own(b.id) ? (b.p ? '✓ Owned' : 'Free') : `★ ${b.p} · ${RARITY[b.r].name}`}${b.fx && !/sparkle|twinkle/.test(b.fx) ? ' · animated' : ''}</small></button>`).join('');
       if (tab === 'looks') h = `<h3 class="ps-h">Patterns</h3>` + PATTERNS.map((x) => tile(x.id, x.name, x.p, x.r || 'c', { none: '⬜', spots: '🟤', stripes: '〰️', sparkle: '✨', pt_hearts: '💗', pt_stars: '⭐', pt_rainbow: '🌈', pt_galaxy: '🌌' }[x.id], D.pattern === x.id, own(x.id), 'data-pt="1"')).join('')
         + `<h3 class="ps-h">Colours</h3><div class="ps-row"><label>Body <input type="color" id="ps-col-b" value="${esc((p.colors && p.colors.body) || '#ffffff')}"></label><label>Accent <input type="color" id="ps-col-a" value="${esc((p.colors && p.colors.accent) || '#ffffff')}"></label></div><p class="small">More accessories are in the Jewelry & Accessories tab.</p>`;
@@ -95,6 +109,11 @@ export function createPalStore(ctx) {
       D.outfit = o; const fb = BGS.filter((b) => !b.p); D.bg = fb[Math.floor(Math.random() * fb.length)].id; refresh(); };
     const commitLook = async () => { const ok = await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); if (ok === false) throw new Error('Couldn’t save the look. Try again.'); dispatchEvent(new Event('kemy:pal-changed')); };
     async function save() {
+      const ud = unowned().filter((x) => x.d); // 👑 Diamond items (Halloween premium) first, on their own sheet
+      if (ud.length) { const { createDiamonds } = await import('./armory.js'); const dia = createDiamonds(ctx.db, S.user.uid); let gems = 0; try { gems = (await dia.get(true)).d || 0; } catch { /* */ }
+        const ok = await openBuySheet({ name: ud.length === 1 ? ud[0].name : `${ud.length} premium items`, price: ud.reduce((a, b) => a + b.d, 0), icon: '👑', balance: gems, currency: '💎', note: '👑 Premium costume. Diamonds only (earn them in Pal Zombie Survival), no real money.', equipped: 'Unlocked ✓', earn: [{ label: '🧟 Earn Diamonds in Pal Zombie Survival', href: '#/arcade/zombie' }],
+          buy: async () => { for (const x of ud) { if (inv[x.id]) continue; try { gems -= await dia.buy(x.id); inv[x.id] = 1; } catch (er) { throw new Error(er.code === 'permission-denied' ? 'Premium costumes open soon (prices are being set up). Try again later!' : er.code ? friendlyError(er) : er.message || 'Purchase failed'); } } return gems; } });
+        if (!ok) { refresh(); return; } if (!unowned().length) { try { await commitLook(); } catch (er) { toast(friendlyError(er)); } refresh(); return; } }
       const u = unowned(); const cost = u.reduce((a, b) => a + (b.p || 0), 0);
       if (u.length) { // one shared buy sheet: confirm, buy, then auto-equip (save the look)
         await openBuySheet({ name: u.length === 1 ? u[0].name : `${u.length} items (${u.map((x) => x.name).join(', ')})`, price: cost, icon: u.length === 1 ? '🛍️' : '🛍️', balance: (e.w && e.w.coins) || 0,
@@ -110,7 +129,7 @@ export function createPalStore(ctx) {
       el.innerHTML = ['l1', 'l2', 'l3'].map((id, i) => { const l = L.find((x) => x.id === id); return `<span class="ps-look"><button class="chip" data-load="${id}" ${l ? '' : 'disabled'}>${l ? esc(l.name) : 'Look ' + (i + 1)}</button><button class="chip" data-store="${id}" aria-label="Save to look ${i + 1}">⤓</button></span>`; }).join('');
       el.querySelectorAll('[data-load]').forEach((b) => b.onclick = () => { const l = L.find((x) => x.id === b.dataset.load); if (!l) return; snap(); D = { outfit: { ...l.outfit }, bg: l.bg || '', variant: l.variant || '', pattern: l.pattern || 'none' }; refresh(); toast(`Trying on ${l.name}. Tap Save Look to keep it.`); });
       el.querySelectorAll('[data-store]').forEach((b) => b.onclick = async () => { try { const i = b.dataset.store.slice(1); await e.saveLook(b.dataset.store, 'Look ' + i, D.outfit, { bg: D.bg, variant: D.variant, pattern: D.pattern }); toast(`Saved to Look ${i}`); looks(); } catch (er) { toast(friendlyError(er)); } }); }
-    looks(); setTab(location.hash.includes('store-bg') ? 'bgs' : 'outfits'); refresh();
+    looks(); setTab(location.hash.includes('store-bg') ? 'bgs' : HW_ON() || location.hash.includes('halloween') ? 'halloween' : 'outfits'); refresh();
   }
   return { page };
 }
