@@ -1331,6 +1331,64 @@ service cloud.firestore {
         || (changed().hasOnly(['d', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && dBuyOk()));
       allow delete: if signedIn() && uid == me();
     }
+    // ================= Pal Zombie Survival co-op lobbies (2-4 players)
+    // Lobby doc: host only (plus a guarded take-over when the host has been quiet for 8 s or left).
+    // Seats: one create-only doc per seat (max 4). Player docs: only their owner. Game state: only the host.
+    match /zLobbies/{code} {
+      function zl() { return request.resource.data; }
+      function zlp(u) { return /databases/$(database)/documents/zLobbies/$(code)/p/$(u); }
+      function zlPath() { return /databases/$(database)/documents/zLobbies/$(code); }
+      function zlShape() {
+        return zl().keys().hasOnly(['host', 'status', 'pub', 'n', 'wave', 'createdAt', 'updatedAt'])
+          && zl().host is string && zl().host.size() <= 128 && zl().status in ['open', 'playing', 'done'] && zl().pub is bool
+          && zl().n is int && zl().n >= 0 && zl().n <= 4 && zl().wave is int && zl().wave >= 0 && zl().wave <= 1000 && zl().updatedAt == request.time;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() && code.matches('^[A-Z2-9]{5}$') && zlShape() && zl().host == me() && zl().status == 'open' && zl().n == 1 && zl().createdAt == request.time;
+      allow update: if signedIn() && zlShape() && zl().createdAt == resource.data.createdAt && (
+        (resource.data.host == me() && (zl().host == me() || exists(zlp(zl().host))))
+        || (zl().host == me() && resource.data.host != me() && exists(zlp(me()))
+            && (!exists(zlp(resource.data.host)) || get(zlp(resource.data.host)).data.at < request.time - duration.value(8, 's'))
+            && zl().diff(resource.data).affectedKeys().hasOnly(['host', 'updatedAt'])));
+      allow delete: if signedIn() && (resource.data.host == me() || resource.data.updatedAt < request.time - duration.value(30, 'm'));
+      match /slot/{s} {
+        allow read: if signedIn();
+        allow create: if signedIn() && s in ['0', '1', '2', '3'] && exists(zlPath())
+          && request.resource.data.keys().hasOnly(['uid', 'at']) && request.resource.data.uid == me() && request.resource.data.at == request.time;
+        allow delete: if signedIn() && (resource.data.uid == me() || !exists(zlPath()) || get(zlPath()).data.host == me()
+          || resource.data.at < request.time - duration.value(30, 'm'));
+      }
+      match /p/{u} {
+        function zp() { return request.resource.data; }
+        function zpShape() {
+          return zp().keys().hasOnly(['name', 'pal', 'slot', 'ready', 'x', 'y', 'z', 'f', 'a', 'fire', 'w', 'hp', 'down', 'rev', 'em', 'emAt', 'hits', 'hs', 'at'])
+            && isStr(zp().name, 0, 40) && zp().pal is map && zp().pal.size() <= 8 && zp().pal.get('outfit', {}) is map && zp().pal.get('outfit', {}).size() <= 14
+            && zp().pal.get('colors', {}) is map && zp().pal.get('colors', {}).size() <= 4
+            && zp().slot is int && zp().slot >= 0 && zp().slot <= 3 && zp().ready is bool
+            && zp().x is number && zp().y is number && zp().z is number && zp().f is number && zp().a is number
+            && zp().x >= -60 && zp().x <= 60 && zp().z >= -60 && zp().z <= 60 && zp().y >= -5 && zp().y <= 20
+            && zp().fire is bool && isStr(zp().w, 0, 10) && zp().hp is number && zp().hp >= 0 && zp().hp <= 200 && zp().down is bool
+            && isStr(zp().rev, 0, 128) && zp().em is int && zp().em >= -1 && zp().em <= 7 && zp().emAt is int
+            && zp().hits is list && zp().hits.size() <= 45 && zp().hs is int && zp().at == request.time;
+        }
+        allow read: if signedIn();
+        allow create, update: if signedIn() && u == me() && zpShape()
+          && getAfter(/databases/$(database)/documents/zLobbies/$(code)/slot/$(string(zp().slot))).data.uid == me()
+          && (resource == null || resource.data.at + duration.value(60, 'ms') < request.time);
+        allow delete: if signedIn() && (u == me() || !exists(zlPath()) || get(zlPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+      }
+      match /s/{d} {
+        function zs() { return request.resource.data; }
+        allow read: if signedIn();
+        allow create, update: if signedIn() && d == 'state' && get(zlPath()).data.host == me()
+          && zs().keys().hasOnly(['wave', 'zs', 'score', 'kills', 'dia', 'over', 'slam', 'seq', 'n', 'ts', 'brk', 'bm', 'at'])
+          && zs().wave is int && zs().wave >= 0 && zs().wave <= 1000 && zs().zs is list && zs().zs.size() <= 300
+          && zs().score is int && zs().kills is map && zs().kills.size() <= 4 && zs().dia is map && zs().dia.size() <= 4
+          && zs().over is bool && zs().slam is list && zs().slam.size() <= 4 && zs().seq is int && zs().n is int && zs().n >= 1 && zs().n <= 4
+          && zs().at == request.time;
+        allow delete: if signedIn() && (!exists(zlPath()) || get(zlPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+      }
+    }
     // Talk to your Pal: short chat memory (last messages + a few facts), owner-only
     match /users/{uid}/pal/chat {
       allow read, delete: if signedIn() && uid == me();
