@@ -4,6 +4,7 @@
 // so human mocap clips can be retargeted (see js/pals/mocap3d.js). Rendered into one shared offscreen WebGL
 // canvas and blitted into the existing 2D canvases, so every screen keeps its drawPal()-style API.
 // Everything is built from code: no external model files, no licensing beyond three.js (MIT).
+import { dressBody, dressHead, bodyScale } from './cloth3d.js';
 import * as THREE from '../vendor/three-0.170.0.module.min.js';
 import { SPEC, SPECIES, stageOf } from './art.js';
 import { ITEM } from './catalog.js';
@@ -91,19 +92,21 @@ function build(pal) {
   const root = new THREE.Group(); const S = [0.86, 1, 1.1][stage];
   const J = {}; // joints
   J.Hips = bone("Hips", root, 0, 0.64, 0);
-  J.Spine = bone('Spine', J.Hips, 0, 0.12, 0); J.Chest = bone('Chest', J.Spine, 0, 0.32, 0);
-  J.Neck = bone('Neck', J.Chest, 0, 0.2, 0); J.Head = bone('Head', J.Neck, 0, 0.1, 0);
+  const [bw, bh, bd] = kind === 'blob' ? bodyScale(sp.id) : [1, 1, 1]; // per-species body type (small/medium/large/long/round)
+  J.Spine = bone('Spine', J.Hips, 0, 0.12, 0); J.Chest = bone('Chest', J.Spine, 0, 0.32 * bh, 0);
+  J.Neck = bone('Neck', J.Chest, 0, 0.2 * bh, 0);
+  J.TB = new THREE.Group(); J.TB.scale.set(bw, bh, bd); J.Spine.add(J.TB); J.TBh = new THREE.Group(); J.TBh.position.y = 0.12; J.TBh.scale.set(bw, bh, bd); J.Hips.add(J.TBh); J.Head = bone('Head', J.Neck, 0, 0.1, 0);
   // torso: pear-shaped belly + chest (soft, chubby kid proportions)
   if (kind === 'blob') {
     const torso = mesh(geo('torso', () => { const pts = [[0, -0.24], [0.2, -0.22], [0.33, -0.15], [0.41, -0.02], [0.42, 0.1], [0.38, 0.24], [0.31, 0.36], [0.25, 0.46], [0.22, 0.54], [0.2, 0.62], [0, 0.66]].map(([r, y]) => new THREE.Vector2(r, y));
-      return new THREE.LatheGeometry(new THREE.SplineCurve(pts).getPoints(48), 56); }), mB, J.Spine); torso.scale.set(1, 1, 0.88);
-    if (ex.has('belly') || sp.id === 'penguin' || sp.id === 'owl') { const b = mesh(sph(1), mat(sp.id === 'penguin' ? '#fbf6ff' : shade(B, 0.6)), J.Spine); b.scale.set(0.3, 0.36, 0.2); b.position.set(0, 0.04, 0.2); }
-    if (ex.has('shell')) { const sh = mesh(sph(1), mat(A, { cc: 0.8, sheen: 0 }), J.Spine); sh.scale.set(0.5, 0.52, 0.34); sh.position.set(0, 0.12, -0.18); }
-    if (ex.has('plates')) for (let i = 0; i < 5; i++) { const k = mesh(geo('plate', () => { const g = new THREE.CylinderGeometry(0.0, 0.11, 0.18, 4); g.scale(1, 1, 0.25); return g; }), mA, J.Spine); k.position.set(0, 0.48 - i * 0.14, -0.4 + i * 0.02); k.rotation.x = -0.6 - i * 0.15; }
-    if (ex.has('fin')) { const f = mesh(cone(0.12, 0.3), mA, J.Spine); f.scale.z = 0.3; f.position.set(0, 0.42, -0.36); f.rotation.x = -0.6; }
-    if (ex.has('spikes')) for (let r = 0; r < 3; r++) for (let i = 0; i < 7; i++) { const s = mesh(cone(0.075, 0.3), mA, J.Spine); const a = -1.35 + i * 0.45; const y = 0.42 - r * 0.24; const rad = 0.5 - (r === 2 ? 0.06 : 0); s.position.set(Math.sin(a) * rad, y, -Math.cos(a) * rad * 0.9); s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.sin(a) * 0.8, 0.55, -Math.cos(a)).normalize()); }
-    if (ex.has('stripes') || ex.has('giraffespots')) for (let i = 0; i < 6; i++) { const s = mesh(sph(1), mA, J.Spine); s.scale.set(ex.has('stripes') ? 0.03 : 0.06, ex.has('stripes') ? 0.12 : 0.05, 0.04); const a = -1 + (i % 3) * 1; s.position.set(Math.sin(a) * 0.4, -0.05 + Math.floor(i / 3) * 0.2, Math.cos(a) * 0.33); }
-    if (ex.has('wool')) for (let i = 0; i < 10; i++) { const w = mesh(sph(0.15), mat('#ffffff'), J.Spine); const a = i * 0.63; w.position.set(Math.sin(a) * 0.34, 0.02 + (i % 2) * 0.14, Math.cos(a) * 0.28); }
+      return new THREE.LatheGeometry(new THREE.SplineCurve(pts).getPoints(48), 56); }), mB, J.TB); torso.scale.set(1, 1, 0.88);
+    if (ex.has('belly') || sp.id === 'penguin' || sp.id === 'owl') { const b = mesh(sph(1), mat(sp.id === 'penguin' ? '#fbf6ff' : shade(B, 0.6)), J.TB); b.scale.set(0.3, 0.36, 0.2); b.position.set(0, 0.04, 0.2); b.userData.deco = 1; }
+    if (ex.has('shell')) { const sh = mesh(sph(1), mat(A, { cc: 0.8, sheen: 0 }), J.TB); sh.scale.set(0.5, 0.52, 0.34); sh.position.set(0, 0.12, -0.18); }
+    if (ex.has('plates')) for (let i = 0; i < 5; i++) { const k = mesh(geo('plate', () => { const g = new THREE.CylinderGeometry(0.0, 0.11, 0.18, 4); g.scale(1, 1, 0.25); return g; }), mA, J.TB); k.position.set(0, 0.48 - i * 0.14, -0.4 + i * 0.02); k.rotation.x = -0.6 - i * 0.15; }
+    if (ex.has('fin')) { const f = mesh(cone(0.12, 0.3), mA, J.TB); f.scale.z = 0.3; f.position.set(0, 0.42, -0.36); f.rotation.x = -0.6; }
+    if (ex.has('spikes')) for (let r = 0; r < 3; r++) for (let i = 0; i < 7; i++) { const s = mesh(cone(0.075, 0.3), mA, J.TB); const a = -1.35 + i * 0.45; const y = 0.42 - r * 0.24; const rad = 0.5 - (r === 2 ? 0.06 : 0); s.position.set(Math.sin(a) * rad, y, -Math.cos(a) * rad * 0.9); s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.sin(a) * 0.8, 0.55, -Math.cos(a)).normalize()); }
+    if (ex.has('stripes') || ex.has('giraffespots')) for (let i = 0; i < 6; i++) { const s = mesh(sph(1), mA, J.TB); s.scale.set(ex.has('stripes') ? 0.03 : 0.06, ex.has('stripes') ? 0.12 : 0.05, 0.04); const a = -1 + (i % 3) * 1; s.position.set(Math.sin(a) * 0.4, -0.05 + Math.floor(i / 3) * 0.2, Math.cos(a) * 0.33); s.userData.deco = 1; }
+    if (ex.has('wool')) for (let i = 0; i < 10; i++) { const w = mesh(sph(0.15), mat('#ffffff'), J.TB); const a = i * 0.63; w.position.set(Math.sin(a) * 0.34, 0.02 + (i % 2) * 0.14, Math.cos(a) * 0.28); w.userData.deco = 1; }
   } else if (kind === 'jelly') {
     const bell = mesh(sph(1), mat(B, { op: 0.82, cc: 1, sheen: 0, r: 0.2 }), J.Chest); bell.scale.set(0.62, 0.52, 0.58);
     J.tent = []; for (let i = 0; i < 6; i++) { const a = i * 1.05; const t = bone('Tent' + i, J.Spine, Math.sin(a) * 0.3, -0.05, Math.cos(a) * 0.3); const m = mesh(cap(0.05, 0.45), mat(A, { op: 0.85 }), t); m.position.y = -0.25; J.tent.push(t); }
@@ -175,9 +178,9 @@ function build(pal) {
   if (ex.has('rainbowmane')) ['#ff8ab8', '#ffd34d', '#7fe0a0', '#7fb8ff', '#c49aff'].forEach((c, i) => mesh(sph(0.1), mat(c), H).position.set(-0.05, 0.42 - i * 0.12, -0.32 - i * 0.02));
   // arms: shoulder > upper > lower > hand (+3 fingers); flippers / wings swap the hand shape
   const armType = ex.has('wings') ? 'wing' : ex.has('flippers') ? 'flipper' : 'paw';
-  const ua = 0.3, la = 0.27, ar = kind === 'blob' ? 0.09 : 0.078, shY = kind === 'blob' ? 0.1 : 0;
+  const ua = 0.3, la = 0.27, ar = (kind === 'blob' ? 0.09 : 0.078) * (1 + (bw - 1) * 0.6), shY = kind === 'blob' ? 0.1 : 0;
   for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) {
-    const sh = bone(n + 'Shoulder', J.Chest, s * (kind === 'blob' ? 0.36 : 0.45), shY, 0);
+    const sh = bone(n + 'Shoulder', J.Chest, s * (kind === 'blob' ? 0.36 * bw : 0.45), shY, 0);
     const up = bone(n + 'UpperArm', sh, 0, 0, 0); const lo = bone(n + 'LowerArm', up, 0, -ua, 0); const hd = bone(n + 'Hand', lo, 0, -la, 0);
     if (armType === 'wing') { const w = mesh(sph(1), mat(shade(B, -0.08)), up); w.scale.set(0.07, 0.28, 0.18); w.position.y = -0.2; }
     else if (armType === 'flipper') { const w = mesh(sph(1), mB, up); w.scale.set(0.07, 0.3, 0.13); w.position.y = -0.22; }
@@ -189,10 +192,10 @@ function build(pal) {
     J[n + 'Shoulder'] = sh; J[n + 'UpperArm'] = up; J[n + 'LowerArm'] = lo; J[n + 'Hand'] = hd;
   }
   // legs: hip > upper > lower > foot (+ toe pads)
-  const ul = 0.27, ll = 0.27, lr = 0.122; J.legL = ul + ll;
+  const ul = 0.27, ll = 0.27, lr = 0.122 * (1 + (bw - 1) * 0.6); J.legL = ul + ll;
   const legs = kind === 'blob' && sp.feet !== 'none' && !ex.has('float');
   for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) {
-    const up = bone(n + 'UpperLeg', J.Hips, s * 0.19, 0, 0); const lo = bone(n + 'LowerLeg', up, 0, -ul, 0); const ft = bone(n + 'Foot', lo, 0, -ll, 0);
+    const up = bone(n + 'UpperLeg', J.Hips, s * 0.19 * bw, 0, 0); const lo = bone(n + 'LowerLeg', up, 0, -ul, 0); const ft = bone(n + 'Foot', lo, 0, -ll, 0);
     if (legs) {
       mesh(cap(lr, ul), mB, up).position.y = -ul / 2; mesh(cap(lr * 0.9, ll), mB, lo).position.y = -ll / 2; mesh(sph(lr * 1.15), mB, up); mesh(sph(lr * 0.95), mB, lo);
       if (sp.feet === 'webbed') { const f = mesh(sph(1), mat('#ffa53a', { sheen: 0 }), ft); f.scale.set(0.11, 0.035, 0.16); f.position.set(0, -0.02, 0.06); }
@@ -202,6 +205,7 @@ function build(pal) {
     J[n + 'UpperLeg'] = up; J[n + 'LowerLeg'] = lo; J[n + 'Foot'] = ft;
   }
   if (!legs) J.Hips.position.y = 0.95;
+  J.fit = { ar, lr, ua, la, ul, ll, legs, kind };
   // tail chain (3 bones) per species
   J.tail = []; const tl = sp.tail;
   if (tl !== 'none') {
@@ -229,7 +233,7 @@ function build(pal) {
   const neck = it('neck'); if (neck) { const n = mesh(geo('scarf', () => new THREE.TorusGeometry(0.26, 0.06, 8, 20)), mat(neck.col || '#ff7ab8'), J.Neck); n.rotation.x = Math.PI / 2; n.position.y = -0.03; }
   const body = it('body'); if (body && kind === 'blob') { const t = mesh(sph(1), mat(body.col || '#5aa8ff'), J.Spine); t.scale.set(0.43, 0.33, 0.38); t.position.y = 0.1; const t2 = mesh(sph(1), mat(body.col || '#5aa8ff'), J.Chest); t2.scale.set(0.37, 0.28, 0.32); }
   const feet = it('feet'); if (feet && legs) for (const n of ['Left', 'Right']) { const s = mesh(sph(1), mat(feet.col || '#ff5a6a', { cc: 0.5 }), J[n + 'Foot']); s.scale.set(0.125, 0.08, 0.17); s.position.set(0, -0.01, 0.06); }
-  wear3D(of, { J, H, headR, fz, legs, kind, B });
+  wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex });
   const pt = pal.pattern; if (pt && pt.startsWith('pt_') && kind === 'blob') { const cols = pt === 'pt_rainbow' ? ['#ff6a7a', '#ffb34a', '#ffe64a', '#6ad870', '#4aa8ff', '#9a6aff'] : pt === 'pt_galaxy' ? ['#3a1a8a', '#ffffff', '#6a3aff'] : pt === 'pt_hearts' ? ['#ff6fae'] : ['#ffe680'];
     for (let i = 0; i < 14; i++) { const a = -1.2 + (i % 7) * 0.4, y = 0.02 + Math.floor(i / 7) * 0.2; const d = mesh(sph(1), mat(cols[i % cols.length], { em: pt === 'pt_galaxy' && i % 3 === 1 ? '#ffffff' : undefined }), J.Spine); d.scale.set(0.04, 0.04, 0.015); d.position.set(Math.sin(a) * 0.47, y, Math.cos(a) * 0.43); d.lookAt(Math.sin(a) * 2, y, Math.cos(a) * 2); } }
   // rare variants (shiny / glow / galaxy / gold / crystal)
@@ -341,25 +345,12 @@ export { DANCES3D };
 export const THREE_VERSION = THREE.REVISION;
 
 // Wardrobe pieces: each is parented to a rig bone, so it moves with every dance and walk.
-function wear3D(of, { J, H, headR, fz, legs, kind, B }) {
+function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex }) {
   const W = (s) => WEAR_BY[of[s]]; const M = (col, o = {}) => { const m = mat(col, { cc: 0.3, ...o }); m.userData.wear = 1; return m; };
   const metal = (col) => { const m = mat(col, { cc: 1, sheen: 0 }); m.metalness = 0.8; m.roughness = 0.25; m.userData.wear = 1; return m; };
-  const shell = (bn, sx, sy, sz, y, col, z = 0) => { const t = mesh(sph(1), M(col), bn); t.scale.set(sx, sy, sz); t.position.set(0, y, z); return t; };
-  const sleeves = (col, len = 1) => { for (const n of ['Left', 'Right']) { const m = mesh(cap(0.095, 0.16 * len), M(col), J[n + 'UpperArm']); m.position.y = -0.1 * len; } };
-  const pants = (col, len) => { for (const n of ['Left', 'Right']) { const m = mesh(cap(0.14, 0.12), M(col), J[n + 'UpperLeg']); m.position.y = -0.1; if (len > 1) { const l = mesh(cap(0.125, 0.16), M(col), J[n + 'LowerLeg']); l.position.y = -0.12; } } };
-  const torso = (col, o = {}) => { const t = mesh(geo('tshell', () => new THREE.CapsuleGeometry(0.46, 0.22, 12, 32)), M(col), J.Spine); t.scale.set(1.04, 1, 0.94); t.position.y = 0.16; if (o.sl !== 0) sleeves(col, o.sl || 1); };
-  const skirt = (col, r0, r1, h, y = 0.02, segs = 28) => { const g = mesh(geo(`sk${r0}${r1}${h}`, () => new THREE.CylinderGeometry(r0, r1, h, segs, 1, true)), M(col, { side: 2 }), J.Hips); g.material.side = THREE.DoubleSide; g.position.y = y; return g; };
   const hd = headR && H;
   // head
-  let w = W('head'); if (w && hd) { const st = w.st, c = w.col;
-    if (st === 'cap') { const d = mesh(sph(1), M(c), H); d.scale.set(headR * 1.02, headR * 0.55, headR); d.position.y = headR * 0.45; const b = mesh(geo('brim', () => new THREE.CylinderGeometry(0.22, 0.22, 0.025, 28)), M(c), H); b.position.set(0, headR * 0.45, headR * 0.85); b.scale.z = 1.2; }
-    else if (st === 'beanie' || st === 'helmet') { const d = mesh(sph(1), M(c, st === 'helmet' ? { cc: 1 } : {}), H); d.scale.set(headR * 1.1, headR * 0.72, headR * 1.08); d.position.y = headR * 0.42; if (st === 'beanie') mesh(sph(0.07), M('#ffffff'), H).position.y = headR * 1.12; else { const s = mesh(cap(0.03, 0.4), M('#ffffff'), H); s.rotation.x = Math.PI / 2; s.position.y = headR * 1.1; } }
-    else if (st === 'bucket') { const d = mesh(geo('bkt', () => new THREE.CylinderGeometry(0.3, 0.38, 0.24, 28)), M(c), H); d.position.y = headR * 0.75; const b = mesh(geo('bktb', () => new THREE.CylinderGeometry(0.55, 0.55, 0.02, 32)), M(c), H); b.position.y = headR * 0.55; }
-    else if (st === 'tiara' || st === 'crown') { const m = metal(c); const g = mesh(geo('crn' + st, () => new THREE.CylinderGeometry(st === 'crown' ? 0.22 : 0.3, st === 'crown' ? 0.19 : 0.3, st === 'crown' ? 0.15 : 0.04, 24, 1, st === 'crown')), m, H); g.position.y = headR * 1.02; for (let i = 0; i < 5; i++) { const a = (i - 2) * (st === 'crown' ? 0.9 : 0.4); const k = mesh(cone(0.035, st === 'crown' ? 0.12 : 0.1 + (i === 2 ? 0.06 : 0)), m, H); k.position.set(Math.sin(a) * (st === 'crown' ? 0.2 : 0.29), headR * 1.02 + 0.09, Math.cos(a) * (st === 'crown' ? 0.2 : 0.29)); } mesh(sph(0.035), M('#ff6fae', { em: '#a02060', cc: 1 }), H).position.set(0, headR * 1.08, st === 'crown' ? 0.2 : 0.3); }
-    else if (st === 'tophat') { mesh(geo('thb', () => new THREE.CylinderGeometry(0.4, 0.4, 0.02, 32)), M(c), H).position.y = headR * 0.95; mesh(geo('tht', () => new THREE.CylinderGeometry(0.24, 0.24, 0.32, 28)), M(c), H).position.y = headR * 0.95 + 0.16; }
-    else if (st === 'earband') { const b = mesh(geo('ebd', () => new THREE.TorusGeometry(headR * 1.0, 0.02, 8, 30, Math.PI)), M(c), H); b.position.y = headR * 0.3; for (const s of [-1, 1]) { const e = mesh(cone(0.09, 0.16), M(c), H); e.position.set(s * 0.22, headR * 1.15, 0.02); e.rotation.z = -s * 0.3; } }
-    else if (st === 'wizard' || st === 'santa') { const g = mesh(cone(0.32, 0.55), M(c), H); g.position.y = headR * 1.2; g.rotation.z = 0.15; mesh(geo('brimw', () => new THREE.TorusGeometry(0.3, 0.05, 10, 28)), M(st === 'santa' ? '#ffffff' : '#ffd34d'), H).position.y = headR * 0.95; H.children[H.children.length - 1].rotation.x = Math.PI / 2; if (st === 'santa') mesh(sph(0.06), M('#ffffff'), H).position.set(0.08, headR * 1.48, 0); }
-    else if (st === 'flowers') for (let i = 0; i < 9; i++) { const a = i * 0.7; mesh(sph(0.055), M(['#ff8ab8', '#ffd34d', '#ffffff'][i % 3]), H).position.set(Math.cos(a) * 0.32, headR * 0.98, Math.sin(a) * 0.3); } }
+  let w = W('head'); if (w && (hd || kind === 'jelly')) dressHead({ H, hr: headR || 0.5, dy: headR ? 0 : 0.14, ea: sp.ears, ex, J, col: w.col, st: w.st });
   // hair
   w = W('hair'); if (w && hd) { const st = w.st, c = w.col;
     if (st === 'bow' || st === 'bow2') { const k = st === 'bow2' ? 1.6 : 1; for (const s of [-1, 1]) { const b = mesh(cone(0.08 * k, 0.15 * k), M(c), H); b.position.set(0.2 + s * 0.08 * k, headR * 0.98, 0.1); b.rotation.z = s * Math.PI / 2; } mesh(sph(0.035 * k), M(c), H).position.set(0.2, headR * 0.98, 0.1); }
@@ -385,33 +376,7 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B }) {
     else if (st === 'tie') { const t = mesh(cone(0.06, 0.3), M(c), N); t.rotation.x = Math.PI; t.position.set(0, -0.22, 0.34); t.scale.z = 0.3; mesh(sph(0.04), M(c), N).position.set(0, -0.06, 0.32); }
     else if (st === 'bowtie') for (const s of [-1, 1]) { const b = mesh(cone(0.06, 0.12), M(c), N); b.position.set(s * 0.055, -0.07, 0.31); b.rotation.z = s * Math.PI / 2; } }
   // tops / bottoms / full outfits (shells slightly larger than the torso, sleeves on the arm bones)
-  if (kind === 'blob') {
-    w = W('full'); const fu = w;
-    if (fu) { const st = fu.st, c = fu.col;
-      if (st === 'dress' || st === 'gown') { torso(c, { sl: 0.6 }); skirt(c, 0.42, st === 'gown' ? 0.75 : 0.6, st === 'gown' ? 0.5 : 0.36, st === 'gown' ? -0.16 : -0.08); if (st === 'gown') for (let i = 0; i < 12; i++) { const a = i * 0.52; mesh(sph(0.02), M('#fff6c0', { em: '#ffe680' }), J.Hips).position.set(Math.sin(a) * 0.58, -0.3, Math.cos(a) * 0.58); } }
-      else if (st === 'overalls') { shell(J.Spine, 0.5, 0.36, 0.46, 0.08, c); pants(c, 2); for (const s of [-1, 1]) { const st2 = mesh(cap(0.025, 0.3), M(c), J.Chest); st2.position.set(s * 0.18, 0.02, 0.36); } }
-      else if (st === 'pjs' || st === 'uniform' || st === 'kit' || st === 'suit' || st === 'xmas' || st === 'hero' || st === 'astro' || st === 'dino' || st === 'coat') {
-        const top = st === 'uniform' ? '#ffffff' : st === 'kit' ? c : c; torso(top, { sl: st === 'kit' ? 0.6 : 1.4 }); pants(st === 'uniform' ? c : st === 'kit' ? '#ffffff' : c, st === 'kit' ? 1 : 2);
-        if (st === 'pjs') for (let i = 0; i < 8; i++) { const a = i * 0.8; mesh(sph(0.02), M('#ffe680', { em: '#ffd34d' }), J.Spine).position.set(Math.sin(a) * 0.5, 0.05 + (i % 3) * 0.1, Math.cos(a) * 0.46); }
-        if (st === 'suit' || st === 'uniform') { const t = mesh(cone(0.05, 0.26), M(st === 'suit' ? '#e8434f' : c), J.Chest); t.rotation.x = Math.PI; t.position.set(0, -0.05, 0.42); t.scale.z = 0.3; }
-        if (st === 'kit') { const n = mesh(geo('num', () => new THREE.BoxGeometry(0.14, 0.18, 0.01)), M('#ffffff'), J.Spine); n.position.set(0, 0.15, 0.47); }
-        if (st === 'xmas') for (let i = 0; i < 6; i++) { const a = -0.6 + i * 0.24; const k = mesh(sph(0.03), M(i % 2 ? '#ffffff' : '#ffd34d'), J.Spine); k.position.set(Math.sin(a) * 0.5, 0.2, Math.cos(a) * 0.46); }
-        if (st === 'hero') { const e = mesh(sph(1), M('#ffd34d', { em: '#a07000' }), J.Chest); e.scale.set(0.12, 0.1, 0.02); e.position.set(0, 0.04, 0.4); const cp = mesh(geo('cape2', () => new THREE.PlaneGeometry(0.7, 0.75, 1, 6)), M(c === C_RED ? '#ffd34d' : '#e8434f', { side: 2 }), J.Chest); cp.material.side = THREE.DoubleSide; cp.position.set(0, -0.3, -0.42); cp.rotation.x = 0.15; }
-        if (st === 'astro') { const h = mesh(sph(1), M('#d8f0ff', { op: 0.35, cc: 1 }), H || J.Head); h.scale.setScalar((headR || 0.4) * 1.3); h.position.y = H ? 0 : 0.3; const pk = mesh(geo('pack', () => new THREE.BoxGeometry(0.4, 0.4, 0.15)), M('#d0d8e8'), J.Chest); pk.position.set(0, 0, -0.45); }
-        if (st === 'dino') { for (let i = 0; i < 5; i++) { const k = mesh(cone(0.06, 0.12), M('#ffd34d'), J.Spine); k.position.set(0, 0.45 - i * 0.12, -0.46 + i * 0.02); k.rotation.x = -0.8; } if (hd) { const hood = mesh(sph(1), M(c), H); hood.scale.set(headR * 1.12, headR * 0.8, headR * 1.1); hood.position.set(0, headR * 0.35, -0.06); } }
-        if (st === 'coat') skirt(c, 0.48, 0.55, 0.3, -0.1); }
-      else if (st === 'swim') { shell(J.Spine, 0.49, 0.32, 0.45, 0.06, c); for (let i = 0; i < 5; i++) { const k = mesh(sph(0.03), M('#ffffff'), J.Spine); k.position.set(-0.3 + i * 0.15, 0.1, 0.44); } }
-    } else {
-      w = W('body'); if (w) { const st = w.st, c = w.col; torso(c, { sl: st === 'tee' || st === 'jersey' ? 0.6 : st === 'blouse' ? 0.8 : 1.4 });
-        if (st === 'hoodie' && hd) { const hood = mesh(geo('hood', () => new THREE.TorusGeometry(0.28, 0.08, 10, 24)), M(c), J.Neck); hood.rotation.x = Math.PI / 2 + 0.4; hood.position.set(0, 0, -0.08); }
-        if (st === 'puffer') for (let i = 0; i < 3; i++) { const r = mesh(geo('pf', () => new THREE.TorusGeometry(0.5, 0.04, 8, 32)), M(c), J.Spine); r.rotation.x = Math.PI / 2; r.position.y = -0.05 + i * 0.15; r.scale.set(1, 0.93, 1); }
-        if (st === 'jersey') { const n = mesh(geo('num', () => new THREE.BoxGeometry(0.14, 0.18, 0.01)), M('#ffffff'), J.Spine); n.position.set(0, 0.15, 0.47); }
-        if (st === 'blouse') for (const s of [-1, 1]) { const f = mesh(geo('frl', () => new THREE.TorusGeometry(0.1, 0.03, 6, 16)), M('#ffffff'), J.Chest); f.position.set(s * 0.08, 0.05, 0.38); } }
-      w = W('bottom'); if (w) { const st = w.st, c = w.col;
-        if (st === 'skirt') skirt(c, 0.44, 0.56, 0.26, -0.06); else if (st === 'tutu') { const t = skirt(c, 0.42, 0.75, 0.12, -0.04, 40); t.material.transparent = true; t.material.opacity = 0.85; skirt(c, 0.44, 0.68, 0.1, -0.1, 40); }
-        else { shell(J.Hips, 0.5, 0.22, 0.46, 0.0, c); pants(c, st === 'pants' ? 2 : 1); } }
-    }
-  }
+  dressBody({ J, W, fit: J.fit }); if ((W('body') || W('full')) && J.TB) J.TB.traverse((o) => { if (o.userData.deco) o.visible = false; });
   // feet
   w = W('feet'); if (w && legs) for (const n of ['Left', 'Right']) { const f = J[n + 'Foot'], c = w.col; const st = w.st;
     const s = mesh(sph(1), st === 'sneakers' && /cf3a/.test(c) ? metal(c) : M(c, { cc: 0.6 }), f); s.scale.set(0.14, st === 'flats' || st === 'sandals' ? 0.05 : 0.09, 0.185); s.position.set(0, -0.02, 0.05);
@@ -420,7 +385,7 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B }) {
     if (st === 'flats') mesh(sph(0.025), M('#ffffff'), f).position.set(0, 0.02, 0.18); }
   // back
   w = W('back'); if (w) { const st = w.st, c = w.col;
-    if (st === 'cape') { const cp = mesh(geo('cape3', () => new THREE.PlaneGeometry(0.75, 0.8, 1, 6)), M(c), J.Chest); cp.material.side = THREE.DoubleSide; cp.position.set(0, -0.32, -0.44); cp.rotation.x = 0.18; }
+    if (st === 'cape') { const cp = mesh(geo('cape5', () => { const g = new THREE.PlaneGeometry(0.72, 0.82, 10, 12); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); const d = 0.41 - y; p.setZ(i, -Math.abs(x) * 0.28 + Math.sin(x * 16) * 0.018 * d); p.setX(i, x * (0.7 + d * 0.5)); } g.computeVertexNormals(); return g; }), M(c, { r: 0.7 }), J.Chest); cp.material.side = THREE.DoubleSide; cp.position.set(0, -0.3, -0.44); cp.rotation.x = 0.16; const cl = mesh(geo('capecl', () => new THREE.TorusGeometry(0.25, 0.022, 8, 28, Math.PI)), M(shade(c, -0.15)), J.Chest); cl.rotation.set(Math.PI / 2 + 0.2, 0, Math.PI); cl.position.set(0, 0.12, -0.05); }
     else if (st === 'wings' || st === 'angel') for (const s of [-1, 1]) { const m = mesh(sph(1), M(c, { op: st === 'wings' ? 0.6 : 1, em: st === 'wings' ? c : undefined }), J.Chest); m.scale.set(0.3, st === 'angel' ? 0.2 : 0.26, 0.03); m.position.set(s * 0.32, 0.12, -0.42); m.rotation.z = s * 0.4; }
     else if (st === 'jetpack') for (const s of [-1, 1]) { const t = mesh(cap(0.08, 0.22), metal(c), J.Chest); t.position.set(s * 0.12, -0.05, -0.46); const fl = mesh(cone(0.06, 0.14), M('#ffb04a', { em: '#ff7a1a' }), t); fl.position.y = -0.24; fl.rotation.x = Math.PI; } }
   // bag

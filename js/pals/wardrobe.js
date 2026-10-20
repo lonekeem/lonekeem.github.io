@@ -4,8 +4,8 @@
 export const WSLOTS = ['head', 'hair', 'face', 'ears', 'neck', 'body', 'bottom', 'full', 'feet', 'back', 'bag', 'held', 'wrist', 'hand'];
 export const WSLOT_NAMES = { head: 'Hats & Crowns', hair: 'Hair & Bows', face: 'Glasses', ears: 'Earrings', neck: 'Necklaces', body: 'Tops', bottom: 'Bottoms', full: 'Dresses & Outfits', feet: 'Shoes', back: 'Capes & Wings', bag: 'Bags', held: 'Hand Items', wrist: 'Bracelets & Watches', hand: 'Rings' };
 export const JEWELRY = ['ears', 'neck', 'wrist', 'hand', 'face', 'bag'];
-const C = { pink: '#ff8ac0', red: '#e8434f', blue: '#4a8aff', navy: '#2a3a7a', green: '#4ab070', yellow: '#ffd34d', purple: '#8a55dc', white: '#f6f2ff', black: '#2a2438', orange: '#ff8a2a', mint: '#7ae0c0', lilac: '#c8a8ff', gold: '#ffcf3a', silver: '#d0d8e8', rose: '#f0a0b0', teal: '#2ab0b0' };
-const T = { pink: 'Pink', red: 'Red', blue: 'Blue', navy: 'Navy', green: 'Green', yellow: 'Sunny', purple: 'Purple', white: 'White', black: 'Midnight', orange: 'Orange', mint: 'Mint', lilac: 'Lilac', gold: 'Gold', silver: 'Silver', rose: 'Rose Gold', teal: 'Teal' };
+const C = { pink: '#f4a6c4', red: '#d9505c', blue: '#6f9fe0', navy: '#2f3d6e', green: '#6bb48a', yellow: '#f7d36b', purple: '#9a74d6', white: '#f7f3ee', black: '#34303f', orange: '#f29a5a', mint: '#9fdcc6', lilac: '#c9b3f0', gold: '#ffcf3a', silver: '#d0d8e8', rose: '#f0a0b0', teal: '#3fa6a6', sage: '#9db89a', cream: '#f3e9d6', denim: '#5b7bb0', camel: '#c8955f', mocha: '#8a6a58', blush: '#f2c4c4', butter: '#f6e3a1', sky: '#a9cdea', plum: '#7c4d7e', forest: '#3f6b52' };
+const T = { pink: 'Pink', red: 'Red', blue: 'Blue', navy: 'Navy', green: 'Green', yellow: 'Sunny', purple: 'Purple', white: 'White', black: 'Midnight', orange: 'Orange', mint: 'Mint', lilac: 'Lilac', gold: 'Gold', silver: 'Silver', rose: 'Rose Gold', teal: 'Teal' , sage: 'Sage', cream: 'Cream', denim: 'Denim', camel: 'Camel', mocha: 'Mocha', blush: 'Blush', butter: 'Butter', sky: 'Sky', plum: 'Plum', forest: 'Forest' };
 // [base id, name, slot, style, g, colours, premium price (0 = free), rarity]
 const BASE = [
   ['cap', 'Cap', 'head', 'cap', 'a', ['red', 'blue', 'black', 'green'], 0], ['beanie', 'Beanie', 'head', 'beanie', 'a', ['pink', 'navy', 'mint'], 0],
@@ -37,6 +37,11 @@ const BASE = [
   ['swim', 'Swimsuit', 'full', 'swim', 'a', ['teal', 'pink', 'orange'], 0], ['dino', 'Dino Costume', 'full', 'dino', 'a', ['green'], 200, 'r'],
   ['astro', 'Astronaut Suit', 'full', 'astro', 'a', ['white'], 350, 'e'], ['hero', 'Hero Suit', 'full', 'hero', 'a', ['red', 'blue'], 250, 'r'],
   ['jumper', 'Holiday Jumper', 'full', 'xmas', 'a', ['red', 'green'], 0],
+  ['blazer', 'Tailored Jacket', 'body', 'blazer', 'a', ['camel', 'navy', 'sage', 'blush'], 0], ['cardigan', 'Button Cardigan', 'body', 'cardigan', 'g', ['cream', 'blush', 'butter', 'sage'], 0],
+  ['pinafore', 'Pinafore Dress', 'full', 'pinafore', 'g', ['navy', 'plum', 'forest'], 0], ['ginghampj', 'Gingham PJs', 'full', 'pjs2', 'a', ['sky', 'blush', 'sage'], 0],
+  ['cordall', 'Cord Dungarees', 'full', 'overalls', 'a', ['mocha', 'sage', 'butter'], 0], ['denimjkt', 'Denim Jacket', 'body', 'blazer', 'b', ['denim'], 0],
+  ['tutudress', 'Tutu Party Dress', 'full', 'tutudress', 'g', ['blush', 'lilac', 'butter'], 140, 'r'], ['cozyhood', 'Cozy Hoodie', 'body', 'hoodie', 'a', ['cream', 'sage', 'sky'], 0],
+  ['knitjumper', 'Fair Isle Sweater', 'body', 'sweater', 'a', ['forest', 'plum', 'cream'], 0], ['longpuffer', 'Long Puffer Coat', 'full', 'coat', 'a', ['cream', 'sage', 'navy'], 120, 'r'],
   ['sneakers', 'Sneakers', 'feet', 'sneakers', 'a', ['white', 'red', 'blue', 'pink'], 0], ['boots', 'Boots', 'feet', 'boots', 'a', ['yellow', 'black'], 0],
   ['flats', 'Ballet Flats', 'feet', 'flats', 'g', ['pink', 'red'], 0], ['sandals', 'Sandals', 'feet', 'sandals', 'a', ['orange', 'mint'], 0], ['goldkicks', 'Golden Kicks', 'feet', 'sneakers', 'a', ['gold'], 300, 'e'],
   ['cape', 'Cape', 'back', 'cape', 'a', ['red', 'purple', 'navy'], 0], ['fairy', 'Fairy Wings', 'back', 'wings', 'g', ['lilac', 'mint'], 150, 'r'],
@@ -51,10 +56,12 @@ const BASE = [
   ['watch', 'Watch', 'wrist', 'watch', 'b', ['black', 'blue', 'silver'], 0], ['smartwatch', 'Glow Watch', 'wrist', 'watch', 'a', ['purple'], 110, 'r'],
   ['ring', 'Ring', 'hand', 'ring', 'a', ['gold', 'silver'], 0], ['gemring', 'Gem Ring', 'hand', 'gem', 'g', ['pink', 'blue', 'purple'], 140, 'r'], ['starring', 'Superstar Ring', 'hand', 'gem', 'a', ['gold'], 500, 'l'],
 ];
+// retired (looked tacky): still render for anyone already wearing them, but no longer listed in the store
+const RETIRED = new Set(['helmet', 'pigtails']);
 export const WEAR = [];
 for (const [id, name, slot, st, g, cols, p, r] of BASE) for (const k of cols) {
   const wid = (p ? '' : 'f_') + id + (cols.length > 1 ? '_' + k : '');
-  WEAR.push({ id: p ? wid.replace(/[^a-z_]/g, '').slice(0, 16) : wid.slice(0, 15), name: (cols.length > 1 ? T[k] + ' ' : '') + name, kind: 'wear', slot, st, col: C[k], p, r: r || 'c', g, free: !p });
+  WEAR.push({ id: p ? wid.replace(/[^a-z_]/g, '').slice(0, 16) : wid.slice(0, 15), name: (cols.length > 1 ? T[k] + ' ' : '') + name, kind: 'wear', slot, st, col: C[k], p, r: r || 'c', g, free: !p, hidden: RETIRED.has(id) || undefined });
 }
 // Care food held in the paws while eating (not sold here; the food shop sells snacks)
 for (const [id, st, col] of [['f_food_berry', 'berry', '#ff4f6f'], ['f_food_cookie', 'cookie', '#e0a060'], ['f_food_cake', 'cake', '#ffc6f0'], ['f_food_apple', 'apple', '#ffcf3a'], ['f_food_carrot', 'carrot', '#ff8a2a'], ['f_food_fish', 'fish', '#7ab8e8'], ['f_food_bamboo', 'bamboo', '#7ad070'], ['f_food_honey', 'honey', '#ffb31a'], ['f_food_leaf', 'leaf', '#4ab070'], ['f_food_seed', 'seed', '#d8b080']])

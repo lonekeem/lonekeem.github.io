@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#2a1458"><canvas id="c" width="1200" height="1600"></canvas>
+<script type="module">
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { loadTrends } from '../../js/pals/dance.js'; await loadTrends();
+const q = new URLSearchParams(location.search);
+const SP = (q.get('sp') || 'kemy,bear,elephant,corgi,dragon,penguin,jelly,stego').split(',');
+const O = [
+  ['idle', { body: 'f_hoodie_purple', bottom: 'f_jeans_blue', head: 'f_cap_red', feet: 'f_sneakers_white' }],
+  ['idle', { full: 'f_dress_pink', hair: 'f_bow_white', feet: 'f_flats_pink' }],
+  ['idle', { full: 'f_overalls_blue', head: 'f_beanie_mint', body: 'f_tee_white' }],
+  ['idle', { body: 'puffer_navy', bottom: 'f_joggers', head: 'f_bucket_yellow' }],
+  ['idle', { full: 'f_uniform_navy', head: 'tophat_black' }],
+  ['dance', { full: 'f_pjs_navy', head: 'crown_gold' }],
+  ['dance', { body: 'f_sweater_lilac', bottom: 'f_tutu_pink', head: 'f_beanie_pink' }],
+  ['dance', { full: 'f_wintercoat_re', head: 'f_holiday_red' }],
+];
+const extra = q.get('o'); if (extra) O.splice(0, O.length, ...JSON.parse(extra));
+const cols = O.length, W = 1200 / cols, Hh = +(q.get('h') || 200), SZ = +(q.get('z') || 115); document.getElementById('c').height = SP.length * Hh;
+const c = document.getElementById('c').getContext('2d'); c.font = '600 11px sans-serif';
+const jobs = []; SP.forEach((sp, r) => O.forEach(([md, of], k) => jobs.push([sp, md, of, k * W, r * Hh])));
+const done = []; let t = 0; const go = () => { t++; let all = true, n = 0;
+  jobs.forEach(([sp, md, of, x, y], i) => { if (done[i]) return; if (n++ > 3) { all = false; return; }
+    if (drawPal3D(c, x + W / 2, y + Hh - 8, SZ, { species: sp, level: 6, outfit: of }, { t: 47, mode: 'idle', yaw: 0.4, dance3d: md === 'dance' ? 'renegroove' : null, beat: 1.7, amt: 1 })) { done[i] = 1; c.fillStyle = '#fff'; c.fillText(sp + ' · ' + md, x + 4, y + 13); } else all = false; });
+  if (!all && t < 600) requestAnimationFrame(go); else window.ready = true; };
+setTimeout(go, 300);
+</script>
