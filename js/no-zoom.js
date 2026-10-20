@@ -26,19 +26,28 @@ html.kz-game :is(.zg-panel,.zg-card,[class*=-scroll],[class*=-list],[class*=-log
 
   let on = false;
   const inGame = () => !!d.querySelector(GAME_SEL);
-  const relayout = () => { try { window.dispatchEvent(new Event('resize')); } catch { /* */ } };
+  // Only re-layout renderers when the viewport really changed (a resize every reset made WebGL realloc + touch cancels).
+  let lastSize = '';
+  const sizeKey = () => { const v = window.visualViewport; return [innerWidth, innerHeight, v ? Math.round(v.width) : 0, v ? Math.round(v.height) : 0].join('x'); };
+  const relayout = (force) => { const k = sizeKey(); if (!force && k === lastSize) return; lastSize = k; try { window.dispatchEvent(new Event('resize')); } catch { /* */ } };
+  let lastReset = 0, resetStreak = 0;
   let resetting = false;
-  const reset = () => { // force: re-write meta, scroll home, re-layout renderers
-    resetting = true;
+  const reset = (manual) => { // force: re-write meta, scroll home, re-layout renderers
+    const now = performance.now();
+    if (manual !== true) { // auto: back off so a persistent offset (iOS landscape safe-area / toolbar) can't loop meta rewrites
+      resetStreak = now - lastReset < 3000 ? resetStreak + 1 : 0;
+      if (resetStreak > 2 || now - lastReset < 1500 * Math.max(1, resetStreak)) return;
+    }
+    lastReset = now; resetting = true;
     meta.setAttribute('content', gameVp.replace('maximum-scale=1', 'maximum-scale=1.0001'));
-    requestAnimationFrame(() => { meta.setAttribute('content', on ? gameVp : baseVp); window.scrollTo(0, 0); if (d.scrollingElement) d.scrollingElement.scrollTop = 0; setTimeout(() => { resetting = false; relayout(); }, 60); });
+    requestAnimationFrame(() => { meta.setAttribute('content', on ? gameVp : baseVp); window.scrollTo(0, 0); if (d.scrollingElement) d.scrollingElement.scrollTop = 0; setTimeout(() => { resetting = false; relayout(manual === true); }, 60); });
   };
   const recover = () => {
     if (!on || resetting) return;
     const v = window.visualViewport;
-    if (v && (Math.abs(v.scale - 1) > 0.01 || (!/^(INPUT|TEXTAREA)$/.test((d.activeElement || {}).tagName || '') && (Math.abs(v.offsetLeft) > 1 || Math.abs(v.offsetTop) > 1)))) { reset(); return; }
+    if (v && Math.abs(v.scale - 1) > 0.01) { reset(); return; }
     if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
-    if (d.scrollingElement) d.scrollingElement.scrollTop = 0;
+    if (d.scrollingElement && d.scrollingElement.scrollTop) d.scrollingElement.scrollTop = 0;
   };
   const set = (v) => {
     if (v === on) return; on = v;
@@ -83,11 +92,11 @@ html.kz-game :is(.zg-panel,.zg-card,[class*=-scroll],[class*=-list],[class*=-log
   d.addEventListener('focusin', () => setTimeout(recover, 300));
   d.addEventListener('visibilitychange', () => { if (!d.hidden) setTimeout(recover, 60); });
   // Safety net: if iOS still ends up magnified (user could not pinch back out), poll while in-game.
-  setInterval(() => { if (on && !d.hidden) recover(); }, 250);
+  setInterval(() => { if (on && !d.hidden) recover(); }, 1000); // cheap: reads only, writes only on real change
 
   new MutationObserver(check).observe(d.body || html, { childList: true, subtree: true });
   check();
-  return (window.__kemyNoZoom = { check, recover, reset, get active() { return on; } });
+  return (window.__kemyNoZoom = { check, recover, reset: () => reset(true), get active() { return on; } });
 }
 
 if (typeof document !== 'undefined') {

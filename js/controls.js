@@ -39,23 +39,37 @@ export function createControls(host, o = {}) {
   const st = { move: { x: 0, y: 0, mag: 0, run: false }, look: { dx: 0, dy: 0 }, held: new Set(), subs: {}, keys: new Set() };
   const emit = (n, v) => (st.subs[n] || []).forEach((f) => f(v));
   // joystick
-  let jid = null, jx = 0, jy = 0; const R = 56, DEAD = 0.14;
-  L.addEventListener('pointerdown', (e) => { if (jid !== null) return; jid = e.pointerId; L.setPointerCapture(e.pointerId); const r = L.getBoundingClientRect(); jx = e.clientX - r.left; jy = e.clientY - r.top; joy.style.left = jx + 'px'; joy.style.top = jy + 'px'; joy.style.display = 'block'; hint.style.display = 'none'; knob.style.transform = ''; });
-  L.addEventListener('pointermove', (e) => { if (e.pointerId !== jid) return; const r = L.getBoundingClientRect(); let dx = e.clientX - r.left - jx, dy = e.clientY - r.top - jy; const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; }
+  let jid = null, jx = 0, jy = 0, jSeen = 0; const jreset = () => { const id = jid; jid = null; joy.style.display = 'none'; knob.style.transform = ''; st.move = { x: 0, y: 0, mag: 0, run: false }; try { if (id !== null && L.hasPointerCapture(id)) L.releasePointerCapture(id); } catch { /* */ } }; const R = 56, DEAD = 0.14;
+  L.addEventListener('pointerdown', (e) => { if (jid !== null && jid !== e.pointerId) jreset(); /* self-heal: a stale/lost pointer never blocks a fresh thumb */ jid = e.pointerId; jSeen = performance.now(); try { L.setPointerCapture(e.pointerId); } catch { /* */ } const r = L.getBoundingClientRect(); jx = e.clientX - r.left; jy = e.clientY - r.top; joy.style.left = jx + 'px'; joy.style.top = jy + 'px'; joy.style.display = 'block'; hint.style.display = 'none'; knob.style.transform = ''; });
+  L.addEventListener('pointermove', (e) => { if (e.pointerId !== jid) return; jSeen = performance.now(); const r = L.getBoundingClientRect(); let dx = e.clientX - r.left - jx, dy = e.clientY - r.top - jy; const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; }
     knob.style.transform = `translate(${dx}px,${dy}px)`; const m = Math.min(1, d / R); const k = m < DEAD ? 0 : (m - DEAD) / (1 - DEAD); const s = k * k * (3 - 2 * k) * 0.35 + k * 0.65; // smooth analog curve
     st.move = { x: m ? (dx / R / m) * s : 0, y: m ? (dy / R / m) * s : 0, mag: s, run: s > 0.85 }; });
-  const jend = (e) => { if (e.pointerId !== jid) return; jid = null; joy.style.display = 'none'; st.move = { x: 0, y: 0, mag: 0, run: false }; };
-  L.addEventListener('pointerup', jend); L.addEventListener('pointercancel', jend);
+  const jend = (e) => { if (e.pointerId !== jid) return; jreset(); };
+  L.addEventListener('pointerup', jend); L.addEventListener('pointercancel', jend); L.addEventListener('lostpointercapture', jend);
+  // iOS can cancel touches (notification, edge swipe, overlay/pill stealing the touch, viewport change) without a
+  // matching pointer event reaching us. Reset everything on any sign of that, and self-heal if the joystick
+  // pointer has no live touch any more.
+  const resetAll = () => { jreset(); looks.clear(); st.look.dx = 0; st.look.dy = 0; root.querySelectorAll('.kc-b.on').forEach((b) => b.classList.remove('on')); for (const id of [...st.held]) { st.held.delete(id); emit(id + ':up'); } st.keys.clear(); };
+  const onTCancel = () => resetAll();
+  const onTEnd = (e) => { if (!e.touches || e.touches.length) return; if (jid !== null || looks.size || st.held.size) setTimeout(() => { if (!liveTouches) resetAll(); }, 0); };
+  let liveTouches = 0; const countT = (e) => { liveTouches = e.touches ? e.touches.length : 0; };
+  const onVisC = () => { if (document.hidden) resetAll(); };
+  document.addEventListener('touchstart', countT, { capture: true, passive: true }); document.addEventListener('touchend', countT, { capture: true, passive: true });
+  document.addEventListener('touchcancel', countT, { capture: true, passive: true });
+  document.addEventListener('touchcancel', onTCancel, { capture: true, passive: true }); document.addEventListener('touchend', onTEnd, { capture: true, passive: true });
+  addEventListener('blur', resetAll); addEventListener('pagehide', resetAll); document.addEventListener('visibilitychange', onVisC);
+  // watchdog: joystick claims a pointer but no finger is on screen (touch device) -> release it
+  const wd = setInterval(() => { if (jid !== null && 'ontouchstart' in window && !liveTouches && performance.now() - jSeen > 400) jreset(); }, 500);
   // look / aim drag
   const looks = new Map();
-  Rr.addEventListener('pointerdown', (e) => { Rr.setPointerCapture(e.pointerId); looks.set(e.pointerId, [e.clientX, e.clientY]); emit('lookstart'); });
+  Rr.addEventListener('pointerdown', (e) => { try { Rr.setPointerCapture(e.pointerId); } catch { /* */ } looks.set(e.pointerId, [e.clientX, e.clientY]); emit('lookstart'); });
   Rr.addEventListener('pointermove', (e) => { const p = looks.get(e.pointerId); if (!p) return; st.look.dx += (e.clientX - p[0]) * S.sens; st.look.dy += (e.clientY - p[1]) * S.sens; looks.set(e.pointerId, [e.clientX, e.clientY]); });
-  const lend = (e) => looks.delete(e.pointerId); Rr.addEventListener('pointerup', lend); Rr.addEventListener('pointercancel', lend);
+  const lend = (e) => looks.delete(e.pointerId); Rr.addEventListener('pointerup', lend); Rr.addEventListener('pointercancel', lend); Rr.addEventListener('lostpointercapture', lend);
   // buttons
   root.querySelectorAll('.kc-b').forEach((b) => { const id = b.dataset.b;
-    b.addEventListener('pointerdown', (e) => { e.stopPropagation(); b.setPointerCapture(e.pointerId); b.classList.add('on'); st.held.add(id); buzz(10); emit(id, true); });
+    b.addEventListener('pointerdown', (e) => { e.stopPropagation(); try { b.setPointerCapture(e.pointerId); } catch { /* */ } b.classList.add('on'); st.held.add(id); buzz(10); emit(id, true); });
     const up = () => { if (!st.held.has(id)) return; b.classList.remove('on'); st.held.delete(id); emit(id + ':up'); };
-    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('contextmenu', (e) => e.preventDefault()); });
+    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up); b.addEventListener('contextmenu', (e) => e.preventDefault()); });
   // keyboard
   const KB = o.keys || {}; // e.g. { ' ': 'jump', q: 'switch', e: 'special', f: 'fire', Shift: 'dodge' }
   const kd = (e) => { if (/input|textarea/i.test(e.target.tagName)) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; st.keys.add(k); const b = KB[k]; if (b && !st.held.has(b)) { st.held.add(b); emit(b, true); } if (/^(Arrow|w$|a$|s$|d$| )/.test(k)) e.preventDefault(); };
@@ -83,6 +97,8 @@ export function createControls(host, o = {}) {
     down: (id) => st.held.has(id),
     on(n, f) { (st.subs[n] = st.subs[n] || []).push(f); return () => { st.subs[n] = st.subs[n].filter((x) => x !== f); }; },
     setLabel(id, icon, label) { const b = root.querySelector(`[data-b="${id}"]`); if (b) b.innerHTML = `${icon}<small>${label}</small>`; },
-    destroy() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); root.remove(); }
+    reset: () => resetAll(),
+    destroy() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); clearInterval(wd); removeEventListener('blur', resetAll); removeEventListener('pagehide', resetAll); document.removeEventListener('visibilitychange', onVisC);
+      document.removeEventListener('touchstart', countT, true); document.removeEventListener('touchend', countT, true); document.removeEventListener('touchcancel', countT, true); document.removeEventListener('touchcancel', onTCancel, true); document.removeEventListener('touchend', onTEnd, true); root.remove(); }
   };
 }

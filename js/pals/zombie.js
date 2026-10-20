@@ -388,7 +388,7 @@ export function createZombieGame(ctx) {
       let k = 0; for (const p of projs) { pm.compose(v3.set(p.x, p.y, p.z), q.identity(), s3.setScalar(p.w.r)); projIM.setMatrixAt(k, pm); projIM.setColorAt(k, tmpC.setHex(p.w.col)); k++; } projIM.count = k; projIM.instanceMatrix.needsUpdate = true; if (projIM.instanceColor) projIM.instanceColor.needsUpdate = true;
       zWind.value = performance.now() / 1000; sky.position.copy(cam.position); sky.material.uniforms.t.value = zWind.value; R.render(scene, cam);
     }
-    function loop(now) { raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000); last = now; if ((!paused || coop) && !over) step(dt); draw();
+    function loop(now) { raf = requestAnimationFrame(loop); const dt = Math.min(0.05, Math.max(0, (now - last) / 1000) || 0); last = now; try { if ((!paused || coop) && !over) step(dt); draw(); } catch (err) { loop.errs = (loop.errs || 0) + 1; if (loop.errs < 5) console.warn('zombie frame', err); }
       fpsN++; fpsT += now - (loop.p || now); loop.p = now; if (fpsT > 1000) { dbg.fps = Math.round((fpsN * 1000) / fpsT); fpsN = 0; fpsT = 0; fpsTag.textContent = dbg.fps + ' fps';
         // dynamic resolution: keep phones smooth
         if (dbg.fps < 40 && pr > prMin) { slowFor++; if (slowFor >= 2) { pr = Math.max(prMin, pr - 0.25); R.setPixelRatio(pr); resize(); slowFor = 0; } } else if (dbg.fps >= 57 && pr < prMax) { slowFor--; if (slowFor <= -4) { pr = Math.min(prMax, pr + 0.25); R.setPixelRatio(pr); resize(); slowFor = 0; } } else slowFor = 0; } }
@@ -410,7 +410,7 @@ export function createZombieGame(ctx) {
     function destroy() { if (net && !destroy.done) { destroy.done = 1; netOff && netOff(); net.leave(); } cancelAnimationFrame(raf); removeEventListener('resize', resize); removeEventListener('hashchange', onHash); document.removeEventListener('visibilitychange', onVis); C.destroy();
       scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); el.remove(); document.documentElement.style.overflow = ''; const gmr = document.getElementById('game-music'); if (gmr) gmr.style.zIndex = ''; if (G === api) G = null; window.__zombie = null; }
     const onHash = () => { if (!/^#\/arcade\/zombie/.test(location.hash)) destroy(); }; addEventListener('hashchange', onHash);
-    const onVis = () => { if (document.hidden && !over && !coop) pause(true); }; document.addEventListener('visibilitychange', onVis);
+    const onVis = () => { C.reset(); if (document.hidden && !over && !coop) pause(true); }; document.addEventListener('visibilitychange', onVis);
     paintGun(); hud(); raf = requestAnimationFrame(loop); paused = true;
     const startMusic = () => import('../gamemusic.js').then(async (gm) => { await gm.mountGameMusic({ corner: 'top-right' }); const r = document.getElementById('game-music'); if (r) { r.style.zIndex = '950'; r.classList.add('top-right'); } if (gm.state().volume > 0.2) gm.setVolume(0.2); if (!gm.isPlaying()) { const b = document.querySelector('#game-music [data-st="theme"]'); if (b) b.click(); else gm.play(); } }).catch(() => {});
     C.tutorial().then(() => { paused = false; startMusic(); msg('🧟 Get ready…', 2); });
