@@ -95,6 +95,7 @@ export function jumpPose(k, height = 0.45) {
 
 /** Natural body/head groove layered over any dance clip (beats = music beats). g = intensity. */
 export function grooveLayer(p, beat, g = 1, seed = 0) {
+  g *= 0.6; // gentle: the dance itself carries the energy, the layer just adds life
   const b = beat * TAU;
   const hit = Math.pow(0.5 + 0.5 * Math.cos(b), 3); // sharp on the beat, soft in between (not a linear tween)
   // knees bounce on the beat; weight shifts every 2 beats with the hips swaying over the supporting leg
@@ -173,14 +174,18 @@ export function plantFeet(root, P, legs) {
 // ---------------------------------------------------------------- springs for ears, tails, trunks, gills, tentacles
 // damped springs driven by how the head and hips move (accelerations), so floppy parts lag, overshoot and settle
 export function springs(root, P) {
+  const n = Math.max(1, Math.min(3, Math.round(root.userData.dt60 || 1))); // fixed 60 Hz sub-steps: stable at any frame rate
   const st = root.userData.spr || (root.userData.spr = { e: [0, 0], ev: [0, 0], tl: [0, 0], tv: [0, 0], ph: null });
   const drv = { hy: P.hy || 0, hrz: P.hrz || 0, hx: P.hx || 0, nz: P.nz || 0, nx: P.nx || 0, ry: P.hry || 0 };
   const pv = st.ph || drv; st.ph = drv;
   const acc = { y: drv.hy - pv.hy, z: drv.hrz - pv.hrz + (drv.nz - pv.nz) * 0.6, x: drv.nx - pv.nx, side: drv.hx - pv.hx, yaw: drv.ry - pv.ry };
   const step = (x, v, i, target, kick, k = 0.16, d = 0.78) => { v[i] = (v[i] + (target - x[i]) * k - kick) * d; x[i] += v[i]; x[i] = clamp(x[i], -0.9, 0.9); };
+  for (let it = 0; it < n; it++) {
+  if (it) { acc.y = acc.z = acc.x = acc.side = acc.yaw = 0; }
   step(st.e, st.ev, 0, -(P.nx || 0) * 0.25, acc.y * 6 + acc.x * 1.5); // ears pitch (flop on bounces)
   step(st.e, st.ev, 1, -(P.nz || 0) * 0.3, acc.z * 4 + acc.side * 4); // ears roll
   step(st.tl, st.tv, 0, -(P.hrz || 0) * 1.6 - (P.hx || 0) * 2, acc.z * 6 + acc.side * 10 + acc.yaw * 5, 0.1, 0.84); // tail side
   step(st.tl, st.tv, 1, (P.hy || 0) * -1.5, acc.y * 8, 0.12, 0.8); // tail up/down
+  }
   return st;
 }

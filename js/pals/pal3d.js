@@ -269,7 +269,9 @@ function build(pal) {
   return root;
 }
 // ---------------------------------------------------------------- posing
-const spring = new WeakMap();
+const ez = (k, dt) => 1 - Math.pow(1 - k, dt); // frame-rate independent easing
+const slots = new WeakMap();
+function slotFor(c, key) { let m = slots.get(c); if (!m) { m = new Map(); slots.set(c, m); } let s = m.get(key); if (!s) { s = { clock: 0, last: 0 }; m.set(key, s); if (m.size > 12) m.delete(m.keys().next().value); } return s; }
 // Applies a full-body human-style pose (see dances3d.js for the joint format) plus procedural life:
 // breathing, blinks, foot-planted knee IK for crouches/weight shifts, and follow-through on head, ears, tail.
 function apply(rootObj, P, t, mode) {
@@ -281,8 +283,8 @@ function apply(rootObj, P, t, mode) {
   for (const [n, s, v] of [['Left', 1, P.shL], ['Right', -1, P.shR]]) if (J[n + 'Shoulder']) J[n + 'Shoulder'].rotation.set(v ? v[0] : 0, 0, v ? s * v[1] + (P.sh || 0) * 0 : 0); // shoulder rolls
   J.Spine.rotation.set(P.sx || 0, P.sy || 0, P.sz || 0); J.Chest.rotation.set(P.cx || 0, P.cy || 0, P.cz || 0);
   // head with lag (follow-through)
-  const sp = spring.get(rootObj) || { hx: 0, hz: 0, e: 0, tl: 0 }; spring.set(rootObj, sp);
-  sp.hx += ((P.nx || 0) - sp.hx) * 0.35; sp.hz += ((P.nz || 0) - sp.hz) * 0.35;
+  const sp = rootObj.userData.sp0 || (rootObj.userData.sp0 = { hx: 0, hz: 0, e: 0, tl: 0 }); const dk = ez(0.25, rootObj.userData.dt60 || 1);
+  sp.hx += ((P.nx || 0) - sp.hx) * dk; sp.hz += ((P.nz || 0) - sp.hz) * dk;
   J.Neck.rotation.set(sp.hx * 0.4, (P.ny || 0) * 0.5, sp.hz * 0.4); J.Head.rotation.set(sp.hx * 0.6, (P.ny || 0) * 0.5, sp.hz * 0.6);
   // arms: [abduct°, forward°, elbow°, twist°]
   for (const [n, s, a] of [['Left', 1, P.aL], ['Right', -1, P.aR]]) {
@@ -353,7 +355,12 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   }
   const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.variant || '', pal.pattern || '', stageOf(pal.level || 1)]);
   let m = cache.get(key); if (!m) { m = build(pal); cache.set(key, m); if (cache.size > 24) { const k0 = cache.keys().next().value; cache.delete(k0); } }
-  const t = st.t || 0;
+  // per-canvas animation state: the same cached model drawn on two canvases (card + Pal Box, floating Pal, store)
+  // must not share easing/spring/gait state (that double-stepped it: fast, jittery motion). Time is real time
+  // (60 ticks per second), so 120 Hz screens and busy frames don't speed the Pal up.
+  const cs = slotFor(c, key); const dt60 = cs.last ? Math.max(0, Math.min(3, (now - cs.last) / 16.667)) : 1; cs.last = now; cs.clock += dt60;
+  const t = (typeof window !== 'undefined' && window.__palFixedClock) ? (st.t || 0) : cs.clock;
+  m.userData.prev = cs.prev; m.userData.pt = cs.pt; m.userData.spr = cs.spr; m.userData.gPh = cs.gPh; m.userData.gT = cs.gT; m.userData.sp0 = cs.sp; m.userData.dt60 = dt60;
   let P; const md = st.mode || 'idle', ud = m.userData, legs = !!(ud.J.fit && ud.J.fit.legs);
   if (md === 'walk' || md === 'run' || st.speed != null && st.speed > 0.02) { // real gait (heel-strike, passing, push-off), walk -> run blend
     const spd = st.speed != null ? st.speed : md === 'run' ? 2 : 1; const ph = advancePhase(ud, t, spd, ud.J.legL || 0.54);
@@ -364,10 +371,11 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   if (!sane(P)) P = modePose('idle', t); // never leave a broken / T-pose on screen
   // overlap & follow-through: every joint eases toward its target (limbs a bit slower than the hips), so moves and
   // dance changes flow into each other instead of snapping
-  const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * 0.28 : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * 0.42 : b; } P = o; }
+  const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }
   m.userData.prev = P; m.userData.pt = t;
   if (m.userData.J && m.userData.J.spark) { const g = m.userData.J.spark; g.rotation.y = t * 0.012; g.children.forEach((o) => { const k = 0.6 + 0.5 * Math.sin(t * 0.08 + o.userData.ph); o.scale.setScalar(k); o.rotation.y = t * 0.05; }); }
   apply(m, P, t, st.mode); grip(m, st.dance3d ? st.amt ?? 1 : 0, st.mode, t);
+  cs.prev = m.userData.prev; cs.pt = m.userData.pt; cs.spr = m.userData.spr; cs.gPh = m.userData.gPh; cs.gT = m.userData.gT; cs.sp = m.userData.sp0;
   m.rotation.y = st.yaw != null ? st.yaw : ((st.face || 1) < 0 ? -0.28 : 0.28) + (P.ry || 0);
   scene.add(m); try { R.render(scene, cam); } finally { scene.remove(m); }
   if (R.getContext().isContextLost?.()) { if (!lost) { lost = true; lostAt = now; } drawLoading(c, x, y, size); return true; }
