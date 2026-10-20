@@ -63,7 +63,7 @@ export function createWatch(ctx) {
   // Newest 60 videos, 60 photos and 60 link posts (180 reads), cached for 3 minutes so switching
   // tabs or coming back to the feed costs nothing. Falls back to unordered if an index is missing.
   async function loadPosts(force = false) {
-    if (!force && postCache && Date.now() - postCacheAt < 180e3) return postCache.filter((p) => !S.blocked.has(p.authorId));
+    if (!force && postCache && Date.now() - postCacheAt < 180e3) return postCache.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
     const posts = collection(db, 'posts');
     const q = (f, v) => getDocs(query(posts, where(f, '==', v), orderBy('createdAt', 'desc'), limit(60)))
       .catch(() => getDocs(query(posts, where(f, '==', v), limit(60))));
@@ -71,7 +71,7 @@ export function createWatch(ctx) {
     const seen = new Map();
     [...v.docs, ...im.docs, ...l.docs].forEach((d) => seen.set(d.id, { id: d.id, ...d.data() }));
     postCache = [...seen.values()].filter((p) => kindOf(p)).sort((a, b) => ms(b) - ms(a)); postCacheAt = Date.now();
-    return postCache.filter((p) => !S.blocked.has(p.authorId));
+    return postCache.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
   }
   async function followingPosts(own) {
     const ids = [...S.following].filter((u) => !S.blocked.has(u));

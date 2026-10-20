@@ -4,6 +4,7 @@
 // is set (js/media-config.js) the editor works but Save shows the "Uploads are almost ready" notice.
 import { CLOUDINARY, LIMITS, uploadsReady, uploadEndpoint, avatarUrl } from './media-config.js';
 import { notReadyNotice } from './create.js';
+import { guardUpload } from './mediascan.js';
 
 const IC = {
   camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.8 5h4.4a1.5 1.5 0 0 1 1.2.6L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/><circle cx="12" cy="13" r="3.5"/></svg>',
@@ -154,6 +155,7 @@ export function createAvatarEditor({ esc, toast, friendlyError, getUid, onSaved,
   }
 
   async function upload(file) {
+    await guardUpload(file, { where: 'avatar' });
     const fd = new FormData();
     fd.append('file', file);
     fd.append('upload_preset', CLOUDINARY.avatarPreset);

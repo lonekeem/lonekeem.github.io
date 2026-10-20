@@ -31,6 +31,7 @@ import { createLive } from './live.js';
 import { createModeration, BlockSet } from './moderation.js';
 import { initKindGuard } from './kindguard.js';
 import * as safety from './safety.js';
+import { initMediaScan, takeHold } from './mediascan.js';
 import { initTranslate, settingsHtml as txSettingsHtml, wireSettings as txWireSettings } from './translate.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
@@ -316,7 +317,7 @@ function adminMediaCleanup(urls) {
 }
 let works = null;
 function getWorks() {
-  if (!works) works = createWorks({ holdOrSet: (...x) => mod.holdOrSet(...x), db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
+  if (!works) works = createWorks({ holdOrSet: (b, r, d) => mod.holdOrSet(b, r, d, d.mediaUrl || (d.work && d.work.cover) ? takeHold() : null), db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
   return works;
 }
 const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
@@ -466,7 +467,7 @@ document.addEventListener('click', closeMenus);
 
 function renderPosts(container, posts, emptyMsg) {
   container.innerHTML = '';
-  const visible = posts.filter((p) => !S.blocked.has(p.authorId));
+  const visible = posts.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
   if (!visible.length) { container.innerHTML = `<div class="empty">${emptyMsg}</div>`; return; }
   visible.forEach((p) => container.appendChild(postCard(p)));
 }
@@ -514,6 +515,12 @@ async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '
       const hOld = q && now - ms(q.hStart) < 3600e3 - 5e3, dOld = q && now - ms(q.dStart) < 864e5 - 5e3;
       if (hOld && q.hN >= 10 || dOld && q.dN >= 30) { $('#report-err').textContent = 'You’ve sent a lot of reports today. Thank you! Please try again a bit later.'; return; }
       b.set(qref, { hStart: hOld ? q.hStart : t, hN: hOld ? q.hN + 1 : 1, dStart: dOld ? q.dStart : t, dN: dOld ? q.dN + 1 : 1, at: t });
+      // one flag per person per post (posts/{id}/flags/{uid}); 3+ different people => hidden pending review
+      if (postId && targetType !== 'comment') {
+        const fl = doc(db, 'posts', postId, 'flags', S.user.uid);
+        const [had, ps] = await Promise.all([getDoc(fl).then((d) => d.exists()).catch(() => true), getDoc(doc(db, 'posts', postId)).catch(() => null)]);
+        if (!had && ps && ps.exists() && ps.data().authorId !== S.user.uid) { b.set(fl, { at: serverTimestamp() }); b.update(doc(db, 'posts', postId), { reportCount: increment(1) }); }
+      }
       await b.commit();
       closeModal(); toast('Thanks. The report was sent.');
     } catch (e) { $('#report-err').textContent = e.code === 'permission-denied' ? 'Couldn’t send the report right now. Please try again in a minute.' : friendlyError(e); }
@@ -662,11 +669,17 @@ const routes = [
 ];
 function gated(fn) { return async (...a) => { if (!requireAuth()) return; if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; } return fn(...a); }; }
 safety.initSafety({ S, db, esc, openModal, closeModal, toast, isAdmin: () => isAdmin(), friendlyError });
+initMediaScan({ S, db, isAdmin: () => isAdmin() });
+// 3+ reports from different people: hidden from everyone except moderators and the author until a
+// moderator keeps it (reportOk) or removes it.
+const REPORT_HIDE_AT = 3;
+const reportHidden = (p) => !!p && (Number(p.reportCount) || 0) - (Number(p.reportOk) || 0) >= REPORT_HIDE_AT;
+window.kemyReportHidden = (p) => reportHidden(p) && !(S.user && (p.authorId === S.user.uid || mod.iAmMod()));
 let routeToken = 0, navCount = 0;
 // In-game music player: shown on every game screen (#/games…, #/game/…, Pal games), hidden elsewhere.
 const kemySongsForGames = async () => {
   const snap = await getDocs(query(collection(db, 'posts'), where('type', '==', 'song'), orderBy('createdAt', 'desc'), limit(25)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.mediaUrl && !(p.work && p.work.explicit) && !S.blocked.has(p.authorId))
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.mediaUrl && !(p.work && p.work.explicit) && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p))
     .map((p) => ({ title: (p.work && p.work.title) || 'Song', artist: (p.work && p.work.artist) || p.authorName || 'Kemy', url: p.mediaUrl }));
 };
 function gameMusicFor(hash) {
@@ -923,7 +936,7 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
     cloudinaryPublicId: String(upload.public_id).slice(0, 255), ...(cat ? { cat } : {}),
     ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
-  });
+  }, takeHold());
   b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
   await b.commit();
   return ref.id;
@@ -960,7 +973,8 @@ async function pagePost(postId, token) {
   if (stale(token)) return;
   if (!snap.exists()) { const held = await mod.heldNotice(postId); main.innerHTML = held || '<div class="empty">This post was removed or doesn’t exist. <a href="#/explore">Explore</a></div>'; return; }
   const p = { id: snap.id, ...snap.data() };
-  main.innerHTML = `<div id="post-slot"></div>
+  if (window.kemyReportHidden(p)) { main.innerHTML = '<section class="card pad center"><div style="font-size:2.4rem" aria-hidden="true">🕒</div><h1 class="page-title">This post is being reviewed</h1><p>Several people reported it, so it’s hidden until a Kemy moderator checks it.</p><a class="btn btn-sm" href="#/watch">Back to Kemy</a></section>'; return; }
+  main.innerHTML = `${reportHidden(p) ? '<p class="card pad small" role="status">🕒 Hidden from others: 3 or more people reported this post. A moderator will review it.</p>' : ''}<div id="post-slot"></div>
     <section class="card pad" aria-labelledby="c-title">
       <h2 id="c-title" style="font-size:1.1rem">Comments</h2>
       <div id="comments"><div class="spinner"></div></div>
@@ -1105,7 +1119,7 @@ function gridTile(p) {
     ${viewsHtml(p.viewCount, p.id, 'gviews')}</a>`;
 }
 function renderGrid(container, posts, emptyMsg) {
-  const visible = posts.filter((p) => !S.blocked.has(p.authorId));
+  const visible = posts.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
   container.innerHTML = visible.length ? `<div class="pgrid">${visible.map(gridTile).join('')}</div>` : `<div class="empty">${emptyMsg}</div>`;
 }
 async function pageFollowList(kind, uid, token) {

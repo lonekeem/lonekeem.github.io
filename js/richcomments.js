@@ -5,6 +5,7 @@
 //   media = { kind: 'gif', id, url, w, h } | { kind: 'photo', url, w, h } | { kind: 'sticker', petId, pose }
 import { CLOUDINARY, GIFS, uploadEndpoint, deliveryBase } from './media-config.js';
 import { drawPal, heart, star } from './pals/art.js';
+import { guardUpload } from './mediascan.js';
 import { doc, getDoc, getDocs, collection } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 export const POSES = [['wave', 'Wave', '👋'], ['love', 'Love', '😍'], ['laugh', 'Laugh', '😂'], ['cry', 'Cry', '😢'], ['wow', 'Wow', '😮'], ['dance', 'Dance', '💃'], ['sleepy', 'Sleepy', '😴']];
@@ -102,6 +103,7 @@ export function uploadCommentPhoto(file, uid, onProgress) {
     try {
       if (!/^image\/(jpeg|png|webp|gif|heic|heif)$/.test(file.type)) throw new Error('Use a JPG, PNG, WebP or GIF photo.');
       if (file.size > 15 * 1048576) throw new Error('Photos can be up to 15 MB.');
+      await guardUpload(file, { where: 'comment' });
       const { blob, w, h } = await shrinkImage(file);
       if (blob.size > 10 * 1048576) throw new Error('That photo is too big (10 MB max).');
       const fd = new FormData(); fd.append('file', blob, 'comment.jpg'); fd.append('upload_preset', CLOUDINARY.commentPreset || 'lks_comment_media'); fd.append('tags', 'lks_comment'); if (uid) fd.append('context', `uid=${uid}`);

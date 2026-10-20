@@ -7,6 +7,7 @@ import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
 import { createSeries } from './series.js';
 import { stripExif } from './safety.js';
+import { guardUpload } from './mediascan.js';
 
 export const GENRES = {
   movie: ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Fantasy', 'Romance', 'Animation', 'Music', 'Documentary', 'Other'],
@@ -82,7 +83,11 @@ export function createWorks(ctx) {
   }
 
   // ---------------------------------------------------------------- uploads (Cloudinary, chunked)
-  function upload(file, preset, tag, onProgress) { return stripExif(file).then((g) => upload0(g, preset, tag, onProgress)); }
+  // every movie / cover / series-art file goes through the on-device picture/video check first
+  async function upload(file, preset, tag, onProgress) {
+    await guardUpload(file, { where: tag === 'lks_work_art' ? 'cover' : tag === 'lks_series_art' ? 'series' : 'movie' });
+    return upload0(await stripExif(file), preset, tag, onProgress);
+  }
   function upload0(file, preset, tag, onProgress) {
     const CH = (LIMITS.chunkMB || 20) * 1048576;
     const send = (blob, headers, base) => new Promise((resolve, reject) => {
@@ -454,7 +459,7 @@ export function createWorks(ctx) {
     let sort = 'createdAt', genre = '', list = [];
     let seriesList = null;
     const paintSeries = async () => { const box = q('.wgrid'); box.innerHTML = '<div class="spinner"></div>'; try { seriesList = seriesList || await series().fetchList({ max: 60 }); } catch { seriesList = []; } if (genre !== '__series') return; await series().renderTiles(box, seriesList, '<div class="empty">No series yet. <a href="#/series/new">Start the first one</a>.</div>'); };
-    const paint = () => { if (genre === '__series') { paintSeries(); return; } const v = list.filter((p) => isWork(p) && !S.blocked.has(p.authorId) && (!genre || p.work.genre === genre)); q('.wgrid').innerHTML = v.length ? v.map((p) => tile(p)).join('') : `<div class="empty">No ${isSong ? 'songs' : 'movies'} here yet. <a href="#/new/${kind}">Share the first one</a>.</div>`; wireTiles(q('.wgrid'), v); };
+    const paint = () => { if (genre === '__series') { paintSeries(); return; } const v = list.filter((p) => isWork(p) && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && (!genre || p.work.genre === genre)); q('.wgrid').innerHTML = v.length ? v.map((p) => tile(p)).join('') : `<div class="empty">No ${isSong ? 'songs' : 'movies'} here yet. <a href="#/new/${kind}">Share the first one</a>.</div>`; wireTiles(q('.wgrid'), v); };
     const load = async () => {
       q('.wgrid').innerHTML = '<div class="spinner"></div>';
       try { const qs = await getDocs(query(collection(db, 'posts'), where('type', '==', kind), orderBy(sort, 'desc'), limit(60))); if (stale(token)) return; list = qs.docs.map((d) => ({ id: d.id, ...d.data() })); }
@@ -493,7 +498,7 @@ export function createWorks(ctx) {
     b.onclick = () => { const open = p.classList.toggle('clamp') === false; b.textContent = open ? 'less' : 'more'; b.setAttribute('aria-expanded', open); };
   }
   function grid(container, posts, empty) {
-    const v = posts.filter((p) => isWork(p) && !S.blocked.has(p.authorId));
+    const v = posts.filter((p) => isWork(p) && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p));
     container.innerHTML = v.length ? `<div class="wgrid">${v.map((p) => tile(p)).join('')}</div>` : `<div class="empty">${empty}</div>`;
     wireTiles(container, v);
   }

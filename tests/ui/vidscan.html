@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kemy picture/video check test</title><link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/polish.css">
+<style>body{padding:12px}.pv{max-width:420px;margin:0 auto}.pv video,.pv img{width:100%;border-radius:14px;background:#000;max-height:46vh;object-fit:contain}.st{min-height:1.4em}.sc{font:12px/1.4 monospace;white-space:pre-wrap;margin:6px 0 0}.ok{color:#0a7d32}.toastx{margin-top:8px;padding:10px 14px;border-radius:12px;background:#2b1747;color:#fff}</style></head>
+<body><main class="pv"><section class="card pad">
+<h1 class="page-title" style="font-size:1.2rem">New post</h1>
+<div id="media"></div>
+<div class="field"><label for="cap">Caption</label><textarea id="cap" maxlength="2000" placeholder="Say something about it…">Sunny day at the park #kemy</textarea></div>
+<p class="small muted st" id="status" role="status"></p><p class="form-error" id="err"></p>
+<div class="btns"><button class="btn" id="post">Post</button></div><div id="toast"></div>
+<pre class="sc" id="sc"></pre><p class="small muted">Written by Lone Keem</p></section></main>
+<script type="module">
+import { guardUpload, scanFile, loadModel, stats, REVIEW_MSG, takeHold } from '../../js/mediascan.js';
+const $ = (s) => document.querySelector(s);
+function scene(c, t = 0) { const x = c.getContext('2d'), W = c.width, H = c.height;
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#7cc6ff'); g.addColorStop(1, '#d9f1ff'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#ffd23f'; x.beginPath(); x.arc(W * .8, H * .2 + Math.sin(t) * 10, H * .1, 0, 7); x.fill();
+  x.fillStyle = '#5cb85c'; x.fillRect(0, H * .7, W, H * .3);
+  x.fillStyle = '#c0504d'; x.fillRect(W * .2 + t * 8, H * .45, W * .25, H * .25); x.fillStyle = '#8b3a3a'; x.beginPath(); x.moveTo(W * .17 + t * 8, H * .45); x.lineTo(W * .325 + t * 8, H * .32); x.lineTo(W * .48 + t * 8, H * .45); x.fill();
+  x.fillStyle = '#6b4226'; x.fillRect(W * .65, H * .5, W * .04, H * .2); x.fillStyle = '#2e7d32'; x.beginPath(); x.arc(W * .67, H * .47, H * .09, 0, 7); x.fill();
+  x.fillStyle = '#fff'; x.font = `bold ${H * .07}px sans-serif`; x.fillText('Kemy test ' + Math.round(t), W * .05, H * .12); }
+async function safeImage() { const c = document.createElement('canvas'); c.width = 800; c.height = 600; scene(c); return new File([await new Promise((r) => c.toBlob(r, 'image/jpeg', .9))], 'park.jpg', { type: 'image/jpeg' }); }
+async function safeVideo(sec = 8) { const c = document.createElement('canvas'); c.width = 640; c.height = 360; const rec = new MediaRecorder(c.captureStream(30), { mimeType: 'video/webm' }); const parts = []; rec.ondataavailable = (e) => parts.push(e.data);
+  const t0 = performance.now(); rec.start(); await new Promise((res) => { const f = () => { const t = (performance.now() - t0) / 1000; scene(c, t); if (t < sec) requestAnimationFrame(f); else res(); }; f(); }); rec.stop(); await new Promise((r) => (rec.onstop = r));
+  return new File(parts, 'park.webm', { type: 'video/webm' }); }
+function show(file) { const u = URL.createObjectURL(file); $('#media').innerHTML = /video/.test(file.type) ? `<video src="${u}" muted playsinline controls></video>` : `<img src="${u}" alt="Test picture">`; }
+async function post(file) { $('#err').textContent = ''; $('#toast').innerHTML = ''; $('#status').textContent = '';
+  try { const r = await guardUpload(file, { where: 'post', caption: $('#cap').value, onStatus: (t) => ($('#status').textContent = t) });
+    const h = takeHold(); $('#status').textContent = h ? '' : '✅ Passed the check, uploading…';
+    if (h) $('#toast').innerHTML = `<div class="toastx">${REVIEW_MSG}</div>`;
+    const top = r.top ? Object.entries(r.top).map(([k, v]) => k + ' ' + (v * 100).toFixed(1) + '%').join(', ') : '';
+    $('#sc').textContent = `level: ${r.level}${h ? ' (held: ' + h.reason + ')' : ''}\nkind: ${r.kind}, frames: ${r.frames}, scan ${r.ms} ms${r.mocked ? ' (MOCKED scores)' : ''}\nhighest: ${top}\nmodel load: ${stats.loadMs} ms`;
+    return { level: r.level, held: !!h, frames: r.frames, ms: r.ms, top: r.top, scores: r.scores };
+  } catch (e) { $('#status').textContent = ''; $('#sc').textContent = 'level: blocked before upload (mocked scores / kind-words)'; $('#err').textContent = e.userMessage || e.message; return { blocked: true, msg: e.userMessage }; } }
+window.run = async (what) => {
+  localStorage.removeItem('kemyScanMock');
+  if (what === 'block') localStorage.setItem('kemyScanMock', JSON.stringify([{ Drawing: .01, Hentai: .02, Neutral: .05, Porn: .9, Sexy: .02 }]));
+  if (what === 'review') localStorage.setItem('kemyScanMock', JSON.stringify([{ Drawing: .05, Hentai: .03, Neutral: .4, Porn: .1, Sexy: .42 }, { Drawing: .05, Hentai: .03, Neutral: .4, Porn: .1, Sexy: .65 }]));
+  if (what === 'caption') $('#cap').value = 'this is sh1t lol';
+  const f = what === 'image' ? await safeImage() : await safeVideo(); show(f); const r = await post(f); localStorage.removeItem('kemyScanMock'); return r; };
+window.ready = true;
+</script></body></html>

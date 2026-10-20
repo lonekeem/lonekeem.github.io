@@ -312,6 +312,12 @@ service cloud.firestore {
     }
 
     match /posts/{postId} {
+      // Videos from accounts under 3 days old go to heldPosts first (the app also holds accounts with
+      // fewer than config/mediaReview.minApproved posts; rules can't count, so that part is app-side).
+      function newVideoOk(d) {
+        return d.get('mediaType', '') != 'video' || isAdmin() || d.authorId == 'studio'
+          || get(userPath(d.authorId)).data.createdAt < request.time - duration.value(3, 'd');
+      }
       function postPath() { return /databases/$(database)/documents/posts/$(postId); }
       function likeChange() {
         let likeP = /databases/$(database)/documents/posts/$(postId)/likes/$(me());
@@ -335,7 +341,8 @@ service cloud.firestore {
       }
 
       allow read: if true;
-      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data) && canCreate(request.resource.data.authorId);
+      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data) && canCreate(request.resource.data.authorId)
+        && newVideoOk(request.resource.data);
       // Moderator "Restore": an exact copy of the held post, moved out of heldPosts in the same batch.
       allow create: if isMod() && exists(/databases/$(database)/documents/heldPosts/$(postId))
         && request.resource.data == get(/databases/$(database)/documents/heldPosts/$(postId)).data.post
@@ -377,8 +384,27 @@ service cloud.firestore {
           && request.resource.data.shareCount == resource.data.get('shareCount', 0) + 1
           && !exists(shareP) && existsAfter(shareP);
       }
-      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange() || catChange() || shareChange()));
+      // Reports: +1 per different person (flags/{uid} created in the same batch); 3+ => hidden in the
+      // app until a moderator keeps it (reportOk = reportCount) or removes it.
+      function reportChange() {
+        let fP = /databases/$(database)/documents/posts/$(postId)/flags/$(request.auth.uid);
+        return changed().hasOnly(['reportCount'])
+          && request.resource.data.reportCount == resource.data.get('reportCount', 0) + 1
+          && resource.data.authorId != me() && !exists(fP) && existsAfter(fP);
+      }
+      function reportOkChange() {
+        return isMod() && changed().hasOnly(['reportOk']) && request.resource.data.reportOk == resource.data.get('reportCount', 0);
+      }
+      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange() || catChange() || shareChange() || reportChange() || reportOkChange()));
       allow delete: if signedIn() && (resource.data.authorId == me() || isMod());
+
+      match /flags/{flaggerId} {
+        allow read: if signedIn() && (flaggerId == me() || isMod());
+        allow create: if signedIn() && flaggerId == me()
+          && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
+          && getAfter(postPath()).data.get('reportCount', 0) == get(postPath()).data.get('reportCount', 0) + 1;
+        allow delete: if signedIn() && (isMod() || !existsAfter(postPath()));
+      }
 
       match /likes/{likerId} {
         allow read: if true;
@@ -1530,6 +1556,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['kofi', 'cashapp', 'paypal', 'bmac', 'other', 'otherLabel', 'updatedAt'])
         && okLink('kofi') && okLink('cashapp') && okLink('paypal') && okLink('bmac') && okLink('other')
         && (!('otherLabel' in request.resource.data) || isStr(request.resource.data.otherLabel, 0, 30));
+    }
+    // New-account video check: how many live posts before videos skip review (admin only).
+    match /config/mediaReview {
+      allow read: if true;
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['minApproved', 'updatedAt'])
+        && request.resource.data.minApproved is int && request.resource.data.minApproved >= 0 && request.resource.data.minApproved <= 50;
     }
     match /config/palShop {
       allow read: if true;

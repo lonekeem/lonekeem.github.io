@@ -61,7 +61,7 @@ export function createMusic(ctx) {
       musicVideos().catch(() => [])
     ]);
     if (stale(token)) return;
-    const ok = (p) => !S.blocked.has(p.authorId);
+    const ok = (p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p);
     const sSongs = studio.filter((p) => p.type === 'song' && W.isWork(p));
     const sVids = studio.filter((p) => p.type !== 'song' && (p.mediaType === 'video' || p.linkUrl || p.type === 'movie'));
     const ss = main.querySelector('#mus-studio-songs');

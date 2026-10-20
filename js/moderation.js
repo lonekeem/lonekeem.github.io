@@ -366,7 +366,9 @@ export function createModeration(ctx) {
   async function queueTab(body) {
     const snap = await getDocs(query(collection(db, 'heldPosts'), orderBy('createdAt', 'desc'), limit(100)));
     const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    body.innerHTML = `<p class="muted small">Auto-flagged posts (and posts a moderator pulled) are hidden from everyone until you act. The poster sees “Your post is being reviewed”.</p><div id="q-list"></div>`;
+    body.innerHTML = `<div id="q-rep"></div>${isAdmin() ? '<div class="card pad" id="q-cfg"><b>🌱 New-account video check</b><p class="muted small" style="margin:3px 0 8px">Videos from accounts under 3 days old, or with fewer than this many live posts, wait here for review first.</p><label class="small" for="q-n">Approved posts needed</label> <input id="q-n" type="number" min="0" max="50" inputmode="numeric" style="width:5em"> <button class="btn btn-sm" id="q-n-save">Save</button> <span class="small muted" id="q-n-msg"></span></div>' : ''}<p class="muted small">Auto-flagged posts (and posts a moderator pulled) are hidden from everyone until you act. The poster sees “Your post is being reviewed”.</p><div id="q-list"></div>`;
+    reportedPosts($('#q-rep'));
+    if (isAdmin()) { const ms = await import('./mediascan.js'); const inp = $('#q-n'); ms.reviewConfig().then((c) => (inp.value = c.minApproved)); $('#q-n-save').onclick = async () => { try { inp.value = await ms.saveReviewConfig(inp.value); $('#q-n-msg').textContent = '✅ Saved'; } catch (er) { $('#q-n-msg').textContent = friendlyError(er); } }; }
     const list = $('#q-list');
     const draw = () => { list.innerHTML = items.length ? items.map((h) => { const p = h.post || {}; const media = p.poster || (p.mediaType === 'image' ? p.mediaUrl : '');
       return `<div class="card pad mod-rep st-open" data-id="${esc(h.id)}"><div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag mod-type">${esc(p.type === 'media' ? (p.mediaType === 'video' ? 'Video' : 'Photo') : p.type || 'post')}</span><span class="mod-st">${h.level === 'bad' ? '🤖 Auto-flag · bad' : h.level === 'borderline' ? '🤖 Auto-flag · borderline' : '👀 Pulled by a moderator'}</span><span class="spacer"></span><span class="muted small">${esc(timeAgo(h.createdAt))}</span></div>
@@ -383,6 +385,24 @@ export function createModeration(ctx) {
         else if (a === 'warn') { await deleteDoc(doc(db, 'heldPosts', id)); log('remove', h.authorId, p.authorName, 'held post: ' + (p.text || '').slice(0, 120)); gone(); messageDialog(h.authorId, p.authorName, 'warn', { ref: 'post:' + id, prefill: `We removed your post because it broke the Kemy rules (${h.reason.toLowerCase()}). Please keep Kemy safe and kind. This is a warning.` }); }
         else if (a === 'ban') { if (await banDialog(h.authorId, p.authorName, p.authorUsername)) { await deleteDoc(doc(db, 'heldPosts', id)).catch(() => {}); gone(); } }
         else if (a === 'user') location.hash = '#/mod/users?u=' + h.authorId;
+      } catch (er) { toast(friendlyError(er)); }
+    };
+  }
+  // Live posts hidden by 3+ reports from different people (posts.reportCount - reportOk >= 3).
+  async function reportedPosts(box) {
+    const snap = await getDocs(query(collection(db, 'posts'), where('reportCount', '>=', 3), limit(50))).catch(() => null);
+    const items = snap ? snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => (p.reportCount || 0) - (p.reportOk || 0) >= 3) : [];
+    if (!items.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<h3 class="hub-h3">🚩 Hidden by reports (${items.length})</h3>` + items.map((p) => { const media = p.poster || (p.mediaType === 'image' ? p.mediaUrl : '');
+      return `<div class="card pad mod-rep st-open" data-id="${esc(p.id)}"><p style="margin:0 0 4px"><b>Why:</b> ${esc(String(p.reportCount))} different people reported it · hidden from everyone else</p><div class="q-prev">${media ? `<img src="${esc(media)}" alt="" loading="lazy">` : ''}<div><b>${esc(p.authorName || '')}</b> <span class="muted small">@${esc(p.authorUsername || '')}</span><blockquote class="mod-quote">${esc(p.text || (p.work && p.work.title) || '(no text)')}</blockquote>${p.mediaType === 'video' && p.mediaUrl ? `<video src="${esc(p.mediaUrl)}" controls playsinline preload="none" style="max-width:100%;border-radius:12px"></video>` : ''}</div></div>
+        <div class="mod-acts"><button class="btn btn-sm" data-r="keep">✅ It’s fine, show it</button><button class="btn btn-sm btn-ghost" data-r="hold">🕒 Move to held</button><button class="btn btn-sm btn-danger" data-r="delete">🗑️ Delete post</button><a class="btn btn-sm btn-ghost" href="#/mod/reports">🚩 Reports</a></div></div>`; }).join('');
+    box.onclick = async (e) => {
+      const b = e.target.closest('[data-r]'); if (!b) return; const card = b.closest('[data-id]'); const p = items.find((x) => x.id === card.dataset.id);
+      try {
+        if (b.dataset.r === 'keep') { await updateDoc(doc(db, 'posts', p.id), { reportOk: p.reportCount }); log('restore', p.authorId, p.authorName, 'kept after reports: ' + (p.text || '').slice(0, 100)); }
+        else if (b.dataset.r === 'hold') await holdLivePost(p, `Hidden by ${p.reportCount} reports`);
+        else { if (!confirm('Delete this post for good?')) return; await deleteDoc(doc(db, 'posts', p.id)); log('remove', p.authorId, p.authorName, 'reported post: ' + (p.text || '').slice(0, 100)); notice(p.authorId, 'Your post was reviewed and removed because it didn’t follow the Kemy rules.').catch(() => {}); }
+        card.remove(); toast('Done');
       } catch (er) { toast(friendlyError(er)); }
     };
   }
@@ -558,8 +578,9 @@ export function createModeration(ctx) {
   }
 
   // ---- auto-flag hook used by every "new post" batch
-  function holdOrSet(b, ref, data) {
-    const f = !isAdmin() && data.authorId !== 'studio' ? autoFlag(postText(data)) : null;
+  // force = { reason, level } from the picture/video check or the new-account video rule
+  function holdOrSet(b, ref, data, force) {
+    const f = (!isAdmin() && data.authorId !== 'studio' ? autoFlag(postText(data)) : null) || (force && force.reason ? { reason: String(force.reason).slice(0, 200), level: 'borderline' } : null);
     if (!f) { b.set(ref, data); return null; }
     b.set(doc(db, 'heldPosts', ref.id), { post: data, reason: f.reason, level: f.level, authorId: data.authorId, createdAt: serverTimestamp() });
     S.lastHeld = ref.id; return f;

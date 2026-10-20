@@ -14,6 +14,7 @@ import { mountPicker } from './fx/picker.js';
 import { FX_DEFAULT } from './fx/looks.js';
 import { onDoubleTap } from './tapstar.js';
 import { stripExif, piiOk } from './safety.js';
+import { guardUpload, REVIEW_MSG } from './mediascan.js';
 import { openEditor } from './snapedit.js';
 import { WORK_IC, DESC as WORK_DESC } from './works.js';
 
@@ -532,6 +533,7 @@ export function createComposer(ctx) {
     const el = mountOverlay(`<div class="cam-msg snap-sending" role="status"><div class="spinner"></div><h2>Sending snap…</h2><div class="pv-progress"><span></span></div><p class="small muted">To ${uids.length} ${uids.length === 1 ? 'friend' : 'friends'}</p></div>`, 'cam-camera has-msg');
     const barIn = el.querySelector('.pv-progress span');
     try {
+      await guardUpload(file, { where: 'snap', onStatus: (t) => { const h = el.querySelector('h2'); if (h) h.textContent = t; } });
       file = await stripExif(file);
       const r = await new Promise((resolve, reject) => {
         const fd = new FormData(); fd.append('file', file, file.name || 'snap');
@@ -550,7 +552,7 @@ export function createComposer(ctx) {
       location.hash = uids.length === 1 ? '#/chat/' + uids[0] : '#/messages';
     } catch (e) {
       closeOverlay();
-      toast(e && e.code === 'permission-denied' ? 'Couldn’t send to everyone. They may not accept messages.' : (e.message || 'Couldn’t send the snap.'));
+      toast(e && e.code === 'permission-denied' ? 'Couldn’t send to everyone. They may not accept messages.' : (e.userMessage || e.message || 'Couldn’t send the snap.'));
     }
   }
 
@@ -637,6 +639,8 @@ export function createComposer(ctx) {
       err.textContent = ''; busy = true; postBtn.disabled = true; postBtn.textContent = 'Posting…';
       try {
         if (!uploaded) {
+          // on-device picture/video check + kind words on the caption (mediascan.js)
+          await guardUpload(file, { where: story ? 'story' : 'post', caption: cap.value, onStatus: (t) => (status.textContent = t) });
           bar.hidden = false; status.textContent = 'Uploading… 0%';
           uploaded = await upload(file, (f) => { barIn.style.transform = `scaleX(${f})`; status.textContent = f >= 1 ? 'Processing…' : `Uploading… ${Math.round(f * 100)}%`; });
         }
@@ -653,6 +657,7 @@ export function createComposer(ctx) {
         const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat') });
         closeOverlay();
         dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 30 } }));
+        if (S.lastHeld === id) { toast(REVIEW_MSG); location.hash = '#/post/' + id; return; }
         toast(isVideo && file.size > LIMITS.eagerOnlyMB * 1048576 ? 'Posted! Long videos can take a few minutes to finish processing.' : 'Posted!');
         location.hash = '#/watch/' + id;
       } catch (e) {
