@@ -717,7 +717,7 @@ const music = createMusic({ S, db, main, esc, openModal, stale, getWorks, gridTi
 const feedToggle = (active) => `<nav class="feed-toggle" aria-label="Feed"><a href="#/watch" class="${active === 'watch' ? 'active' : ''}">For You</a><a href="#/feed" class="${active === 'feed' ? 'active' : ''}">Posts</a></nav>`;
 async function pageFeed(token) {
   if (!S.user || !S.profile) {
-    main.innerHTML = `${feedToggle('feed')}
+    main.innerHTML = `${feedToggle('feed')}<a class="pk-quick" href="#/park" aria-label="Open Pal Park"><span class="pk-quick-ic" aria-hidden="true">🌳</span><span><b>Pal Park</b><small>Hang out with friends in 3D</small></span><span class="pk-quick-go">Play ›</span></a>
       <section class="card pad center stack">
         <img class="auth-logo" src="kemy-logo.png" alt="" width="64" height="64" style="border-radius:22%">
         <h1 class="page-title" style="margin:0">Join the community</h1>
@@ -739,6 +739,7 @@ async function pageFeed(token) {
   main.innerHTML = `
     ${verified ? '' : `<div class="banner">Check your inbox to verify <b>${esc(S.user.email)}</b>. <button class="link-btn" id="resend">Resend email</button></div>`}
     ${feedToggle('feed')}
+    <a class="pk-quick" href="#/park" aria-label="Open Pal Park"><span class="pk-quick-ic" aria-hidden="true">🌳</span><span><b>Pal Park</b><small>Hang out with friends in 3D</small></span><span class="pk-quick-go">Play ›</span></a>
     <div id="live-now"></div>
     <div id="stories" class="stories-slot"></div>
     <div class="row"><h1 class="page-title">Posts</h1><span class="spacer"></span><a class="btn btn-sm btn-ghost" href="#/new">New post</a></div>
@@ -761,6 +762,7 @@ async function pageExplore(tab, token) {
   if (tab) { main.innerHTML = `<h1 class="page-title">Explore</h1>${tabs}<div id="wx"></div>`; return getWorks().explore($('#wx'), tab === 'movies' ? 'movie' : 'song', token); }
   main.innerHTML = `
     <h1 class="page-title">Explore</h1>${tabs}
+    <a class="g-promo pk-promo" href="#/park"><i class="zf-mini" aria-hidden="true">🌳</i><span><b>Pal Park 3D</b><small>Walk your Pal with friends, chat, dance and find treasures.</small></span><span aria-hidden="true">›</span></a>
     <a class="g-promo" href="#/games">${GAMES_ICON}<span><b>Games</b><small>Star Pool, Star Drop, checkers, Trivia &amp; more. Play friends or the computer.</small></span><span aria-hidden="true">›</span></a>
     <a class="g-promo zf-promo" href="#/arcade/zombie"><i class="zf-mini" aria-hidden="true">🧟</i><span><b>New: Pal Zombie Survival</b><small>Bring your Pal, splat silly zombies with bubbles. Tap to play!</small></span><span aria-hidden="true">›</span></a>
     <div id="ex-top"></div>

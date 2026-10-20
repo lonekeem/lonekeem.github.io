@@ -17,6 +17,7 @@ import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
 import { emoteMs, EMOTE_BY_ID } from './emotes.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
+import { addParkHD } from './park-hd.js';
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
@@ -76,7 +77,7 @@ export function createPark3D(ctx) {
     const size = () => { const w = view.clientWidth || innerWidth, h = view.clientHeight || innerHeight; R.setPixelRatio(DPR * dprK); R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
     size(); addEventListener('resize', size);
     // lights
-    const hemi = new THREE.HemisphereLight('#cfe6ff', '#5f8a3e', 0.6); scene.add(hemi);
+    const hemi = new THREE.HemisphereLight('#d6ecff', '#6c9a48', LOW ? 0.75 : 0.68); scene.add(hemi);
     const sun = new THREE.DirectionalLight('#fff1d6', 3.1); sun.position.set(40, 70, 25); scene.add(sun); scene.add(sun.target);
     if (Q.shadows) { sun.castShadow = true; const sm = Q.shadowMap; sun.shadow.mapSize.set(sm, sm); const sc = sun.shadow.camera; sc.left = sc.bottom = -34; sc.right = sc.top = 34; sc.near = 10; sc.far = 160; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04; sun.shadow.radius = 3; if (ULTRA) { sc.left = sc.bottom = -46; sc.right = sc.top = 46; } }
     // procedural sky (gradient + sun + soft fbm clouds) and an environment map baked from it
@@ -251,6 +252,9 @@ export function createPark3D(ctx) {
     const NSP = LOW ? 160 : 420; const spG = new THREE.BufferGeometry(); const spP = new Float32Array(NSP * 3), spV = []; for (let i = 0; i < NSP; i++) spV.push({ a: Math.random() * 6.28, life: Math.random() });
     spG.setAttribute('position', new THREE.BufferAttribute(spP, 3)); const spray = new THREE.Points(spG, new THREE.PointsMaterial({ color: '#e8f8ff', size: 0.12, transparent: true, opacity: 0.85, depthWrite: false })); spray.position.copy(fountain.position); spray.frustumCulled = false; scene.add(spray);
     cyl.push({ x: 0, z: 0, r: 4.5, top: fy + 0.85 }); cyl.push({ x: 0, z: 0, r: 0.9, top: 99 });
+
+    // HD extras: butterflies, petals, 3D clouds, reeds + foam, flower beds, lamp glow (js/pals/park-hd.js, tier-scaled)
+    const hd = addParkHD(scene, { Q, LOW, ground, pathD, walkable, POND, LAKE, WATER_Y, PLAZA_R, lampHeads, W, H });
 
     // ---------------------------------------------------------------- Kemy Studio (purple, original design) with porch stairs you can climb
     { const g = new THREE.Group(); const y0 = 2.6; g.position.set(STUDIO.x, y0, STUDIO.z); scene.add(g);
@@ -517,7 +521,7 @@ export function createPark3D(ctx) {
         if (Math.hypot(it.x - P.x, it.z - P.z) < 1.3 && Math.abs(P.y + 0.8 - it.m.position.y) < 1.6) { found.add(it.id); it.m.visible = false; lss(tk, JSON.stringify([...found])); paintFound(); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: 10, why: 'for a treasure' } })); hint('✨ Treasure found! +10 Star Coins'); } }
       if (portalCd > 0) portalCd -= dt; for (const pt of portals) { pt.disc.material.opacity = 0.45 + Math.sin(now / 300 + pt.x) * 0.15; if (portalCd <= 0 && Math.hypot(pt.x - P.x, pt.z - P.z) < 1.2) { portalCd = 4; if (confirm(`Play ${pt.name}?`)) { location.hash = pt.href; return; } } }
       // world animation
-      const tt = now / 1000; wind.value = RM() ? 0 : tt; skyMat.uniforms.t.value = RM() ? 0 : tt; sky.position.copy(cam.position); waterM.uniforms.t.value = tt;
+      const tt = now / 1000; wind.value = RM() ? 0 : tt; skyMat.uniforms.t.value = RM() ? 0 : tt; sky.position.copy(cam.position); waterM.uniforms.t.value = tt; hd.update(tt, cam);
       for (let i = 0; i < NSP; i++) { const s = spV[i]; s.life += dt * 0.9; if (s.life > 1) { s.life -= 1; s.a = Math.random() * 6.28; } const l = s.life, r = 0.2 + l * (i % 2 ? 1.5 : 0.9), y = 3.6 + l * 2.6 - l * l * 3.6 * (i % 2 ? 1.2 : 1.6); spP[i * 3] = Math.cos(s.a) * r; spP[i * 3 + 1] = Math.max(0.6, y); spP[i * 3 + 2] = Math.sin(s.a) * r; } spG.attributes.position.needsUpdate = true;
       clouds.position.x = (tt * 0.6) % 120; const pg = window.__p3play; if (pg && !RM()) { pg.userData.seats.forEach((s, i) => (s.rotation.x = Math.sin(tt * 1.6 + i * 1.3) * 0.35)); pg.userData.plank.rotation.z = Math.sin(tt * 0.9) * 0.22; }
       if (window.__p3star) window.__p3star.rotation.y = tt;

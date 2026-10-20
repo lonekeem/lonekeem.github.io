@@ -122,7 +122,7 @@ export function createPalGames(ctx) {
   async function myPal() { if (!S.user) return snap(null); try { return snap(await getActivePal(db, S.user.uid)); } catch { return snap(null); } }
   async function lobby(params) {
     const sel = GAME[params.g] ? params.g : 'race';
-    main.innerHTML = `<section class="card pad pal-box pg-lobby"><div class="pal-box-head"><h1>🎮 Pal Games</h1><a class="btn btn-sm btn-ghost" href="#/games">All games</a></div>
+    main.innerHTML = `<section class="card pad pal-box pg-lobby"><div class="pal-box-head"><h1>🎮 Pal Games</h1><a class="btn btn-sm" href="#/park">🌳 Pal Park</a><a class="btn btn-sm btn-ghost" href="#/games">All games</a></div>
       <p class="muted small">Your Pal competes in 30-second real-time mini-games. Play a friend, get a quick match, or practise against the computer. Wins give your Pal XP and Star Coins.</p>
       <div class="pg-cards">${PAL_GAMES.map((g) => `<button class="pg-card ${g.id === sel ? 'on' : ''}" data-g="${g.id}"><span class="pg-ic">${g.icon}</span><b>${esc(g.name)}</b><small>${esc(g.blurb)}</small></button>`).join('')}</div>
       <div class="pg-modes"><button class="btn" data-m="cpu">🤖 vs Computer</button><button class="btn btn-ghost" data-m="quick">⚡ Quick match</button><button class="btn btn-ghost" data-m="friend">💌 Play a friend</button></div>

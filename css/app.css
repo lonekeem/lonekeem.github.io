@@ -1631,3 +1631,10 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .don-x { color: var(--muted); font-size: 1rem; padding: 4px; }
 .don-btn { margin-bottom: 14px; background: linear-gradient(135deg, #8a2be2, #c04bd8); }
 .don-kids { background: rgba(255, 200, 80, .12); border-radius: 10px; padding: 8px 10px; }
+
+/* Pal Park quick access (home feed + Explore) */
+.pk-quick{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:10px 14px;border-radius:18px;text-decoration:none;color:#0b1a10;background:linear-gradient(135deg,#eaffd9,#c9f1ff);border:1px solid #9bd77a;box-shadow:0 4px 14px rgba(60,140,80,.25)}
+.pk-quick b{display:block;color:#0b1a10;font-size:1rem}.pk-quick small{display:block;color:#24412c;font-size:.8rem}
+.pk-quick-ic{font-size:1.9rem;line-height:1}.pk-quick > span:nth-child(2){flex:1;min-width:0}
+.pk-quick-go{flex:0 0 auto;padding:7px 14px;border-radius:999px;background:#2f8a3e;color:#fff;font-weight:800;font-size:.85rem}
+.pk-promo{background:linear-gradient(135deg,rgba(95,174,60,.28),rgba(47,154,216,.22))!important;border:1px solid rgba(155,215,122,.6)!important}
