@@ -1306,7 +1306,7 @@ async function pageNotifications(asStudio, token) {
 // ---------------------------------------------------------------- admin
 // All shop items (base catalog + Pal Store outfits/looks/backgrounds/Rare Pals + dances), same doc the Dance Shop button writes.
 async function adminShopDoc() {
-  await import('./pals/store.js'); await import('./pals/armory.js'); const du = await import('./pals/dance-ui.js'); await du.registerDanceItems();
+  await import('./pals/store.js'); await import('./pals/armory.js'); const du = await import('./pals/dance-ui.js'); await du.registerDanceItems(); await (await import('./world/cars.js')).registerCarItems(); // Kemy World cars (⭐ car_*, 💎 z_car_*)
   return (await import('./pals/catalog.js')).shopDoc();
 }
 async function adminShopStatus() {

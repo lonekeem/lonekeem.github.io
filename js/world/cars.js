@@ -6,17 +6,17 @@ import * as THREE from '../vendor/three-0.170.0.module.min.js';
 
 export const CARS = [
   { id: 'pip', name: 'Pocket Pip', style: 'mini', emoji: '🚗', free: 1, blurb: 'A tiny, bubbly city car. Everyone starts with one!',
-    L: 3.1, Wd: 1.62, H: 1.45, wr: 0.32, mass: 850, torque: 150, redline: 6800, gears: [3.4, 2.1, 1.45, 1.05], fd: 4.1, grip: 1.05, steer: 0.62, top: 26, susp: 26, damp: 2.6, color: 6 },
+    L: 3.1, Wd: 1.62, H: 1.45, wr: 0.32, mass: 850, torque: 150, redline: 6800, gears: [3.4, 2.1, 1.45, 1.05], fd: 4.1, grip: 1.05, steer: 0.62, top: 16, susp: 26, damp: 2.6, color: 6 },
   { id: 'star', name: 'Star Racer', style: 'coupe', emoji: '🏎️', p: 450, blurb: 'A smooth sporty coupe with a little ducktail.',
-    L: 4.3, Wd: 1.86, H: 1.3, wr: 0.34, mass: 1300, torque: 330, redline: 7400, gears: [3.3, 2.2, 1.6, 1.25, 1.0, 0.82], fd: 3.7, grip: 1.15, steer: 0.55, top: 48, susp: 34, damp: 3.2, color: 0 },
+    L: 4.3, Wd: 1.86, H: 1.3, wr: 0.34, mass: 1300, torque: 330, redline: 7400, gears: [3.3, 2.2, 1.6, 1.25, 1.0, 0.82], fd: 3.7, grip: 1.15, steer: 0.55, top: 27, susp: 34, damp: 3.2, color: 0 },
   { id: 'cruise', name: 'Moonlight Cruiser', style: 'cruiser', emoji: '🚙', p: 650, blurb: 'A long classic cruiser with chrome and tail fins.',
-    L: 5.0, Wd: 1.96, H: 1.42, wr: 0.36, mass: 1650, torque: 380, redline: 5600, gears: [2.9, 1.8, 1.25, 1.0], fd: 3.3, grip: 0.95, steer: 0.5, top: 40, susp: 22, damp: 2.4, color: 3 },
+    L: 5.0, Wd: 1.96, H: 1.42, wr: 0.36, mass: 1650, torque: 380, redline: 5600, gears: [2.9, 1.8, 1.25, 1.0], fd: 3.3, grip: 0.95, steer: 0.5, top: 22, susp: 22, damp: 2.4, color: 3 },
   { id: 'bear', name: 'Trail Bear', style: 'truck', emoji: '🛻', p: 900, blurb: 'A tall off-road truck with chunky tires and a light bar.',
-    L: 4.9, Wd: 2.06, H: 1.95, wr: 0.48, mass: 2300, torque: 560, redline: 5200, gears: [3.8, 2.4, 1.6, 1.15, 0.9], fd: 3.9, grip: 1.0, steer: 0.52, top: 38, susp: 18, damp: 2.0, color: 2 },
+    L: 4.9, Wd: 2.06, H: 1.95, wr: 0.48, mass: 2300, torque: 560, redline: 5200, gears: [3.8, 2.4, 1.6, 1.15, 0.9], fd: 3.9, grip: 1.0, steer: 0.52, top: 20, susp: 18, damp: 2.0, color: 2 },
   { id: 'comet', name: 'Purple Comet', style: 'super', emoji: '☄️', d: 1200, prem: 1, blurb: 'A low, wide supercar with a glowing wing. Premium.',
-    L: 4.5, Wd: 2.0, H: 1.12, wr: 0.36, mass: 1400, torque: 600, redline: 8400, gears: [3.1, 2.2, 1.65, 1.3, 1.08, 0.92, 0.8], fd: 3.5, grip: 1.3, steer: 0.5, top: 70, susp: 44, damp: 4.0, color: 1 },
+    L: 4.5, Wd: 2.0, H: 1.12, wr: 0.36, mass: 1400, torque: 600, redline: 8400, gears: [3.1, 2.2, 1.65, 1.3, 1.08, 0.92, 0.8], fd: 3.5, grip: 1.3, steer: 0.5, top: 35, susp: 44, damp: 4.0, color: 1 },
   { id: 'aurora', name: 'Aurora GT', style: 'gt', emoji: '🌌', d: 1600, prem: 1, blurb: 'A long-nose grand tourer with an aurora light strip. Premium.',
-    L: 4.8, Wd: 1.98, H: 1.2, wr: 0.37, mass: 1550, torque: 650, redline: 7800, gears: [3.0, 2.1, 1.6, 1.28, 1.05, 0.88, 0.76], fd: 3.4, grip: 1.22, steer: 0.5, top: 66, susp: 38, damp: 3.6, color: 4 },
+    L: 4.8, Wd: 1.98, H: 1.2, wr: 0.37, mass: 1550, torque: 650, redline: 7800, gears: [3.0, 2.1, 1.6, 1.28, 1.05, 0.88, 0.76], fd: 3.4, grip: 1.22, steer: 0.5, top: 33, susp: 38, damp: 3.6, color: 4 },
 ];
 export const CAR = Object.fromEntries(CARS.map((c) => [c.id, c]));
 export const CAR_IDX = CARS.map((c) => c.id); // append-only: used in the compact multiplayer code
@@ -53,6 +53,10 @@ const M = {
 function extrudeSide(pts, width, bevel, curve = 10) { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) { const p = pts[i]; if (p.length === 4) s.quadraticCurveTo(p[0], p[1], p[2], p[3]); else s.lineTo(p[0], p[1]); } s.closePath();
   const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.01, width - bevel * 2), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.9, bevelSegments: 5, curveSegments: curve, steps: 1 });
   g.translate(0, 0, -(width - bevel * 2) / 2); g.rotateY(-Math.PI / 2); g.computeVertexNormals(); return g; }
+// shape the slab into a car body: tumblehome above the beltline, rounded plan view at nose/tail, tucked rocker
+function sculpt(g, c, belt, top, k = 1) { const p = g.attributes.position, hl = c.L / 2 + 0.2; for (let i = 0; i < p.count; i++) { let x = p.getX(i); const y = p.getY(i), z = p.getZ(i);
+    const tb = Math.max(0, Math.min(1, (y - belt) / Math.max(0.05, top - belt))); x *= 1 - 0.2 * k * tb * tb; const t = Math.min(1, Math.abs(z) / hl); x *= 1 - 0.16 * Math.pow(t, 5); if (y < c.wr * 0.75) x *= 0.95; p.setX(i, x); }
+  g.computeVertexNormals(); return g; }
 // body profiles per style, as fractions of length (x from -0.5 front... we use +x = front) and height
 function profiles(c) { const L = c.L, H = c.H, r = c.wr, cl = r * 0.55; const f = L / 2, b = -L / 2;
   switch (c.style) {
@@ -78,20 +82,20 @@ function rim(r, w, spokes) { const g = new THREE.Group(); const ch = M.chrome();
 export function buildCar(def, color, o = {}) { const c = typeof def === 'string' ? CAR[def] : def; const col = PAINTS[color ?? c.color] || PAINTS[0]; const lite = !!o.lite;
   const root = new THREE.Group(); const ch = new THREE.Group(); root.add(ch); const paint = paintMat(col);
   const pr = profiles(c); const W = c.Wd, r = c.wr; const bev = Math.min(0.16, W * 0.08);
-  const body = new THREE.Mesh(extrudeSide(pr.body, W, bev, lite ? 6 : 12), paint); ch.add(body);
-  const cabW = W * pr.roofW; const cab = new THREE.Mesh(extrudeSide(pr.cabin, cabW, 0.1, lite ? 6 : 12), M.glass()); cab.renderOrder = 2; ch.add(cab);
+  const body = new THREE.Mesh(sculpt(extrudeSide(pr.body, W, bev, lite ? 6 : 12), c, c.H * 0.3, c.H * 0.62), paint); ch.add(body);
+  const cabW = W * pr.roofW; const cab = new THREE.Mesh(sculpt(extrudeSide(pr.cabin, cabW, 0.1, lite ? 6 : 12), c, c.H * 0.55, c.H, 1.1), M.glass()); cab.renderOrder = 2; ch.add(cab);
   // roof skin (paint) as a thin slab following the top of the cabin
   { const top = pr.cabin.filter((p, i) => i === 1 || i === 2).map((p) => p.length === 4 ? [p[2], p[3]] : p); const x0 = Math.min(top[0][0], top[1][0]) , x1 = Math.max(top[0][0], top[1][0]); const y = Math.max(top[0][1], top[1][1]);
-    const roof = new THREE.Mesh(extrudeSide([[x0 + 0.05, y - 0.06], [x1 - 0.05, y - 0.06], [x1 - 0.12, y + 0.03], [x0 + 0.12, y + 0.03]], cabW + 0.02, 0.05, 4), paint); ch.add(roof); }
+    const roof = new THREE.Mesh(extrudeSide([[x0 + 0.05, y - 0.06], [x1 - 0.05, y - 0.06], [x1 - 0.12, y + 0.03], [x0 + 0.12, y + 0.03]], cabW * 0.9, 0.05, 4), paint); ch.add(roof); }
   // wheel arch flares
   const axF = c.L * 0.33, axR = -c.L * 0.32, tw = W / 2 - r * 0.2;
   for (const z of [axF, axR]) for (const s of [-1, 1]) { const fl = new THREE.Mesh(new THREE.TorusGeometry(r * 1.12, r * 0.18, 8, 18, Math.PI), paint); fl.rotation.y = Math.PI / 2; fl.position.set(s * (W / 2 - 0.02), r, z); fl.scale.set(1, 1, 1.4); ch.add(fl); }
   // lights + grille + badge
-  const fz = c.L / 2 + 0.03, by = c.H * (c.style === 'super' ? 0.28 : 0.38);
+  const fz = c.L / 2 + bev * 0.9 + 0.02, by = c.H * (c.style === 'super' ? 0.28 : 0.38);
   for (const s of [-1, 1]) { const hl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 10), M.head()); hl.scale.set(c.style === 'super' || c.style === 'gt' ? 2.2 : 1.2, 0.7, 0.5); hl.position.set(s * W * 0.33, by + 0.05, fz - 0.06); ch.add(hl);
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(c.style === 'gt' ? W * 0.3 : 0.32, 0.1, 0.06), M.tail()); tl.position.set(s * W * 0.32, c.H * 0.45, -c.L / 2 - 0.02); ch.add(tl); tl.userData.tail = 1; }
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(c.style === 'gt' ? W * 0.3 : 0.32, 0.1, 0.06), M.tail()); tl.position.set(s * W * 0.3, c.H * 0.45, -c.L / 2 - bev * 0.9 - 0.01); ch.add(tl); tl.userData.tail = 1; }
   const gr = new THREE.Mesh(new THREE.BoxGeometry(W * 0.42, c.H * 0.12, 0.05), M.trim()); gr.position.set(0, by - 0.08, fz - 0.03); ch.add(gr);
-  for (const [z, ry] of [[fz + 0.005, 0], [-c.L / 2 - 0.045, Math.PI]]) { const b = new THREE.Mesh(new THREE.CircleGeometry(0.09, 20), M.badge()); b.position.set(0, ry ? c.H * 0.36 : by + 0.1, z); b.rotation.y = ry; ch.add(b); }
+  for (const [z, ry] of [[fz + 0.005, 0], [-c.L / 2 - bev * 0.9 - 0.03, Math.PI]]) { const b = new THREE.Mesh(new THREE.CircleGeometry(0.09, 20), M.badge()); b.position.set(0, ry ? c.H * 0.36 : by + 0.1, z); b.rotation.y = ry; ch.add(b); }
   // bumpers (chrome for the cruiser)
   for (const z of [c.L / 2, -c.L / 2]) { const bm = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, W - 0.3, 4, 10), c.style === 'cruiser' || c.style === 'truck' ? M.chrome() : M.trim()); bm.rotation.z = Math.PI / 2; bm.position.set(0, r * 0.75, z); ch.add(bm); }
   // style extras
@@ -106,15 +110,15 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
   // interior: seats, dash, steering wheel (visible through the glass, used by the POV camera)
   const seatY = Math.max(r * 0.9, c.H * 0.38), drvX = W * 0.22, seatZ = (pr.cabin[0][0] + pr.cabin[pr.cabin.length - 1][0]) / 2 - 0.1;
   for (const s of [1, -1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.14, 0.48), M.seat()); st.position.set(s * drvX, seatY, seatZ); ch.add(st); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.6, 0.12), M.seat()); bk.position.set(s * drvX, seatY + 0.32, seatZ - 0.26); bk.rotation.x = -0.18; ch.add(bk); }
-  const dashZ = pr.cabin[0][0] - 0.15; const dash = new THREE.Mesh(new THREE.BoxGeometry(W * 0.8, 0.18, 0.4), M.dash()); dash.position.set(0, seatY + 0.34, dashZ); ch.add(dash);
-  const gauge = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), M.glow('#7dd3fc')); gauge.position.set(drvX, seatY + 0.44, dashZ - 0.2); gauge.rotation.x = -0.4; gauge.rotation.y = Math.PI; ch.add(gauge);
-  const steer = new THREE.Group(); steer.position.set(drvX, seatY + 0.42, dashZ - 0.28); steer.rotation.x = -0.45; ch.add(steer);
+  const dashZ = pr.cabin[0][0] - 0.12; const dash = new THREE.Mesh(new THREE.BoxGeometry(W * 0.74, 0.16, 0.36), M.dash()); dash.position.set(0, seatY + 0.26, dashZ - 0.22); ch.add(dash);
+  const gauge = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), M.glow('#7dd3fc')); gauge.position.set(drvX, seatY + 0.35, dashZ - 0.41); gauge.rotation.x = -0.4; gauge.rotation.y = Math.PI; ch.add(gauge);
+  const steer = new THREE.Group(); steer.position.set(drvX, seatY + 0.4, dashZ - 0.5); steer.rotation.x = -0.45; ch.add(steer);
   { const wr = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 24), M.trim()); steer.add(wr); const sp = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.02), M.trim()); steer.add(sp); const cen = new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), M.badge()); cen.position.z = -0.012; cen.rotation.y = Math.PI; steer.add(cen); }
   // doors: hinged panels at the front edge on each side (pivot = hinge)
   const doors = []; const dz0 = pr.cabin[0][0] - 0.02, dlen = Math.min(1.25, c.L * 0.3), dh = c.H * (c.style === 'truck' ? 0.36 : 0.32);
   for (const s of [-1, 1]) { const piv = new THREE.Group(); piv.position.set(s * (W / 2 + 0.005), seatY - 0.12, dz0); ch.add(piv);
     const pnl = new THREE.Mesh(new THREE.BoxGeometry(0.05, dh, dlen), paint); pnl.position.set(0, dh / 2 - 0.05, -dlen / 2); piv.add(pnl);
-    const gw = new THREE.Mesh(new THREE.BoxGeometry(0.03, c.H * 0.3, dlen * 0.82), M.glass()); gw.position.set(-s * 0.02, dh + c.H * 0.14, -dlen * 0.52); gw.renderOrder = 3; piv.add(gw);
+    const gw = new THREE.Mesh(new THREE.BoxGeometry(0.03, c.H * 0.3, dlen * 0.82), M.glass()); gw.position.set(-s * 0.02, dh + c.H * 0.14, -dlen * 0.52); gw.renderOrder = 3; gw.visible = false;
     const hd = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.16), M.chrome()); hd.position.set(s * 0.03, dh - 0.12, -dlen * 0.8); piv.add(hd); doors.push({ piv, s, a: 0 }); }
   // wheels: steer pivot -> spin group (tire + rim)
   const wheels = []; const ww = r * 0.75 * (c.style === 'truck' ? 1.3 : 1);
@@ -140,7 +144,7 @@ export function createVehicle(def, groundAt) { const c = typeof def === 'string'
   function step(h, inp) { // inp: { thr 0..1, brk 0..1, steer -1..1, hand }
     // smoothed input: gradual throttle, speed-sensitive steering
     V.thr += ((inp.thr || 0) - V.thr) * Math.min(1, h * 3.5); V.brk += ((inp.brk || 0) - V.brk) * Math.min(1, h * 8);
-    const spd = Math.abs(V.vf); const maxSt = c.steer / (1 + spd * 0.045); V.steer += (((inp.steer || 0) * maxSt) - V.steer) * Math.min(1, h * 6);
+    const spd = Math.abs(V.vf); const maxSt = c.steer / (1 + spd * 0.055); V.steer += (((inp.steer || 0) * maxSt) - V.steer) * Math.min(1, h * 6);
     // reverse: brake held when (nearly) stopped
     if (V.brk > 0.5 && V.vf < 0.6 && !V.rev && V.thr < 0.1) V.revT = (V.revT || 0) + h; else V.revT = 0; if (V.revT > 0.35) V.rev = true; if (V.rev && (V.thr > 0.1 || V.vf > 0.3) && V.brk < 0.1) V.rev = false;
     // gears + rpm (auto box)
@@ -159,10 +163,10 @@ export function createVehicle(def, groundAt) { const c = typeof def === 'string'
       V.r = V.vf * Math.tan(V.steer) / L; V.vl *= Math.max(0, 1 - h * 10);
       V.acc = (Fd + Fb + drag) / m; V.vf += V.acc * h; } else {
       const sf = Math.atan2(V.vl + a * V.r, Math.abs(V.vf)) - V.steer * Math.sign(V.vf), sr = Math.atan2(V.vl - b * V.r, Math.abs(V.vf));
-      const Cf = m * 9, Cr = m * 9.6; const Fyf = Math.max(-mu * Nf, Math.min(mu * Nf, -Cf * sf)), Fyr = Math.max(-mu * Nr * 0.98, Math.min(mu * Nr * 0.98, -Cr * sr));
+      const Cf = m * 9, Cr = m * 9.6; const Fyf = Math.max(-mu * Nf, Math.min(mu * Nf, -Cf * sf)), rg = inp.hand ? 0.6 : 1.12, Fyr = Math.max(-mu * Nr * rg, Math.min(mu * Nr * rg, -Cr * sr));
       V.slip = Math.max(Math.abs(sf), Math.abs(sr)) * (Math.abs(Cr * sr) > mu * Nr ? 1.6 : 0.6);
       V.acc = (Fd + Fb + drag - Fyf * Math.sin(V.steer)) / m; const ay = (Fyr + Fyf * Math.cos(V.steer)) / m - V.vf * V.r; V.ay = ay;
-      V.vf += V.acc * h; V.vl += ay * h; V.r += (a * Fyf * Math.cos(V.steer) - b * Fyr) / I * h; V.vl *= 1 - h * 0.6; }
+      V.vf += V.acc * h; V.vl += ay * h; V.r += (a * Fyf * Math.cos(V.steer) - b * Fyr) / I * h; V.vl *= 1 - h * 0.6; V.r *= 1 - h * 0.25; const rmax = mu * g * (inp.hand ? 1.6 : 1.15) / Math.max(spd, 3); V.r = Math.max(-rmax, Math.min(rmax, V.r)); }
     if (Math.abs(V.vf) < 0.03 && pedal < 0.05) V.vf = 0;
     // integrate world position
     let sy = Math.sin(V.yaw), cy = Math.cos(V.yaw); V.yaw += V.r * h;

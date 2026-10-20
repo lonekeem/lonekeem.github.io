@@ -45,6 +45,6 @@ try {
   await a.setViewportSize({ width: 844, height: 390 }); await W(a, 2500); await a.evaluate(() => { window.__p3.teleport(30, 112); window.__p3.setYaw(0.2); }); await W(a, 3000); await a.screenshot({ path: shot + 'landscape-parkcorner.png' });
   await a.evaluate(() => { window.__p3.teleport(0, 60); window.__p3.setYaw(0); }); await W(a, 3000); await a.screenshot({ path: shot + 'landscape-gate-from-park.png' });
   out.fps = await a.evaluate(() => window.__p3.fps);
-  if (steps.includes('drive')) out.drive = await (await import('./street-drive.mjs')).default(a, shot, W);
+  if (steps.includes('drive') || steps.includes('all')) out.drive = await (await import('./street-drive.mjs')).default(a, shot, W);
 } catch (e) { console.log('ERR', e.message); }
 console.log(JSON.stringify(out, null, 1)); console.log('errors:', errors.slice(0, 20).join('\n') || 'none'); await browser.close();

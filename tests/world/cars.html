@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Kemy Cars preview</title><style>body{margin:0;background:#222}canvas{display:block;width:100vw;height:100vh}</style><canvas id="c"></canvas>
+<script type="module">
+import * as THREE from '../../js/vendor/three-0.170.0.module.min.js';
+import { gfxPreset, makeRenderer, makeSky, envFromSky } from '../../js/gfx.js';
+import { CARS, buildCar, poseCar, setDoors } from '../../js/world/cars.js';
+const Q = { ...gfxPreset(), ...(location.hash.includes('low') ? { shadows: false } : {}) }; const R = makeRenderer(document.getElementById('c'), Q); const scene = new THREE.Scene();
+const sky = makeSky({ top: '#3b2470', hor: '#c4a5ff' }); scene.add(sky); scene.environment = envFromSky(R, sky); scene.environmentIntensity = 0.6;
+scene.add(new THREE.HemisphereLight('#d6ccff', '#3a3060', 1.2)); const sun = new THREE.DirectionalLight('#fff', 2.4); sun.position.set(6, 10, 8); sun.castShadow = true; scene.add(sun);
+const g = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: '#3b3d48', roughness: 0.9 })); g.rotation.x = -Math.PI / 2; g.receiveShadow = true; scene.add(g);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500); cam.position.set(13, 5, 9); cam.lookAt(0, 0.6, -1);
+const only = new URLSearchParams(location.search).get('car');
+(only ? CARS.filter((c) => c.id === only) : CARS).forEach((c, i, a) => { const m = buildCar(c, c.color); scene.add(m); const x = only ? 0 : (i % 3 - 1) * 5.5, z = only ? 0 : Math.floor(i / 3) * -6.5 + 3; poseCar(m, { x, y: 0, z, yaw: 0.6 }, 0.25, 0); setDoors(m, location.hash.includes('doors') ? 1 : 0); });
+if (only) { cam.position.set(5.6, 1.9, 3.2); cam.lookAt(0, 0.5, 0.2); }
+R.setSize(innerWidth, innerHeight, false); R.render(scene, cam); window.done = 1;
+</script>

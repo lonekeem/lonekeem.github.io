@@ -5,6 +5,7 @@
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
 import { HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS } from './layout.js';
 import { buildCar, poseCar, CAR_IDX, CARS } from './cars.js';
+import { attachDrive } from './drive.js';
 export { worldGround, worldClamp } from './layout.js';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v)), sstep = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -197,14 +198,15 @@ export function attachWorld(api) {
   const hud = document.createElement('div'); hud.className = 'ks-hud'; view.appendChild(hud);
   if (!document.getElementById('ks-css')) { const st = document.createElement('style'); st.id = 'ks-css'; st.textContent = `.ks-hud{position:absolute;inset:0;pointer-events:none;z-index:6;font-family:Inter,system-ui,sans-serif}
 .ks-act{position:absolute;left:50%;bottom:calc(max(18px,env(safe-area-inset-bottom)) + 118px);transform:translateX(-50%);pointer-events:auto;min-height:56px;padding:0 22px;border-radius:999px;border:3px solid #fff;background:#ff8a1f;color:#2b1d55;font:900 18px Inter,system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-.ks-act[hidden]{display:none}.ks-bagb{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 156px);right:8px;pointer-events:auto;min-width:48px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(43,29,85,.75);color:#fff;font:800 15px Inter,sans-serif;padding:0 12px}
-.ks-map{position:absolute;right:8px;top:calc(max(8px,env(safe-area-inset-top)) + 202px);width:92px;height:92px;border-radius:14px;border:2px solid rgba(255,255,255,.6);background:rgba(20,12,45,.55);pointer-events:auto}
+.ks-act[hidden]{display:none}.ks-bagb{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 134px);left:max(8px,env(safe-area-inset-left));pointer-events:auto;min-width:48px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(43,29,85,.75);color:#fff;font:800 15px Inter,sans-serif;padding:0 12px}
+.ks-map{position:absolute;left:max(8px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + 180px);width:92px;height:92px;border-radius:14px;border:2px solid rgba(255,255,255,.6);background:rgba(20,12,45,.55);pointer-events:auto}
 .ks-panel{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;background:rgba(10,5,30,.6);pointer-events:auto;padding:14px}.ks-card{background:#2b1d55;color:#fff;border-radius:20px;padding:18px;max-width:380px;width:100%;max-height:86vh;overflow:auto}
 .ks-card h3{margin:0 0 8px;font-size:20px}.ks-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.ks-grid div{background:rgba(255,255,255,.1);border-radius:12px;padding:6px;text-align:center;font-size:12px}.ks-grid b{display:block;font-size:24px}
 .ks-card button{min-height:48px;border-radius:12px;border:0;padding:0 16px;font-weight:800;background:#ffd23f;color:#2b1d55;font-size:16px;margin-top:10px}.ks-card .ghost{background:rgba(255,255,255,.15);color:#fff}
 .ks-toast{position:absolute;left:50%;top:22%;transform:translate(-50%,0);background:rgba(43,29,85,.9);color:#fff;border-radius:16px;padding:10px 16px;font-weight:800;font-size:16px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}.ks-toast.on{opacity:1}
 .ks-tag{position:absolute;left:0;top:0;font:800 11px Inter,sans-serif;color:#fff;background:rgba(30,16,60,.55);padding:2px 7px;border-radius:999px;white-space:nowrap;transform:translate(-50%,-100%)}
-.ks-bub{position:absolute;left:0;top:0;max-width:180px;background:#fff;color:#2a1458;font:700 13px Inter,sans-serif;padding:6px 10px;border-radius:14px;transform:translate(-50%,-100%);box-shadow:0 3px 10px rgba(0,0,0,.25);text-align:center}`; document.head.appendChild(st); }
+.ks-bub{position:absolute;left:0;top:0;max-width:180px;background:#fff;color:#2a1458;font:700 13px Inter,sans-serif;padding:6px 10px;border-radius:14px;transform:translate(-50%,-100%);box-shadow:0 3px 10px rgba(0,0,0,.25);text-align:center}
+@media (max-height:500px){.ks-bagb{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 112px)}.ks-map{top:calc(max(8px,env(safe-area-inset-top)) + 130px);width:64px;height:64px}}`; document.head.appendChild(st); }
   hud.innerHTML = `<button type="button" class="ks-act" id="ks-act" hidden></button><button type="button" class="ks-bagb" id="ks-bag" aria-label="Candy bag">🍬 0</button><canvas class="ks-map" id="ks-map" width="184" height="184" aria-label="Map"></canvas><div class="ks-toast" id="ks-toast"></div><div id="ks-tags"></div>`;
   const $ = (s) => hud.querySelector(s); const actB = $('#ks-act'), bagB = $('#ks-bag'), mapC = $('#ks-map'), toastEl = $('#ks-toast'), tagsEl = $('#ks-tags'); const mapX = mapC.getContext('2d');
   const say = (t) => { toastEl.textContent = t; toastEl.classList.add('on'); clearTimeout(toastEl._t); toastEl._t = setTimeout(() => toastEl.classList.remove('on'), 2600); };
@@ -241,7 +243,9 @@ export function attachWorld(api) {
 
   // ---------------------------------------------------------------- per-frame update
   let lightT = 0, mapT = 0, cullT = 0; const peds = () => { const out = [{ x: P.x, z: P.z }]; for (const o of api.others.values()) out.push({ x: o.x, z: o.z }); for (const b of bots) out.push({ x: b.x, z: b.z }); return out; };
+  const titleEl = view.querySelector('.p3-top b'); let area = '';
   function update(dt, now) { const tt = now / 1000; const inS = P.z > PARK.H - 14 ? sstep(PARK.H - 16, PARK.H + 14, P.z) : 0; setNight(inS);
+    const ar = P.z > PARK.H + 2 ? '🎃 Kemy Street' : '🌳 Pal Park'; if (ar !== area && titleEl) { area = ar; titleEl.textContent = ar; }
     const cp = api.cam.position; moon.position.set(cp.x - 120, cp.y + 160, cp.z + 260); moon.lookAt(cp); stars.position.copy(cp); const near = P.z > PARK.H - 40;
     root.visible = true; // culling per object below
     if ((cullT += dt) > 0.4) { cullT = 0; const far = Q.draw * 0.75; for (const c of cars) { const x = c.drive ? c.m.position.x : c.x, z = c.drive ? c.m.position.z : c.z; c.m.visible = Math.hypot(x - P.x, z - P.z) < far; } }
@@ -285,7 +289,11 @@ export function attachWorld(api) {
   function spawnStreet() { P.x = GATE.x + (Math.random() - 0.5) * 3; P.z = GATE.z + 6 + Math.random() * 3; P.yaw = 0; P.y = ground(P.x, P.z); }
   function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
-  return { update, spawnStreet, destroy, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
+  const W = { update: null, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
+  const D = attachDrive(api, W); W.drive = D;
+  W.update = (dt, now) => { D.update(dt, now); update(dt, now); };
+  W.destroy = () => { try { D.destroy(); } catch { /* */ } destroy(); };
+  return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];
 void CAR_IDX; void roadD; void segD;
