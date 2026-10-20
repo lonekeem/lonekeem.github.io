@@ -991,7 +991,7 @@ service cloud.firestore {
         allow read: if true;
         allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
           && request.resource.data.uid == me() && request.resource.data.e is int
-          && request.resource.data.e >= 0 && request.resource.data.e <= 9 && request.resource.data.at == request.time;
+          && ((request.resource.data.e >= 0 && request.resource.data.e <= 9) || (request.resource.data.e >= 100 && request.resource.data.e <= 199)) && request.resource.data.at == request.time; // 100+: Pal emote (game-emotes.js)
         allow delete: if isAdmin();
       }
       // Trivia answers: one doc per player, overwritten each round; only you and the host read it.
@@ -1643,7 +1643,7 @@ service cloud.firestore {
       match /live/{uid} {
         allow read: if true;
         allow create, update: if signedIn() && uid == me() && me() in get(/databases/$(database)/documents/palGames/$(gid)).data.players
-          && request.resource.data.keys().hasOnly(['p', 's', 'fin', 'at']) && request.resource.data.p is int && request.resource.data.p >= 0 && request.resource.data.p <= 1000
+          && request.resource.data.keys().hasOnly(['p', 's', 'fin', 'at', 'em', 'emAt']) && (!('em' in request.resource.data) || (request.resource.data.em is int && request.resource.data.em >= -1 && request.resource.data.em <= 199 && request.resource.data.emAt is int)) && request.resource.data.p is int && request.resource.data.p >= 0 && request.resource.data.p <= 1000
           && request.resource.data.s is int && request.resource.data.s >= 0 && request.resource.data.s <= 999 && request.resource.data.fin is bool
           && request.resource.data.at == request.time
           && (resource == null || (!resource.data.fin && resource.data.at + duration.value(300, 'ms') < request.time && request.resource.data.s >= resource.data.s));

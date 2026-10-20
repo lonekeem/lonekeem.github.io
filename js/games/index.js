@@ -52,7 +52,7 @@ export function createGames(ctx) {
     host.appendChild(el); setTimeout(() => el.remove(), 2600);
     sfx.play(e === 6 ? 'star' : 'pop');
   }
-  const emoteBar = () => `<div class="g-emotes" role="group" aria-label="Quick chat">${EMOTES.map((t, i) => `<button data-e="${i}" class="${i === 6 ? 'em-star' : ''}" aria-label="${i === 6 ? 'Send a gold star' : esc(t)}">${i === 6 ? STAR() : esc(t)}</button>`).join('')}</div>`;
+  const emoteBar = () => `<div class="g-emotes" role="group" aria-label="Quick chat"><button data-ew class="ge-in" aria-label="Emote wheel: your Pal dances">😊</button>${EMOTES.map((t, i) => `<button data-e="${i}" class="${i === 6 ? 'em-star' : ''}" aria-label="${i === 6 ? 'Send a gold star' : esc(t)}">${i === 6 ? STAR() : esc(t)}</button>`).join('')}</div>`;
   function wireEmotes(root, gid, names) {
     const host = root.querySelector('.g-fx');
     const local = !gid;
@@ -64,7 +64,10 @@ export function createGames(ctx) {
       b.disabled = true; setTimeout(() => (b.disabled = false), 1500);
       try { await net.sendEmote(gid, e); } catch (err) { toast(friendlyError(err)); }
     });
-    if (gid) S.unsubs.push(net.watchChat(gid, (m) => { if (m.uid !== myUid()) floatEmote(host, m.e, names(m.uid)); }));
+    // Pal emote wheel + avatar cards (js/pals/game-emotes.js): emote codes >= 100 ride the same chat channel
+    let ge = null; const bar = root.querySelector('.g-emotes'); const ewb = root.querySelector('.g-emotes [data-ew]');
+    if (bar && ewb) import('../pals/game-emotes.js').then((m) => { ge = m.mountGameEmotes(bar, { db, uid: signedIn() ? myUid() : '', button: ewb, requireAuth, toast, send: local ? null : (code) => net.sendEmote(gid, code) }); }).catch(() => { ewb.hidden = true; });
+    if (gid) S.unsubs.push(net.watchChat(gid, (m) => { if (m.uid === myUid()) return; if (m.e >= 100) { ge && ge.recv(m.uid, m.e, names(m.uid) || 'Player'); return; } floatEmote(host, m.e, names(m.uid)); }));
   }
   let curType = '', curPlayers = null;
   function resultModal({ title, sub, win, buttons, pts, spectator }) {
@@ -121,6 +124,7 @@ export function createGames(ctx) {
     };
     $('#g-lb-tabs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; [...$('#g-lb-tabs').children].forEach((x) => x.classList.toggle('active', x === b)); lb(b.dataset.t); };
     lb(GAMES[0].id);
+    lobbyEmotes();
   }
   function pick(what) {
     const label = { friend: 'Play a friend', quick: 'Quick match', cpu: 'Play the computer' }[what] || 'Pick a game';
@@ -128,6 +132,8 @@ export function createGames(ctx) {
   }
 
   // ------------------------------------------------------------ per-game lobby page
+  // lobby / hub: the emote wheel makes your Pal dance on a small card (local only, nothing synced)
+  const lobbyEmotes = () => { const host = main.firstElementChild; if (host && signedIn()) import('../pals/game-emotes.js').then((m) => m.mountGameEmotes(host, { db, uid: myUid(), toast })).catch(() => {}); };
   async function gamePage(type, params) {
     const g = GAMES.find((x) => x.id === type);
     if (!g) { main.innerHTML = '<div class="empty">Game not found. <a href="#/games">Games</a></div>'; return; }
@@ -182,6 +188,7 @@ export function createGames(ctx) {
       const box = $('#g-lb'); if (!box) return;
       box.innerHTML = rows.length ? `<ol class="g-lb">${rows.map((r, i) => `<li class="${r.uid === myUid() ? 'me' : ''}"><span class="g-rank">${i < 3 ? STAR('r' + i) : ''}<b>${i + 1}</b></span>${avatar({ uid: r.uid, displayName: r.name, username: r.uname, color: r.color }, 'sm', true)}<a href="#/u/${esc(r.uname)}" class="g-lb-n">${esc(r.name)}<small class="muted">@${esc(r.uname)}</small></a><span class="g-lb-s"><b>${r[type + '_w'] || 0}</b> W · ${r[type + '_l'] || 0} L</span></li>`).join('')}</ol>` : '<div class="empty">No online wins yet.</div>';
     }).catch((e) => { const box = $('#g-lb'); if (box) box.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; });
+    lobbyEmotes();
   }
 
   // ------------------------------------------------------------ board rendering

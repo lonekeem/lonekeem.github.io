@@ -22,6 +22,7 @@ export function createArcade(ctx) {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">${MINIGAMES.map((g) => `<a class="card" href="${g.href || '#/arcade/' + g.id}" data-mg="${g.id}" style="display:block;padding:16px;border-radius:18px;background:${g.color};color:#fff;text-decoration:none;min-height:150px">
         <div style="font-size:46px">${g.emoji}</div><b style="font-size:1.15rem">${esc(g.name)}</b><div class="small" style="opacity:.8">${esc(g.tag || '')}</div><p class="small" style="margin:6px 0 0;opacity:.9">${esc(g.desc)}</p>${g.id === 'zombie' && best.wave ? `<div class="small" style="margin-top:6px">🏅 Best: wave ${best.wave} · ⭐ ${best.score}</div>` : ''}</a>`).join('')}</div>
       <p style="margin-top:14px"><a href="#/scores/pals">🏆 Scoreboard</a></p></section>`;
+    if (ctx.S.user) import('./game-emotes.js').then((m) => m.mountGameEmotes(main.firstElementChild, { db: ctx.db, uid: ctx.S.user.uid, toast: ctx.toast })).catch(() => {});
   }
   async function page(id, qs) {
     if (!requireAuth()) return;

@@ -128,7 +128,7 @@ export function createPalGames(ctx) {
       <div class="pg-modes"><button class="btn" data-m="cpu">🤖 vs Computer</button><button class="btn btn-ghost" data-m="quick">⚡ Quick match</button><button class="btn btn-ghost" data-m="friend">💌 Play a friend</button></div>
       <form class="pg-friend" id="pg-friend" hidden><input id="pg-handle" placeholder="@friend’s handle (or leave empty for a link)" autocomplete="off"><button class="btn btn-sm" type="submit">Create game</button></form>
       <h2 class="pal-sub">🏆 Top Pal players</h2><div id="pg-lb" class="card"><div class="spinner"></div></div></section>`;
-    let g = sel;
+    let g = sel; if (S.user) import('./game-emotes.js').then((m) => m.mountGameEmotes(main.firstElementChild, { db, uid: me(), toast })).catch(() => {});
     main.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { g = b.dataset.g; main.querySelectorAll('[data-g]').forEach((x) => x.classList.toggle('on', x === b)); });
     main.querySelector('[data-m=cpu]').onclick = () => cpu(g);
     main.querySelector('[data-m=quick]').onclick = () => quick(g);
@@ -169,7 +169,7 @@ export function createPalGames(ctx) {
     const cpuPal = { species: ['puppy', 'kitten', 'panda', 'fox', 'dragon'][Math.floor(Math.random() * 5)], level: 5, name: 'Robo Pal' };
     main.innerHTML = `<section class="pg-play"><div class="pg-top"><b>${esc(GAME[game].name)}</b> vs 🤖 Robo Pal <select id="pg-lvl" aria-label="Difficulty">${['easy', 'normal', 'hard'].map((l) => `<option ${l === level ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="pg-host"></div></section>`;
     main.querySelector('#pg-lvl').onchange = (e) => { localStorage.setItem('kemy-pg-cpu', e.target.value); cpu(game); };
-    const host = main.querySelector('.pg-host'); await countdown(host);
+    const host = main.querySelector('.pg-host'); if (S.user) import('./game-emotes.js').then((m) => m.mountGameEmotes(host, { db, uid: me(), toast })).catch(() => {}); await countdown(host);
     const start = performance.now(); const jitter = 0.85 + Math.random() * 0.3; let os = 0;
     const opp = () => { const tt = Math.min(DUR, (performance.now() - start) / 1000); os = Math.max(os, Math.floor(CPU_RATE[game] * k * jitter * tt)); return { p: Math.min(1000, tt / DUR * 1000 * (game === 'race' ? 0.95 * k * jitter : 1)), s: os, name: 'Robo Pal' }; };
     const score = await playGame(host, game, Math.floor(Math.random() * 1e9), { pal, oppPal: cpuPal, opp, sound });
@@ -210,10 +210,14 @@ export function createPalGames(ctx) {
       const cdi = setInterval(() => { const el = host.querySelector('.pg-count'); const left = Math.ceil(((g.startAt && g.startAt.toMillis ? g.startAt.toMillis() : 0) - Date.now()) / 1000); if (el) el.textContent = left > 0 ? left : 'Go!'; }, 250);
       await new Promise((r) => setTimeout(r, wait)); clearInterval(cdi);
       const lref = doc(db, 'palGames', gid, 'live', me()); let lastW = 0, pending = null, best = 0;
-      const send = (p, s, fin) => { best = Math.max(best, s); const now = Date.now(); const data = { p, s: Math.min(999, best), fin: !!fin, at: serverTimestamp() }; if (!fin && now - lastW < 450) return; lastW = now; setDoc(lref, data).catch(() => {}); };
+      // Pal emotes ride along in the live doc (em/emAt), sent with the next progress write (rules keep the ~2/s limit)
+      let emF = {}; const seen = {}; let ge = null;
+      import('./game-emotes.js').then((m) => { ge = m.mountGameEmotes(host, { db, uid: me(), toast, send: async (code) => { emF = { em: code, emAt: Date.now() }; } }); }).catch(() => {});
+      const emPoll = setInterval(() => { if (!host.isConnected) { clearInterval(emPoll); return; } const L = live[other]; if (L && L.emAt && L.emAt !== seen[other]) { const first = seen[other] === undefined; seen[other] = L.emAt; if (!first || Date.now() - L.emAt < 6000) ge && ge.recv(other, L.em, g.names[oi]); } }, 300);
+      const send = (p, s, fin) => { best = Math.max(best, s); const now = Date.now(); const data = { p, s: Math.min(999, best), fin: !!fin, at: serverTimestamp(), ...emF }; if (!fin && now - lastW < 450) return; lastW = now; setDoc(lref, data).catch(() => {}); };
       const opp = () => { const L = live[other] || { p: 0, s: 0 }; const cur = shown[other] || { p: 0, s: 0 }; cur.p += (L.p - cur.p) * 0.15; cur.s = L.s; shown[other] = cur; return { p: cur.p, s: cur.s, name: g.names[oi] }; };
       const score = await playGame(host, g.game, g.seed, { pal: g.pals[g.players.indexOf(me())], oppPal: g.pals[oi], opp, onTick: (p, s) => send(p, s, false), sound });
-      await new Promise((r) => setTimeout(r, 500)); await setDoc(lref, { p: 1000, s: Math.min(999, score), fin: true, at: serverTimestamp() }).catch(() => {});
+      await new Promise((r) => setTimeout(r, 500)); await setDoc(lref, { p: 1000, s: Math.min(999, score), fin: true, at: serverTimestamp(), ...emF }).catch(() => {});
       host.innerHTML = '<div class="pg-wait"><div class="spinner"></div><p>Waiting for your rival to finish…</p></div>';
       const t0 = Date.now(); while (!(live[other] && live[other].fin) && Date.now() - t0 < 20000) await new Promise((r) => setTimeout(r, 400));
       const os = live[other] ? live[other].s : 0; const theyFinished = !!(live[other] && live[other].fin); const win = score > os;

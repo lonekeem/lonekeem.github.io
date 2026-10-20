@@ -11,7 +11,8 @@ import { openTalk } from './talk.js';
 import { doc as fdoc, getDoc as fget, setDoc as fset, serverTimestamp as fts } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { roomOf } from './economy.js';
 import { DECOR } from './wear.js';
-import { drawDancer } from './dance.js';
+import { drawDancer, danceById } from './dance.js';
+let boxEmo = { id: '', pal: '', until: 0 };
 import { openWheel, wheelButton, loadOwnedEmotes } from './emote-wheel.js';
 import { emoteMs } from './emotes.js';
 import { createDanceUI, initFloat, registerDanceItems } from './dance-ui.js';
@@ -397,7 +398,7 @@ export function createPals(ctx) {
     const n = slots(m); const act = activeOf(m); const firstEmpty = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].find((id) => !m.list.some((p) => p.id === id));
     main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Box</h1><span class="muted small">${m.list.length}/${MAX_PALS} Pals · ${n} unlocked · <a href="#/pals/gallery">Pal Gallery (${collected().size}/${SPECIES.length})</a></span><a class="pal-coins" href="#/pals/shop" title="Star Coins: open the Pal Shop" id="pal-coins">${shop.coinTxt('…')}</a></div>
       ${m.list.length > 1 ? `<div class="pal-l">Who’s on your profile? <small class="muted">Swipe and tap to switch</small></div><div class="pal-switch" role="radiogroup" aria-label="Active Pal">${m.list.map((p) => `<button role="radio" aria-checked="${act && act.id === p.id}" class="pal-sw-b ${act && act.id === p.id ? 'on' : ''}" data-act="${p.id}"><i data-swc="${p.id}"></i><b>${esc(p.name)}</b></button>`).join('')}</div>` : ''}
-      <div class="pal-quick"><a class="btn btn-sm" href="#/pals/shop">🛍️ Pal Shop</a><a class="btn btn-sm btn-ghost" href="#/games/pals">🎮 Pal Games</a><a class="btn btn-sm btn-ghost" href="#/park">🌳 Pal Park</a></div>
+      <div class="pal-quick"><button class="btn btn-sm" type="button" id="pal-emo" aria-label="Emote wheel: make your Pal dance">😊 Emote</button><a class="btn btn-sm" href="#/pals/shop">🛍️ Pal Shop</a><a class="btn btn-sm btn-ghost" href="#/games/pals">🎮 Pal Games</a><a class="btn btn-sm btn-ghost" href="#/park">🌳 Pal Park</a></div>
       <p class="muted small">${esc(PALS_SHORT)} New eggs unlock as your Pals level up and with daily visit streaks.</p>
       <div class="pal-grid">${['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => { const p = m.list.find((x) => x.id === id);
         if (p) return `<div class="pal-card ${act && act.id === id ? 'active' : ''}" data-id="${id}"><div class="pal-thumb"></div><b>${esc(p.name)}</b><small>${esc(formName(p))} · Lv ${p.level}</small>
@@ -410,10 +411,13 @@ export function createPals(ctx) {
     main.querySelectorAll('[data-swc]').forEach((el) => { const p = m.list.find((x) => x.id === el.dataset.swc); const q = stage(el, 56, 50); drawPal(q.c, 28, 47, 40, p, { t: 20, mode: 'idle' }); });
     main.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => { const p = m.list.find((x) => x.id === b.dataset.act); if (act && p.id === act.id) return; try { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); snd('pop'); toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } });
     visitorSetting(main.querySelector('#pal-vchat'));
+    // Pal Box emote wheel: the Pal on your profile (selected/active) does the emote right in its card
+    main.querySelector('#pal-emo').onclick = () => { const tgt = act || m.list[0]; if (!tgt) { toast('Hatch a Pal first'); return; }
+      loadOwnedEmotes(db, S.user.uid).then(() => openWheel({ onEmote: (id) => { boxEmo = { id, pal: tgt.id, until: performance.now() + emoteMs(id) }; main.querySelector(`.pal-card[data-id="${tgt.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, onShop: () => danceOpen(tgt, 'shop'), onLocked: (d) => { toast(`🔒 ${d.name} is in the Dance Shop`); danceOpen(tgt, 'shop'); } })); };
     main.querySelector('#pal-pops').onchange = (e) => { pop.set(e.target.checked); toast(e.target.checked ? 'Pal pop-ups on' : 'Pal pop-ups off'); };
     const pt = main.querySelector('#pal-poptest'); if (pt) pt.onclick = () => pop.show(true);
     main.querySelectorAll('.pal-card[data-id]').forEach((card) => { const p = m.list.find((x) => x.id === card.dataset.id); const s = stage(card.querySelector('.pal-thumb'), 110, 90);
-      const f = (t) => { s.c.clearRect(0, 0, 110, 90); if (p.bg) drawBg(s.c, 110, 90, p.bg, t); drawDancer(s.c, 55, 84, 74, p, { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
+      const f = (t) => { s.c.clearRect(0, 0, 110, 90); if (p.bg) drawBg(s.c, 110, 90, p.bg, t); const em = boxEmo.id && boxEmo.pal === p.id && performance.now() < boxEmo.until ? danceById(boxEmo.id) : null; drawDancer(s.c, 55, 84, 74, p, em ? { t, dance: em, beat: performance.now() / 1000 * 116 / 60 } : { t, mode: isNight() ? 'sleep' : 'idle', mood: moodOf(liveStats(p)) }); }; f.el = s.cv; loop(f);
       card.querySelectorAll('[data-c]').forEach((b) => b.onclick = async () => { const c = b.dataset.c;
         if (c === 'talk') talk(p, true, S.profile.username, S.user.uid); if (c === 'dance') danceOpen(p); if (c === 'care') openSheet(p); if (c === 'closet') { sessionStorage.setItem('kemy-store-pal', p.id); location.hash = '#/pals/store'; } if (c === 'style') creator({ pal: p, onDone: () => page(main) });
         if (c === 'show') { try { await m.store.setActive(p.id); S.profile.activePet = p.id; dispatchEvent(new Event('kemy:pal-changed')); toast(`${p.name} is on your profile now`); page(main); } catch (e) { toast(friendlyError(e)); } } }); });

@@ -61,6 +61,9 @@ export async function boot(root, opts = {}) {
   // -------------------------------------------------- screens
   function setScreen(s, html) {
     G.screen = s; ui.innerHTML = html || ''; ui.classList.toggle('on', !!html); root.dataset.screen = s;
+    // Pal emote wheel on the menus (not during play): your Pal dances on a little card (signed-in players only)
+    if (G.emo && G.emoS !== s) { G.emo.destroy(); G.emo = null; }
+    if (G.user && (s === 'title' || s === 'map')) import('../../pals/game-emotes.js').then(async (m) => { if (G.screen !== s || G.emo) return; const { db } = await import('../../firebase-init.js'); G.emoS = s; G.emo = m.mountGameEmotes(ui, { z: 9000, alive: () => G.screen === 'title' || G.screen === 'map', db, uid: G.user.uid, onShop: () => { location.href = 'app.html#/pals'; } }); }).catch(() => {});
     input.playing = s === 'play'; layout();
     ui.querySelectorAll('button,a').forEach((b) => b.addEventListener('click', () => audio.play('tap')));
     const first = ui.querySelector('[autofocus],button'); if (first && !matchMedia('(pointer: coarse)').matches) first.focus({ preventScroll: true });
