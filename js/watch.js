@@ -1,3 +1,4 @@
+import { cachedQuery } from './fs-cache.js';
 // Lone Keem Studios - "For You" vertical video feed (TikTok / Reels style).
 // One video per screen, CSS scroll-snap, autoplay-in-view via IntersectionObserver.
 // Every video post in Firestore shows up here automatically: studio + community uploads
@@ -63,11 +64,12 @@ export function createWatch(ctx) {
   // Newest 60 videos, 60 photos and 60 link posts (180 reads), cached for 3 minutes so switching
   // tabs or coming back to the feed costs nothing. Falls back to unordered if an index is missing.
   async function loadPosts(force = false) {
-    if (!force && postCache && Date.now() - postCacheAt < 180e3) return postCache.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !window.kemyParental?.hidePost?.(p));
+    if (!force && postCache && Date.now() - postCacheAt < 600e3) return postCache.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !window.kemyParental?.hidePost?.(p));
     const posts = collection(db, 'posts');
     const capped = (pr) => Promise.race([pr, new Promise((r) => setTimeout(() => r({ docs: [], timedOut: true }), 8000))]);
-    const q = (f, v) => capped(getDocs(query(posts, where(f, '==', v), orderBy('createdAt', 'desc'), limit(60)))
-      .catch(() => getDocs(query(posts, where(f, '==', v), limit(60)))).catch(() => ({ docs: [] })));
+    // ≤90 reads per 10 min per device; repeats/reloads come from the IndexedDB cache; quota errors fall back to cache.
+    const q = (f, v) => capped(cachedQuery('watch:' + v, query(posts, where(f, '==', v), orderBy('createdAt', 'desc'), limit(30)), force ? 0 : 600e3)
+      .catch(() => cachedQuery('watch0:' + v, query(posts, where(f, '==', v), limit(30)), 600e3)).catch(() => ({ docs: [] })));
     const [v, im, l] = await Promise.all([q('mediaType', 'video'), q('mediaType', 'image'), q('type', 'link')]);
     const seen = new Map();
     [...v.docs, ...im.docs, ...l.docs].forEach((d) => seen.set(d.id, { id: d.id, ...d.data() }));

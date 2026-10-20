@@ -1,3 +1,4 @@
+import { cachedQuery } from './fs-cache.js';
 // Lone Keem Studios - Go Live (free, no media server).
 // WebRTC peer-to-peer: the broadcaster opens one connection per viewer (capped at LIVE_CAP) using
 // free public STUN; Firestore only carries signaling (one offer / one answer per viewer, full SDP
@@ -61,7 +62,7 @@ export function createLive(ctx) {
   // ------------------------------------------------------------ discovery (feed / profile)
   async function liveNow() {
     try {
-      const snap = await getDocs(query(collection(db, 'lives'), where('status', '==', 'live'), limit(40)));
+      const snap = await cachedQuery('livesNow', query(collection(db, 'lives'), where('status', '==', 'live'), limit(40)), 60e3);
       return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((l) => isFresh(l) && !S.blocked.has(l.hostId))
         .sort((a, b) => (b.viewerCount || 0) - (a.viewerCount || 0));
     } catch { return []; }

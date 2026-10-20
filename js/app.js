@@ -1,3 +1,4 @@
+import { cachedQuery, cachedDoc, BUSY_MSG } from './fs-cache.js';
 import { initPolish, fxOn, setFx } from './polish.js';
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetectWifi } from './autoplay.js';
@@ -125,6 +126,7 @@ function toast(msg) {
   clearTimeout(toast.t);
   toast.t = setTimeout(() => (root.innerHTML = ''), 3200);
 }
+let busyAt = 0; window.kemyBusy = () => { if (Date.now() - busyAt > 60e3) { busyAt = Date.now(); toast(BUSY_MSG + ' (showing saved posts)'); } };
 function friendlyError(e) {
   const c = e && (e.code || '');
   const map = {
@@ -137,8 +139,10 @@ function friendlyError(e) {
     'auth/too-many-requests': 'Too many tries. Please wait a moment and try again.',
     'auth/popup-closed-by-user': 'Sign-in window was closed.',
     'auth/network-request-failed': 'Network problem. Check your connection.',
+    'resource-exhausted': 'Kemy is extra busy right now — try again in a bit 💜',
     'permission-denied': 'You’re going a little fast, or that action isn’t allowed. Wait a few seconds and try again.'
   };
+  if (!map[c] && e && /quota/i.test(e.message || '')) return map['resource-exhausted'];
   return map[c] || (e && e.message ? e.message.replace(/^Firebase: /, '') : 'Something went wrong.');
 }
 function requireAuth() {
@@ -178,8 +182,8 @@ async function refreshProfile(uid) {
     if (snap.exists()) { S.profile = snap.data(); profileCache.set(uid, { uid, ...S.profile }); }
     return S.profile;
   }
-  profileCache.delete(uid);
-  return getProfile(uid);
+  const snap = await cachedDoc('u:' + uid, doc(db, 'users', uid), 300e3); // ≤1 read / 5 min per profile (stories row)
+  const p = snap.exists() ? { uid, ...snap.data() } : null; profileCache.set(uid, p); return p;
 }
 async function uidForUsername(username) {
   const snap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
@@ -823,7 +827,7 @@ async function pageFeed(token) {
       <h2 style="margin:26px 0 14px;font-size:1.2rem">Latest from the community</h2>
       <div id="posts"></div>`;
     live.renderFeed($('#live-now'), $('#stories'), stories.renderRow($('#stories'), token, stale), token);
-    const snap = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)));
+    const snap = await cachedQuery('feed:anon', query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)), 600e3);
     if (stale(token)) return;
     renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet.');
     feedDonate();
@@ -842,10 +846,10 @@ async function pageFeed(token) {
   const rs = $('#resend'); if (rs) rs.onclick = async () => { try { await sendEmailVerification(S.user); toast('Verification email sent'); } catch (e) { toast(friendlyError(e)); } };
   const authors = [...new Set([S.user.uid, STUDIO_UID, ...S.following])].filter((u) => !S.blocked.has(u));
   const chunks = []; for (let i = 0; i < authors.length; i += 30) chunks.push(authors.slice(i, i + 30));
-  const results = await Promise.all(chunks.map((c) => getDocs(query(collection(db, 'posts'), where('authorId', 'in', c), orderBy('createdAt', 'desc'), limit(40)))));
+  const results = await Promise.all(chunks.map((c, i) => cachedQuery('feed:' + S.user.uid + ':' + i + ':' + c.length, query(collection(db, 'posts'), where('authorId', 'in', c), orderBy('createdAt', 'desc'), limit(20)), 300e3)));
   if (stale(token)) return;
   const ms = (p) => p.createdAt?.toMillis?.() || Date.now();
-  const posts = results.flatMap((r) => r.docs.map((d) => ({ id: d.id, ...d.data() }))).sort((a, b) => ms(b) - ms(a)).slice(0, 60);
+  const posts = results.flatMap((r) => r.docs.map((d) => ({ id: d.id, ...d.data() }))).sort((a, b) => ms(b) - ms(a)).slice(0, 30);
   renderPosts($('#posts'), posts, 'Your feed is empty. <a href="#/explore">Explore</a> to find people to follow, or <a href="#/new">make your first post</a>.');
   feedDonate();
 }
@@ -863,7 +867,7 @@ async function pageExplore(tab, token) {
     <h2 style="margin:22px 0 14px;font-size:1.15rem">Recent posts</h2>
     <div id="posts"><div class="spinner"></div></div>`;
   search.renderExploreTop($('#ex-top'), token);
-  const snap = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(30)));
+  const snap = await cachedQuery('explore', query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)), 300e3);
   if (stale(token)) return;
   renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet. Be the first!');
 }

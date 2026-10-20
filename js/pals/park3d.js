@@ -25,7 +25,7 @@ import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, at
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
 const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX), Math.round(z * PX + CY)];
 const W = 100, H = 75;                                // world half-size (200 m x 150 m)
-const MAX_ROOM = 30, ROOMS = 20, SEND_MS = 240, HB_MS = 15000, STALE_MS = 30000;
+const MAX_ROOM = 30, ROOMS = 20, SEND_MS = 1000, HB_MS = 15000, STALE_MS = 30000;
 const PORTAL_NAME = { race: 'Pal Race', bubbles: 'Bubble Pop', stars: 'Star Catch', dance: 'Dance-Off' };
 const EMO_DANCE = { '👋': 'wave', '💜': 'happyshimmy', '😂': 'bounce', '😮': 'woah', '🎉': 'groove', '😴': 'slowmo', '⭐': 'twirl', '🐾': 'hopclap' };
 const BPM = 112;
@@ -410,7 +410,9 @@ export function createPark3D(ctx) {
       try { await setDoc(meRef, base()); net.ok++; } catch (e) { net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; try { const q = base(); delete q.at; net.last = JSON.stringify(q).slice(0, 600); } catch { /* */ } if (e.code === 'permission-denied') { if (roomState.inId) { dirty = true; lastSend = now + 400; } else if (extras) { extras = false; dirty = true; lastSend = 0; } else lastSend = now + 300; } } sending = false; };
     await send(true);
     const others = new Map(); const blocked = S.blocked || new Set(); const MK = 'kemy-park-muted-' + S.user.uid; const muted = new Set(JSON.parse(lsg(MK) || '[]'));
-    const unsub = onSnapshot(collection(db, 'parkRooms', room, 'p'), (qs) => {
+    // Presence costs 1 read per other player's write, so: ~1 write/s max (was ~4/s), only fresh docs,
+    // and the listener detaches while the tab is hidden.
+    const listen = () => onSnapshot(query(collection(db, 'parkRooms', room, 'p'), where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS * 2))), (qs) => {
       const now = Date.now(); net.snaps++;
       qs.docChanges().forEach((ch) => { const id = ch.doc.id; if (id === S.user.uid) return; if (ch.type === 'removed') { drop(id); return; }
         const d = ch.doc.data(); const at = d.at && d.at.toMillis ? d.at.toMillis() : now;
@@ -421,6 +423,10 @@ export function createPark3D(ctx) {
         if (d.sayAt && d.sayAt > o.seenS && d.say) { o.seenS = d.sayAt; if (!muted.has(id) && !blocked.has(id)) logMsg(d.name, clean(d.say), d.color); }
         if (d.eAt && d.eAt > o.seenE) { o.seenE = d.eAt; if (d.e && EMO_DANCE[d.e]) { o.dance = EMO_DANCE[d.e]; o.danceUntil = performance.now() + 6000; } if (d.tgt === S.user.uid && d.e === '🐾') toast(`@${d.uname} petted your Pal! 💜`); } });
     }, (e) => { net.snapErr = e.code || String(e); });
+    let unsubL = listen();
+    const onVis = () => { if (document.hidden) { if (unsubL) { unsubL(); unsubL = null; } } else if (!unsubL && document.body.contains(cv)) { unsubL = listen(); send(true); } };
+    document.addEventListener('visibilitychange', onVis);
+    const unsub = () => { document.removeEventListener('visibilitychange', onVis); if (unsubL) unsubL(); unsubL = null; };
     function drop(id) { const o = others.get(id); if (!o) return; if (o.obj) { scene.remove(o.obj); } o.tag?.remove(); others.delete(id); }
 
     // ---------------------------------------------------------------- name tags + speech bubbles (HTML overlay, crisp on phones)

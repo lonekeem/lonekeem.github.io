@@ -1,3 +1,4 @@
+import { cachedDoc } from '../fs-cache.js';
 import { openBuySheet, coinBadge } from '../buy-sheet.js';
 // Dance picker + Dance Shop (Star Coins, the Pals' existing free currency) + the floating companion Pal.
 import { EMOTE_DANCES, priceOf, BASIC, TRENDING, PRICE, RARITY_NAME, allDances, danceById, itemId, isFree, loadTrends, tiktok, setOwned, ownsDance, favOf, setFav, drawDancer, forcePreview, busState, isDancing, danceEnabled, BASIC as B0 } from './dance.js';
@@ -25,7 +26,7 @@ export function createDanceUI(ctx) {
   const { S, db, esc, toast, openModal, closeModal, friendlyError, isAdmin } = ctx;
   let econ = null;
   async function refreshOwned() { if (!econ) return; try { const inv = await econ.inventory(true); setOwned(Object.keys(inv).filter((k) => (k.startsWith('dn_') || k.startsWith('z_dn_')) && inv[k] > 0)); } catch { /* */ } }
-  async function pricesLive() { try { const s = await getDoc(doc(db, 'config', 'palShop')); const dt = s.exists() ? s.data() : {}; return { ...(dt.prices || {}), ...(dt.dprices || {}) }; } catch { return {}; } }
+  async function pricesLive() { try { const s = await cachedDoc('cfg:palShop', doc(db, 'config', 'palShop'), 6 * 3600e3); const dt = s.exists() ? s.data() : {}; return { ...(dt.prices || {}), ...(dt.dprices || {}) }; } catch { return {}; } }
 
   // the modal: tabs "Pick a dance" / "Dance Shop"
   async function open(pal, { tab = 'pick', econOf } = {}) {

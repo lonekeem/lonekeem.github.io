@@ -24,7 +24,7 @@ export const PORTALS = [{ g: 'race', x: 1470, y: 1080 }, { g: 'bubbles', x: 1730
 const PORTAL_NAME = { race: 'Pal Race', bubbles: 'Bubble Pop', stars: 'Star Catch', dance: 'Dance-Off' };
 export const EMOTES = ['👋', '💜', '😂', '😮', '🎉', '😴', '⭐', '🐾'];
 export const PHRASES = ['Hi! 👋', 'Nice Pal!', 'Wanna play?', 'Follow me!', 'Love your outfit!', 'GG!', 'Let’s race!', 'Bye! 👋', 'Found a treasure!', 'So cute!'];
-const MAX_ROOM = 20, ROOMS = 20, SEND_MS = 250, HB_MS = 15000, STALE_MS = 30000;
+const MAX_ROOM = 20, ROOMS = 20, SEND_MS = 1000, HB_MS = 15000, STALE_MS = 30000;
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const inWater = (x, y) => WATER.some((w) => ((x - w.x) / w.rx) ** 2 + ((y - w.y) / w.ry) ** 2 < 1);
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -64,7 +64,9 @@ export function createPark(ctx) {
     let lastSend = 0, dirty = true, sending = false;
     const send = async (force) => { const now = Date.now(); if (sending || (!force && (!dirty || now - lastSend < SEND_MS) && now - lastSend < HB_MS)) return; sending = true; lastSend = now; dirty = false; try { await setDoc(meRef, base()); } catch (e) { if (e.code === 'permission-denied') lastSend = now + 300; } sending = false; };
     await send(true);
-    const unsub = onSnapshot(collection(db, 'parkRooms', room, 'p'), (qs) => {
+    // Presence costs 1 read per other player's write, so: ~1 write/s max (was ~4/s), only fresh docs,
+    // and the listener detaches while the tab is hidden.
+    const listen = () => onSnapshot(query(collection(db, 'parkRooms', room, 'p'), where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS * 2))), (qs) => {
       const now = Date.now();
       qs.docChanges().forEach((ch) => { const id = ch.doc.id; if (id === S.user.uid) return; if (ch.type === 'removed') { others.delete(id); return; }
         const d = ch.doc.data(); const at = d.at && d.at.toMillis ? d.at.toMillis() : now;
@@ -74,6 +76,10 @@ export function createPark(ctx) {
         if (d.tgt === S.user.uid && d.eAt > (o.seenT || 0) && d.e === '🐾') { o.seenT = d.eAt; P.petted = 90; toast(`@${d.uname} petted your Pal! 💜`); }
         others.set(id, o); });
     }, () => {});
+    let unsubL = listen();
+    const onVis = () => { if (document.hidden) { if (unsubL) { unsubL(); unsubL = null; } } else if (!unsubL && document.body.contains(cv)) { unsubL = listen(); send(true); } };
+    document.addEventListener('visibilitychange', onVis);
+    const unsub = () => { document.removeEventListener('visibilitychange', onVis); if (unsubL) unsubL(); unsubL = null; };
     // collectibles
     const tk = 'kemy-park-found-' + S.user.uid + '-' + dayNo(); const found = new Set(JSON.parse(localStorage.getItem(tk) || '[]')); const items = treasures();
     const foundEl = main.querySelector('#park-found'); const paintFound = () => { foundEl.textContent = `✨ ${found.size}/${items.length}`; }; paintFound();
