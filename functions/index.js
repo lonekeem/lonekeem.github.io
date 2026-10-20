@@ -1,44 +1,13 @@
-// Kemy paid credit. Wallets: users/{uid}/pal/wallet {coins,...} and users/{uid}/pal/diamonds {d,...}.
-// Only the Admin SDK (here) may raise balances beyond the capped earning rules in firestore.rules.
-// Writes stay within the key sets allowed by walletShape()/dShape() so later client writes still pass.
-const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
-const { defineSecret } = require('firebase-functions/params');
-const { setGlobalOptions } = require('firebase-functions/v2');
+// Kemy paid credit (Google Play). Wallets: users/{uid}/pal/wallet {coins,...} and users/{uid}/pal/diamonds {d,...}.
+// Only the Admin SDK may raise balances beyond the capped earning rules in firestore.rules; writes stay within
+// the key sets allowed by walletShape()/dShape() so later client writes still pass. Stripe: ../functions-stripe.
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
-const PACKS = require('./packs');
-
+const { setGlobalOptions } = require('firebase-functions/v2');
+const { credit, PACKS } = require('./credit');
 admin.initializeApp();
 setGlobalOptions({ region: 'us-central1', maxInstances: 10 });
-const db = admin.firestore();
-const { FieldValue: FV } = require('firebase-admin/firestore');
 const PKG = 'com.lonekeemstudios.kemy';
-const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
-// Optional: Stripe price id / payment link id -> pack id (used if the session has no metadata.pack).
-const STRIPE_MAP = {};
-
-const dayNo = () => Math.floor(Date.now() / 86400000);
-const safeId = (s) => String(s).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 1400);
-
-// Idempotent: purchases/{id} is created in the same transaction as the credit.
-async function credit(uid, sku, purchaseId, provider, extra = {}) {
-  const pack = PACKS[sku]; if (!pack) throw new Error('unknown sku ' + sku);
-  const pref = db.doc('purchases/' + safeId(purchaseId));
-  const wref = db.doc(`users/${uid}/pal/${pack.cur === 'star' ? 'wallet' : 'diamonds'}`);
-  return db.runTransaction(async (t) => {
-    const [p, w] = await Promise.all([t.get(pref), t.get(wref)]);
-    if (p.exists) return { credited: false, already: true, uid: p.data().uid };
-    const now = FV.serverTimestamp();
-    if (pack.cur === 'star') {
-      if (w.exists) t.update(wref, { coins: FV.increment(pack.n), updatedAt: now });
-      else t.set(wref, { coins: pack.n, total: 0, day: dayNo(), earned: {}, src: '', last: now, lastBuy: '', paid: 0, buyAt: now, room: [], updatedAt: now });
-    } else {
-      if (w.exists) t.update(wref, { d: FV.increment(pack.n), updatedAt: now });
-      else t.set(wref, { d: pack.n, total: 0, day: dayNo(), today: 0, last: now, lastBuy: '', paid: 0, buyAt: now, updatedAt: now });
-    }
-    t.set(pref, { uid, sku, cur: pack.cur, n: pack.n, provider, at: now, ...extra });
-    return { credited: true, cur: pack.cur, n: pack.n };
-  });
-}
 
 async function playApi() {
   const { google } = require('googleapis');
@@ -74,18 +43,3 @@ exports.verifyPlayPurchase = onCall({ enforceAppCheck: false }, async (req) => {
   return { ok: true, ...res, uid: undefined };
 });
 
-exports.stripeWebhook = onRequest({ secrets: [STRIPE_WEBHOOK_SECRET], cors: false }, async (req, res) => {
-  if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
-  const stripe = require('stripe')('sk_unused'); // only used for signature verification (no API calls)
-  let ev;
-  try { ev = stripe.webhooks.constructEvent(req.rawBody, req.get('stripe-signature'), STRIPE_WEBHOOK_SECRET.value()); }
-  catch (e) { res.status(400).send('Bad signature'); return; }
-  if (ev.type !== 'checkout.session.completed') { res.json({ ignored: ev.type }); return; }
-  const s = ev.data.object;
-  if (s.payment_status !== 'paid') { res.json({ ignored: 'unpaid' }); return; }
-  const uid = s.client_reference_id;
-  const sku = (s.metadata && s.metadata.pack) || STRIPE_MAP[s.payment_link] || STRIPE_MAP[s.metadata && s.metadata.price];
-  if (!uid || !/^[A-Za-z0-9_-]{1,128}$/.test(uid) || !PACKS[sku]) { console.error('stripe: unmapped', s.id, uid, sku, s.payment_link); res.json({ ignored: 'unmapped' }); return; }
-  try { const r = await credit(uid, sku, 'stripe_' + s.id, 'stripe', { session: s.id, link: s.payment_link || null }); res.json({ ok: true, ...r }); }
-  catch (e) { console.error('stripe credit failed', e); res.status(500).send('retry'); }
-});

@@ -19,7 +19,17 @@
     {
       "source": "functions",
       "codebase": "default",
-      "runtime": "nodejs20",
+      "runtime": "nodejs22",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "*.local"
+      ]
+    },
+    {
+      "source": "functions-stripe",
+      "codebase": "stripe",
+      "runtime": "nodejs22",
       "ignore": [
         "node_modules",
         ".git",

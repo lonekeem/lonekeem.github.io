@@ -2,11 +2,10 @@
   "name": "kemy-functions",
   "private": true,
   "main": "index.js",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "dependencies": {
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.1.0",
-    "googleapis": "^144.0.0",
-    "stripe": "^17.3.0"
+    "googleapis": "^144.0.0"
   }
 }
