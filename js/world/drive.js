@@ -27,7 +27,18 @@ export function attachDrive(api, world) {
     V.place(p.x, p.z, p.yaw); const cy = { x: p.x, z: p.z, r: def.Wd * 0.55, top: 99, mycar: 1 }; api.cyl.push(cy);
     my = { id, color, m, V, state: 'parked', t: 0, door: 0, doorWant: 0, cy, rs: V.update(0, inp) }; poseCar(m, my.rs, 0, 0); window.__kd && (window.__kd.spawned = id); return my; }
   function removeCar() { if (!my) return; if (my.state !== 'parked') exitNow(); scene.remove(my.m); const i = api.cyl.indexOf(my.cy); if (i >= 0) api.cyl.splice(i, 1); my = null; }
+  function dropCy() { const i = my ? api.cyl.indexOf(my.cy) : -1; if (i >= 0) api.cyl.splice(i, 1); }
+  // input never stays latched: pedals, handbrake, joystick all cleared on enter/exit/blur
+  function resetInput() { held.gas = held.brake = 0; inp.thr = inp.brk = inp.steer = inp.hand = 0; try { api.tc.reset && api.tc.reset(); } catch { /* */ } document.querySelectorAll('.kd-b.on').forEach((b) => b.classList.remove('on')); if (my) { my.stuckT = 0; } }
+  addEventListener('blur', () => resetInput());
+  // unstick: try small moves out of whatever we are wedged in, else put the car upright on the nearest road
+  function freeAt(x, z, yaw, c) { const s = Math.sin(yaw), co = Math.cos(yaw); for (const f of [c.L * 0.38, 0, -c.L * 0.38]) { const px = x + s * f, pz = z + co * f; const [nx, nz] = api.collide(px, pz, ground(px, pz)); if (Math.abs(nx - px) + Math.abs(nz - pz) > 1e-3) return false; } return true; }
+  function resetCar(toRoad) { if (!my) return; const c = my.m.userData.def; let p = null;
+    if (!toRoad) for (const d of [0.8, -0.8, 1.6, -1.6, 2.4]) for (const sd of [0, 0.9, -0.9]) { const x = my.V.x + Math.sin(my.V.yaw) * d + Math.cos(my.V.yaw) * sd, z = my.V.z + Math.cos(my.V.yaw) * d - Math.sin(my.V.yaw) * sd; if (freeAt(x, z, my.V.yaw, c)) { p = { x, z, yaw: my.V.yaw }; break; } if (p) break; }
+    if (!p) { const r = nearestRoad(my.V.x, my.V.z); p = r || { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; }
+    my.V.place(p.x, p.z, p.yaw); my.V.rev = false; my.V.gear = 1; my.V.heave = my.V.pitch = my.V.roll = my.V.hv = my.V.pv = my.V.rv = 0; my.stuckT = 0; held.gas = held.brake = 0; inp.hand = 0; api.markDirty(); }
   const seatWorld = (car, out) => { car.updateMatrixWorld(true); out.copy(car.userData.seat); out.y -= 0.1; return out.applyMatrix4(car.userData.chassis.matrixWorld); };
+  const V_REV = (q) => q.V.rev || (q.V.vf < 0.6 && held.brake > 0.5);
   const sv = new THREE.Vector3(), sv2 = new THREE.Vector3();
   // ---------------------------------------------------------------- HUD: My Cars button + drive controls + speedometer
   const css = document.createElement('style'); css.textContent = `.kd-my{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 134px);pointer-events:auto;min-width:48px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(43,29,85,.75);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
@@ -43,11 +54,11 @@ export function attachDrive(api, world) {
 .kd-set label{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:8px 0}.kd-set select{min-height:40px;border-radius:10px;background:#fff;color:#111;border:0;padding:0 8px;font-size:15px}`; document.head.appendChild(css);
   const myB = document.createElement('button'); myB.type = 'button'; myB.className = 'kd-my'; myB.textContent = '🚗 My Cars'; hud.appendChild(myB);
   const drv = document.createElement('div'); drv.className = 'kd-drv'; drv.hidden = true; drv.innerHTML = `<div class="kd-speed" id="kd-spd">0<small>km/h · D1</small><div class="rpm"><i></i></div></div>
-    <div class="kd-side"><button type="button" class="kd-b" data-k="horn" aria-label="Horn"><i>📯</i>Horn</button><button type="button" class="kd-b" data-k="cam" aria-label="Car camera"><i>🎥</i><span>Chase</span></button><button type="button" class="kd-b" data-k="doors" aria-label="Doors"><i>🚪</i>Doors</button><button type="button" class="kd-b" data-k="out" aria-label="Get out"><i>🚶</i>Get out</button></div>
+    <div class="kd-side"><button type="button" class="kd-b" data-k="horn" aria-label="Horn"><i>📯</i>Horn</button><button type="button" class="kd-b" data-k="cam" aria-label="Car camera"><i>🎥</i><span>Chase</span></button><button type="button" class="kd-b" data-k="doors" aria-label="Doors"><i>🚪</i>Doors</button><button type="button" class="kd-b" data-k="reset" aria-label="Flip or reset car"><i>🔄</i>Reset</button><button type="button" class="kd-b" data-k="out" aria-label="Get out"><i>🚶</i>Get out</button></div>
     <div class="kd-pedals"><button type="button" class="kd-b brk" data-k="brake" aria-label="Brake or reverse"><i>🛑</i>Brake/Rev</button><button type="button" class="kd-b gas" data-k="gas" aria-label="Gas"><i>⏩</i>Gas</button></div>`; hud.appendChild(drv);
   const spdEl = drv.querySelector('#kd-spd'); const camLbl = drv.querySelector('[data-k=cam] span'); camLbl.textContent = CAM_NAME[camMode].split(' ')[0];
   drv.querySelectorAll('.kd-b').forEach((b) => { const k = b.dataset.k; const dn = (e) => { e.preventDefault(); e.stopPropagation(); try { b.setPointerCapture(e.pointerId); } catch { /* */ } b.classList.add('on');
-      if (k === 'gas' || k === 'brake') held[k] = 1; else if (k === 'horn') { honk(); api.markDirty(); } else if (k === 'cam') cycleCam(); else if (k === 'doors') toggleDoors(); else if (k === 'out') getOut(); };
+      if (k === 'gas' || k === 'brake') held[k] = 1; else if (k === 'horn') { honk(); api.markDirty(); } else if (k === 'cam') cycleCam(); else if (k === 'doors') toggleDoors(); else if (k === 'out') getOut(); else if (k === 'reset') { resetCar(true); say('🔄 Car flipped upright on the road'); } };
     const up = () => { b.classList.remove('on'); if (k === 'gas' || k === 'brake') held[k] = 0; }; b.addEventListener('pointerdown', dn); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up); });
   const kd = (e) => { if (!my || my.state !== 'drive' || /input|textarea/i.test(e.target.tagName)) return; const k = e.key.toLowerCase(); if (k === 'h') honk(); if (k === 'c') cycleCam(); if (k === 'f') getOut(); if (k === ' ') inp.hand = 1; };
   const ku = (e) => { if (e.key === ' ') inp.hand = 0; }; addEventListener('keydown', kd); addEventListener('keyup', ku);
@@ -73,10 +84,10 @@ export function attachDrive(api, world) {
   myB.onclick = openMyCars;
   // ---------------------------------------------------------------- enter / exit
   function enterSync() { P.dance = carCode(my.id, my.color, my.door > 0.5); P.danceUntil = Date.now() + 864e5; api.markDirty(); }
-  function getIn() { if (!my || my.state !== 'parked') return; my.state = 'enter'; my.t = 0; my.from = { x: P.x, z: P.z }; my.cy.r = 0; my.eng = my.eng || createEngineSound(); enterSync(); drv.hidden = false; myB.hidden = true; api.tc.root.classList.add('kd-on'); world.hud.querySelector('.ks-act').hidden = true; window.__kd && (window.__kd.state = 'enter'); }
+  function getIn() { if (!my || my.state !== 'parked') return; my.state = 'enter'; my.t = 0; my.from = { x: P.x, z: P.z }; my.cy.r = 0; dropCy(); resetInput(); my.eng = my.eng || createEngineSound(); enterSync(); drv.hidden = false; myB.hidden = true; api.tc.root.classList.add('kd-on'); world.hud.querySelector('.ks-act').hidden = true; window.__kd && (window.__kd.state = 'enter'); }
   function getOut() { if (!my || my.state !== 'drive') return; if (my.V.speed() > 1.2) { say('Slow down to get out 🙂'); return; } my.state = 'exit'; my.t = 0; held.gas = held.brake = 0; }
   function exitNow() { if (!my) return; const c = my.m.userData.def; const s = Math.sin(my.V.yaw), co = Math.cos(my.V.yaw); const side = c.Wd / 2 + 0.8; P.x = my.V.x + co * side; P.z = my.V.z - s * side; P.y = ground(P.x, P.z); me.scale.setScalar(1); me.visible = true;
-    my.state = 'parked'; my.cy.x = my.V.x; my.cy.z = my.V.z; my.cy.r = c.Wd * 0.55; P.dance = ''; P.danceUntil = 0; api.markDirty(); drv.hidden = true; myB.hidden = false; api.tc.root.classList.remove('kd-on'); if (my.eng) { my.eng.stop(); my.eng = null; } setBrakeLights(my.m, false); }
+    my.state = 'parked'; my.cy.x = my.V.x; my.cy.z = my.V.z; my.cy.r = c.Wd * 0.55; if (!api.cyl.includes(my.cy)) api.cyl.push(my.cy); resetInput(); P.dance = ''; P.danceUntil = 0; api.markDirty(); drv.hidden = true; myB.hidden = false; api.tc.root.classList.remove('kd-on'); if (my.eng) { my.eng.stop(); my.eng = null; } setBrakeLights(my.m, false); }
   // ---------------------------------------------------------------- remote cars (interpolation + prediction)
   const remote = new Map(); // uid -> { m, id, color, s:{x,z,yaw}, v:{x,z,w}, last:{x,z,yaw,t}, door }
   function remoteCars(dt, nowMs) { const seen = new Set();
@@ -108,8 +119,9 @@ export function attachDrive(api, world) {
       const jy = drive && !window.__kdTest ? -mv.y : 0, jx = drive && !window.__kdTest ? mv.x : 0; const T = window.__kdTest || {};
       inp.thr = drive ? clamp(Math.max(held.gas, jy > 0.25 ? jy : 0, T.thr || 0), 0, 1) : 0; inp.brk = drive ? clamp(Math.max(held.brake, jy < -0.25 ? -jy : 0, T.brk || 0), 0, 1) : (my.V.speed() > 0.1 ? 1 : 0); inp.steer = drive ? clamp(-(jx || 0) - (T.steer || 0), -1, 1) : 0;
       const rs = my.V.update(dt, inp, (V) => { // collisions (world colliders), soft: slide + lose speed
-        const s = Math.sin(V.yaw), co = Math.cos(V.yaw); let hit = false; for (const f of [c.L * 0.38, 0, -c.L * 0.38]) { const x = V.x + s * f, z = V.z + co * f; const [nx, nz] = api.collide(x, z, ground(x, z)); if (Math.abs(nx - x) + Math.abs(nz - z) > 1e-4) { V.x += (nx - x); V.z += (nz - z); hit = true; } }
-        if (hit) { V.vf *= 0.92; V.vl *= 0.8; } });
+        const s = Math.sin(V.yaw), co = Math.cos(V.yaw); let px = 0, pz = 0; for (const f of [c.L * 0.38, 0, -c.L * 0.38]) { const x = V.x + s * f, z = V.z + co * f; const [nx, nz] = api.collide(x, z, ground(x, z)); if (Math.abs(nx - x) + Math.abs(nz - z) > 1e-4) { V.x += (nx - x); V.z += (nz - z); px += nx - x; pz += nz - z; } }
+        const pl = Math.hypot(px, pz); if (pl > 1e-4) { const into = -(s * px + co * pz) / pl; if (into * V.vf > 0) V.vf *= 0.9; V.vl *= 0.85; } });
+      if (drive) { const want = Math.max(inp.thr, V_REV(my) ? inp.brk : 0); if (want > 0.3 && my.V.speed() < 0.35) { my.stuckT = (my.stuckT || 0) + dt; if (my.stuckT > 1.5) { my.nudges = (my.nudges || 0) + 1; resetCar(my.nudges > 2); if (my.nudges > 2) { my.nudges = 0; say('🔄 Car reset onto the road'); } } } else { my.stuckT = 0; if (my.V.speed() > 3) my.nudges = 0; } }
       my.rs = rs; poseCar(my.m, rs, my.V.steer, my.V.spin); setDoors(my.m, my.door); setBrakeLights(my.m, inp.brk > 0.1 && !my.V.rev);
       if (drive) { seatWorld(my.m, sv); me.position.copy(sv); me.rotation.y = rs.yaw; me.scale.setScalar(0.6); sitPose(me, dt); }
       P.x = my.V.x; P.z = my.V.z; P.yaw = my.V.yaw; P.y = ground(P.x, P.z); P.vy = 0; if (my.V.speed() > 0.05) api.markDirty();
@@ -130,7 +142,7 @@ export function attachDrive(api, world) {
   const prevAct = api.onAction; api.onAction = (a) => { if (a === 'enter') getIn(); else if (prevAct) prevAct(a); };
   api.driving = () => !!my && my.state !== 'parked'; api.myCar = () => (my && my.state !== 'parked' ? { x: my.V.x, z: my.V.z } : null);
   world.move = (m) => (api.driving() ? { x: 0, y: 0, mag: 0, run: false } : m); world.driving = () => api.driving();
-  window.__kdApi = { spawn: (id, c, at) => { id = id || 'pip'; if (!owned.has(id) && lsg('kemy-pals-debug') !== '1') return false; spawnCar(id, c ?? 0, at); return true; }, enter: () => getIn(), out: () => getOut(), cam: () => cycleCam(), doors: () => toggleDoors(), test: (o) => { window.__kdTest = o; }, showroom: (x, z) => { CARS.forEach((c, i) => { const m = buildCar(c, c.color); scene.add(m); poseCar(m, { x: x + i * 5.2, y: ground(x + i * 5.2, z), z, yaw: 0.5 }, 0.3, 0); setDoors(m, i % 2 ? 0.8 : 0); }); }, owned: () => [...owned], myCars: () => openMyCars() };
+  window.__kdApi = { spawn: (id, c, at) => { id = id || 'pip'; if (!owned.has(id) && lsg('kemy-pals-debug') !== '1') return false; spawnCar(id, c ?? 0, at); return true; }, enter: () => getIn(), out: () => getOut(), cam: () => cycleCam(), reset: (r) => resetCar(r !== false), stuckProbe: () => ({ stuckT: my && my.stuckT, nudges: my && my.nudges, ownCy: !!my && api.cyl.includes(my.cy) }), doors: () => toggleDoors(), test: (o) => { window.__kdTest = o; }, showroom: (x, z) => { CARS.forEach((c, i) => { const m = buildCar(c, c.color); scene.add(m); poseCar(m, { x: x + i * 5.2, y: ground(x + i * 5.2, z), z, yaw: 0.5 }, 0.3, 0); setDoors(m, i % 2 ? 0.8 : 0); }); }, owned: () => [...owned], myCars: () => openMyCars() };
   return { update, destroy() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); }, spawnCar };
 }
 void FLAT;
