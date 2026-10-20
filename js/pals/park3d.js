@@ -48,7 +48,7 @@ function ground(x, z) { // gentle hills, flattened at the plaza, paths, studio a
   flat(0, 0, PLAZA_R + 3, PLAZA_R + 14, 2.4); flat(STUDIO.x, STUDIO.z, 16, 26, 2.6); flat(PLAY.x, PLAY.z, 12, 20, 2.2); flat(HUB.x, HUB.z, HUB.r + 3, HUB.r + 10, 2.4);
   for (const e of [POND, LAKE]) { const d = ellD(e, x, z); if (d < 1.5) { const k = Math.max(0, 1.5 - d) / 1.5; h -= k * k * 3.2; } }
   const pd = pathD(x, z); if (pd < 3) h -= (3 - pd) * 0.05;
-  const edge = Math.max(Math.abs(x) - (W - 12), Math.abs(z) - (H - 12), 0); h += edge * edge * 0.12; // rim hills
+  const edge = Math.max(Math.abs(x) - (W - 12), Math.abs(z) - (H - 12), 0); h += 14 * (1 - Math.exp(-edge * edge * 0.12 / 14)); // rim hills (soft-capped: never a km-high wall)
   return worldGround(x, z, h); }
 const WATER_Y = { pond: 0, lake: 0 }; { WATER_Y.pond = ground(POND.x, POND.z) + 2.2; WATER_Y.lake = ground(LAKE.x, LAKE.z) + 2.2; }
 
@@ -75,7 +75,7 @@ export function createPark3D(ctx) {
     let lost = false; cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; }); cv.addEventListener('webglcontextrestored', () => { lost = false; });
     const scene = new THREE.Scene(); const SKY = new THREE.Color('#9fd3ff'), FOG = new THREE.Color('#bfe0fb'); void SKY;
     scene.fog = new THREE.Fog(FOG, Q.draw * 0.6, Q.draw * 1.15);   // light haze only far away
-    const cam = new THREE.PerspectiveCamera(60, 1, 0.05, 420);
+    const cam = new THREE.PerspectiveCamera(60, 1, 0.08, Math.min(420, Q.draw * 1.3 + 40)); // near 0.08 (was 0.05): better depth precision far away, no z-fighting
     const size = () => { const w = view.clientWidth || innerWidth, h = view.clientHeight || innerHeight; R.setPixelRatio(DPR * dprK); R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
     size(); addEventListener('resize', size);
     // lights
@@ -83,7 +83,8 @@ export function createPark3D(ctx) {
     const sun = new THREE.DirectionalLight('#fff1d6', 3.1); sun.position.set(40, 70, 25); scene.add(sun); scene.add(sun.target);
     if (Q.shadows) { sun.castShadow = true; const sm = Q.shadowMap; sun.shadow.mapSize.set(sm, sm); const sc = sun.shadow.camera; sc.left = sc.bottom = -34; sc.right = sc.top = 34; sc.near = 10; sc.far = 160; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04; sun.shadow.radius = 3; if (ULTRA) { sc.left = sc.bottom = -46; sc.right = sc.top = 46; } }
     // procedural sky (gradient + sun + soft fbm clouds) and an environment map baked from it
-    const sky = makeSky({ sunDir: sun.position, top: '#2c7be5', hor: '#b4dcff', ground: '#a8cf96', cloud: LOW ? 0.4 : 0.52 }); scene.add(sky); const skyMat = sky.material;
+    const sky = makeSky({ sunDir: sun.position, top: '#2c7be5', hor: '#b4dcff', ground: '#a8cf96', cloud: LOW ? 0.4 : 0.52, fogColor: scene.fog.color, mountains: true }); scene.add(sky); const skyMat = sky.material;
+    const fitSky = () => sky.scale.setScalar(cam.far * 0.92 / 400); fitSky(); // the dome always sits inside the far plane
     scene.environment = envFromSky(R, sky); scene.environmentIntensity = 0.22;
     const R0 = rng(7); const clouds = new THREE.Group(); // clouds now live in the sky shader
     { const NC = LOW ? 60 : 140; let k = 0; for (let c = 0; c < NC / 7; c++) { R0(); R0(); R0(); for (let i = 0; i < 7 && k < NC; i++, k++) { R0(); R0(); R0(); R0(); } } } // keep the seeded layout (trees/rocks) identical to before
@@ -464,9 +465,17 @@ export function createPark3D(ctx) {
     let gm = null; import('../gamemusic.js').then(async (m) => { gm = m; await m.mountGameMusic({ corner: 'top-right' }); if (!m.isPlaying() && document.body.contains(cv)) m.playStation('theme', { volume: 0.18 }); }).catch(() => {});
     const beatNow = () => { const a = gm && gm.audioEl && gm.audioEl(); if (a && !a.paused) return { on: true, beat: a.currentTime * BPM / 60 }; return { on: false, beat: performance.now() / 1000 * BPM / 60 }; };
 
+    // distance culling for the whole Pal Park build (terrain, trees, grass, flowers, props): one group, hidden when you are far
+    // away (e.g. driving in the southern towns it used to cost ~1M triangles + ~150 draw calls for things you cannot see);
+    // the dense ground detail (grass / flower instancing) gets its own, much shorter range
+    const parkG = new THREE.Group(), parkDet = new THREE.Group(); parkG.name = 'park'; parkDet.name = 'park-detail';
+    { const keep = new Set([sky, hemi, sun, sun.target, me]); for (const o of [...scene.children]) { if (keep.has(o) || o.userData.uid) continue; const n = o.isInstancedMesh ? (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3 * o.count : 0; (n > 40000 ? parkDet : parkG).add(o); } scene.add(parkG, parkDet); }
+    const parkCull = () => { const dx = Math.max(0, Math.abs(P.x) - (W + 30)), dz = Math.max(0, Math.abs(P.z) - (H + 30)), d = Math.hypot(dx, dz); parkG.visible = d < Q.draw * 0.8; parkDet.visible = d < 50; };
     const W3 = attachWorld({ THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, db, toast, sky, sun, hemi, ground, cam, palObj, others, gaitFor, posePal3D, beatNow: () => beatNow(), proceduralTex, terrainMat: terrainM, tc, collide, floorAt, markDirty: () => { dirty = true; }, send: (f) => send(f) });
     if (/^#\/street/.test(location.hash)) W3.spawnStreet();
     // ---------------------------------------------------------------- main loop
+    let fast = 0, qStep = 0, drvCls = false, cullAt = 0; const applyDraw = () => { scene.fog.near = Q.draw * 0.6; scene.fog.far = Q.draw * 1.15; waterM.uniforms.fogNear.value = scene.fog.near; waterM.uniforms.fogFar.value = scene.fog.far; cam.far = Math.min(420, Q.draw * 1.3 + 40); cam.updateProjectionMatrix(); fitSky(); };
+    R.shadowMap.autoUpdate = !(Q.phone || LOW); let shN = 0; // phones: shadow map re-rendered every other frame (the sun follows the player slowly)
     let alive = true, last = performance.now(), frames = 0, fpsT = last, fps = 0, slow = 0, lodT = 0, portalCd = 0; lodTrees(P.x, P.z);
     const fpsEl = $('#p3-fps'); const dbgFps = lsg('kemy-pals-debug') === '1' || /fps/.test(location.hash + location.search); if (!(dbgFps || gfxShowFps())) fpsEl.hidden = true;
     $('#p3-load').remove(); hint('Drag to look around · 👁 switches camera');
@@ -476,7 +485,10 @@ export function createPark3D(ctx) {
       requestAnimationFrame(frame); if (lost || document.hidden) { last = now; return; }
       const dt = Math.min(0.05, (now - last) / 1000); last = now; frames++; window.__p3.frame++; const c0 = performance.now();
       if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; fpsEl.textContent = fps.toFixed(0) + ' fps'; window.__p3.fps = fps;
-        if (fps < 26 && now > 8000) { if (++slow >= 4 && DPR * dprK > 1) { dprK = Math.max(1 / DPR, dprK - 0.15); size(); slow = 0; } } else slow = Math.max(0, slow - 1); }
+        // auto quality from measured FPS: 1) pixel ratio down to 1.0, 2) shadows off, 3) shorter draw distance; climbs back when smooth
+        if (fps < 40 && now > 6000) { if (++slow >= 3) { slow = 0; fast = 0; if (DPR * dprK > 1.01) { dprK = Math.max(1 / DPR, dprK - 0.15); size(); } else if (sun.castShadow) { sun.castShadow = false; R.shadowMap.enabled = false; qStep = 2; } else if (Q.draw > 110) { Q.draw = Math.round(Q.draw * 0.8); applyDraw(); qStep = 3; } } }
+        else { slow = Math.max(0, slow - 1); if (fps > 56 && ++fast >= 8 && dprK < 1) { fast = 0; dprK = Math.min(1, dprK + 0.1); size(); } }
+        window.__p3.q = { dpr: +(DPR * dprK).toFixed(2), shadows: sun.castShadow, draw: Q.draw, step: qStep, tier: Q.tier, phone: !!Q.phone }; }
       // input -> move relative to the camera
       const mv = W3.move(jv.test ? { x: jv.x, y: jv.y, run: false } : tc.move); if (W3.driving()) jumpQ = false; let ix = mv.x, iz = mv.y; const lk = tc.takeLook(); if (lk.dx || lk.dy) { C.yaw -= lk.dx * 0.008; C.pitch = Math.max(pov ? -0.6 : -0.15, Math.min(pov ? 1.2 : 1.25, C.pitch + lk.dy * 0.006)); }
       const im = Math.min(1, Math.hypot(ix, iz)); const running = runT || mv.run || keys.shift; const sp = (running ? RUN_V : WALK_W) * im;
@@ -529,19 +541,20 @@ export function createPark3D(ctx) {
       for (let i = 0; i < NSP; i++) { const s = spV[i]; s.life += dt * 0.9; if (s.life > 1) { s.life -= 1; s.a = Math.random() * 6.28; } const l = s.life, r = 0.2 + l * (i % 2 ? 1.5 : 0.9), y = 3.6 + l * 2.6 - l * l * 3.6 * (i % 2 ? 1.2 : 1.6); spP[i * 3] = Math.cos(s.a) * r; spP[i * 3 + 1] = Math.max(0.6, y); spP[i * 3 + 2] = Math.sin(s.a) * r; } spG.attributes.position.needsUpdate = true;
       clouds.position.x = (tt * 0.6) % 120; const pg = window.__p3play; if (pg && !RM()) { pg.userData.seats.forEach((s, i) => (s.rotation.x = Math.sin(tt * 1.6 + i * 1.3) * 0.35)); pg.userData.plank.rotation.z = Math.sin(tt * 0.9) * 0.22; }
       if (window.__p3star) window.__p3star.rotation.y = tt;
-      if ((lodT += dt) > 0.6) { lodT = 0; lodTrees(P.x, P.z); }
+      if ((lodT += dt) > 0.6) { lodT = 0; lodTrees(P.x, P.z); } if (now - cullAt > 500) { cullAt = now; parkCull(); } // wall-clock: also right on a stuttering phone
       // shadows follow the player
       sun.target.position.set(P.x, P.y, P.z); sun.position.set(P.x + 40, P.y + 70, P.z + 25);
       updateCam(dt); send(false);
-      W3.update(dt, now); R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
+      { const dv = !!W3.driving(); if (dv !== drvCls) { drvCls = dv; document.body.classList.toggle('p3-drive', dv); } }
+      W3.update(dt, now); if (!R.shadowMap.autoUpdate) R.shadowMap.needsUpdate = (++shN & 1) === 0; R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
+    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, scene: () => scene, gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
     function cleanup() { if (!alive) return; alive = false; try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', size); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
-      document.body.classList.remove('p3-on'); tc?.destroy(); try { scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } delete window.__p3star; delete window.__p3play; }
+      document.body.classList.remove('p3-on', 'p3-drive'); tc?.destroy(); try { scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } delete window.__p3star; delete window.__p3play; }
     stop = cleanup;
   }
   return { page };

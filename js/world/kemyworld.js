@@ -3,7 +3,7 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
-import { HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL } from './layout.js';
+import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL } from './layout.js';
 import { attachEast } from './east.js';
 import { attachHomes } from './homes.js';
 import { attachRespawn } from './respawn.js';
@@ -54,6 +54,11 @@ export function attachWorld(api) {
     const X = [[-64, 100], [64, 100], [0, 100], [-64, 145], [64, 145], [0, 145]];
     for (const [x, z] of X) for (const [dx, dz, rot] of [[0, -6.2, 0], [0, 6.2, 0], [-6.2, 0, Math.PI / 2], [6.2, 0, Math.PI / 2]]) for (let i = -3; i <= 3; i++) put('mark', G.plane, '#f2f2f2', x + dx + (rot ? 0 : i * 1.05), y + 0.007, z + dz + (rot ? i * 1.05 : 0), rot, 0.55, 1, 2.4);
     put('walk', G.box, '#d8cdb8', 0, FLAT + 0.06, (PARK.H - 8 + 96) / 2, 0, 4.5, 0.1, 96 - PARK.H + 8); // path from the park
+    // Open Plains country roads: asphalt, dashed yellow centre, white edge lines (merged into the same batches = no extra draw calls)
+    for (const r of ROADS3) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2, dx = (bx - ax) / len, dz = (bz - az) / len;
+      put('road', G.plane, '#3b3d48', cx, y - 0.004, cz, ang, r.w, 1, len + r.w);
+      for (const s2 of [-1, 1]) put('mark', G.plane, '#e8e8e8', cx - dz * s2 * (r.w / 2 - 0.35), y + 0.005, cz + dx * s2 * (r.w / 2 - 0.35), ang, 0.16, 1, len);
+      for (let t = 3; t < len - 3; t += 6) { const k = t / len; put('mark', G.plane, '#ffd84a', ax + (bx - ax) * k, y + 0.006, az + (bz - az) * k, ang, 0.16, 1, 3); } }
     flush('road', asphalt, false); flush('walk', std('#fff', { vc: true, r: 0.85 }), false); flush('mark', std('#fff', { vc: true, r: 0.6 }), false); }
 
   // ---------------------------------------------------------------- houses (4 original styles, merged by material)
@@ -100,7 +105,7 @@ export function attachWorld(api) {
   api.nightU = api.nightU || { value: 0 };
   const sidingT = api.proceduralTex ? api.proceduralTex('siding', Q, [1, 1]) : null; const wallMat = std('#fff', { vc: true, r: 0.85 }); if (sidingT) { wallMat.normalMap = sidingT.normalMap; wallMat.normalScale = new THREE.Vector2(0.6, 0.6); }
   const townG = {}; const roofM = std('#fff', { vc: true, r: 0.7 }), trimM = std('#fff', { vc: true, r: 0.55 }), walkM = std('#fff', { vc: true, r: 0.9 });
-  for (const t of ['', ...Object.keys(TOWN_PAL)]) { const tk = t ? '@' + t : ''; let par = root; if (t) { par = townG[t] = new THREE.Group(); const hs = HOUSES.filter((h) => h.town === t); par.userData.c = [hs.reduce((a, h) => a + h.x, 0) / hs.length, hs.reduce((a, h) => a + h.z, 0) / hs.length]; root.add(par); }
+  for (const t of ['', ...Object.keys(TOWN_PAL)]) { const tk = t ? '@' + t : ''; let par = root; if (!t) { par = townG._street = new THREE.Group(); par.userData.c = [0, 122]; root.add(par); } if (t) { par = townG[t] = new THREE.Group(); const hs = HOUSES.filter((h) => h.town === t); par.userData.c = [hs.reduce((a, h) => a + h.x, 0) / hs.length, hs.reduce((a, h) => a + h.z, 0) / hs.length]; root.add(par); }
     flush('wall' + tk, wallMat, true, par); flush('roof' + tk, roofM, true, par); flush('trim' + tk, trimM, true, par); flush('glow' + tk, glowMat, false, par); flush('walk' + tk, walkM, false, par); }
   // instanced front doors (each one can swing open)
   const doorG = new THREE.BoxGeometry(1.2, 2.2, 0.1); doorG.translate(0.6, 1.1, 0); const doorM = new THREE.InstancedMesh(doorG, std('#fff', { r: 0.6 }), doors.length);
@@ -147,6 +152,8 @@ export function attachWorld(api) {
   trees.forEach((t, i) => { tmpM.compose(tv.set(t.x, FLAT + 1.5 * t.s, t.z), tq.identity(), ts.set(t.s, t.s, t.s)); trunkIM.setMatrixAt(i, tmpM); for (let j = 0; j < 2; j++) { tq.setFromAxisAngle(UP, i + j); tmpM.compose(tv.set(t.x + (j ? 0.7 : -0.3) * t.s, FLAT + (3.4 + j * 1.1) * t.s, t.z + (j ? -0.4 : 0.3) * t.s), tq, ts.setScalar(t.s * (j ? 0.75 : 1))); leafIM.setMatrixAt(i * 2 + j, tmpM); leafIM.setColorAt(i * 2 + j, col.set(t.c).offsetHSL(0, 0, j ? 0.05 : 0)); }
     tmpM.compose(tv.set(t.x + 1, FLAT - 0.35, t.z + 0.6), tq.identity(), ts.set(1.3, 0.6, 1)); pileIM.setMatrixAt(i, tmpM); pileIM.setColorAt(i, col.set(t.c).offsetHSL(0, -0.1, -0.08)); cyl.push({ x: t.x, z: t.z, r: 0.35 * t.s, top: 99 }); });
   trunkIM.castShadow = leafIM.castShadow = !LOW; root.add(trunkIM, leafIM, pileIM);
+  // street-only decorations ride in the street group, so they are distance-culled with it (not drawn from the far towns)
+  for (const o of [pumpIM, stemIM, ghostIM, bulbIM, hayIM, batIM, postIM, headIM, capIM, trunkIM, leafIM, pileIM]) townG._street.add(o);
   // park corner: a gazebo, benches, a pumpkin patch and a big friendly scarecrow-free hay maze ring
   { const cx = 32, cz = 122, y = FLAT; const wood = std('#f3e8ff', { r: 0.6 }), purple = std('#6d28d9', { r: 0.5 }); const g = new THREE.Group(); g.position.set(cx, y, cz); root.add(g);
     const fl = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.2, 0.4, 8), wood); fl.position.y = 0.2; g.add(fl); box.push({ x0: cx - 3.4, x1: cx + 3.4, z0: cz - 3.4, z1: cz + 3.4, top: y + 0.4, bot: -99 });
@@ -253,11 +260,11 @@ export function attachWorld(api) {
   // ---------------------------------------------------------------- per-frame update
   let lightT = 0, mapT = 0, cullT = 0; const peds = () => { const out = [{ x: P.x, z: P.z }]; for (const o of api.others.values()) out.push({ x: o.x, z: o.z }); for (const b of bots) out.push({ x: b.x, z: b.z }); return out; };
   const titleEl = view.querySelector('.p3-top b'); let area = '';
-  function update(dt, now) { const tt = now / 1000; const inS = P.z > PARK.H - 14 && P.x < 392 ? sstep(PARK.H - 16, PARK.H + 14, P.z) * (1 - sstep(104, 124, P.x)) : 0; setNight(inS);
+  function update(dt, now) { const tt = now / 1000; const inS = P.z > PARK.H - 14 && P.x < 392 ? sstep(PARK.H - 16, PARK.H + 14, P.z) * (1 - sstep(104, 124, P.x)) * (1 - sstep(PLAINS.z0 - 14, PLAINS.z0 + 8, P.z)) : 0; setNight(inS);
     const ar = areaAt(P.x, P.z); if (ar !== area && titleEl) { area = ar; titleEl.textContent = ar; }
     const cp = api.cam.position; moon.position.set(cp.x - 120, cp.y + 160, cp.z + 260); moon.lookAt(cp); stars.position.copy(cp); const near = P.z > PARK.H - 40;
     root.visible = true; // culling per object below
-    if ((cullT += dt) > 0.4) { cullT = 0; const far = Q.draw * 0.75; for (const g of Object.values(townG)) g.visible = Math.hypot(g.userData.c[0] - P.x, g.userData.c[1] - P.z) < Q.draw + 70; for (const c of cars) { const x = c.drive ? c.m.position.x : c.x, z = c.drive ? c.m.position.z : c.z; c.m.visible = Math.hypot(x - P.x, z - P.z) < far; } }
+    if (now - cullT > 400) { cullT = now; const far = Q.draw * 0.75; for (const g of Object.values(townG)) g.visible = Math.hypot(g.userData.c[0] - P.x, g.userData.c[1] - P.z) < (g === townG._street ? Q.draw * 0.6 + 60 : Q.draw + 70); for (const c of cars) { const x = c.drive ? c.m.position.x : c.x, z = c.drive ? c.m.position.z : c.z; c.m.visible = Math.hypot(x - P.x, z - P.z) < far; } }
     // pooled lights -> nearest lamps / porches
     if (NPL && (lightT += dt) > 0.5 && inS > 0.05) { lightT = 0; const s = lightSpots.map((l) => [l, (l.x - P.x) ** 2 + (l.z - P.z) ** 2]).sort((a, b) => a[1] - b[1]); pls.forEach((pl, i) => { const l = s[i] && s[i][0]; if (!l) return; pl.position.set(l.x, l.y, l.z); pl.color.set(l.c); pl.userData.i = l.i; }); }
     for (const pl of pls) pl.intensity = (pl.userData.i || 0) * inS;

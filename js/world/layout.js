@@ -33,7 +33,14 @@ export const ROADS2 = [
   { id: 'hW2', a: [122, 206], b: [122, 490], w: 12, hw: 1 }, { id: 'hE2', a: [362, 206], b: [362, 490], w: 12, hw: 1 }, { id: 'hS2', a: [362, 490], b: [122, 490], w: 12, hw: 1 },
   { id: 't1', a: [122, 270], b: [362, 270], w: 8 }, { id: 't2', a: [122, 355], b: [362, 355], w: 8 }, { id: 't3', a: [240, 206], b: [240, 270], w: 8 },
 ];
-export const ALL_ROADS = () => ROADS.concat(ROADS2);
+// stage 4: Open Plains, a huge flat meadow south of Kemy Street (x -97..118, z 172..540) for driving + building, joined to
+// Kemy Street (east spine) and to the southern highway (x = 122) by long straight country roads
+export const PLAINS = { x0: -97, x1: 118, z0: 174, z1: 540 };
+export const ROADS3 = [
+  { id: 'pa', a: [91, 145], b: [91, 440], w: 8, cr: 1 }, { id: 'pb', a: [-86, 270], b: [122, 270], w: 8, cr: 1 },
+  { id: 'pc', a: [-86, 440], b: [122, 440], w: 8, cr: 1 }, { id: 'pd', a: [-40, 270], b: [-40, 440], w: 8, cr: 1 },
+];
+export const ALL_ROADS = () => ROADS.concat(ROADS2, ROADS3);
 export const SIDEWALK = 2.6;
 // the friendly entrance from Pal Park's south path
 export const GATE = { x: 0, z: 79 };
@@ -52,7 +59,8 @@ export const TOWNS = [
   { id: 'park', name: '🌳 Pal Park', x: 0, z: 0 }, { id: 'street', name: '🎃 Kemy Street', x: 0, z: 122 },
   { id: 'down', name: '🏙️ Kemy Downtown', x: 185, z: 22, gate: [122, 100] }, { id: 'farm', name: '🌾 Clover Fields', x: 300, z: 60, gate: [300, 20] },
   { id: 'snow', name: '❄️ Frostberry Village', x: 178, z: 270, gate: [128, 270] }, { id: 'desert', name: '🌵 Sunstone Canyon', x: 300, z: 270, gate: [356, 270] },
-  { id: 'lake', name: '🛶 Willow Lake', x: 245, z: 385, gate: [128, 355] }, { id: 'shore', name: '🏖️ Sunny Shore', x: 245, z: 495, gate: [128, 484] }];
+  { id: 'lake', name: '🛶 Willow Lake', x: 245, z: 385, gate: [128, 355] }, { id: 'shore', name: '🏖️ Sunny Shore', x: 245, z: 495, gate: [128, 484] },
+  { id: 'plains', name: '🌾 Open Plains', x: 10, z: 355 }];
 const TOWN_ROWS = [ // rows of houses facing a road 16 m away (same lot shape as Kemy Street, so garages fit)
   { town: 'down', z: 116, face: -1, x0: 134, n: 7 }, { town: 'farm', z: 4, face: 1, x0: 256, n: 7 },
   { town: 'snow', z: 254, face: 1, x0: 136, n: 7 }, { town: 'snow', z: 286, face: -1, x0: 136, n: 7 },
@@ -76,7 +84,7 @@ HOUSES.forEach((h, i) => { h.i = i; h.sale = i % 3 === 1; });
 export const HOUSE_BY_ID = Object.fromEntries(HOUSES.map((h) => [h.id, h]));
 const sstep = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 export function segD(x, z, r) { const [ax, az] = r.a, [bx, bz] = r.b; const dx = bx - ax, dz = bz - az; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - ax - dx * t, z - az - dz * t); }
-export const roadD = (x, z) => { let d = 1e9; for (const r of ROADS.concat(ROADS2)) d = Math.min(d, segD(x, z, r) - r.w / 2); return d; };
+export const roadD = (x, z) => { let d = 1e9; for (const r of ROADS.concat(ROADS2, ROADS3)) d = Math.min(d, segD(x, z, r) - r.w / 2); return d; };
 // Pal Park calls this with its own park height h (already including its rim hills): the south edge melts into the flat
 // street level and the outer world rim gets gentle hills.
 export function worldGround(x, z, h) { const { W, H } = PARK;
@@ -84,10 +92,16 @@ export function worldGround(x, z, h) { const { W, H } = PARK;
   const ws = Math.max(sstep(H - 14, H - 1, z), sstep(W - 14, W - 1, x)); if (ws <= 0) return h;
   const east = sstep(96, 112, x);
   // neighborhood rim (west + south of the street) fades out toward the east side
-  const rimN = Math.max(BOUNDS.x0 + 10 - x, (z - 164) * (1 - east), 0);
+  // (the south side of the street is now the Open Plains: only the far west / far south edges rise)
+  const pl = x < PLAINS.x1 + 4 ? sstep(PLAINS.z0 - 8, PLAINS.z0, z) : 0;
+  const rimN = Math.max(BOUNDS.x0 + 10 - x, (z - 164) * (1 - east) * (1 - pl), (z - PLAINS.z1) * (1 - east), 0);
   // east side: outer rim hills, rolling countryside, beach slope down to the sea
   const rimE = Math.max(x - 374, -66 - z, 0) * east;
-  let base = FLAT + rimN * rimN * 0.09 + rimE * rimE * 0.12;
+  // rim hills are capped (soft) at ~16 m: they used to grow quadratically into km-high walls whose stretched grass
+  // texture showed up as giant green/white streaks in the sky from the southern towns
+  const cap = (v) => 16 * (1 - Math.exp(-v / 16));
+  let base = FLAT + cap(rimN * rimN * 0.09) + cap(rimE * rimE * 0.12);
+  if (pl > 0 && x < PLAINS.x1) base += pl * Math.sin(x * 0.031) * Math.cos(z * 0.027) * 0.25 * Math.min(1, Math.max(0, roadD(x, z) - 2) / 8); // almost perfectly flat
   if (east > 0) { const f = sstep(FIELDS.x0 - 4, FIELDS.x0 + 8, x) * (1 - sstep(FIELDS.x1 - 8, FIELDS.x1 + 2, x)) * sstep(FIELDS.z0, FIELDS.z0 + 10, z) * (1 - sstep(FIELDS.z1 - 10, FIELDS.z1, z));
     base += f * (Math.sin(x * 0.07) * Math.cos(z * 0.05) + 1) * 1.1 * Math.min(1, roadD(x, z) / 6);
     if (z > SHORE.z0) base -= (z - SHORE.z0) * 0.16 * sstep(100, 112, x);
@@ -98,12 +112,13 @@ export function worldGround(x, z, h) { const { W, H } = PARK;
 const ROMS_X = 392;
 export function worldClamp(x, z) { const { W, H } = PARK; void SNOW; void DESERT;
   if (roomState.box) { const b = roomState.box; return [Math.max(b.x0, Math.min(b.x1, x)), Math.max(b.z0, Math.min(b.z1, z))]; }
-  x = Math.max(BOUNDS.x0 + 3, Math.min(BOUNDS.x1 - 3, x)); z = Math.max(BOUNDS.z0 + 3, Math.min(SHORE.sea + 4, z));
-  if (x < 100 && z > 169) z = 169; // south of the neighborhood is hills
+  x = Math.max(BOUNDS.x0 + 3, Math.min(BOUNDS.x1 - 3, x)); z = Math.max(BOUNDS.z0 + 3, Math.min(x < PLAINS.x1 + 4 ? PLAINS.z1 : SHORE.sea + 4, z));
+  // south of the neighborhood is now the Open Plains (walk or drive straight in)
   { const dx = x - LAKE.x, dz = z - LAKE.z, d = Math.hypot(dx, dz); if (d < LAKE.r - 3) { x = LAKE.x + dx / d * (LAKE.r - 3); z = LAKE.z + dz / d * (LAKE.r - 3); } }
   if (z > 297 && z < 331 && x > 128 && x < 356 && Math.abs(x - 240) > 6) z = z < 314 ? 297 : 331; // peaks/mesas: walk around via the canyon pass
   void W; void H; return [x, z]; }
 export const inStreet = (x, z) => z > PARK.H - 4 && x < 100;
 export function areaAt(x, z) { if (x > ROMS_X) return '🏠 Inside'; if (z > SHORE.z0 - 30 && x > 100) return '🏖️ Sunny Shore';
   if (x > 100 && z > 330) return '🛶 Willow Lake'; if (x > 100 && z > 222) return x < 244 ? '❄️ Frostberry Village' : '🌵 Sunstone Canyon'; if (x > 100 && ROADS2.some((r) => r.hw && segD(x, z, r) < 9)) return '🛣️ Loop Highway'; if (x > 100 && z < 206 && x < 244 && z > -52) return '🏙️ Kemy Downtown'; if (x >= FIELDS.x0 - 6 && x < 380 && z < FIELDS.z1 + 6) return '🌾 Clover Fields';
+  if (x < PLAINS.x1 + 2 && z > PLAINS.z0 - 4) return '🌾 Open Plains';
   if (x > 104) return (x < 240 && z < 92) ? '🏙️ Kemy Downtown' : '🛣️ Loop Highway'; if (z > PARK.H + 2) return '🎃 Kemy Street'; return '🌳 Pal Park'; }

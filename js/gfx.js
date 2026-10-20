@@ -24,7 +24,9 @@ export function autoTier() { // picks by device: memory, cores, data saver, phon
   if (phone) return (mem && mem < 6) || cores < 6 ? 'medium' : 'high';
   return mem && mem < 8 ? 'high' : 'ultra'; }
 export function gfxTier() { const v = gfxSetting(); return v === 'auto' ? autoTier() : v; }
-export function gfxPreset() { return { tier: gfxTier(), ...PRESETS[gfxTier()] }; }
+export const isPhone = () => { const n = navigator; return /iPhone|iPad|iPod|Android|Mobile/i.test(n.userAgent || '') || (n.maxTouchPoints > 1 && Math.min(innerWidth, innerHeight) < 600); };
+// phones: pixel ratio capped at 1.5 (1.0 on Low), smaller shadow maps, shorter draw distance: the iPhone fill-rate budget
+export function gfxPreset() { const q = { tier: gfxTier(), ...PRESETS[gfxTier()] }; if (isPhone()) { q.phone = true; q.dpr = Math.min(q.dpr, q.tier === 'low' ? 1 : 1.5); q.shadowMap = Math.min(q.shadowMap, q.tier === 'ultra' ? 2048 : 1024); q.draw = Math.min(q.draw, q.tier === 'low' ? 140 : 230); q.grass = Math.min(q.grass, 0.7); } return q; }
 export const showFps = () => ls(FPSK) === '1';
 export const setShowFps = (on) => { ls(FPSK, on ? '1' : '0'); dispatchEvent(new CustomEvent('kemy:gfx', { detail: 'fps' })); };
 
@@ -41,21 +43,32 @@ const NOISE = `float h21(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p
   float fbm(vec2 p){ float a = .5, s = 0.; for (int i = 0; i < 5; i++){ s += a*vn(p); p = p*2.03 + 7.1; a *= .5; } return s; }`;
 export function makeSky(o = {}) {
   const u = { sunDir: { value: (o.sunDir || new THREE.Vector3(0.45, 0.75, 0.3)).clone().normalize() }, top: { value: new THREE.Color(o.top || '#2f7fe6') }, hor: { value: new THREE.Color(o.hor || '#bfe3ff') },
-    ground: { value: new THREE.Color(o.ground || '#9cc4a0') }, sunCol: { value: new THREE.Color(o.sun || '#fff4dc') }, cloud: { value: o.cloud ?? 0.55 }, cloudCol: { value: new THREE.Color(o.cloudCol || '#ffffff') }, t: { value: 0 } };
-  const mat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: u,
-    vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); gl_Position.z = gl_Position.w; }',
-    fragmentShader: `uniform vec3 sunDir, top, hor, ground, sunCol, cloudCol; uniform float cloud, t; varying vec3 vP; ${NOISE}
+    ground: { value: new THREE.Color(o.ground || '#9cc4a0') }, sunCol: { value: new THREE.Color(o.sun || '#fff4dc') }, cloud: { value: o.cloud ?? 0.55 }, cloudCol: { value: new THREE.Color(o.cloudCol || '#ffffff') }, t: { value: 0 },
+    // fogC: the scene fog colour (shared Color object, so day/night lerps follow); mount: 0 = none, 1 = distant hazy ranges on the horizon
+    fogC: { value: o.fogColor || new THREE.Color(o.hor || '#bfe3ff') }, mount: { value: o.mountains ? 1 : 0 } };
+  // pure maths per pixel (no textures at all, so nothing can ever stretch); far plane trick keeps it behind everything
+  const mat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false, uniforms: u,
+    vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); gl_Position.z = gl_Position.w * .99999; }',
+    fragmentShader: `uniform vec3 sunDir, top, hor, ground, sunCol, cloudCol, fogC; uniform float cloud, t, mount; varying vec3 vP; ${NOISE}
       void main(){ vec3 d = normalize(vP); float h = max(d.y, 0.); vec3 c = mix(hor, top, pow(h, .5));
         float s = max(dot(d, sunDir), 0.); c += sunCol * (smoothstep(.9994, .9997, s) * 3. + pow(s, 64.) * .35 + pow(s, 6.) * .12);
         if (cloud > 0. && d.y > 0.) { vec2 q = d.xz / (d.y + .12) * 1.2; q.x += t * .004;
           float n = fbm(q * .9) * .65 + fbm(q * 2.7 + 3.) * .35; float cv = smoothstep(1. - cloud, 1.05 - cloud * .55, n) * smoothstep(0., .18, d.y);
           vec3 cc = mix(cloudCol * .82, cloudCol * 1.04, smoothstep(.4, .8, n)) + sunCol * pow(s, 8.) * .25; c = mix(c, cc, cv * .9); }
-        if (d.y < 0.) c = mix(hor, ground, min(1., -d.y * 5.));
+        // horizon haze = fog colour, so terrain fading into the fog meets the sky without a seam
+        c = mix(c, fogC, (1. - smoothstep(0., .16, d.y)) * .85);
+        if (mount > 0.) { vec2 az = normalize(d.xz + 1e-5);
+          float r1 = .035 + .05 * fbm(az * 3.1 + 11.) + .02 * vn(az * 19. + 3.), r2 = .02 + .035 * fbm(az * 5.3 + 2.);
+          float ey = d.y + .004;
+          vec3 m1 = mix(fogC, vec3(.32, .42, .52) * (fogC * 1.1), .38), m2 = mix(fogC, vec3(.28, .4, .36) * (fogC * 1.2), .55);
+          c = mix(c, m1 + vec3(1.) * pow(s, 12.) * .05, smoothstep(r1 + .002, r1 - .002, ey) * .9);
+          c = mix(c, m2, smoothstep(r2 + .002, r2 - .002, ey) * .92); }
+        if (d.y < 0.) c = mix(mount > 0. ? mix(fogC, ground, .25) : hor, ground, min(1., -d.y * (mount > 0. ? 2. : 5.)));
         gl_FragColor = vec4(c, 1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }` });
-  const m = new THREE.Mesh(new THREE.SphereGeometry(o.radius || 400, 48, 24), mat); m.frustumCulled = false; m.renderOrder = -1; m.userData.u = u; return m; }
+  const m = new THREE.Mesh(new THREE.SphereGeometry(o.radius || 400, 32, 16), mat); m.frustumCulled = false; m.renderOrder = -1; m.userData.u = u; return m; }
 // procedural environment map from the sky (PBR reflections / ambient)
 export function envFromSky(R, sky) { const pm = new THREE.PMREMGenerator(R); const s = new THREE.Scene(); const c = sky.clone(); c.material = sky.material.clone(); c.material.uniforms.cloud.value = sky.material.uniforms.cloud.value * 0.6; c.scale.setScalar(0.2); s.add(c);
   const rt = pm.fromScene(s, 0.02, 0.1, 200); pm.dispose(); c.material.dispose(); return rt.texture; }
