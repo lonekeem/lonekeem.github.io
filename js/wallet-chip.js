@@ -36,7 +36,7 @@ onAuthStateChanged(auth, (u) => {
 });
 const SHOP = '#/pals/store';
 export function walletChip(o = {}) { css(); const el = document.createElement('button'); el.type = 'button'; el.className = 'wchip' + (o.small ? ' sm' : '');
-  el.onclick = (e) => { e.stopPropagation(); const to = o.href || (/^#\/(park|street)|zombie|armory/.test(location.hash) ? '#/pals/shop' : SHOP); if (o.onTap) o.onTap(); location.hash = to; };
+  el.onclick = (e) => { e.stopPropagation(); if (o.onTap) o.onTap(); if (o.href) { location.hash = o.href; return; } import('./coinshop.js').then((m) => m.openCoinShop('get')).catch(() => { location.hash = /^#\/(park|street)|zombie|armory/.test(location.hash) ? '#/pals/shop' : SHOP; }); };
   chips.add(el); paint(el); return el; }
 export function mountHeaderChip(ha) { if (!ha || !st.uid || ha.querySelector('.wchip')) return; ha.prepend(walletChip()); }
 // Floating compact chip for full-screen games / HUDs (top-centre, safe-area aware).
