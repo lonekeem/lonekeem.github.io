@@ -131,6 +131,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       for (const c of ['inv', 'looks']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
       // pal/* rules match fixed doc ids only (no collection list), so delete those directly
       await deleteRefs(['wallet', 'chat', 'settings'].map((k) => doc(db, 'users', uid, 'pal', k)));
+      await deleteDoc(doc(db, 'parental', uid)).catch(() => {});   // Parental Controls PIN hash
       await deleteDoc(doc(db, 'palStats', uid)).catch(() => {});
       for (const g of ['stardrop', 'starcards', 'pool', 'chess', 'ludo', 'trivia', 'klgrid', 'checkers', 'pals', 'quest', 'all']) await deleteDoc(doc(db, 'leaderboard', uid + '_' + g)).catch(() => {});   // scoreboards
       for (let i = 1; i <= 20; i++) await deleteDoc(doc(db, 'parkRooms', 'r' + i, 'p', uid)).catch(() => {});

@@ -22,11 +22,11 @@ body.pc-nolive a[href="#/live/new"] { display: none !important; }
 .pc-err { color: #b0003a; font-weight: 600; min-height: 1em; margin: 8px 0 0; }
 .pc-modal, .pc-timeup { position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(8, 2, 16, .82); padding: 20px; }
 .pc-timeup { background: radial-gradient(circle at 50% 30%, #3a1670, #0b0414 70%); }
-.pc-box { background: #120720; color: #f3ecff; border: 2px solid #6a2fd0; border-radius: 22px; padding: 22px 20px; width: min(360px, 100%); text-align: center; box-shadow: 0 10px 40px rgba(106, 47, 208, .45); }
+.pc-box { background: #120720; color: #f3ecff; border: 2px solid #6a2fd0; border-radius: 22px; padding: 22px 20px; width: min(360px, 100%); text-align: center; box-shadow: 0 10px 40px rgba(106, 47, 208, .45); box-sizing: border-box; }
 .pc-box h2 { margin: 0 0 6px; color: #fff; }
 .pc-sub { color: #d9c8ff; margin: 0 0 12px; }
 .pc-box .pc-err { color: #ff9ab8; }
-.pc-pin { width: 100%; box-sizing: border-box; font-size: 1.8rem; letter-spacing: .5em; text-align: center; padding: 10px; border-radius: 14px; border: 2px solid #8a55dc; background: #f3ecff; color: #14091f; }
+.pc-pin { width: 100%; box-sizing: border-box; font-size: 1.8rem; letter-spacing: .5em; text-align: center; padding: 10px; border-radius: 14px; border: 2px solid #8a55dc !important; background: #f3ecff !important; color: #14091f !important; }
 .pc-pw { font-size: 1.1rem; letter-spacing: normal; }
 .pc-link { background: none; border: 0; color: #c9a8ff; text-decoration: underline; margin-top: 12px; font: inherit; cursor: pointer; }
 .pc-moon { font-size: 3rem; }
