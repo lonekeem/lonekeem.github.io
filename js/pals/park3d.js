@@ -18,12 +18,13 @@ import { emoteMs, EMOTE_BY_ID } from './emotes.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
 import { addParkHD } from './park-hd.js';
+import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; // Kemy World: Kemy Street district etc. (own module)
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
 const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX), Math.round(z * PX + CY)];
 const W = 100, H = 75;                                // world half-size (200 m x 150 m)
-const MAX_ROOM = 25, ROOMS = 20, SEND_MS = 240, HB_MS = 15000, STALE_MS = 30000;
+const MAX_ROOM = 30, ROOMS = 20, SEND_MS = 240, HB_MS = 15000, STALE_MS = 30000;
 const PORTAL_NAME = { race: 'Pal Race', bubbles: 'Bubble Pop', stars: 'Star Catch', dance: 'Dance-Off' };
 const EMO_DANCE = { '👋': 'wave', '💜': 'happyshimmy', '😂': 'bounce', '😮': 'woah', '🎉': 'groove', '😴': 'slowmo', '⭐': 'twirl', '🐾': 'hopclap' };
 const BPM = 112;
@@ -47,7 +48,7 @@ function ground(x, z) { // gentle hills, flattened at the plaza, paths, studio a
   for (const e of [POND, LAKE]) { const d = ellD(e, x, z); if (d < 1.5) { const k = Math.max(0, 1.5 - d) / 1.5; h -= k * k * 3.2; } }
   const pd = pathD(x, z); if (pd < 3) h -= (3 - pd) * 0.05;
   const edge = Math.max(Math.abs(x) - (W - 12), Math.abs(z) - (H - 12), 0); h += edge * edge * 0.12; // rim hills
-  return h; }
+  return worldGround(x, z, h); }
 const WATER_Y = { pond: 0, lake: 0 }; { WATER_Y.pond = ground(POND.x, POND.z) + 2.2; WATER_Y.lake = ground(LAKE.x, LAKE.z) + 2.2; }
 
 export function createPark3D(ctx) {
@@ -344,7 +345,7 @@ export function createPark3D(ctx) {
       for (const c of cyl) { if (c.top <= feet + STEP) continue; const dx = x - c.x, dz = z - c.z, d = Math.hypot(dx, dz), m = c.r + RAD; if (d < m && d > 1e-4) { x = c.x + dx / d * m; z = c.z + dz / d * m; } }
       for (const b of box) { if (b.top <= feet + STEP) continue; if (x > b.x0 - RAD && x < b.x1 + RAD && z > b.z0 - RAD && z < b.z1 + RAD) { const pl = x - (b.x0 - RAD), pr = (b.x1 + RAD) - x, pb = z - (b.z0 - RAD), pf = (b.z1 + RAD) - z; const mn = Math.min(pl, pr, pb, pf); if (mn === pl) x = b.x0 - RAD; else if (mn === pr) x = b.x1 + RAD; else if (mn === pb) z = b.z0 - RAD; else z = b.z1 + RAD; } }
       for (const e of [POND, LAKE]) if (inEll(e, x, z, -1.5)) { const d = ellD(e, x, z) || 1e-3; const k = (1 - 1.5 / Math.min(e.rx, e.rz)) / d; x = e.x + (x - e.x) * k * 1.001; z = e.z + (z - e.z) * k * 1.001; }
-      x = Math.max(-W + 3, Math.min(W - 3, x)); z = Math.max(-H + 3, Math.min(H - 3, z)); return [x, z]; }
+      return worldClamp(x, z); }
 
     // ---------------------------------------------------------------- camera (3rd person orbit with anti-clip, or POV)
     const CK = 'kemy-park-cam-' + S.user.uid; let pov = lsg(CK) === 'pov';
@@ -462,6 +463,8 @@ export function createPark3D(ctx) {
     let gm = null; import('../gamemusic.js').then(async (m) => { gm = m; await m.mountGameMusic({ corner: 'top-right' }); if (!m.isPlaying() && document.body.contains(cv)) m.playStation('theme', { volume: 0.18 }); }).catch(() => {});
     const beatNow = () => { const a = gm && gm.audioEl && gm.audioEl(); if (a && !a.paused) return { on: true, beat: a.currentTime * BPM / 60 }; return { on: false, beat: performance.now() / 1000 * BPM / 60 }; };
 
+    const W3 = attachWorld({ THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, db, toast, sky, sun, hemi, ground, cam, palObj, others, gaitFor, posePal3D, beatNow: () => beatNow(), proceduralTex, terrainMat: terrainM, tc, collide, floorAt, markDirty: () => { dirty = true; }, send: (f) => send(f) });
+    if (/^#\/street/.test(location.hash)) W3.spawnStreet();
     // ---------------------------------------------------------------- main loop
     let alive = true, last = performance.now(), frames = 0, fpsT = last, fps = 0, slow = 0, lodT = 0, portalCd = 0; lodTrees(P.x, P.z);
     const fpsEl = $('#p3-fps'); const dbgFps = lsg('kemy-pals-debug') === '1' || /fps/.test(location.hash + location.search); if (!(dbgFps || gfxShowFps())) fpsEl.hidden = true;
@@ -474,7 +477,7 @@ export function createPark3D(ctx) {
       if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; fpsEl.textContent = fps.toFixed(0) + ' fps'; window.__p3.fps = fps;
         if (fps < 26 && now > 8000) { if (++slow >= 4 && DPR * dprK > 1) { dprK = Math.max(1 / DPR, dprK - 0.15); size(); slow = 0; } } else slow = Math.max(0, slow - 1); }
       // input -> move relative to the camera
-      const mv = jv.test ? { x: jv.x, y: jv.y, run: false } : tc.move; let ix = mv.x, iz = mv.y; const lk = tc.takeLook(); if (lk.dx || lk.dy) { C.yaw -= lk.dx * 0.008; C.pitch = Math.max(pov ? -0.6 : -0.15, Math.min(pov ? 1.2 : 1.25, C.pitch + lk.dy * 0.006)); }
+      const mv = W3.move(jv.test ? { x: jv.x, y: jv.y, run: false } : tc.move); if (W3.driving()) jumpQ = false; let ix = mv.x, iz = mv.y; const lk = tc.takeLook(); if (lk.dx || lk.dy) { C.yaw -= lk.dx * 0.008; C.pitch = Math.max(pov ? -0.6 : -0.15, Math.min(pov ? 1.2 : 1.25, C.pitch + lk.dy * 0.006)); }
       const im = Math.min(1, Math.hypot(ix, iz)); const running = runT || mv.run || keys.shift; const sp = (running ? RUN_V : WALK_W) * im;
       if (im > 0.08) { const a = Math.atan2(ix, iz) + C.yaw - Math.PI; const want = Math.atan2(-Math.sin(a), -Math.cos(a)); const mx = Math.sin(want), mz = Math.cos(want);
         let nx = P.x + mx * sp * dt, nz = P.z + mz * sp * dt; [nx, nz] = collide(nx, nz, P.y); P.x = nx; P.z = nz;
@@ -529,14 +532,14 @@ export function createPark3D(ctx) {
       // shadows follow the player
       sun.target.position.set(P.x, P.y, P.z); sun.position.set(P.x + 40, P.y + 70, P.z + 25);
       updateCam(dt); send(false);
-      R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
+      W3.update(dt, now); R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
     window.__p3 = { fps: 0, frame: 0, cpu: 0, net, extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
-    function cleanup() { if (!alive) return; alive = false; unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', size); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
+    function cleanup() { if (!alive) return; alive = false; try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', size); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
       document.body.classList.remove('p3-on'); tc?.destroy(); try { scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } delete window.__p3star; delete window.__p3play; }
     stop = cleanup;
   }

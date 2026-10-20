@@ -603,6 +603,7 @@ const routes = [
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
   [/^#\/pals(?:\/(gallery|shop|store|store-bg))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
   [/^#\/park$/, () => park.page(), 'me'],
+  [/^#\/street$/, () => park.page(), 'games'], // Kemy Street: the Halloween district of the Pal Park world (js/world/)
   [/^#\/arcade(?:\/([\w-]+))?(?:\?(.*))?$/, (id, q) => import('./pals/minigames.js').then((m) => (arcade = arcade || m.createArcade({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal, sendMessage, getProfile })).page(id, q)), 'games'],
   [/^#\/scores(?:\/([\w-]+))?(?:\?(.*))?$/, (g, q, t) => import('./leaderboard.js').then((m) => m.scoreboardPage(main, { game: g || 'all', tab: new URLSearchParams(q || '').get('tab') || 'all', S, stale: () => stale(t) })), 'games'],
   [/^#\/games\/pals(?:\/([\w-]+))?(?:\?(.*))?$/, (b, q) => palGames.page(b, Object.fromEntries(new URLSearchParams(q || ''))), 'games'],
@@ -630,7 +631,7 @@ const kemySongsForGames = async () => {
     .map((p) => ({ title: (p.work && p.work.title) || 'Song', artist: (p.work && p.work.artist) || p.authorName || 'Kemy', url: p.mediaUrl }));
 };
 function gameMusicFor(hash) {
-  if (/^#\/(games?(\/|\?|$)|park$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
+  if (/^#\/(games?(\/|\?|$)|park$|street$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
   else hideGameMusic();
 }
 async function route() {
@@ -648,7 +649,7 @@ async function route() {
       main.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
       document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
       document.body.classList.remove('live-mode');
-      document.body.classList.toggle('game-mode', /^#\/(park|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
+      document.body.classList.toggle('game-mode', /^#\/(park|street|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
       window.scrollTo(0, 0);
       gameMusicFor(hash);
       if (mod.isSuspended() && !/^#\/(settings|notifications|login|signup|reset|support|feedback)/.test(hash)) { main.innerHTML = mod.suspendedHtml(); hideGameMusic(); document.body.classList.remove('feed-mode', 'game-mode'); return; }
