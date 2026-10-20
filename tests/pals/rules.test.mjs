@@ -94,6 +94,11 @@ await ok('cannot self-grant a rare Pal without paying', assertFails(setDoc(doc(A
 await ok('cannot self-grant a premium bg without paying', assertFails(setDoc(doc(A, 'users/alice/inv/bp_galaxy'), { n: 1, at: serverTimestamp() })));
 await ok('saved look with bg + jewelry ok', assertSucceeds(setDoc(doc(A, 'users/alice/looks/l1'), { name: 'Party', outfit: { full: 'f_dress_pink', wrist: 'f_bracelet_gold' }, bg: 'b_candy', variant: '', pattern: 'none' })));
 await sleep(1100);
+await ok('non-admin cannot equip the Founder Pal', assertFails(PU({ species: 'founder' })));
+{ const AD = env.authenticatedContext('kemyadmin', { email: 'lillykemoy1@gmail.com', email_verified: true }).firestore(); const pet = (sp) => ({ species: sp, name: 'Kemy', colors: { body: '#ffffff', accent: '#ffffff', eye: '#000000' }, pattern: 'none', acc: 'none', xp: 0, level: 1, pats: 0, stats: { happy: 80, hunger: 80, energy: 80, clean: 80 }, at: serverTimestamp(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await ok('admin can have the Founder Pal', assertSucceeds(setDoc(doc(AD, 'users/kemyadmin/pets/p1'), pet('founder'))));
+  const FAKE = env.authenticatedContext('faker', { email: 'lillykemoy1@gmail.com', email_verified: false }).firestore();
+  await ok('unverified admin email cannot', assertFails(setDoc(doc(FAKE, 'users/faker/pets/p1'), pet('founder')))); }
 await ok('unowned rare species refused', assertFails(PU({ species: 'rxphoenix' })));
 await ok('new free species ok', assertSucceeds(PU({ species: 'corgi' })));
 await ok('cannot self-grant a rare species', assertFails(setDoc(doc(A, 'users/alice/inv/sp_rxphoenix'), { n: 1, at: serverTimestamp() })));

@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#3a2a8a"><canvas id="c" width="1000" height="420"></canvas>
+<script type="module">
+import { drawPal3D } from '../../js/pals/pal3d.js';
+const c = document.getElementById('c').getContext('2d'); const g = c.createLinearGradient(0, 0, 0, 420); g.addColorStop(0, '#5a3ac0'); g.addColorStop(1, '#2a1a6a'); c.fillStyle = g; c.fillRect(0, 0, 1000, 420);
+const J = [['founder', 0.35, 'idle'], ['founder', -0.5, 'react'], ['founder', 1.3, 'idle'], ['kemy', 0.35, 'idle']]; const done = []; let t = 0;
+const go = () => { t++; let all = true; J.forEach(([sp, yaw, md], i) => { if (done[i]) return; if (drawPal3D(c, 125 + i * 250, 380, 150, { species: sp, level: 6 }, { t: 60, mode: md, yaw })) { done[i] = 1; c.fillStyle = '#fff'; c.font = '600 13px sans-serif'; c.fillText(sp === 'kemy' ? 'normal Kemy (1x)' : 'Kemy (Founder) 1.2x', 20 + i * 250, 20); } else all = false; }); if (!all && t < 300) requestAnimationFrame(go); else window.ready = true; };
+setTimeout(go, 300);
+</script>

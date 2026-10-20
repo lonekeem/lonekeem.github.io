@@ -43,5 +43,7 @@ export const SPECIES = [
 const CAT0 = {"kemy": "sea", "elephant": "land", "unicorn": "fantasy", "dragon": "fantasy", "starsprite": "fantasy", "cloudpuff": "fantasy", "jelly": "sea", "penguin": "sea", "seal": "sea", "otter": "sea", "turtle": "sea", "frog": "land", "owl": "sky", "duckling": "sky", "chick": "sky"};
 for (const s of SPECIES) s.cat = CAT0[s.id] || 'land';
 SPECIES.push(...MORE_SPECIES);
+// Admin-exclusive founder Pal (the Kemy app-icon axolotl). Rules: species 'founder' needs isAdmin().
+export const FOUNDER = { id: 'founder', name: 'Kemy (Founder)', cat: 'fantasy', vibe: 'star', body: '#f6d4ee', acc: '#8a5ad8', ears: 'gills', snout: 'smile', tail: 'axo', feet: 'paws', extras: ['belly', 'cheeks', 'founder'], react: 'sparkle', forms: ['Kemy (Founder)', 'Kemy (Founder)', 'Kemy (Founder)'], blurb: 'The original Kemy, for the founder only.', founder: true, admin: true };
 export const RARE_SPECIES = SPECIES.filter((s) => s.rare);
 export const isRareSpecies = (id) => /^rx[a-z]+$/.test(id);

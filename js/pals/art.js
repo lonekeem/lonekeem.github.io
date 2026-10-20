@@ -2,10 +2,10 @@
 const TAU = Math.PI * 2;
 export const VIBES = { water: { name: 'Water', c: '#5aa8ff' }, star: { name: 'Star', c: '#ffd34d' }, leaf: { name: 'Leaf', c: '#6fd39a' }, flame: { name: 'Flame', c: '#ff8a5c' }, spark: { name: 'Spark', c: '#ffe14d' }, moon: { name: 'Moon', c: '#b9a6ff' } };
 import { drawWear } from './wear.js';
-import { SPECIES } from './species.js';
+import { SPECIES , FOUNDER } from './species.js';
 export { SPECIES };
 const ALIAS = { twinkbun: 'bunny', nimbo: 'cloudpuff', ember: 'puppy', mossy: 'turtle', prism: 'fox', zap: 'chick', luno: 'owl', petal: 'hamster' };
-export const SPEC = Object.fromEntries(SPECIES.map((s) => [s.id, s]));
+export const SPEC = Object.fromEntries(SPECIES.map((s) => [s.id, s])); SPEC.founder = FOUNDER;
 for (const k in ALIAS) SPEC[k] = SPEC[ALIAS[k]];
 export const BODY_PRESETS = ['#f7cdee', '#ffd6a8', '#cdeec0', '#cfe3ff', '#e4d6ff', '#fff3a6', '#ffc0cb', '#d0d0e0'];
 export const ACC_PRESETS = ['#8a55dc', '#ff7ab8', '#5aa8ff', '#5fae6e', '#ffb31a', '#ff7a4d', '#6b4fd6', '#3a2a63'];

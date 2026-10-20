@@ -1189,6 +1189,7 @@ service cloud.firestore {
           && (!('voice' in pd()) || (pd().voice is string && pd().voice.matches('^[a-z_]{2,16}$') && (!pd().voice.matches('^vx_.*') || exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().voice)))))
           && (!('outfit' in pd()) || outfitOk(pd().outfit))
           && pd().species is string && pd().species.matches('^[a-z]{2,16}$')
+          && (pd().species != 'founder' || isAdmin())
           && (!pd().species.matches('^rx[a-z]+$') || exists(/databases/$(database)/documents/users/$(uid)/inv/$('sp_' + pd().species)))
           && isStr(pd().name, 1, 20)
           && pd().colors is map && pd().colors.keys().hasOnly(['body', 'accent', 'eye']) && hex(pd().colors.body) && hex(pd().colors.accent) && hex(pd().colors.eye)

@@ -1283,6 +1283,7 @@ async function pageAdmin(token) {
       <p class="muted small" style="margin:3px 0 8px">Sends every price in the app (dances, outfits, jewelry, looks, backgrounds, Rare Pals and pal items) to the live shop, so people can buy them.</p>
       <p class="small" id="shop-status">Checking the live shop…</p>
       <button class="btn" id="shop-pub" style="font-size:1.05rem;padding:12px 22px">Publish shop prices</button></div>
+    ${big('founder', '👑', 'Kemy (Founder) Pal', 'Your admin-only Pal: the Kemy app-icon axolotl, 1.2x size, crown and sparkles. Keeps your Pal’s name, level and outfit. Only your verified admin account can use it.', '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" id="adm-founder">👑 Make my active Pal the Founder</button><button class="btn btn-sm btn-ghost" id="adm-founder-off">Switch back</button></div>')}
     ${big('reindex', '🔎', 'Build search index', 'Adds search keywords and #hashtags to every post and profile that’s missing them.', '<button class="btn btn-sm" id="reindex">Build search index</button>')}
     ${big('studio', '🎬', 'Lone Keem Studios account', 'Read and answer the studio’s messages and notifications, or post as the studio.', '<div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn btn-sm btn-ghost" href="#/messages/studio">Studio inbox</a><a class="btn btn-sm btn-ghost" href="#/notifications/studio">Studio notifications</a><a class="btn btn-sm btn-ghost" href="#/new">Post as the studio</a></div>')}
     ${big('feat', '★', 'Feature posts (Studio Picks)', 'Open any movie, show or song and tap “Feature in Studio Picks” (tap again to unfeature).', '<a class="btn btn-sm btn-ghost" href="#/watch">Go to Watch</a>')}
@@ -1290,6 +1291,10 @@ async function pageAdmin(token) {
     ${big('media', '🧹', 'Media cleanup', 'After you delete a post, Kemy shows a command to erase its files from Cloudinary on your computer (the key never goes in the app). For a full sweep run <code>node scripts/cloudinary-cleanup.mjs</code> (dry run first).')}
     <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports</h2>
     <div id="reports"></div>`;
+  const founderSet = async (on) => { if (!isAdmin()) return toast('Admins only'); try { const m = await pals.myPals(true); const p = m && (m.list.find((x) => x.id === S.profile.activePet) || m.list[0]); if (!p) return toast('Hatch a Pal first');
+      const k = 'kemy-founder-prev-' + p.id; let sp = 'founder'; if (on) { if (p.species !== 'founder') localStorage.setItem(k, p.species); } else { sp = localStorage.getItem(k) || 'kemy'; }
+      await m.store.save(p, { species: sp }); dispatchEvent(new Event('kemy:pal-changed')); toast(on ? `${p.name} is now Kemy (Founder) 👑` : `${p.name} switched back`); } catch (e) { toast(friendlyError(e)); } };
+  if ($('#adm-founder')) { $('#adm-founder').onclick = () => founderSet(true); $('#adm-founder-off').onclick = () => founderSet(false); }
   const st = $('#shop-status'), pub = $('#shop-pub');
   const showStatus = async () => {
     try { const r = await adminShopStatus(); if (stale(token)) return;
