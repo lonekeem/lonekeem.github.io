@@ -1573,6 +1573,65 @@ service cloud.firestore {
         allow delete: if signedIn() && (!exists(zlPath()) || get(zlPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
       }
     }
+    // Kemy Challenge Show (js/pals/show-net.js): up to 30 players per room, host-authoritative show state
+    match /shows/{code} {
+      function sl() { return request.resource.data; }
+      function shp(u) { return /databases/$(database)/documents/shows/$(code)/p/$(u); }
+      function shPath() { return /databases/$(database)/documents/shows/$(code); }
+      function slShape() {
+        return sl().keys().hasOnly(['host', 'status', 'pub', 'n', 'createdAt', 'updatedAt'])
+          && sl().host is string && sl().host.size() <= 128 && sl().status in ['open', 'playing', 'done'] && sl().pub is bool
+          && sl().n is int && sl().n >= 0 && sl().n <= 30 && sl().updatedAt == request.time;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() && notBanned() && code.matches('^[A-Z2-9]{5}$') && slShape() && sl().host == me() && sl().status == 'open' && sl().n == 1 && sl().createdAt == request.time;
+      allow update: if signedIn() && notBanned() && slShape() && sl().createdAt == resource.data.createdAt && (
+        (resource.data.host == me() && (sl().host == me() || exists(shp(sl().host))))
+        || (sl().host == me() && resource.data.host != me() && exists(shp(me()))
+            && (!exists(shp(resource.data.host)) || get(shp(resource.data.host)).data.at < request.time - duration.value(8, 's'))
+            && sl().diff(resource.data).affectedKeys().hasOnly(['host', 'updatedAt'])));
+      allow delete: if signedIn() && (resource.data.host == me() || resource.data.updatedAt < request.time - duration.value(30, 'm'));
+      match /slot/{s} {
+        allow read: if signedIn();
+        allow create: if signedIn() && notBanned() && s.matches('^([0-9]|[12][0-9])$') && exists(shPath())
+          && request.resource.data.keys().hasOnly(['uid', 'at']) && request.resource.data.uid == me() && request.resource.data.at == request.time;
+        allow delete: if signedIn() && (resource.data.uid == me() || !exists(shPath()) || get(shPath()).data.host == me()
+          || resource.data.at < request.time - duration.value(30, 'm'));
+      }
+      match /p/{u} {
+        function sp() { return request.resource.data; }
+        function spShape() {
+          return sp().keys().hasOnly(['name', 'pal', 'slot', 'ready', 'x', 'y', 'z', 'f', 'v', 'st', 'r', 'sc', 'tp', 'bp', 'em', 'emAt', 'at'])
+            && isStr(sp().name, 0, 40) && sp().pal is map && sp().pal.size() <= 8 && sp().pal.get('outfit', {}) is map && sp().pal.get('outfit', {}).size() <= 14
+            && sp().pal.get('colors', {}) is map && sp().pal.get('colors', {}).size() <= 4
+            && sp().slot is int && sp().slot >= 0 && sp().slot <= 29 && sp().ready is bool
+            && sp().x is number && sp().y is number && sp().z is number && sp().f is number && sp().v is number
+            && sp().x >= -120 && sp().x <= 120 && sp().z >= -120 && sp().z <= 120 && sp().y >= -20 && sp().y <= 40 && sp().v >= 0 && sp().v <= 50
+            && sp().st is int && sp().st >= 0 && sp().st <= 2 && sp().r is int && sp().r >= -1 && sp().r <= 10
+            && sp().sc is int && sp().sc >= -10 && sp().sc <= 10000 && sp().tp is int && sp().tp >= 0 && sp().tp <= 5000
+            && sp().bp is list && sp().bp.size() <= 24 && sp().em is int && sp().em >= -1 && sp().em <= 999 && sp().emAt is int && sp().at == request.time;
+        }
+        allow read: if signedIn();
+        allow create, update: if signedIn() && notBanned() && u == me() && spShape()
+          && getAfter(/databases/$(database)/documents/shows/$(code)/slot/$(string(sp().slot))).data.uid == me()
+          && (resource == null || resource.data.at + duration.value(250, 'ms') < request.time);
+        allow delete: if signedIn() && (u == me() || !exists(shPath()) || get(shPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+      }
+      match /s/{d} {
+        function ss() { return request.resource.data; }
+        allow read: if signedIn();
+        allow create, update: if signedIn() && d == 'state' && get(shPath()).data.host == me()
+          && ss().keys().hasOnly(['ph', 'rd', 'nx', 'plan', 'left', 'light', 'lq', 'll', 'alive', 'out', 'elim', 'teams', 'pairs', 'rope', 'seed', 'rev', 'nb', 'bots', 'bb', 'bbq', 'champ', 'casual', 'seq', 'at'])
+          && ss().ph in ['wait', 'intro', 'play', 'inter', 'end'] && ss().rd is int && ss().rd >= 0 && ss().rd <= 10
+          && ss().get('plan', []) is list && ss().get('plan', []).size() <= 8 && ss().get('alive', []) is list && ss().get('alive', []).size() <= 45
+          && ss().get('out', []) is list && ss().get('out', []).size() <= 45 && ss().get('elim', {}) is map && ss().get('elim', {}).size() <= 45
+          && ss().get('teams', []) is list && ss().get('teams', []).size() <= 45 && ss().get('pairs', []) is list && ss().get('pairs', []).size() <= 45
+          && ss().get('rev', []) is list && ss().get('rev', []).size() <= 16 && ss().get('bots', []) is list && ss().get('bots', []).size() <= 75
+          && ss().get('bb', []) is list && ss().get('bb', []).size() <= 24 && ss().get('champ', []) is list && ss().get('champ', []).size() <= 45
+          && ss().get('nb', 0) is int && ss().get('nb', 0) <= 14 && ss().seq is int && ss().at == request.time;
+        allow delete: if signedIn() && (!exists(shPath()) || get(shPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+      }
+    }
     // Talk to your Pal: short chat memory (last messages + a few facts), owner-only
     match /users/{uid}/pal/chat {
       allow read, delete: if signedIn() && uid == me();

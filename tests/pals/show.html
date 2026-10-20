@@ -1,0 +1,8 @@
+<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Challenge Show harness</title>
+<body style="margin:0;background:#000"><script type="module">
+// Offline harness for the Kemy Challenge Show (solo vs bots, no account / Firebase writes): ?species=bear&bots=7&casual=1
+const q = new URLSearchParams(location.search); localStorage.setItem('kemy-tut-show', '1'); window.__showNoSave = 1; if (q.get('plan')) window.__showPlan = q.get('plan').split(',');
+const { createShowGame } = await import('../../js/pals/show.js');
+const g = createShowGame({ S: { user: { uid: 'harness' } }, db: null, toast: console.log });
+window.__sg = await g.open({ pal: { species: q.get('species') || 'bear', name: 'Test', level: 6, colors: {}, outfit: q.get('outfit') ? JSON.parse(q.get('outfit')) : {} }, bots: Number(q.get('bots') || 7), casual: q.get('casual') === '1' });
+</script>

@@ -5,11 +5,15 @@ export const MINIGAMES = [];
 export function registerMinigame(g) { if (!MINIGAMES.some((x) => x.id === g.id)) MINIGAMES.push(g); return g; }
 export const BOOTHS = [ // park coordinates (2D park world px; 3D park: x/40, y/40), near the plaza
   { id: 'zombie', x: 1600, y: 1560, label: '🧟 Zombie Survival' },
-  { id: 'armory', x: 1760, y: 1560, label: '🛡️ Zombie Armory' }
+  { id: 'armory', x: 1760, y: 1560, label: '🛡️ Zombie Armory' },
+  { id: 'show', x: 1440, y: 1560, label: '🎪 Challenge Show' }
 ];
 registerMinigame({ id: 'zombie', name: 'Pal Zombie Survival', emoji: '🧟', color: '#3d2a7a', tag: '3D · Action · Solo or 2-4 player co-op',
   desc: 'Play as your own Pal and splat waves of goofy zombies with goo, foam, bubbles and a pillow hammer. Earn 💎 Diamonds!',
   open: async (ctx, q) => { const m = await import('./zombie-lobby.js'); (ctx.zlobby = ctx.zlobby || m.createZombieLobby(ctx)); return ctx.zlobby.page(q || {}); } });
+registerMinigame({ id: 'show', name: 'Kemy Challenge Show', emoji: '🎪', color: '#c2407a', tag: '3D · Party · Up to 30 players or vs bots',
+  desc: 'Freeze Dash with Sunny Bloom 🌻, Cookie Carve, Tug Splash, Marble Match, Bubble Bridge and the Bumper Summit. Last Pal standing wins!',
+  open: async (ctx, q) => { const m = await import('./show-lobby.js'); (ctx.slobby = ctx.slobby || m.createShowLobby(ctx)); return ctx.slobby.page(q || {}); } });
 registerMinigame({ id: 'armory', name: 'Zombie Armory', emoji: '🛡️', color: '#5b3a1e', tag: 'Shop', desc: 'Weapons, upgrades and armor for Zombie Survival. Pay with 💎 Diamonds or ★ Star Coins.',
   open: async (ctx) => { const m = await import('./armory.js'); return m.createArmory(ctx).page(ctx.main); } });
 registerMinigame({ id: 'palgames', name: 'Pal Games', emoji: '🐾', color: '#2a6a4a', tag: 'Race · Bubbles · Stars · Dance', desc: 'The classic Pal mini-games (vs other players or a bot).', href: '#/games/pals' });

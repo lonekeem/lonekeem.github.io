@@ -412,3 +412,11 @@
 .zf-arcade{display:flex;justify-content:space-between;margin:0 0 14px;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,.06);color:inherit;text-decoration:none;font-weight:700}
 .g-prof-z{margin-top:8px}
 .zf-mini{flex:0 0 36px;font-size:1.8rem;font-style:normal;text-align:center}
+
+/* Kemy Challenge Show hero card (Games page) */
+.cs-hero{position:relative;display:block;min-height:178px;margin:4px 0 8px;padding:16px;border-radius:22px;overflow:hidden;color:#fff;text-decoration:none;background:radial-gradient(120% 90% at 85% 15%,#ffb3d1 0,#ff6b9a 30%,#8a55dc 70%,#2b1d55 100%);border:1px solid rgba(255,210,63,.6);box-shadow:0 10px 28px rgba(138,85,220,.35)}
+.cs-hero::after{content:"";position:absolute;inset:auto 0 0 0;height:30px;background:repeating-linear-gradient(90deg,#ffd23f 0 18px,#ff6b9a 18px 36px,#7ee08a 36px 54px,#8fd8ff 54px 72px);opacity:.35;clip-path:polygon(0 100%,0 40%,4% 0,8% 40%,12% 0,16% 40%,20% 0,24% 40%,28% 0,32% 40%,36% 0,40% 40%,44% 0,48% 40%,52% 0,56% 40%,60% 0,64% 40%,68% 0,72% 40%,76% 0,80% 40%,84% 0,88% 40%,92% 0,96% 40%,100% 0,100% 100%)}
+.cs-sun{position:absolute;z-index:1;right:6%;bottom:-4px;width:34%;max-width:150px;animation:csSway 3s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes csSway{50%{transform:rotate(-6deg)}}
+.cs-hero .zf-txt b{text-shadow:0 2px 0 #5a1d4a,0 0 12px rgba(255,210,63,.6)}
+.cs-play{background:linear-gradient(#ffe58a,#ffb020)!important;color:#3a2300!important;box-shadow:0 4px 0 #b06f00,0 6px 14px rgba(0,0,0,.4)!important}
