@@ -55,7 +55,7 @@ try {
   if (process.env.MULTI !== '0' && sofa[1]) { await a.evaluate(([x, z]) => window.__p3.teleport(x, z), [sofa[1].x, sofa[1].z - 0.9]); await W(a, 900); await a.evaluate(() => window.__khApi.sitDown(window.__khApi.seats().findIndex((q) => q.c === 'cs' && Math.abs(q.x - window.__p3.pos.x) < 0.3 + 0))); await W(a, 300);
     out.aSit2 = await st(a); if (!out.aSit2.kh.sit) { const i = await a.evaluate(() => window.__khApi.seats().findIndex((q) => q.c === 'cs')); await a.evaluate((i) => window.__khApi.sitDown(i + 1), i); }
     b = await account('b', 'elephant', 'Desktop Chrome', 'low', '#/street'); await W(b, 5000); await b.evaluate((h) => window.__khApi.goIn(h), H); await W(b, 1500);
-    await tp(b, R.cx - 3, R.cz + 3.2, Math.PI); await W(b, 6000); out.bSees = await b.evaluate(() => window.__p3.othersInfo()); await S(b, 'desktop-b-sees-sit');
+    await tp(b, sofa[1].x + 3.2, sofa[1].z - 2.2, Math.PI * 0.62); await W(b, 6000); out.bSees = await b.evaluate(() => window.__p3.othersInfo()); await S(b, 'desktop-b-sees-sit');
     out.aNow = await st(a); }
 } catch (e) { out.err = String(e && e.stack || e); }
 out.errors = errors.slice(0, 15); console.log(JSON.stringify(out, null, 1)); await browser.close();
