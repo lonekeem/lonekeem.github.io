@@ -1,4 +1,4 @@
-const CACHE = 'lks-v82';
+const CACHE = 'lks-v83';
 const CORE = [
   './', 'index.html', 'app.html', 'terms.html', 'privacy.html', 'guidelines.html',
   'css/app.css', 'css/polish.css', 'js/polish.js', 'kemy-logo.png', 'favicon-32.png', 'js/app.js', 'js/home.js', 'js/firebase-init.js', 'js/watch.js', 'js/feed-cats.js', 'js/feedrank.js', 'js/discover.js', 'js/autoplay.js', 'js/gamemusic.js', 'js/embeds.js', 'js/leaderboard.js', 'css/gamemusic.css',
