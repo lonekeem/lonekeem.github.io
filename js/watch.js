@@ -15,6 +15,7 @@ import { catOf, CATS } from './feed-cats.js';
 import { loadDiscover } from './discover.js';
 import { prefsStore as sharedPrefsStore } from './interests.js';
 import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from './autoplay.js';
+import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['music', 'Music'], ['trending', 'Trending']];
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
@@ -231,7 +232,7 @@ export function createWatch(ctx) {
   // ------------------------------------------------------------ main render
   async function render(postId, token, tab = 'foryou') {
     if (!FEED_TABS.some(([t]) => t === tab)) tab = 'foryou';
-    const posts = await buildTab(tab);
+    const posts = (await buildTab(tab)).filter((p) => !(p.ytBlocked || isYtBlocked(p.ytId || (p.linkUrl && youTubeId(p.linkUrl)))));
     if (stale(token)) return;
     const st = prefsStore();
     let startId = postId || '';
@@ -322,7 +323,14 @@ export function createWatch(ctx) {
             else if ((e.data === -1 || e.data === 5) && slides[active] === sl && !blocked()) setTimeout(tryPlay, 300);
             try { const f = sl._yt.getIframe(); f.dataset.kemyUnmuted = e.data === 1 && /music|dance/.test(sl.dataset.cat || '') && !sl._yt.isMuted() ? '1' : '0'; } catch { /* */ }
           },
-          onError: () => fallback()
+          onError: (e) => {
+            if (!isHardYtError(e.data)) return fallback();
+            // Removed, private or embedding turned off: hide it and move on to the next video.
+            markYtBlocked(p.ytId || youTubeId(p.linkUrl), 'err' + e.data, p.id);
+            const i = +sl.dataset.i; closeEmbed(sl); sl.style.display = 'none';
+            const nx = slides.slice(i + 1).find((x) => x.style.display !== 'none');
+            if (nx) { feed.scrollTo({ top: nx.offsetTop, behavior: 'auto' }); if (slides[active] === sl) { active = -1; activate(+nx.dataset.i); } }
+          }
         } });
       }).catch(() => { /* API unavailable: the autoplay=1&mute=1 URL still applies */ });
       // Not playing after ~4 s: one more try, then show the thumbnail (tapping it, or re-entering view, tries again).

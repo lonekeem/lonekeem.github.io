@@ -2,6 +2,7 @@
 // map, so stars, comments + replies, saves, views/plays, reports, search, feeds, profiles and
 // account deletion all reuse the post system. Uploads go straight to Cloudinary (unsigned presets).
 import { musicEmbed } from './embeds.js';
+import { isYtBlocked, checkYtForUpload } from './ytcheck.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
 import { createSeries } from './series.js';
@@ -213,6 +214,7 @@ export function createWorks(ctx) {
       }
       if (src() === 'youtube') {
         yt = ytIdFrom($('#w-yt').value); if (!yt) { err.textContent = 'Paste a valid YouTube link.'; return; }
+        err.textContent = 'Checking the YouTube video…'; { const bad = await checkYtForUpload(yt); err.textContent = bad; if (bad) return; }
         runtime = Math.max(0, Math.min(1440, Math.round(Number($('#w-rt').value) || 0))) * 60;
       } else {
         file = $('#w-file').files[0]; if (!file) { err.textContent = isSong ? 'Choose an audio file.' : 'Choose a video file.'; return; }
@@ -340,7 +342,8 @@ export function createWorks(ctx) {
     const w = p.work, isSong = p.type === 'song', art = artOf(p);
     const el = document.createElement('article'); el.className = 'card wpage ' + p.type; el.dataset.postId = p.id;
     const player18 = blurred(p);
-    const ytEmbed = w.yt ? `<div class="wplayer yt"><button class="wfacade" data-a="yt" style="background-image:url('${ytThumb(w.yt)}')" aria-label="Play ${esc(w.title)}"><span class="wplay">${PLAY}</span></button></div>` : '';
+    const ytEmbed = w.yt ? (isYtBlocked(w.yt) ? `<p class="muted small">This YouTube video can’t play in Kemy. <a href="https://www.youtube.com/watch?v=${esc(w.yt)}" target="_blank" rel="noopener">Open on YouTube</a></p>`
+      : `<div class="wplayer yt"><div class="embed"><iframe data-kemy-yt="${esc(w.yt)}" data-post-id="${esc(p.id)}" src="https://www.youtube-nocookie.com/embed/${esc(w.yt)}?enablejsapi=1&autoplay=0&mute=1&playsinline=1&rel=0&origin=${encodeURIComponent(location.origin)}" title="${esc(w.title)}" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div></div>`) : '';
     el.innerHTML = `
       ${isSong ? `<div class="wsong-top"><div class="wcover" style="${art ? '' : `background:${gradientCss(p.id + w.title)}`}">${art ? `<img src="${esc(art)}" alt="Cover art for ${esc(w.title)}" onerror="this.parentNode.style.background='linear-gradient(135deg,#5b21b6,#c026d3 70%,#f5b301)';this.remove()">` : `<b class="wart-t">${esc(w.title)}</b>`}</div>
           ${p.mediaUrl ? `<canvas class="wviz" width="600" height="120" aria-hidden="true"></canvas>
@@ -370,7 +373,7 @@ export function createWorks(ctx) {
     if (!isSong) series().episodeBar(p, el).catch(() => {});
     const vid = q('video');
     if (vid) { tenSeconds(vid, p); vid.addEventListener('error', () => { const o = origUrl(vid.currentSrc || vid.src); if (o && o !== vid.src) vid.src = o; }, { once: true }); }
-    const wireYt = () => { const f = q('[data-a=yt]'); if (f) f.onclick = () => { f.parentElement.innerHTML = `<div class="embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(w.yt)}?autoplay=1&rel=0" title="${esc(w.title)}" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe></div>`; setTimeout(() => recordView(p.id, p.authorId), PLAY_SECONDS * 1000); }; };
+    const wireYt = () => { if (q('iframe[data-kemy-yt]')) setTimeout(() => { if (q('iframe[data-kemy-yt]')?.isConnected) recordView(p.id, p.authorId); }, PLAY_SECONDS * 1000 + 3000); const f = q('[data-a=yt]'); if (f) f.onclick = () => { f.parentElement.innerHTML = `<div class="embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(w.yt)}?autoplay=1&rel=0" title="${esc(w.title)}" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe></div>`; setTimeout(() => recordView(p.id, p.authorId), PLAY_SECONDS * 1000); }; };
     wireYt();
     q('[data-a="18"]')?.addEventListener('click', () => { confirm18(p.id); slot.innerHTML = ''; page(p, slot, more); });
     // song controls

@@ -1,6 +1,8 @@
 import { initPolish, fxOn, setFx } from './polish.js';
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetectWifi } from './autoplay.js';
+import { startAutoplayAll } from './autoplay-all.js';
+import { isYtBlocked, setYtReporter, checkYtForUpload } from './ytcheck.js';
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { mountGameMusic, hideGameMusic } from './gamemusic.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
@@ -339,7 +341,8 @@ function mediaHtml(p) {
     const yt = youTubeId(p.linkUrl);
     if (yt && /^[\w-]+$/.test(yt)) {
       const tall = p.linkUrl.includes('/shorts/');
-      return `<div class="post-media"><div class="embed ${tall ? 'tall' : ''}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(yt)}" title="YouTube video" loading="lazy" allowfullscreen allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"></iframe></div></div>`;
+      if (p.ytBlocked || isYtBlocked(yt)) return `<p class="muted small">This YouTube video can’t play in Kemy. <a href="${esc(p.linkUrl)}" target="_blank" rel="noopener nofollow ugc">Open on YouTube</a></p>`;
+      return `<div class="post-media"><div class="embed ${tall ? 'tall' : ''}"><iframe data-kemy-yt="${esc(yt)}" data-post-id="${esc(p.id || '')}" src="https://www.youtube-nocookie.com/embed/${esc(yt)}?enablejsapi=1&autoplay=0&mute=1&playsinline=1&rel=0&origin=${encodeURIComponent(location.origin)}" title="YouTube video" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div></div>`;
     }
     const tt = tikTokId(p.linkUrl);
     if (tt) return `<div class="post-media"><div class="embed tall"><iframe src="https://www.tiktok.com/embed/v2/${esc(tt)}" title="TikTok video" loading="lazy" allowfullscreen allow="encrypted-media"></iframe></div></div>`;
@@ -650,6 +653,12 @@ function gameMusicFor(hash) {
   if (/^#\/(games?(\/|\?|$)|park$|street$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
   else hideGameMusic();
 }
+// YouTube posts that can't play here get one moderator report per device (posts are never deleted).
+setYtReporter((postId, yt, why) => {
+  if (!S.user) return; const k = 'kemy-yt-rep-' + postId; if (localStorage.getItem(k)) return; localStorage.setItem(k, '1');
+  addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'post', targetId: postId, postId, targetUid: '', reason: `🤖 Auto: YouTube video ${yt} can’t play in other apps (${why}). It’s hidden from video feeds; no action needed unless you want to remove it.`, excerpt: '', status: 'open', createdAt: serverTimestamp() }).catch(() => {});
+});
+try { startAutoplayAll(); } catch (e) { console.warn('autoplay', e); }
 async function route() {
   navCount++;
   if (!S.ready) return;
@@ -852,6 +861,8 @@ function textComposeForm(slot, open) {
     if (!text && !linkUrl) { err.textContent = 'Write something or add a link.'; return; }
     if (!(await safety.gate())) return;
     if (!safety.piiOk(text)) return;
+    const ytNew = linkUrl ? youTubeId(linkUrl) : null;
+    if (ytNew && /^[\w-]+$/.test(ytNew)) { err.textContent = 'Checking the YouTube video…'; const bad = await checkYtForUpload(ytNew); err.textContent = bad; if (bad) return; }
     const btn = $('#compose-btn'); btn.disabled = true; btn.textContent = 'Posting…';
     try {
       const { authorId, author } = await postAuthor(asStudio);

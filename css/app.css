@@ -1638,3 +1638,12 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .pk-quick-ic{font-size:1.9rem;line-height:1}.pk-quick > span:nth-child(2){flex:1;min-width:0}
 .pk-quick-go{flex:0 0 auto;padding:7px 14px;border-radius:999px;background:#2f8a3e;color:#fff;font-weight:800;font-size:.85rem}
 .pk-promo{background:linear-gradient(135deg,rgba(95,174,60,.28),rgba(47,154,216,.22))!important;border:1px solid rgba(155,215,122,.6)!important}
+
+/* App-wide autoplay (js/autoplay-all.js) */
+.ap-host{position:relative}
+.ap-sound{position:absolute;right:10px;bottom:10px;z-index:3;border:0;border-radius:999px;padding:8px 12px;background:rgba(0,0,0,.62);color:#fff;font:600 .85rem system-ui;cursor:pointer}
+.ap-sound.on{padding:8px 10px}
+.ap-tap{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:0;background:rgba(0,0,0,.35);color:#fff;cursor:pointer}
+.ap-tap span{display:grid;place-items:center;width:78px;height:78px;border-radius:50%;background:rgba(0,0,0,.6);font-size:2rem}
+.ap-tap small{font:700 1rem system-ui;text-shadow:0 1px 3px #000}
+.vslide.yt-wait .vcard::after{content:'▶  Tap to play';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:18px 26px;border-radius:999px;background:rgba(0,0,0,.65);color:#fff;font:800 1.15rem system-ui;pointer-events:none}

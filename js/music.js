@@ -17,9 +17,9 @@ export function openYouTube(v, { openModal, esc, onClose } = {}) {
   window.dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'youtube' } }));
   try { window.__kemyPlayer?.audio?.pause(); } catch { /* */ }
   stopTheme(150);
-  const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.ytId)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
+  const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.ytId)}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
   openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button>
-    <div class="yt-sheet"><div class="yt-frame${v.short ? ' short' : ''}"><iframe src="${src}" title="${esc(v.text)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    <div class="yt-sheet"><div class="yt-frame${v.short ? ' short' : ''}"><iframe data-kemy-yt="${esc(v.ytId)}" data-ap-modal="1" src="${src}" title="${esc(v.text)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
     <h2 style="font-size:1.05rem;margin:10px 0 2px">${esc(v.text)}</h2>
     <p class="muted small" style="margin:0">From YouTube · <a href="${esc(v.sourceUrl || 'https://www.youtube.com')}" target="_blank" rel="noopener">${esc(v.source)}</a> · <a href="${esc(v.linkUrl)}" target="_blank" rel="noopener">Open on YouTube</a></p></div>`);
   onClose && onClose();
