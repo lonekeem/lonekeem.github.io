@@ -622,6 +622,7 @@ async function route() {
       main.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
       document.body.classList.toggle('feed-mode', nav === 'watch' && fn === pageWatch);
       document.body.classList.remove('live-mode');
+      document.body.classList.toggle('game-mode', /^#\/(park|arcade)(\/|\?|$)/.test(hash)); // full-screen games: no bottom nav
       window.scrollTo(0, 0);
       gameMusicFor(hash);
       try { await fn(...m.slice(1), token); }
@@ -631,7 +632,7 @@ async function route() {
       return;
     }
   }
-  document.body.classList.remove('feed-mode');
+  document.body.classList.remove('feed-mode', 'game-mode');
   main.innerHTML = '<div class="empty">Page not found. <a href="#/watch">Go home</a></div>';
 }
 initInterests({ S, db, fs: { doc, getDoc, setDoc, serverTimestamp } });

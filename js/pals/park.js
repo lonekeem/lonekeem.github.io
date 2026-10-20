@@ -43,7 +43,7 @@ export function createPark(ctx) {
       <p class="small muted park-help">Walk with the joystick, arrow keys/WASD or a gamepad. Tap a player for Report/Block. Find 16 treasures a day for Star Coins! Step into a portal to play Pal Games.</p></section>`;
     const cv = main.querySelector('#park-cv'); const view = main.querySelector('.park-view'); const c = cv.getContext('2d');
     let VW = 360, VH = 520, DPR = Math.min(2, devicePixelRatio || 1);
-    const size = () => { VW = view.clientWidth || 360; VH = Math.max(380, Math.min(innerHeight - 170, 720)); cv.width = VW * DPR; cv.height = VH * DPR; cv.style.width = VW + 'px'; cv.style.height = VH + 'px'; view.style.height = VH + 'px'; };
+    const size = () => { VW = view.clientWidth || 360; VH = Math.max(300, view.getBoundingClientRect().height || innerHeight - 60); cv.width = VW * DPR; cv.height = VH * DPR; cv.style.width = VW + 'px'; cv.style.height = VH + 'px'; };
     size(); addEventListener('resize', size);
     const pal = await getActivePal(db, S.user.uid).catch(() => null);
     const palSnap = pal ? { species: pal.species, name: pal.name, colors: pal.colors, pattern: pal.pattern, acc: pal.acc, outfit: pal.outfit || {}, level: pal.level || 1 } : { species: 'kemy', name: 'Kemy', level: 1 };
@@ -53,7 +53,7 @@ export function createPark(ctx) {
     main.querySelector('#park-room').textContent = `Room ${room.slice(1)}`;
     const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid);
     const P = { x: 1600 + (Math.random() - 0.5) * 200, y: 1200 + 180, d: 1, px: 0, py: 0, e: '', eAt: 0, say: '', sayAt: 0, tgt: '', moving: false };
-    P.px = P.x - 30; P.py = P.y + 6;
+    P.px = P.x; P.py = P.y;
     const others = new Map(); const blocked = S.blocked || new Set();
     const base = () => ({ x: Math.round(P.x), y: Math.round(P.y), d: P.d, e: P.e, eAt: P.eAt, say: P.say, sayAt: P.sayAt, tgt: P.tgt, name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2', pal: palSnap, at: serverTimestamp() });
     let lastSend = 0, dirty = true, sending = false;
@@ -115,12 +115,12 @@ export function createPark(ctx) {
       vx += jv.x; vy += jv.y; const m = Math.hypot(vx, vy); const sp = 3.4 * dt;
       P.moving = m > 0.1; if (P.moving) { vx /= Math.max(1, m); vy /= Math.max(1, m); const nx = Math.max(20, Math.min(WORLD.w - 20, P.x + vx * sp)), ny = Math.max(40, Math.min(WORLD.h - 10, P.y + vy * sp)); if (!inWater(nx, P.y)) P.x = nx; if (!inWater(P.x, ny)) P.y = ny; if (Math.abs(vx) > 0.1) P.d = vx > 0 ? 1 : -1; dirty = true; }
       // pal follows
-      const fx = P.x - P.d * 38, fy = P.y + 6; P.px += (fx - P.px) * 0.08 * dt; P.py += (fy - P.py) * 0.08 * dt;
+      P.px = P.x; P.py = P.y;
       send(false);
       // others: interpolate to latest target, pal follows
       const nowMs = Date.now(); near = null; let nd = 70;
       for (const [id, o] of others) { if (blocked.has(id) || nowMs - o.at > STALE_MS * 2) { if (nowMs - o.at > STALE_MS * 2) others.delete(id); continue; }
-        const k = 0.18 * dt; o.mv = Math.hypot(o.tx - o.x, o.ty - o.y) > 1; o.x += (o.tx - o.x) * k; o.y += (o.ty - o.y) * k; o.px += (o.x - o.d * 38 - o.px) * 0.08 * dt; o.py += (o.y + 6 - o.py) * 0.08 * dt;
+        const k = 0.18 * dt; o.mv = Math.hypot(o.tx - o.x, o.ty - o.y) > 1; o.x += (o.tx - o.x) * k; o.y += (o.ty - o.y) * k; o.px = o.x; o.py = o.y;
         const dd = Math.hypot(o.px - P.x, o.py - P.y); if (dd < nd) { nd = dd; near = o; } }
       actBtn.disabled = !near;
       // treasures
@@ -166,10 +166,8 @@ export function createPark(ctx) {
       const happy = (st.happy || st.hearts || st.petted) ? 'happy' : null; if (st.happy) st.happy--; if (st.hearts) st.hearts--; if (st.petted) st.petted--;
       drawDancer(c, px, py, 44, ps || { species: 'kemy' }, { t, mode: happy || (mv ? 'walk' : 'idle'), face: d });
       if (st.hearts || st.petted) { c.fillStyle = '#ff6fae'; heart(c, px, py - 50 - ((t % 40) / 2), 5); c.fill(); }
-      // little avatar
-      const b = mv ? Math.abs(Math.sin(t * 0.3)) * 3 : 0; c.fillStyle = 'rgba(30,10,60,.2)'; c.beginPath(); c.ellipse(x, y, 12, 4, 0, 0, 7); c.fill();
-      c.fillStyle = color; c.beginPath(); c.roundRect(x - 9, y - 26 - b, 18, 22, 7); c.fill(); c.fillStyle = '#ffe1c4'; c.beginPath(); c.arc(x, y - 36 - b, 10, 0, 7); c.fill();
-      c.fillStyle = '#24133f'; c.beginPath(); c.arc(x - 3 + d, y - 37 - b, 1.4, 0, 7); c.arc(x + 3 + d, y - 37 - b, 1.4, 0, 7); c.fill();
+      // you are your Pal: name tag, bubble and emote ride on the Pal itself (no separate avatar figure)
+      x = px; y = py - 30; const b = mv ? Math.abs(Math.sin(t * 0.3)) * 3 : 0;
       c.fillStyle = mine ? '#ffd34d' : '#fff'; c.font = '700 11px Inter, sans-serif'; c.textAlign = 'center'; c.strokeStyle = 'rgba(30,10,60,.6)'; c.lineWidth = 3; c.strokeText(name, x, y - 52 - b); c.fillText(name, x, y - 52 - b); c.lineWidth = 1;
       const nowMs = Date.now();
       if (st.say && nowMs - st.sayAt < 6000) { c.font = '600 12px Inter, sans-serif'; const tw = Math.min(180, c.measureText(st.say).width + 16); c.fillStyle = '#fff'; c.beginPath(); c.roundRect(x - tw / 2, y - 88 - b, tw, 24, 10); c.fill(); c.fillStyle = '#2a1458'; c.fillText(st.say.slice(0, 30), x, y - 71 - b); }

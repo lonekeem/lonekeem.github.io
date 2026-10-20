@@ -1556,3 +1556,12 @@ body.kb-open .theme-fab { display: none; }
 .g-scores b, .g-scores small { display: block; color: #241400; } .g-scores b { font-size: 16px; } .g-scores small { font-size: 12px; opacity: .8; }
 /* readable selects everywhere (Settings playlist / graphics etc.) */
 select { background: #120c24; color: #fff; -webkit-text-fill-color: #fff; border: 1px solid var(--border, #4a3a7a); border-radius: 12px; padding: 10px 12px; }
+/* Full-screen games (Pal Park, Arcade, zombie game): no bottom nav/footer, controls above the iOS home indicator */
+body.game-mode .bottom-nav, body.game-mode .site-footer { display: none !important; }
+body.game-mode .app-main { padding-bottom: 0 !important; }
+body.game-mode .toast { bottom: calc(110px + env(safe-area-inset-bottom)); }
+body.game-mode .park { position: fixed; inset: 0; z-index: 90; max-width: none; margin: 0; display: flex; flex-direction: column; background: #0d0820; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+body.game-mode .park-top { padding: 8px 10px; } body.game-mode .park-view { flex: 1; min-height: 0; border-radius: 0; } body.game-mode .park-help { display: none; }
+body.game-mode .park-joy { left: max(18px, env(safe-area-inset-left)); bottom: calc(max(20px, env(safe-area-inset-bottom)) + 16px); }
+body.game-mode .park-btns { right: max(14px, env(safe-area-inset-right)); bottom: calc(max(20px, env(safe-area-inset-bottom)) + 16px); }
+body.game-mode .park-panel { bottom: calc(max(20px, env(safe-area-inset-bottom)) + 150px); }
