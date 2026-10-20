@@ -44,4 +44,9 @@ body.p3-on .gm.top-right { z-index: 95; }
 .p3-view .kc-btns { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 58px); }
 .p3-view .kc-b.lock { background: #f59e0b; } .p3-view .kc-b[data-b=cam].on { background: #7c3aed; }
 .p3-view .kc-hint { bottom: calc(16% + 30px); }
-.p3-top { padding-right: 118px; }
+.p3-top { padding-right: 64px; }
+.p3-view .kc-gear { display: none; }
+/* settings sits on its own just under the top-right music button so it never collides with the top bar chips on phones */
+#p3-set { position: absolute; top: calc(max(8px, env(safe-area-inset-top)) + 54px); right: max(10px, env(safe-area-inset-right)); width: 44px; height: 44px; z-index: 6; }
+.p3-top { min-width: 0; overflow: hidden; } .p3-top > span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 400px) { .p3-top b { display: none; } }

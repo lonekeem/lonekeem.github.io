@@ -507,7 +507,8 @@ export function posePal3D(m, st = {}) {
   // multiplier (>1 = quicker steps to match a faster ground speed); st.turn -1..1; st.mode idle|walk|run|hop; st.jumpK 0..1
   const ud = m.userData, dt60 = st.dt60 ?? 1; ud.dt60 = dt60; ud.clk = (ud.clk || 0) + dt60 * (st.cadence || 1); const t = st.t || 0;
   const md = st.mode || 'idle', legs = !!(ud.J.fit && ud.J.fit.legs), L = ud.J.legL || 0.54; let P;
-  if (md === 'walk' || md === 'run' || (st.speed != null && st.speed > 0.02 && md !== 'hop')) { const spd = st.speed != null ? st.speed : md === 'run' ? 2 : 1; P = gaitPose(advancePhase(ud, ud.clk, spd, L), spd, st.turn || 0, L, legs); }
+  if (md === 'walk' || md === 'run' || (st.speed != null && st.speed > 0.02 && md !== 'hop')) { const spd = st.speed != null ? st.speed : md === 'run' ? 2 : 1; P = gaitPose(advancePhase(ud, ud.clk, spd, L), spd, st.turn || 0, L, legs);
+    if (st.stride && st.stride !== 1) for (const k of ['fL', 'fR']) if (Array.isArray(P[k])) { P[k] = P[k].slice(); P[k][2] *= st.stride; P[k][1] *= Math.min(1.4, st.stride); } } // longer steps for big 3D Pals
   else if (md === 'hop') P = jumpPose(st.jumpK != null ? st.jumpK : ((t % 72) + 72) % 72 / 72, 0.45);
   else P = modePose(md, t);
   if (st.dance3d) { const D3 = clipFor(st.dance3d, ud.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }

@@ -22,7 +22,7 @@ async function account(tag, species, device, gfx) {
   for (let i = 0; i < 3; i++) { await p.evaluate(() => document.getElementById('pal-crack')?.click()); await W(p, 250); }
   await p.waitForSelector('#pal-form'); await W(p, 800);
   await p.evaluate((s) => document.querySelector(`[data-species="${s}"]`)?.click(), species); await p.fill('#pal-name', tag === 'a' ? 'Bloop' : 'Toots'); await p.evaluate(() => document.querySelector('#pal-form [type=submit]').click()); await W(p, 3000);
-  await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/park'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 60000 });
+  await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/park'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 60000 }).catch(async (e) => { await p.screenshot({ path: "/workspace/park3d-dbg-" + tag + ".png" }); throw e; });
   return p;
 }
 const out = {};
@@ -37,7 +37,11 @@ try {
   out.multi = { aSeesOthers: (await pos()).others, bSeesOthers: (await b.evaluate(() => window.__p3.pos)).others, aLog: await a.evaluate(() => document.getElementById('p3-log').textContent), aNet: await a.evaluate(() => window.__p3.net), aFps: await a.evaluate(() => window.__p3.fps), bNet: await b.evaluate(() => window.__p3.net), extras: await a.evaluate(() => window.__p3.extras()) };
   await a.fill('#p3-t', 'Hello park!'); await a.press('#p3-t', 'Enter'); await W(a, 3000); await F(b, 3);
   out.multi.bLog = await b.evaluate(() => document.getElementById('p3-log').textContent);
-  await b.evaluate(() => window.__p3.emote('🎉')); await W(a, 2000); await F(a, 6);
+  await b.evaluate(() => window.__p3.emote('🎉')); await W(a, 2500); await F(a, 4); out.multi.remoteDance = (await a.evaluate(() => window.__p3.othersInfo()))[0]?.dn;
+  await a.screenshot({ path: shot + 'remote-dance.png' });
+  out.gear = await a.evaluate(() => { const r = (e) => e && e.getBoundingClientRect(); const g = r(document.getElementById('p3-set')); const hit = [...document.querySelectorAll('.p3-top > *, .gm, .kc-b, .p3-chat, .p3-log')].filter((e) => { const b = r(e); return b.width && !(b.right <= g.left || b.left >= g.right || b.bottom <= g.top || b.top >= g.bottom); }).map((e) => e.className || e.id); return { x: g.left, y: g.top, w: g.width, overlaps: hit }; });
+  await b.evaluate(() => window.__p3.input({ jump: true })); let maxUp = 0; for (let i = 0; i < 12; i++) { await W(a, 150); const o = (await a.evaluate(() => window.__p3.othersInfo()))[0]; if (o && o.th != null) maxUp = Math.max(maxUp, o.th - o.ground); } out.multi.remoteJumpSeen = +maxUp.toFixed(2);
+  await W(a, 6000); out.multi.remoteDanceAfter = (await a.evaluate(() => window.__p3.othersInfo()))[0]?.dn;
   await a.screenshot({ path: shot + 'multiplayer.png' }); await b.screenshot({ path: shot + 'multiplayer-desktop.png' });
   // a third observer view: B walks, A sees it move (interpolated)
   const bx0 = await a.evaluate(() => { const o = [...document.querySelectorAll('.p3-tag')]; return o.length; });

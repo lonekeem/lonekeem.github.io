@@ -55,7 +55,7 @@ export function createPark3D(ctx) {
     const gfx = gfxLevel() === 'flat' ? 'low' : gfxLevel(); const ULTRA = gfx === 'ultra', LOW = gfx === 'low';
     main.innerHTML = `<section class="p3"><div class="p3-view" id="p3-view">
       <canvas id="park-cv" class="p3-cv" tabindex="0" aria-label="Pal Park 3D. Joystick or WASD to walk, Space to jump, Shift to run. Drag to look around."></canvas>
-      <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div>
+      <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div><button class="p3-b" id="p3-set" aria-label="Control settings">⚙️</button>
       <div class="p3-log" id="p3-log" aria-live="polite"></div>
       <div class="p3-tags" id="p3-tags"></div>
       <form class="p3-chat" id="p3-chat"><input id="p3-t" maxlength="60" placeholder="Say something nice…" autocomplete="off" enterkeyhint="send" aria-label="Chat message"><button class="p3-send" aria-label="Send">➤</button><button type="button" class="p3-b" id="p3-quick" aria-label="Quick phrases">💬</button></form>
@@ -274,7 +274,7 @@ export function createPark3D(ctx) {
       const bb = new THREE.Box3().setFromObject(m); const h = Math.max(0.5, bb.max.y - bb.min.y); const k = HEIGHT / h * 1.0; m.scale.multiplyScalar(k); m.position.y = -bb.min.y * k;
       m.traverse((o) => { if (o.isMesh) { o.castShadow = shadow; o.frustumCulled = false; } }); holder.userData = { m, eye: (bb.max.y - bb.min.y) * k * 0.82 }; return holder; }
     const me = palObj(palSnap, !LOW); scene.add(me);
-    const J = me.userData.m.userData.J; const headParts = []; J.Head.traverse((o) => { if (o.isMesh) headParts.push(o); });
+    const J = me.userData.m.userData.J; const D2R = Math.PI / 180; const bodyParts = [], armParts = new Set(); me.traverse((o) => { if (o.isMesh) bodyParts.push(o); }); for (const n of ['LeftUpperArm', 'RightUpperArm']) J[n].traverse((o) => armParts.add(o));
     // eye height per species: the head bone's world height in rest pose
     { me.updateMatrixWorld(true); const hp = new THREE.Vector3(); J.Head.getWorldPosition(hp); me.userData.eye = Math.max(0.5, hp.y + 0.12); }
     // spawn near the plaza
@@ -282,10 +282,11 @@ export function createPark3D(ctx) {
     P.y = ground(P.x, P.z);
 
     // ---------------------------------------------------------------- physics-lite
-    const RAD = 0.42, STEP = 0.55, GRAV = 26, JUMP = 9.2, WALK_W = 2.6, RUN_V = 6.2;
+    const RAD = 0.42, STEP = 0.55, GRAV = 26, JUMP = 9.2, WALK_W = 1.7, RUN_V = 3.6;
     // gait matching (js/pals/motion3d.js): ground speed -> gait speed (walk 1, run 2.3) + cadence so the feet don't skate
-    const gaitFor = (obj, v, run) => { const sc = obj.userData.m.scale.x, L = obj.userData.m.userData.J.legL || 0.54; const v1 = WALK_V * 60 * sc * (L / 0.54); if (v < 0.15) return { speed: 0, cadence: 1 };
-      const speed = run ? Math.min(2.4, Math.max(1.7, v / v1 / 2.2)) : Math.min(1.25, Math.max(0.55, v / v1 / 2.6)); return { speed, cadence: Math.max(1, Math.min(3, v / (v1 * speed))) }; };
+    // ground speed -> gait (js/pals/motion3d.js): walk speed ~1, run ~2.3, longer stride (walk x1.7, run x1.5) and cadence matched exactly so feet stay planted
+    const STRIDE = 1.7; const gaitFor = (obj, v, run) => { const sc = obj.userData.m.scale.x, L = obj.userData.m.userData.J.legL || 0.54; const v1 = WALK_V * 60 * sc * (L / 0.54); if (v < 0.15) return { speed: 0, cadence: 1, stride: 1 };
+      const speed = run ? 2.3 : Math.max(0.6, Math.min(1, v / (v1 * STRIDE * 3))); const stride = run ? 1.5 : STRIDE; return { speed, stride, cadence: Math.max(0.6, Math.min(3.6, v / (v1 * speed * stride))) }; };
     function floorAt(x, z, feet) { let f = ground(x, z); for (const b of box) if (x > b.x0 - RAD * 0.5 && x < b.x1 + RAD * 0.5 && z > b.z0 - RAD * 0.5 && z < b.z1 + RAD * 0.5 && b.top < 50 && b.top <= feet + STEP && b.top > f) f = b.top;
       for (const c of cyl) if (c.top < 50 && Math.hypot(c.x - x, c.z - z) < c.r && c.top <= feet + STEP && c.top > f) f = c.top; return f; }
     function collide(x, z, feet) { // push out of anything taller than a step
@@ -304,8 +305,11 @@ export function createPark3D(ctx) {
       for (const c of cyl) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.15 && y < Math.min(c.top, 7)) return true; return false; }
     const tgt = new THREE.Vector3();
     function updateCam(dt) {
-      if (pov) { const e = me.userData.eye; const hp = new THREE.Vector3(); J.Head.getWorldPosition(hp); cam.position.set(P.x - Math.sin(P.yaw) * 0.18, Math.max(P.y + e * 0.8, hp.y), P.z - Math.cos(P.yaw) * 0.18);
-        const pitch = C.pitch - 0.32; cam.lookAt(cam.position.x + Math.sin(C.yaw + Math.PI) * -Math.cos(pitch) * -1, cam.position.y - Math.sin(pitch), cam.position.z + Math.cos(C.yaw + Math.PI) * -Math.cos(pitch) * -1); return; }
+      if (pov) { // eye camera: a little behind the (hidden) head so both arms + paws sit in the lower part of the view
+        me.updateMatrixWorld(true); const hp = new THREE.Vector3(); J.Head.getWorldPosition(hp); const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
+        cam.position.set(hp.x - fx * 0.38, hp.y + 0.12, hp.z - fz * 0.38); const pitch = C.pitch - 0.17;
+        cam.lookAt(cam.position.x + fx * Math.cos(pitch), cam.position.y - Math.sin(pitch), cam.position.z + fz * Math.cos(pitch)); if (cam.fov !== 70) { cam.fov = 70; cam.updateProjectionMatrix(); } return; }
+      if (cam.fov !== 60) { cam.fov = 60; cam.updateProjectionMatrix(); }
       tgt.set(P.x, P.y + 1.2, P.z);
       const dir = new THREE.Vector3(Math.sin(C.yaw) * Math.cos(C.pitch), Math.sin(C.pitch), Math.cos(C.yaw) * Math.cos(C.pitch));
       let d = C.dist; for (let i = 1; i <= 28; i++) { const s = (i / 28) * C.dist; if (camBlocked(tgt.x + dir.x * s, tgt.y + dir.y * s, tgt.z + dir.z * s)) { d = Math.max(0.3, s - 0.3); break; } }
@@ -323,7 +327,7 @@ export function createPark3D(ctx) {
       buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'run', icon: '🏃', label: 'Run' }, { id: 'emote', icon: '😊', label: 'Emote' }, { id: 'cam', icon: '👁', label: 'Camera' }] });
     tc.on('jump', () => { jumpQ = true; }); tc.on('run', () => { runT = !runT; tc.root.querySelector('[data-b=run]')?.classList.toggle('lock', runT); hint(runT ? 'Running 🏃' : 'Walking'); });
     tc.on('emote', () => openEmotes()); tc.on('cam', () => toggleCam());
-    paintCam(); setTimeout(() => tc.tutorial(), 600);
+    paintCam(); setTimeout(() => tc.tutorial(), 600); $('#p3-set').onclick = () => tc.settings();
     { // tap a Pal + two-finger pinch zoom on the look side (the shared controls handle the drag-to-look)
       const rz = tc.root.querySelector('.kc-r'); const pts = new Map(); let p0 = 0, ts = null;
       rz.addEventListener('pointerdown', (e) => { pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 2) { const [a, b] = [...pts.values()]; p0 = Math.hypot(a[0] - b[0], a[1] - b[1]); } ts = pts.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null; });
@@ -425,20 +429,22 @@ export function createPark3D(ctx) {
       P.vy -= GRAV * dt; P.y += P.vy * dt;
       if (P.y <= fl) { if (!P.onGround && P.vy < -2) dirty = true; P.y = fl; P.vy = 0; P.onGround = true; } else if (P.onGround && P.y - fl < 0.35 && P.vy <= 0) { P.y = fl; P.vy = 0; } else P.onGround = false;
       if (!P.onGround && P.y > fl + 0.35) P.onGround = false;
+      if (!P.onGround) dirty = true; // stream the jump arc (send() still caps it at ~4/s)
+      if (P.danceUntil && Date.now() > P.danceUntil && P.dance) { P.dance = ''; dirty = true; } // tell others the dance ended
       me.position.set(P.x, P.y, P.z); me.rotation.y = P.yaw;
       // animation on the rig
       const bt = beatNow(); const dancing = P.dance && Date.now() < P.danceUntil;
       P.t += dt * 60; const dt60 = dt * 60; const gv = sp; P.turnS = (P.turnS || 0) * 0.85 + (P.lastYaw != null ? Math.atan2(Math.sin(P.yaw - P.lastYaw), Math.cos(P.yaw - P.lastYaw)) / Math.max(dt, 1e-3) * 0.15 * 0.15 : 0); P.lastYaw = P.yaw;
       let mode = 'idle'; const st = { t: P.t, dt60, turn: Math.max(-1, Math.min(1, P.turnS)) };
       if (!P.onGround) { mode = 'hop'; st.jumpK = Math.max(0.15, Math.min(0.85, 0.5 - P.vy / (JUMP * 2) * 0.7)); }
-      else if (im > 0.08) { const g = gaitFor(me, gv, running); mode = running ? 'run' : 'walk'; st.speed = g.speed; st.cadence = g.cadence; if (running) st.extra = { cx: 0.22, nx: -0.08 }; }
+      else if (im > 0.08) { const g = gaitFor(me, gv, running); mode = running ? 'run' : 'walk'; st.speed = g.speed; st.cadence = g.cadence; st.stride = g.stride; if (running) st.extra = { cx: 0.22, nx: -0.08 }; }
       else if (dancing && !bt.on && P.dance === 'wave') mode = 'wave';
       st.mode = mode;
       if (dancing && P.onGround && im < 0.08) { st.dance3d = P.dance; st.beat = bt.beat; st.amt = 1; st.mode = 'idle'; }
       posePal3D(me.userData.m, st);
-      if (pov) { // arms forward into view; head hidden so it doesn't clip the camera
-        const fw = (J.LeftUpperArm.rotation.x); J.LeftUpperArm.rotation.x = fw - 1.25; J.RightUpperArm.rotation.x = J.RightUpperArm.rotation.x - 1.25; J.LeftUpperArm.rotation.z -= 0.12; J.RightUpperArm.rotation.z += 0.12; J.LeftLowerArm.rotation.x -= 0.35; J.RightLowerArm.rotation.x -= 0.35; }
-      for (const h of headParts) h.visible = !pov;
+      if (pov) { // arms forward + elbows bent so paws (and held items) are in view; walk/wave/dance motion rides on top
+        for (const [n, sg] of [['Left', 1], ['Right', -1]]) { J[n + 'UpperArm'].rotation.x -= 55 * D2R; J[n + 'UpperArm'].rotation.z += sg * 32 * D2R; J[n + 'LowerArm'].rotation.x -= 70 * D2R; } }
+      if (pov !== me.userData.povVis) { me.userData.povVis = pov; for (const o of bodyParts) o.visible = !pov || armParts.has(o); } // only arms/paws/held items in first-person
       // others: interpolate, LOD (full rig near, simple pose far, hidden very far)
       const nowMs = Date.now(); for (const o of others3D()) {
         if (blocked.has(o.uid) || nowMs - o.at > STALE_MS * 2) { drop(o.uid); continue; }
@@ -449,7 +455,7 @@ export function createPark3D(ctx) {
         if (!o.obj) continue; const dist = Math.hypot(o.x - P.x, o.z - P.z); o.obj.visible = dist < (LOW ? 60 : 110); o.obj.position.set(o.x, o.y, o.z); o.obj.rotation.y = o.yaw;
         const near = dist < (ULTRA ? 30 : LOW ? 12 : 20); o.t += dt * 60; o.lodN = (o.lodN || 0) + 1;
         if (o.obj.visible && (near || o.lodN % 3 === 0)) { const air = o.th != null && o.th > gy + 0.3; const od = (o.dance && performance.now() < o.danceUntil) || o.dn ? (o.dn || o.dance) : '';
-          const run2 = mvd > 4.2; const g2 = gaitFor(o.obj, mvd, run2); const s2 = { mode: air ? 'hop' : mvd > 0.6 ? (run2 ? 'run' : 'walk') : 'idle', t: o.t, dt60: dt * 60 * (near ? 1 : 3), speed: mvd > 0.6 ? g2.speed : 0, cadence: g2.cadence, extra: run2 ? { cx: 0.22, nx: -0.08 } : null, jumpK: 0.5 }; if (od && mvd < 0.6 && !air) { s2.dance3d = od; s2.beat = bt.beat; s2.amt = 1; } posePal3D(o.obj.userData.m, s2); }
+          const run2 = mvd > 2.6; const g2 = gaitFor(o.obj, mvd, run2); const s2 = { mode: air ? 'hop' : mvd > 0.6 ? (run2 ? 'run' : 'walk') : 'idle', t: o.t, dt60: dt * 60 * (near ? 1 : 3), speed: mvd > 0.6 ? g2.speed : 0, cadence: g2.cadence, stride: g2.stride, extra: run2 ? { cx: 0.22, nx: -0.08 } : null, jumpK: 0.5 }; if (od && mvd < 0.6 && !air) { s2.dance3d = od; s2.beat = bt.beat; s2.amt = 1; } posePal3D(o.obj.userData.m, s2); }
         o.obj.traverse((c) => { if (c.isMesh) c.castShadow = near && !LOW; });
         placeTag(o, o.x, o.y + HEIGHT + 0.35, o.z, muted.has(o.uid) ? '' : clean(o.say || ''), o.sayAt || 0, !o.obj.visible || dist > 45); }
       placeTag(meTag, P.x, P.y + HEIGHT + 0.35, P.z, P.say, P.sayAt, pov && Date.now() - P.sayAt > 7000);
@@ -469,7 +475,7 @@ export function createPark3D(ctx) {
       R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
+    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, teleport: (x, z) => { P.x = x; P.z = z; P.y = ground(x, z) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);

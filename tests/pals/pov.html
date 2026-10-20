@@ -1,0 +1,17 @@
+<!doctype html><meta name="viewport" content="width=device-width"><body style="margin:0;background:#9cf"><canvas id="c" style="width:100vw;height:100vh;display:block"></canvas>
+<script type="module">
+import { THREE, makePal3D, posePal3D } from '../../js/pals/pal3d.js';
+import { WALK_V } from '../../js/pals/motion3d.js';
+const q = new URLSearchParams(location.search); const sp = q.get('s') || 'tiger', mode = q.get('m') || 'idle';
+const cv = document.getElementById('c'); const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setSize(innerWidth, innerHeight, false);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#9cf'); scene.add(new THREE.HemisphereLight('#fff', '#685', 2)); const sun = new THREE.DirectionalLight('#fff', 2); sun.position.set(3, 5, 2); scene.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), new THREE.MeshStandardMaterial({ color: '#6a5' })); gnd.rotation.x = -Math.PI / 2; scene.add(gnd);
+const pal = { species: sp, name: 'T', level: 12, outfit: q.get('o') ? JSON.parse(q.get('o')) : {} };
+const m = makePal3D(pal); const holder = new THREE.Group(); holder.add(m); scene.add(holder);
+const bb = new THREE.Box3().setFromObject(m); const h = bb.max.y - bb.min.y, k = 1.45 / h; m.scale.multiplyScalar(k); m.position.y = -bb.min.y * k;
+const cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 100);
+window.info = { scale: m.scale.x, legL: m.userData.J.legL, v1: WALK_V * 60 * m.scale.x * ((m.userData.J.legL || 0.54) / 0.54) };
+let t = 0; window.step = (n, st) => { for (let i = 0; i < n; i++) { t++; posePal3D(m, { t, dt60: 1, mode, ...(st || {}) }); window.povPose && window.povPose(m); } holder.updateMatrixWorld(true); };
+window.render = (pov) => { if (pov) { window.povCam(m, cam); } R.render(scene, cam); };
+window.THREE = THREE; window.m = m; window.cam = cam; window.ready = true;
+</script>
