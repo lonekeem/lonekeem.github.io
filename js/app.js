@@ -1,3 +1,4 @@
+import { initPolish, fxOn, setFx } from './polish.js';
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetectWifi } from './autoplay.js';
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
@@ -45,7 +46,7 @@ const S = {
   following: new Set(), blocked: new Set(), saved: new Set(), liked: new Map(),
   unsubs: [], globalUnsubs: [], unreadNotes: false, unreadChats: false
 };
-const main = document.getElementById('main');
+const main = document.getElementById('main'); initPolish();
 const COLORS = ['#8a2be2', '#4da3ff', '#e2448a', '#2bb673', '#f2a33a', '#6a3df0', '#e05a2b', '#14a3a3'];
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 const LINK_RE = /^https:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be|tiktok\.com)\/.*$/i;
@@ -1079,6 +1080,7 @@ async function pageSettings() {
     </section>
     <section class="card pad" style="margin-top:16px" aria-labelledby="spals-h">
       <h2 id="spals-h" style="font-size:1.05rem">Pals</h2>
+      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-fx" ${fxOn() ? 'checked' : ''}> <span>Fancy effects<br><span class="muted small">Glass blur, 3D tilt and the animated background. Turn off for older phones.</span></span></label>
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-dance" ${danceEnabled() ? 'checked' : ''}> <span>Pals dance to music<br><span class="muted small">When the theme song, a song or a music video plays.</span></span></label>
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-keep" ${palKeepOn() ? 'checked' : ''}> <span>Keep Pal on screen while scrolling<br><span class="muted small">A small Pal in the corner. Double-tap it to hide, triple-tap the screen to bring it back, drag to move.</span></span></label>
       <label for="s-pal-gfx" style="margin-top:8px">Pal graphics</label><select id="s-pal-gfx" style="width:100%"><option value="ultra">Ultra (sharpest 3D, opt-in)</option><option value="high">High (3D, default)</option><option value="low">Low (lighter 3D, saves battery)</option><option value="flat">2D art (no 3D)</option></select>
@@ -1100,6 +1102,7 @@ async function pageSettings() {
   wireCounter($('#s-pro'), $('#s-pro-n'), 20); wireCounter($('#s-web'), $('#s-web-n'), 100);
   if (sessionStorage.getItem('lks-focus-bio')) { sessionStorage.removeItem('lks-focus-bio'); setTimeout(() => { const t = $('#s-bio'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); } }, 60); }
   document.querySelectorAll('[name=s-theme-mode]').forEach((r) => { r.onchange = () => { setThemeMode(r.value, { start: r.value === 'play' }); toast(r.value === 'play' ? 'Theme song on' : r.value === 'mute' ? 'Theme song muted' : 'Theme song off'); }; });
+  $('#s-fx').onchange = (e) => { setFx(e.target.checked); toast(e.target.checked ? 'Fancy effects on ✨' : 'Effects off (lighter)'); };
   $('#s-pal-dance').onchange = (e) => { setDanceEnabled(e.target.checked); toast(e.target.checked ? 'Pals will dance to music 💃' : 'Pal dancing off'); };
   $('#s-pal-keep').onchange = (e) => { setPalKeep(e.target.checked); toast(e.target.checked ? 'Your Pal will stay on screen' : 'Floating Pal off'); };
   { const g = $('#s-pal-gfx'); import('./pals/pal3d.js').then((m) => { g.value = m.gfxLevel(); g.onchange = () => { m.setGfx(g.value); toast(g.value === 'flat' ? 'Pals use 2D art (reload to apply)' : 'Pal graphics: ' + g.value + (g.value === 'low' ? ' (lighter 3D)' : '')); }; }).catch(() => { g.value = 'low'; g.disabled = true; }); }
