@@ -4,6 +4,7 @@ import {
   doc, getDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, writeBatch, serverTimestamp, increment, deleteField
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { fmtCount } from './views.js';
+import * as safety from './safety.js';
 import { attachComposer, mediaHtml, hydrateStickers } from './richcomments.js';
 
 const MEDIA_LABEL = { gif: 'sent a GIF', photo: 'sent a photo', sticker: 'sent a Pal sticker' };
@@ -190,7 +191,10 @@ export function createComments(ctx) {
       try {
         const r = reply && last.some((x) => x.id === reply.parentId && !x.deleted) ? reply : null;
         if (reply && !r) throw Object.assign(new Error('That comment was deleted.'), { code: 'gone' });
+        if (!(await safety.gate())) { if (btn) btn.disabled = false; return; }
+        if (text && !safety.piiOk(text)) { if (btn) btn.disabled = false; return; }
         await addComment(p, text, r, media);
+        safety.scanAge(text, 'comment', p.id, p.id);
         input.value = ''; rc && rc.clear(); setReply(null);
       } catch (e2) {
         if (err) err.textContent = e2.code === 'permission-denied' ? 'Please wait a few seconds between comments.' : e2.code === 'gone' ? 'That comment was deleted, so you can’t reply to it.' : friendlyError(e2);

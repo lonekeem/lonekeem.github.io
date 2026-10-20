@@ -5,6 +5,7 @@ import { musicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
 import { createSeries } from './series.js';
+import { stripExif } from './safety.js';
 
 export const GENRES = {
   movie: ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Fantasy', 'Romance', 'Animation', 'Music', 'Documentary', 'Other'],
@@ -80,7 +81,8 @@ export function createWorks(ctx) {
   }
 
   // ---------------------------------------------------------------- uploads (Cloudinary, chunked)
-  function upload(file, preset, tag, onProgress) {
+  function upload(file, preset, tag, onProgress) { return stripExif(file).then((g) => upload0(g, preset, tag, onProgress)); }
+  function upload0(file, preset, tag, onProgress) {
     const CH = (LIMITS.chunkMB || 20) * 1048576;
     const send = (blob, headers, base) => new Promise((resolve, reject) => {
       const fd = new FormData(); fd.append('file', blob, file.name || 'upload'); fd.append('upload_preset', preset); fd.append('tags', tag);

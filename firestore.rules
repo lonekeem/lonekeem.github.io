@@ -26,6 +26,22 @@ service cloud.firestore {
     function isAI() { return signedIn() && exists(rolePath(me())) && get(rolePath(me())).data.get('ai', false) == true; }
     function isMod() { return isAdmin() || (signedIn() && exists(rolePath(me())) && get(rolePath(me())).data.mod == true); }
     // Banned right now (the admin can never be locked out).
+    // ---------- Kid & teen safety (js/safety.js) ----------
+    // Birthday (birthY/birthM, self-declared, set once; only the admin or a human moderator can
+    // change it), Community Rules agreement (rulesAt), and a mod-controlled under-13 flag
+    // (underage/{uid}) that the user can't touch. Posting, uploads, comments and DMs need all three.
+    function u13Path(u) { return /databases/$(database)/documents/underage/$(u); }
+    function ageOkData(d) {
+      let y = d.get('birthY', 0);
+      return y is int && (request.time.year() - y) * 12 + (request.time.month() - d.get('birthM', 12)) >= 156;
+    }
+    function canCreate(u) {
+      let d = get(userPath(u)).data;
+      return isAdmin() || u == 'studio' || (ageOkData(d) && d.get('rulesAt', null) is timestamp && !exists(u13Path(u)));
+    }
+    function validBirth(d) {
+      return !('birthY' in d) || (d.birthY is int && d.get('birthM', 0) is int && d.birthY >= 1900 && d.birthY <= 2100 && d.birthM >= 1 && d.birthM <= 12);
+    }
     function notBanned() { return !signedIn() || isAdmin() || !exists(banPath(me())) || get(banPath(me())).data.until <= request.time; }
 
     // ---------- Usernames (uniqueness) ----------
@@ -46,7 +62,8 @@ service cloud.firestore {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
-                               'pronouns', 'website', 'activePet'])
+                               'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt'])
+        && validBirth(d)
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
         && isStr(d.displayName, 1, 50)
@@ -105,7 +122,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn() && uid == me()
         && validProfile(request.resource.data)
-        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil'])
+        && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt'])
         && request.resource.data.createdAt == request.time
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if actingAs(uid)
@@ -117,6 +134,10 @@ service cloud.firestore {
         && rateOk('lastPostAt', 20)
         && rateOk('lastCommentAt', 5)
         && rateOk('lastMessageAt', 1)
+        // Birthday: set once, then locked (admin / human moderators fix mistakes below).
+        && (!('birthY' in resource.data) || (request.resource.data.get('birthY', 0) == resource.data.birthY && request.resource.data.get('birthM', 0) == resource.data.birthM))
+        // Rules agreement: set to now, once.
+        && (!('rulesAt' in changed()) || (!('rulesAt' in resource.data) && request.resource.data.rulesAt == request.time))
         // Profile photo: '' (removed) or an image on our Cloudinary cloud (blocked until the
         // real cloud name is set, same placeholder as media posts). Checked only when it changes.
         && (!('photoURL' in changed()) || request.resource.data.photoURL == ''
@@ -125,6 +146,9 @@ service cloud.firestore {
         && (!('storyUntil' in changed()) || (request.resource.data.storyUntil is timestamp
             && request.resource.data.storyUntil > request.time
             && request.resource.data.storyUntil <= request.time + duration.value(24, 'h')));
+      // Admin or a human moderator corrects a birthday.
+      allow update: if isMod() && !isAI() && changed().hasOnly(['birthY', 'birthM']) && validBirth(request.resource.data)
+        && 'birthY' in request.resource.data;
       // Admin search-index rebuild: only the search fields, on any profile.
       allow update: if isAdmin()
         && changed().hasOnly(['usernameLower', 'displayNameLower'])
@@ -309,7 +333,7 @@ service cloud.firestore {
       }
 
       allow read: if true;
-      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data);
+      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data) && canCreate(request.resource.data.authorId);
       // Moderator "Restore": an exact copy of the held post, moved out of heldPosts in the same batch.
       allow create: if isMod() && exists(/databases/$(database)/documents/heldPosts/$(postId))
         && request.resource.data == get(/databases/$(database)/documents/heldPosts/$(postId)).data.post
@@ -456,7 +480,7 @@ service cloud.firestore {
         }
 
         allow read: if true;
-        allow create: if signedIn() && notBanned()
+        allow create: if signedIn() && notBanned() && canCreate(request.resource.data.authorId)
           && !blockedBy(get(postPath()).data.authorId)
           && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'text', 'createdAt',
                                                    'parentId', 'likeCount', 'replyCount', 'media'])
@@ -555,7 +579,7 @@ service cloud.firestore {
     }
     match /stories/{sid} {
       allow read: if canSeeStories(resource.data.authorId);
-      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validStory(request.resource.data);
+      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validStory(request.resource.data) && canCreate(request.resource.data.authorId);
       allow delete: if signedIn() && (actingAs(resource.data.authorId) || isAdmin());
 
       // Who viewed a story: written by each viewer, read by the owner.
@@ -630,7 +654,7 @@ service cloud.firestore {
       function liveOn() { return live().status == 'live'; }
 
       allow read: if true;
-      allow create: if signedIn() && actingAs(request.resource.data.hostId) && validNewLive(request.resource.data);
+      allow create: if signedIn() && actingAs(request.resource.data.hostId) && validNewLive(request.resource.data) && canCreate(request.resource.data.hostId);
       allow update: if signedIn() && (hostLiveUpdate() || adminEndsLive());
       allow delete: if signedIn() && (actingAs(resource.data.hostId) || isAdmin());
 
@@ -722,6 +746,10 @@ service cloud.firestore {
         && actingAs(request.resource.data.lastSender)
         && exists(userPath(otherOf(request.resource.data.lastSender)))
         && !isBlocked(otherOf(request.resource.data.lastSender), request.resource.data.lastSender)
+        // DMs are friends-only: a new chat needs follows both ways (or the studio / a moderator).
+        && ('studio' in request.resource.data.participants || isMod()
+            || (exists(/databases/$(database)/documents/follows/$(request.resource.data.lastSender + '_' + otherOf(request.resource.data.lastSender)))
+                && exists(/databases/$(database)/documents/follows/$(otherOf(request.resource.data.lastSender) + '_' + request.resource.data.lastSender))))
         && isStr(request.resource.data.lastMessage, 0, 1000)
         && request.resource.data.lastAt == request.time
         && request.resource.data.createdAt == request.time;
@@ -736,6 +764,7 @@ service cloud.firestore {
       match /messages/{mid} {
         allow read: if inChat();
         allow create: if inChat() && notBanned()
+          && ('studio' in parts() || canCreate(request.resource.data.senderId))
           && request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt', 'snap', 'viewed'])
           && (!('snap' in request.resource.data) || snapOk(request.resource.data))
           && (!('viewed' in request.resource.data) || ('snap' in request.resource.data && request.resource.data.viewed == false))
@@ -1235,6 +1264,15 @@ service cloud.firestore {
     }
     // Suspensions. Readable by the person themselves and moderators. Moderators can't suspend
     // themselves or other moderators (only the admin can).
+    // Under-13 flag: moderators and the Kemy Helper mark; only the admin / human moderators undo.
+    match /underage/{uid} {
+      allow read: if signedIn() && (uid == me() || isMod());
+      allow create: if isMod() && uid != me() && !exists(rolePath(uid))
+        && request.resource.data.keys().hasOnly(['by', 'reason', 'at'])
+        && request.resource.data.by == me() && isStr(request.resource.data.reason, 0, 200)
+        && request.resource.data.at == request.time;
+      allow delete: if isMod() && !isAI();
+    }
     match /bans/{uid} {
       allow read: if signedIn() && (uid == me() || isMod());
       allow create, update: if isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
@@ -1277,7 +1315,7 @@ service cloud.firestore {
         && hp().post is map && hp().authorId == hp().post.authorId
         && isStr(hp().reason, 1, 200) && hp().level in ['bad', 'borderline', 'mod']
         && hp().createdAt == request.time
-        && ((hp().level != 'mod' && !('by' in hp()) && actingAs(hp().authorId) && validNewPost(hp().post))
+        && ((hp().level != 'mod' && !('by' in hp()) && actingAs(hp().authorId) && validNewPost(hp().post) && canCreate(hp().authorId))
             // a moderator pulls a live post into review
             || (hp().level == 'mod' && isMod() && hp().by == me() && exists(livePost())
                 && hp().post == get(livePost()).data && !existsAfter(livePost())));

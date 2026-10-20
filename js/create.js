@@ -13,6 +13,7 @@ import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
 import { FX_DEFAULT } from './fx/looks.js';
 import { onDoubleTap } from './tapstar.js';
+import { stripExif, piiOk } from './safety.js';
 import { openEditor } from './snapedit.js';
 import { WORK_IC, DESC as WORK_DESC } from './works.js';
 
@@ -531,6 +532,7 @@ export function createComposer(ctx) {
     const el = mountOverlay(`<div class="cam-msg snap-sending" role="status"><div class="spinner"></div><h2>Sending snap…</h2><div class="pv-progress"><span></span></div><p class="small muted">To ${uids.length} ${uids.length === 1 ? 'friend' : 'friends'}</p></div>`, 'cam-camera has-msg');
     const barIn = el.querySelector('.pv-progress span');
     try {
+      file = await stripExif(file);
       const r = await new Promise((resolve, reject) => {
         const fd = new FormData(); fd.append('file', file, file.name || 'snap');
         fd.append('upload_preset', CLOUDINARY.snapPreset || CLOUDINARY.uploadPreset);
@@ -576,7 +578,7 @@ export function createComposer(ctx) {
         <label for="pv-caption" class="sr-only">Caption</label>
         <textarea id="pv-caption" maxlength="${LIMITS.captionMax}" rows="2" placeholder="Write a caption…"></textarea>
         ${catPickerHtml('pv-cat', '', esc)}
-        <div class="pv-row small muted"><span>${isAdmin() ? '<label class="check pv-studio"><input type="checkbox" id="pv-studio"> <span>Post as <b>Lone Keem Studios</b></span></label>' : 'By posting you agree to the <a href="guidelines.html">Community Guidelines</a>.'}</span><span><span id="pv-count">0</span>/${LIMITS.captionMax}</span></div>
+        <div class="pv-row small muted"><span>${isAdmin() ? '<label class="check pv-studio"><input type="checkbox" id="pv-studio"> <span>Post as <b>Lone Keem Studios</b></span></label>' : 'By posting you agree to the <a href="#/rules">Community Rules</a>. Photo location info is removed.'}</span><span><span id="pv-count">0</span>/${LIMITS.captionMax}</span></div>
         <div class="pv-progress" hidden aria-hidden="true"><span></span></div>
         <p class="pv-status small muted" aria-live="polite"></p>
         <p class="form-error" id="pv-err"></p>
@@ -631,6 +633,7 @@ export function createComposer(ctx) {
       ev.preventDefault();
       if (!uploadsReady()) { err.textContent = 'Uploads are almost ready. Please check back very soon.'; return; }
       if (busy) return;
+      if (!piiOk(cap.value)) return;
       err.textContent = ''; busy = true; postBtn.disabled = true; postBtn.textContent = 'Posting…';
       try {
         if (!uploaded) {
@@ -662,7 +665,8 @@ export function createComposer(ctx) {
 
     // Uploads straight to Cloudinary. Big files go in ~20 MB chunks (X-Unique-Upload-Id +
     // Content-Range), each retried up to 3 times, so a long video survives a shaky connection.
-    function upload(f, onProgress) {
+    function upload(f, onProgress) { return stripExif(f).then((g) => upload0(g, onProgress)); }
+    function upload0(f, onProgress) {
       const CH = LIMITS.chunkMB * 1048576;
       const fields = (fd) => {
         fd.append('upload_preset', story ? CLOUDINARY.storyPreset : CLOUDINARY.uploadPreset);

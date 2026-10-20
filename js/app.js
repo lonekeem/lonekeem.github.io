@@ -28,6 +28,7 @@ import { ICONS } from './icons.js';
 import { createLive } from './live.js';
 import { createModeration, BlockSet } from './moderation.js';
 import { initKindGuard } from './kindguard.js';
+import * as safety from './safety.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createComments } from './comments.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
@@ -195,10 +196,16 @@ async function isLiked(postId) {
 const chatIdFor = (a, b) => [a, b].sort().join('_');
 // Sends a DM (used by the chat page and story replies). `me` is the sender (studio for the admin).
 async function sendMessage(otherUid, text, me = S.user.uid, snapData = null) {
+  if (me !== STUDIO_UID && !(await safety.gate())) throw Object.assign(new Error('Messages are switched off for your account.'), { code: 'kemy/safety' });
+  if (me !== STUDIO_UID) safety.scanAge(text, 'chat message', chatIdFor(me, otherUid));
   const cid = chatIdFor(me, otherUid);
   const chatRef = doc(db, 'chats', cid);
   const snap = await getDoc(chatRef).catch(() => null);
   const exists = !!(snap && snap.exists());
+  if (!exists && me !== STUDIO_UID && otherUid !== STUDIO_UID && !mod.iAmMod()) {
+    const [f1, f2] = await Promise.all([getDoc(doc(db, 'follows', `${me}_${otherUid}`)), getDoc(doc(db, 'follows', `${otherUid}_${me}`))].map((x) => x.then((d) => d.exists()).catch(() => false)));
+    if (!f1 || !f2) throw Object.assign(new Error('For safety, you can only start a chat with friends: you both need to follow each other.'), { code: 'kemy/friends-only' });
+  }
   const b = writeBatch(db);
   const meta = { lastMessage: text.slice(0, 1000), lastAt: serverTimestamp(), lastSender: me };
   if (exists) b.update(chatRef, meta);
@@ -460,20 +467,26 @@ function renderPosts(container, posts, emptyMsg) {
 }
 
 // ---------------------------------------------------------------- moderation actions
+const REPORT_REASONS = [['bullying', '😢 Bullying or being mean'], ['inappropriate', '🙈 Inappropriate (swearing, adult or scary)'], ['spam', '📢 Spam or scam'], ['personal', '🔒 Shares personal info'], ['under13', '🧒 Seems under 13'], ['other', '❓ Something else']];
 function reportDialog(targetType, targetId, postId, excerpt, targetUid = '') {
   if (!requireAuth()) return;
   openModal(`
     <h2 style="font-size:1.25rem">Report ${esc(targetType)}</h2>
     <p>Tell us what’s wrong. Reports go privately to the Kemy moderators.</p>
     <form id="report-form" style="text-align:left">
-      <div class="field"><label for="report-reason">Reason</label>
-      <textarea id="report-reason" maxlength="500" required placeholder="e.g. spam, stolen content, harassment, explicit content"></textarea></div>
+      <fieldset class="field rep-reasons" style="border:0;padding:0;margin:0 0 10px"><legend style="font-weight:500;margin-bottom:6px">Why are you reporting this?</legend>
+      ${REPORT_REASONS.map(([k, l], i) => `<label class="check" style="display:flex;gap:8px;margin:0 0 6px"><input type="radio" name="rep-r" value="${k}" ${i ? '' : 'required'}> <span>${l}</span></label>`).join('')}</fieldset>
+      <div class="field"><label for="report-reason">Add a note <span class="muted small">(optional)</span></label>
+      <textarea id="report-reason" maxlength="400" placeholder="Anything that helps the moderators"></textarea></div>
       <p class="form-error" id="report-err"></p>
       <div class="btns"><button class="btn" type="submit">Send report</button><button class="btn btn-ghost" type="button" data-close>Cancel</button></div>
     </form>`);
   $('#report-form').onsubmit = async (ev) => {
     ev.preventDefault();
-    const reason = $('#report-reason').value.trim(); if (!reason) return;
+    const pick = $('#report-form input[name=rep-r]:checked'); if (!pick) { $('#report-err').textContent = 'Pick a reason.'; return; }
+    const lbl = (REPORT_REASONS.find((r) => r[0] === pick.value) || ['', 'Other'])[1];
+    const note = $('#report-reason').value.trim();
+    const reason = (pick.value === 'under13' ? '🧒 Possible under 13: ' : '') + lbl + (note ? ' · ' + note : '');
     try {
       await addDoc(collection(db, 'reports'), {
         reporterId: S.user.uid, targetType, targetId, postId: postId || '', reason: reason.slice(0, 500),
@@ -590,7 +603,7 @@ const routes = [
   [/^#\/explore(?:\/(movies|songs))?$/, pageExplore, 'explore'],
   [/^#\/search(?:\?(.*))?$/, pageSearch, 'explore'],
   [/^#\/new(?:\/(text|menu|movie|song|aimovie))?(?:\?(.*))?$/, pageCompose, 'new'],
-  [/^#\/series\/new$/, (t) => getWorks().series().editPage(null, t), 'explore'],
+  [/^#\/series\/new$/, gated((t) => getWorks().series().editPage(null, t)), 'explore'],
   [/^#\/series\/([\w-]+)\/edit$/, (id, t) => getWorks().series().editPage(id, t), 'explore'],
   [/^#\/series\/([\w-]+)$/, (id, t) => getWorks().series().page(id, t), 'explore'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
@@ -599,7 +612,7 @@ const routes = [
   [/^#\/u\/([a-z0-9_.]{1,30})(?:\/(saved|movies|songs|series))?$/i, pageProfile, 'me'],
   [/^#\/(followers|following)\/([\w-]+)$/, pageFollowList, 'me'],
   [/^#\/post\/([\w-]+)$/, pagePost, ''],
-  [/^#\/live\/new$/, (t) => live.pageGoLive(t), 'new'],
+  [/^#\/live\/new$/, gated((t) => live.pageGoLive(t)), 'new'],
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
   [/^#\/pals(?:\/(gallery|shop|store|store-bg))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
   [/^#\/park$/, () => park.page(), 'me'],
@@ -609,6 +622,7 @@ const routes = [
   [/^#\/games\/pals(?:\/([\w-]+))?(?:\?(.*))?$/, (b, q) => palGames.page(b, Object.fromEntries(new URLSearchParams(q || ''))), 'games'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
+  [/^#\/rules$/, () => safety.rulesPage(main), 'me'],
   [/^#\/settings$/, pageSettings, 'me'],
   [/^#\/settings\/interests$/, (t) => interestsPage({ main, esc, toast, getDoc, doc, db, loadDiscover, stale, token: t }), 'me'],
   [/^#\/music$/, (t) => music.page(t), 'explore'],
@@ -623,6 +637,8 @@ const routes = [
   [/^#\/reset$/, pageReset, 'me'],
   [/^#\/onboard$/, pageOnboard, 'me']
 ];
+function gated(fn) { return async (...a) => { if (!requireAuth()) return; if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; } return fn(...a); }; }
+safety.initSafety({ S, db, esc, openModal, closeModal, toast, isAdmin: () => isAdmin(), friendlyError });
 let routeToken = 0, navCount = 0;
 // In-game music player: shown on every game screen (#/games…, #/game/…, Pal games), hidden elsewhere.
 const kemySongsForGames = async () => {
@@ -796,6 +812,7 @@ const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${ava
 const composer = createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends });
 async function pageCompose(sub, qs, token) {
   if (!requireAuth()) return;
+  if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; }
   const pre = Object.fromEntries(new URLSearchParams(qs || ''));
   if (pre.series) { pre.sid = pre.series; }
   if (sub === 'movie' || sub === 'song') return getWorks().composePage(sub, token, pre);
@@ -833,6 +850,8 @@ function textComposeForm(slot, open) {
     const asStudio = isAdmin() && !!$('#as-studio')?.checked;
     if (linkUrl && !LINK_RE.test(linkUrl)) { err.textContent = 'Links must be a YouTube or TikTok URL starting with https://'; return; }
     if (!text && !linkUrl) { err.textContent = 'Write something or add a link.'; return; }
+    if (!(await safety.gate())) return;
+    if (!safety.piiOk(text)) return;
     const btn = $('#compose-btn'); btn.disabled = true; btn.textContent = 'Posting…';
     try {
       const { authorId, author } = await postAuthor(asStudio);
@@ -846,6 +865,7 @@ function textComposeForm(slot, open) {
       });
       b.update(doc(db, 'users', authorId), { lastPostAt: serverTimestamp() });
       await b.commit();
+      safety.scanAge(text, 'post', ref.id, ref.id);
       toast(S.lastHeld === ref.id ? 'Your post is being reviewed 🕒' : 'Posted!');
       location.hash = '#/post/' + ref.id;
     } catch (e) {
@@ -857,6 +877,7 @@ function textComposeForm(slot, open) {
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
 async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
+  if (caption) safety.scanAge(caption, 'post');
   const urls = deliveryUrls(upload);
   const { authorId, author } = await postAuthor(asStudio);
   const ref = doc(collection(db, 'posts'));
@@ -1074,7 +1095,7 @@ async function pageSettings() {
   const p = S.profile;
   main.innerHTML = `
     <h1 class="page-title">Edit profile</h1>
-    <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><a class="btn btn-sm btn-ghost" href="#/feedback" id="set-feedback">🐞 Report a bug / Send feedback</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><a class="btn btn-sm btn-ghost" href="#/rules" id="set-rules">📜 Community Rules</a><a class="btn btn-sm btn-ghost" href="#/feedback" id="set-feedback">🐞 Report a bug / Send feedback</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
     ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Mod Hub${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
     ${isAdmin() ? '<a class="btn btn-block" href="#/admin" id="set-admin" style="margin-bottom:14px">🛡️ Admin tools (publish shop prices, reports, studio)</a>' : ''}
     <div id="set-donate"></div>
@@ -1176,6 +1197,7 @@ async function pageSettings() {
     const displayName = $('#s-name').value.trim();
     const username = $('#s-user').value.trim().toLowerCase().replace(/^@/, '');
     const bio = cleanBio($('#s-bio').value);
+    if (bio !== (p.bio || '')) { if (!safety.piiOk(bio)) return; safety.scanAge(bio, 'user', S.user.uid); }
     const pronouns = $('#s-pro').value.trim().slice(0, 20);
     const website = normWebsite($('#s-web').value);
     if (website === null) { err.textContent = 'Website must be a valid https:// link (up to 100 characters).'; return; }
@@ -1409,7 +1431,7 @@ async function pageAdmin(token) {
 }
 
 // ---------------------------------------------------------------- auth pages
-let pendingProfile = null;
+let pendingProfile = null, pendingBirthday = null;
 let pendingNext = null;
 const nextHash = () => {
   const n = decodeURIComponent(location.hash.split('?next=')[1] || '#/watch');
@@ -1461,7 +1483,7 @@ function profileFields(prefillName = '') {
 // Remember topic picks from the sign-up / onboarding form until the profile exists.
 document.addEventListener('change', (e) => { if (e.target.name !== 'topic' || !e.target.closest('#onboard-form, #signup-form, .auth-card, form')) return; if (location.hash.startsWith('#/settings')) return;
   const picks = [...document.querySelectorAll('input[name=topic]:checked')].map((i) => i.value); try { sessionStorage.setItem('kemy-topics', JSON.stringify(picks)); } catch { /* */ } });
-const agreeField = `<label class="check field"><input type="checkbox" id="p-agree" required> <span>I’m 13 or older and I agree to the <a href="terms.html" target="_blank">Terms</a>, <a href="privacy.html" target="_blank">Privacy</a> and <a href="guidelines.html" target="_blank">Community Guidelines</a>.</span></label>`;
+const agreeField = `<label class="check field"><input type="checkbox" id="p-agree" required> <span>I agree to the <a href="#/rules" target="_blank">Community Rules</a>, <a href="terms.html" target="_blank">Terms</a>, <a href="privacy.html" target="_blank">Privacy</a> and <a href="guidelines.html" target="_blank">Community Guidelines</a>.</span></label>`;
 const readProfileForm = () => ({
   displayName: $('#p-name').value.trim(),
   username: $('#p-user').value.trim().toLowerCase().replace(/^@/, '')
@@ -1473,6 +1495,7 @@ async function pageSignup() {
       ${profileFields()}
       <div class="field"><label for="p-email">Email</label><input id="p-email" type="email" autocomplete="email" required></div>
       <div class="field"><label for="p-pass">Password</label><input id="p-pass" type="password" autocomplete="new-password" minlength="6" required></div>
+      ${safety.birthdayFields('sbd')}
       ${agreeField}
       <p class="form-error" id="p-err"></p>
       <button class="btn btn-block" type="submit" id="p-btn">Create account</button>
@@ -1480,7 +1503,9 @@ async function pageSignup() {
     ${googleBlock}
     <p class="center small muted" style="margin-top:18px">Already have an account? <a href="#/login">Log in</a></p>`);
   $('#google').onclick = () => {
-    if (!$('#p-agree').checked) { $('#p-err').textContent = 'Please confirm you’re 13+ and agree to the Terms first.'; return; }
+    if (!$('#p-agree').checked) { $('#p-err').textContent = 'Please agree to the Terms and Community Rules first.'; return; }
+    const bd = safety.readBirthday('sbd'); if (!bd) { $('#p-err').textContent = 'Please pick your birthday month and year.'; return; }
+    pendingBirthday = bd;
     googleSignIn();
   };
   $('#signup-form').onsubmit = async (ev) => {
@@ -1489,6 +1514,8 @@ async function pageSignup() {
     const { displayName, username } = readProfileForm();
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
+    const bd = safety.readBirthday('sbd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; }
+    pendingBirthday = bd;
     const btn = $('#p-btn'); btn.disabled = true; btn.textContent = 'Creating…';
     try {
       if (await uidForUsername(username)) throw new Error('That username is taken. Try another.');
@@ -1503,7 +1530,7 @@ async function pageOnboard() {
   if (!S.user) { location.replace('#/signup'); return; }
   if (S.profile) { location.replace('#/feed'); return; }
   authShell('Pick your username', 'One last step to finish your profile.', `
-    <form id="onboard-form">${profileFields(S.user.displayName || '')}${agreeField}<p class="form-error" id="p-err"></p>
+    <form id="onboard-form">${profileFields(S.user.displayName || '')}${pendingBirthday ? '' : safety.birthdayFields('obd')}${agreeField}<p class="form-error" id="p-err"></p>
     <button class="btn btn-block" type="submit">Continue</button></form>
     <p class="center small muted" style="margin-top:14px"><button class="link-btn" id="ob-out">Use a different account</button></p>`);
   $('#ob-out').onclick = () => signOut(auth);
@@ -1513,6 +1540,7 @@ async function pageOnboard() {
     const { displayName, username } = readProfileForm();
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
+    if (!pendingBirthday) { const bd = safety.readBirthday('obd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; } pendingBirthday = bd; }
     try { await createProfile(displayName, username); go(pendingNext || '#/feed'); pendingNext = null; }
     catch (e) { err.textContent = friendlyError(e); }
   };
@@ -1538,8 +1566,10 @@ async function createProfile(displayName, username) {
   b.set(doc(db, 'users', uid), {
     displayName: displayName.slice(0, 50), username, bio: '', color: COLORS[Math.floor(Math.random() * COLORS.length)],
     ...userSearchFields({ displayName: displayName.slice(0, 50), username }),
+    ...(pendingBirthday ? { birthY: pendingBirthday.birthY, birthM: pendingBirthday.birthM } : {}),
     createdAt: serverTimestamp(), welcomed: false
   });
+  pendingBirthday = null;
   b.set(doc(db, 'follows', `${uid}_${STUDIO_UID}`), { follower: uid, followee: STUDIO_UID, createdAt: serverTimestamp() });
   await b.commit();
   try { const t = JSON.parse(sessionStorage.getItem('kemy-topics') || '[]'); if (t.length) { pickTopics(t); } sessionStorage.removeItem('kemy-topics'); } catch { /* */ }

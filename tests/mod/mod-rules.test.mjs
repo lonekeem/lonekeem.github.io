@@ -8,7 +8,7 @@ let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; cons
 const ADMIN = env.authenticatedContext('admin', { email: 'lillykemoy1@gmail.com', email_verified: true }).firestore();
 const db = (u) => env.authenticatedContext(u, { email: u + '@example.com', email_verified: true }).firestore();
 const M = db('mia'), U = db('bob'), C = db('cal');
-const prof = (n) => ({ displayName: n, username: n, bio: '', color: '#8a2be2', createdAt: Timestamp.now(), welcomed: true });
+const prof = (n) => ({ displayName: n, username: n, bio: '', color: '#8a2be2', createdAt: Timestamp.now(), welcomed: true, birthY: 2000, birthM: 1, rulesAt: Timestamp.now() });
 await env.withSecurityRulesDisabled(async (c) => { const f = c.firestore(); for (const n of ['admin', 'mia', 'bob', 'cal']) await setDoc(doc(f, 'users', n), prof(n)); await setDoc(doc(f, 'posts/p1'), { authorId: 'cal', text: 'hi', commentCount: 0, lastCommentId: '' }); });
 const role = (by) => ({ mod: true, name: 'Mia', uname: 'mia', by, at: serverTimestamp() });
 const ban = (by, ms = 86400000, o = {}) => ({ until: Timestamp.fromMillis(Date.now() + ms), reason: 'Rude chat', permanent: false, hide: false, by, at: serverTimestamp(), ...o });
