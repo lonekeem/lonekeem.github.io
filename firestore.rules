@@ -1456,7 +1456,13 @@ service cloud.firestore {
       function pp() { return request.resource.data; }
       allow read: if signedIn();
       allow create, update: if signedIn() && uid == me() && room.matches('^r[0-9]{1,2}$')
-        && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at'])
+        && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at', 'h', 'r', 'dn', 'v'])
+        // 3D park extras: height (dm), facing (deg), dance id, client version
+        && (!('h' in pp()) || (pp().h is int && pp().h >= 0 && pp().h <= 2000))
+        && (!('r' in pp()) || (pp().r is int && pp().r >= 0 && pp().r < 360))
+        && (!('dn' in pp()) || isStr(pp().dn, 0, 20)) && (!('v' in pp()) || (pp().v is int && pp().v >= 0 && pp().v <= 99))
+        // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
+        && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= 0 && pp().x <= 4000 && pp().y is int && pp().y >= 0 && pp().y <= 4000
         && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && isStr(pp().tgt, 0, 128)
         && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
