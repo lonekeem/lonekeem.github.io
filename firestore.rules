@@ -24,6 +24,14 @@ service cloud.firestore {
     // roles/{uid} {mod: true} is written only by the admin. bans/{uid} {until, ...} by moderators.
     function rolePath(u) { return /databases/$(database)/documents/roles/$(u); }
     function banPath(u) { return /databases/$(database)/documents/bans/$(u); }
+    // Watchlist (warned / suspended / restricted by a moderator): their pictures and videos must go
+    // through heldPosts first, and stories are paused. A ban doc (even an expired one) also counts.
+    function watchPath(u) { return /databases/$(database)/documents/watchlist/$(u); }
+    function watched(u) {
+      return u != 'studio' && !isAdmin()
+        && (exists(banPath(u)) || (exists(watchPath(u)) && get(watchPath(u)).data.until > request.time));
+    }
+    function hasMedia(d) { return d.get('mediaUrl', '') != '' || d.get('work', {}).get('cover', '') != ''; }
     // The AI helper moderator ('Kemy Helper'): a moderator whose role has ai == true (admin-set).
     function isAI() { return signedIn() && exists(rolePath(me())) && get(rolePath(me())).data.get('ai', false) == true; }
     function isMod() { return isAdmin() || (signedIn() && exists(rolePath(me())) && get(rolePath(me())).data.mod == true); }
@@ -342,7 +350,8 @@ service cloud.firestore {
 
       allow read: if true;
       allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validNewPost(request.resource.data) && canCreate(request.resource.data.authorId)
-        && newVideoOk(request.resource.data);
+        && newVideoOk(request.resource.data)
+        && !(hasMedia(request.resource.data) && watched(request.resource.data.authorId));
       // Moderator "Restore": an exact copy of the held post, moved out of heldPosts in the same batch.
       allow create: if isMod() && exists(/databases/$(database)/documents/heldPosts/$(postId))
         && request.resource.data == get(/databases/$(database)/documents/heldPosts/$(postId)).data.post
@@ -607,7 +616,8 @@ service cloud.firestore {
     }
     match /stories/{sid} {
       allow read: if canSeeStories(resource.data.authorId);
-      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validStory(request.resource.data) && canCreate(request.resource.data.authorId);
+      allow create: if signedIn() && notBanned() && actingAs(request.resource.data.authorId) && validStory(request.resource.data) && canCreate(request.resource.data.authorId)
+        && !watched(request.resource.data.authorId);
       allow delete: if signedIn() && (actingAs(resource.data.authorId) || isAdmin());
 
       // Who viewed a story: written by each viewer, read by the owner.
@@ -1370,6 +1380,14 @@ service cloud.firestore {
       allow delete: if isMod() && (isAdmin() || !exists(rolePath(uid)));
     }
     // Removed accounts whose content is hidden everywhere (public list, moderators write).
+    match /watchlist/{uid} {
+      allow read: if signedIn() && (uid == me() || isMod());
+      allow create, update: if isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
+        && request.resource.data.keys().hasOnly(['reason', 'by', 'at', 'until'])
+        && isStr(request.resource.data.reason, 0, 200) && request.resource.data.until is timestamp
+        && request.resource.data.by == me() && request.resource.data.at == request.time;
+      allow delete: if isMod() && !isAI();
+    }
     match /hiddenUsers/{uid} {
       allow read: if true;
       allow create, update: if isMod() && !isAI() && uid != me() && (isAdmin() || !exists(rolePath(uid)))

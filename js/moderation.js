@@ -62,9 +62,18 @@ export function createModeration(ctx) {
     if (reportsUnsub) { reportsUnsub(); reportsUnsub = null; }
     S.ban = null; S.modOpen = 0;
     if (!S.user) return;
-    try { const s = await getDoc(doc(db, 'bans', S.user.uid)); S.ban = s.exists() ? activeBan(s.data()) : null; } catch (e) { /* no ban */ }
-    S.globalUnsubs && S.globalUnsubs.push(onSnapshot(doc(db, 'bans', S.user.uid), (s) => { const was = !!S.ban; S.ban = s.exists() ? activeBan(s.data()) : null; if (was !== !!S.ban) onChange && onChange('ban'); }, () => {}));
+    try { const s = await getDoc(doc(db, 'bans', S.user.uid)); S.banDoc = s.exists(); S.ban = s.exists() ? activeBan(s.data()) : null; } catch (e) { /* no ban */ }
+    S.globalUnsubs && S.globalUnsubs.push(onSnapshot(doc(db, 'bans', S.user.uid), (s) => { S.banDoc = s.exists(); if (s.exists()) S.watchedMe = true; const was = !!S.ban; S.ban = s.exists() ? activeBan(s.data()) : null; if (was !== !!S.ban) onChange && onChange('ban'); }, () => {}));
+    try { const w = await getDoc(doc(db, 'watchlist', S.user.uid)); S.watchedMe = isWatched(w); } catch { S.watchedMe = false; }
+    S.globalUnsubs && S.globalUnsubs.push(onSnapshot(doc(db, 'watchlist', S.user.uid), (w) => { S.watchedMe = isWatched(w); }, () => {}));
     watchReports();
+  }
+  // ---- watchlist: warned / suspended / restricted users. Their pictures + videos are held for review
+  // (rules enforce it), stories are paused. A ban doc (even expired) counts too.
+  const isWatched = (w) => !!S.banDoc || (!!w && w.exists() && w.data().until && w.data().until.toMillis() > Date.now());
+  const WATCH_DAYS = 30;
+  function watchUser(uid, reason, until) {
+    return setDoc(doc(db, 'watchlist', uid), { reason: String(reason || '').slice(0, 200), by: S.user.uid, at: serverTimestamp(), until: until || Timestamp.fromMillis(Date.now() + WATCH_DAYS * DAY) }).catch(() => {});
   }
   function watchReports() {
     if (reportsUnsub || !iAmMod()) return; setTimeout(() => watchCounts(), 0);
@@ -114,7 +123,7 @@ export function createModeration(ctx) {
         <div class="field"><label for="mod-msg-t">Message</label><textarea id="mod-msg-t" maxlength="1000" required>${esc(prefill || list[0])}</textarea></div>
         <div class="btns"><button class="btn" type="submit">Send</button><button class="btn btn-ghost" type="button" data-close>Cancel</button></div></form>`);
     const ta = $('#mod-msg-t'); wireTpl(list, ta);
-    return new Promise((res) => { $('#mod-msg').onsubmit = async (e) => { e.preventDefault(); try { await sendThread(uid, ta.value.trim(), ref || (reportId ? 'report:' + reportId : '')); log(kind === 'warn' ? 'warn' : 'message', uid, name, ta.value.trim(), reportId); closeModal(); toast('Sent ✓'); res(true); } catch (er) { toast(friendlyError(er)); } }; });
+    return new Promise((res) => { $('#mod-msg').onsubmit = async (e) => { e.preventDefault(); try { await sendThread(uid, ta.value.trim(), ref || (reportId ? 'report:' + reportId : '')); log(kind === 'warn' ? 'warn' : 'message', uid, name, ta.value.trim(), reportId); if (kind === 'warn') watchUser(uid, 'Warned: ' + ta.value.trim()); closeModal(); toast('Sent ✓'); res(true); } catch (er) { toast(friendlyError(er)); } }; });
   }
 
   // ---- moderator invites (admin sends, user answers)
@@ -190,6 +199,7 @@ export function createModeration(ctx) {
       try {
         await setDoc(doc(db, 'bans', uid), { until, reason, permanent: perm, hide, by: S.user.uid, at: serverTimestamp(), name: String(name || '').slice(0, 60), uname: String(uname || '').slice(0, 30) });
         if (hide) await setDoc(doc(db, 'hiddenUsers', uid), { by: S.user.uid, at: serverTimestamp() });
+        await watchUser(uid, 'Suspended: ' + reason, perm ? FOREVER() : Timestamp.fromMillis(until.toMillis() + WATCH_DAYS * DAY));
         const when = perm ? 'permanently' : `for ${v} day${v === '1' ? '' : 's'}`;
         if ($('#mod-ban-n').checked) await sendThread(uid, `Your Kemy account is suspended ${when}. Reason: ${reason}. You can reply here if you think this is a mistake.`, reportId ? 'report:' + reportId : '').catch(() => notice(uid, `Your Kemy account is suspended ${when}. Reason: ${reason}`).catch(() => {}));
         log(hide ? 'remove-account' : 'ban', uid, name, `${when}: ${reason}`, reportId);
@@ -199,7 +209,7 @@ export function createModeration(ctx) {
   }
   async function unban(uid, name) {
     if (!confirm(`Unsuspend ${name || 'this user'}?`)) return false;
-    try { await deleteDoc(doc(db, 'bans', uid)); await deleteDoc(doc(db, 'hiddenUsers', uid)).catch(() => {}); log('unban', uid, name); await notice(uid, 'Your Kemy account is active again. Please follow the rules and be kind. 💜').catch(() => {}); toast('Unsuspended'); return true; }
+    try { await deleteDoc(doc(db, 'bans', uid)); await deleteDoc(doc(db, 'hiddenUsers', uid)).catch(() => {}); log('unban', uid, name); await watchUser(uid, 'Recently unsuspended'); await notice(uid, 'Your Kemy account is active again. Please follow the rules and be kind. 💜').catch(() => {}); toast('Unsuspended'); return true; }
     catch (e) { toast(friendlyError(e)); return false; }
   }
 
@@ -266,7 +276,7 @@ export function createModeration(ctx) {
     const mod = S.mods.has(u.uid);
     return `<div class="list-item mod-user" data-uid="${esc(u.uid)}">${avatar(u, '', false)}<div class="meta"><b>${esc(u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${mod ? ' · Moderator' : ''}</p>
       <div class="mod-acts">${roles ? (mod ? `<button class="btn btn-sm btn-ghost" data-u="unmod">Remove moderator</button><button class="btn btn-sm btn-ghost" data-u="ai">${S.modsAI.has(u.uid) ? 'Remove 🤖 AI Helper flag' : '🤖 Mark as AI Helper'}</button>` : u._inv === 'pending' ? '<span class="mod-st">⏳ Invite pending</span><button class="btn btn-sm btn-ghost" data-u="cancel">Cancel invite</button>' : `${u._inv === 'declined' ? '<span class="mod-st">✕ Declined</span>' : ''}<button class="btn btn-sm" data-u="mod">🛡️ ${u._inv === 'declined' ? 'Invite again' : 'Invite as moderator'}</button>`)
-        : `<a class="btn btn-sm btn-ghost" href="#/u/${esc(u.username)}">Profile</a><button class="btn btn-sm btn-ghost" data-u="warn">Warn</button><button class="btn btn-sm btn-danger" data-u="ban">Suspend</button><button class="btn btn-sm btn-ghost" data-u="unban">Unsuspend</button>`}</div></div></div>`;
+        : `<a class="btn btn-sm btn-ghost" href="#/u/${esc(u.username)}">Profile</a><button class="btn btn-sm btn-ghost" data-u="warn">Warn</button><button class="btn btn-sm btn-danger" data-u="ban">Suspend</button><button class="btn btn-sm btn-ghost" data-u="unban">Unsuspend</button><button class="btn btn-sm btn-ghost" data-u="watch">👀 Hold their pictures & videos</button><button class="btn btn-sm btn-ghost" data-u="unwatch">Stop holding</button>`}</div></div></div>`;
   }
   function wireUserList(box, users, { roles = false, onDone } = {}) {
     box.innerHTML = users.length ? users.map((u) => userRow(u, { roles })).join('') : '<div class="empty">No one found.</div>';
@@ -289,6 +299,8 @@ export function createModeration(ctx) {
       } else if (a === 'warn') messageDialog(uid, u.displayName, 'warn');
       else if (a === 'ban') banDialog(uid, u.displayName, u.username);
       else if (a === 'unban') unban(uid, u.displayName);
+      else if (a === 'watch') { const why = prompt('Why? (only moderators see this)', 'Restricted by a moderator'); if (why === null) return; await watchUser(uid, 'Restricted: ' + why); log('watch', uid, u.displayName, why); toast(`👀 ${u.displayName}'s pictures & videos will be held for ${WATCH_DAYS} days`); }
+      else if (a === 'unwatch') { try { await deleteDoc(doc(db, 'watchlist', uid)); log('unwatch', uid, u.displayName); toast('No longer holding their posts'); } catch (er) { toast(friendlyError(er)); } }
     };
   }
 
@@ -564,7 +576,7 @@ export function createModeration(ctx) {
   }
 
   // ---- Audit log (admin) + recent actions
-  const ACT = { 'false-report': '🚫 false-report strike for', 'undo-strike': '↩️ removed a false-report strike from', 'mark-u13': '🧒 marked under 13', 'undo-u13': '↩️ removed under-13 mark from', 'make-ai': '🤖 marked as AI Helper', 'remove-ai': 'removed AI Helper flag from', 'auto-timeout': '⏳ auto timeout for', 'keep-timeout': '⏳ kept timeout for', 'invite-mod': '✉️ invited as moderator', 'cancel-invite': '✕ cancelled moderator invite for', ban: '⛔ suspended', 'remove-account': '🗑️ removed account of', unban: '✅ unsuspended', warn: '⚠️ warned', message: '💬 messaged', remove: '🗑️ removed content by', dismiss: '👍 dismissed report about', review: '👀 is reviewing report about', 'make-mod': '✓ made moderator', 'remove-mod': '✕ removed moderator', restore: '✅ restored post by', hold: '🕒 held post by', feedback: '🐞 updated feedback from', feature: '★ featured', unfeature: '☆ unfeatured' };
+  const ACT = { 'false-report': '🚫 false-report strike for', 'undo-strike': '↩️ removed a false-report strike from', 'mark-u13': '🧒 marked under 13', 'undo-u13': '↩️ removed under-13 mark from', 'make-ai': '🤖 marked as AI Helper', 'remove-ai': 'removed AI Helper flag from', 'auto-timeout': '⏳ auto timeout for', 'keep-timeout': '⏳ kept timeout for', 'invite-mod': '✉️ invited as moderator', 'cancel-invite': '✕ cancelled moderator invite for', ban: '⛔ suspended', 'remove-account': '🗑️ removed account of', unban: '✅ unsuspended', warn: '⚠️ warned', message: '💬 messaged', remove: '🗑️ removed content by', dismiss: '👍 dismissed report about', review: '👀 is reviewing report about', 'make-mod': '✓ made moderator', watch: '👀 started holding pictures & videos from', unwatch: '👀 stopped holding posts from', 'remove-mod': '✕ removed moderator', restore: '✅ restored post by', hold: '🕒 held post by', feedback: '🐞 updated feedback from', feature: '★ featured', unfeature: '☆ unfeatured' };
   async function logList(box, n) {
     try { const snap = await getDocs(query(collection(db, 'modLog'), orderBy('at', 'desc'), limit(n)));
       box.innerHTML = snap.docs.length ? snap.docs.map((d) => { const x = d.data(); return `<div class="list-item"><div class="meta"><div><b>${esc(x.byName)}</b> ${esc(ACT[x.action] || x.action)} <b>${esc(x.targetName || '')}</b> <span class="muted small">· ${esc(timeAgo(x.at))}</span></div>${x.detail ? `<p>${esc(x.detail)}</p>` : ''}</div></div>`; }).join('') : '<div class="empty">No moderator actions yet.</div>';
@@ -580,7 +592,9 @@ export function createModeration(ctx) {
   // ---- auto-flag hook used by every "new post" batch
   // force = { reason, level } from the picture/video check or the new-account video rule
   function holdOrSet(b, ref, data, force) {
-    const f = (!isAdmin() && data.authorId !== 'studio' ? autoFlag(postText(data)) : null) || (force && force.reason ? { reason: String(force.reason).slice(0, 200), level: 'borderline' } : null);
+    const media = !!(data.mediaUrl || (data.work && data.work.cover));
+    const f = (!isAdmin() && data.authorId !== 'studio' ? autoFlag(postText(data)) : null) || (force && force.reason ? { reason: String(force.reason).slice(0, 200), level: 'borderline' } : null)
+      || (media && S.watchedMe && !isAdmin() && data.authorId !== 'studio' ? { reason: '👀 Watchlist (warned, suspended or restricted): pictures & videos are checked first', level: 'borderline' } : null);
     if (!f) { b.set(ref, data); return null; }
     b.set(doc(db, 'heldPosts', ref.id), { post: data, reason: f.reason, level: f.level, authorId: data.authorId, createdAt: serverTimestamp() });
     S.lastHeld = ref.id; return f;

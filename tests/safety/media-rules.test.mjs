@@ -1,7 +1,7 @@
 // Rules tests: new-account video hold (3 days), report counting (one per person) + moderator keep, config/mediaReview.
 // Run: firebase emulators:exec --config firebase.emu.json --only firestore --project demo-media "node tests/safety/media-rules.test.mjs"
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, writeBatch, serverTimestamp, Timestamp, increment } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, getDoc, writeBatch, serverTimestamp, Timestamp, increment } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-media', firestore: { host: '127.0.0.1', port: 8199, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
 let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, e.message.slice(0, 200)); } };
@@ -15,6 +15,10 @@ await env.withSecurityRulesDisabled(async (c) => { const f = c.firestore();
   for (const u of ['a', 'b', 'c', 'mia']) await setDoc(doc(f, 'users/' + u), prof(u, Timestamp.fromMillis(Date.now() - 10 * 864e5)));
   await setDoc(doc(f, 'roles/mia'), { mod: true, name: 'Mia', uname: 'mia', by: 'admin', at: Timestamp.now() });
   await setDoc(doc(f, 'posts/v1'), { authorId: 'vet', text: 'hi', reportCount: 0 });
+  for (const u of ['warned', 'banned', 'expired', 'helped']) await setDoc(doc(f, 'users/' + u), prof(u, Timestamp.fromMillis(Date.now() - 10 * 864e5)));
+  await setDoc(doc(f, 'watchlist/warned'), { reason: 'Warned', by: 'mia', at: Timestamp.now(), until: Timestamp.fromMillis(Date.now() + 30 * 864e5) });
+  await setDoc(doc(f, 'watchlist/expired'), { reason: 'Old', by: 'mia', at: Timestamp.now(), until: Timestamp.fromMillis(Date.now() - 864e5) });
+  await setDoc(doc(f, 'bans/banned'), { until: Timestamp.fromMillis(Date.now() - 864e5), reason: 'x', permanent: false, hide: false, by: 'mia', at: Timestamp.now(), name: 'b', uname: 'b' });
 });
 const C = 'https://res.cloudinary.com/zfmeldgm/';
 const media = (u, id, kind) => { const f = db(u); const b = writeBatch(f);
@@ -43,4 +47,22 @@ await ok('mod keeps it (reportOk = reportCount)', assertSucceeds(updateDoc(doc(d
 await ok('mod cannot set a fake reportOk', assertFails(updateDoc(doc(db('mia'), 'posts/v1'), { reportOk: 99 })));
 await ok('admin sets minApproved', assertSucceeds(setDoc(doc(ADMIN, 'config/mediaReview'), { minApproved: 5, updatedAt: serverTimestamp() })));
 await ok('user cannot set minApproved', assertFails(setDoc(doc(db('a'), 'config/mediaReview'), { minApproved: 0 })));
+const story = (u) => { const f = db(u); const b = writeBatch(f); b.set(doc(f, 'stories', 's-' + u), { authorId: u, authorName: u, authorUsername: u, authorColor: '#8a2be2', mediaType: 'image', mediaUrl: C + 'image/upload/v1/lks/a.jpg', posterUrl: C + 'image/upload/v1/lks/a.jpg', width: 10, height: 10, duration: 0, caption: '', cloudinaryPublicId: 'lks/a', createdAt: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 23 * 3600e3) }); b.update(doc(f, 'users', u), { lastPostAt: serverTimestamp(), storyUntil: Timestamp.fromMillis(Date.now() + 23 * 3600e3) }); return b.commit(); };
+const reset = (u) => env.withSecurityRulesDisabled((c) => updateDoc(doc(c.firestore(), 'users/' + u), { lastPostAt: Timestamp.fromMillis(0) }));
+await ok('watched (warned) user: picture cannot go public', assertFails(media('warned', 'w1', 'image')));
+await reset('warned');
+await ok('watched (warned) user: video cannot go public', assertFails(media('warned', 'w2', 'video')));
+await reset('warned');
+await ok('watched user: media post goes to heldPosts', assertSucceeds(held('warned', 'w3')));
+await reset('warned');
+await ok('watched user: story blocked', assertFails(story('warned')));
+await reset('expired');
+await ok('normal user: story allowed (control)', assertSucceeds(story('expired')));
+await reset('expired');
+await ok('suspended-before (ban doc, expired) user: picture cannot go public', assertFails(media('banned', 'w4', 'image')));
+await ok('expired watchlist entry: picture is fine', assertSucceeds(media('expired', 'w5', 'image')));
+await ok('mod can add to watchlist', assertSucceeds(setDoc(doc(db('mia'), 'watchlist/helped'), { reason: 'Restricted', by: 'mia', at: serverTimestamp(), until: Timestamp.fromMillis(Date.now() + 864e5) })));
+await ok('user cannot remove themselves from watchlist', assertFails(deleteDoc(doc(db('warned'), 'watchlist/warned'))));
+await ok('user cannot add someone to watchlist', assertFails(setDoc(doc(db('a'), 'watchlist/b'), { reason: '', by: 'a', at: serverTimestamp(), until: Timestamp.now() })));
+await ok('watched user can read own entry', assertSucceeds(getDoc(doc(db('warned'), 'watchlist/warned'))));
 console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

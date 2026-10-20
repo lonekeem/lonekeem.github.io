@@ -165,6 +165,7 @@ export function clearHold() { pend = null; }
 export async function guardUpload(file, { where = 'post', caption = '', title = '', onStatus } = {}) {
   const tp = textProblem(caption, title); if (tp) { const e = new Error(tp); e.userMessage = tp; throw e; }
   if (C && C.isAdmin()) return { level: 'ok' };
+  if (where === 'story' && C && C.S.watchedMe) { const m = 'Stories are paused for now while a moderator checks your posts 💜 You can still share a post; it will be reviewed first.'; const e = new Error(m); e.userMessage = m; throw e; }
   const canHold = where === 'post' || where === 'movie' || where === 'cover';
   const r = await scanFile(file, { onStatus });
   if (r.level === 'block' || (r.level === 'review' && !canHold && !r.failed)) {
