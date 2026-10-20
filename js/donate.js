@@ -68,7 +68,7 @@ export function createDonate({ db, esc, toast, friendlyError, openModal, closeMo
     el.innerHTML = `<div class="card pad don-card"><span aria-hidden="true" style="font-size:1.3rem">💜</span><div style="flex:1;min-width:0"><b>Enjoying Kemy?</b><br><span class="muted small">Help Lone Keem Studios make Kemy even better. Totally optional.</span></div>
       <button type="button" class="btn btn-sm btn-ghost" id="don-home">Support</button><button type="button" class="link-btn don-x" id="don-x" aria-label="Hide this">✕</button></div>`;
     el.querySelector('#don-home').onclick = openSheet;
-    el.querySelector('#don-x').onclick = () => { try { localStorage.setItem(HIDE_KEY, String(Date.now() + 30 * 864e5)); } catch {} el.innerHTML = ''; };
+    el.className = 'don-dismissable'; el.querySelector('#don-x').onclick = () => hideCards();
   }
 
   // Admin section
@@ -92,5 +92,56 @@ export function createDonate({ db, esc, toast, friendlyError, openModal, closeMo
       catch (err) { msg.textContent = friendlyError(err); }
     };
   }
-  return { mountSettings, mountHome, mountAdmin, openSheet, links, isTWA };
+  const cardsHidden = () => { try { return +localStorage.getItem(HIDE_KEY) > Date.now(); } catch { return false; } };
+  const hideCards = () => { try { localStorage.setItem(HIDE_KEY, String(Date.now() + 30 * 864e5)); } catch {} document.querySelectorAll('.don-dismissable').forEach((e) => e.remove()); };
+  // Header pill: always shown (unless TWA / no links).
+  async function mountPill(ha) {
+    if (!ha) return; const L = await links(); if (!L.length || !ha.isConnected || ha.querySelector('.don-pill')) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'don-pill'; b.textContent = '💜 Support'; b.setAttribute('aria-label', 'Support Kemy'); b.onclick = openSheet;
+    ha.prepend(b);
+  }
+  // Inline button (profiles): always shown.
+  async function mountButton(el, label = '💜 Support Kemy') {
+    if (!el) return; const L = await links(); if (!L.length || !el.isConnected) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm don-btn-sm'; b.textContent = label; b.onclick = openSheet; el.replaceWith(b);
+  }
+  // Slim, dismissible card (Games hub, Posts feed).
+  async function mountSlim(el, text = 'Help Lone Keem Studios make Kemy even better.') {
+    if (!el || cardsHidden()) return; const L = await links(); if (!L.length || !el.isConnected) return;
+    el.className = 'don-dismissable';
+    el.innerHTML = `<div class="card don-slim"><span aria-hidden="true">💜</span><span class="small" style="flex:1;min-width:0">${esc(text)} <span class="muted">Optional.</span></span><button type="button" class="btn btn-sm btn-ghost" data-don-open>Support</button><button type="button" class="link-btn don-x" data-don-x aria-label="Hide for 30 days">✕</button></div>`;
+    el.querySelector('[data-don-open]').onclick = openSheet; el.querySelector('[data-don-x]').onclick = hideCards;
+  }
+  // For You feed: a full-height card of its own (never over a video) after every 25th video, at most one per 25.
+  async function feedSlides(feed, every = 25) {
+    if (!feed || cardsHidden()) return; const L = await links(); if (!L.length || !feed.isConnected) return;
+    const vids = [...feed.querySelectorAll('.vslide:not(.vdon):not(.vend)')];
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) dispatchEvent(new Event('kemy:feed-break')); }), { threshold: 0.6 });
+    for (let i = every - 1; i < vids.length - 1; i += every) {
+      const s = document.createElement('section'); s.className = 'vslide vend vdon don-dismissable'; s.dataset.kind = 'support'; s.setAttribute('aria-label', 'Support Kemy');
+      s.innerHTML = `<div class="vend-inner"><div style="font-size:2.4rem" aria-hidden="true">💜</div><h2>Enjoying Kemy?</h2><p>Help Lone Keem Studios make Kemy even better. You can give any amount you like, or nothing at all.</p>
+        <button class="btn" type="button" data-don-open>💜 Support Kemy</button><p class="small" style="margin-top:12px">Kids: ask a grown-up before donating.</p>
+        <div class="vend-row"><button class="btn btn-ghost btn-sm" type="button" data-don-skip>Keep watching ↓</button><button class="btn btn-ghost btn-sm" type="button" data-don-x>Hide for 30 days</button></div></div>`;
+      s.querySelector('[data-don-open]').onclick = openSheet;
+      s.querySelector('[data-don-skip]').onclick = () => s.nextElementSibling?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      s.querySelector('[data-don-x]').onclick = () => { const nx = s.nextElementSibling; hideCards(); nx?.scrollIntoView({ block: 'start' }); };
+      vids[i].after(s); io.observe(s);
+    }
+  }
+  // Game results: a small thank-you, at most once per day. Links are inline so it works above game overlays.
+  const DAY_KEY = 'kemy-don-result-day';
+  async function resultCard(after) {
+    if (!after || cardsHidden()) return; const today = new Date().toDateString();
+    try { if (localStorage.getItem(DAY_KEY) === today) return; } catch {}
+    const L = await links(); if (!L.length || !after.isConnected) return;
+    try { localStorage.setItem(DAY_KEY, today); } catch {}
+    const c = document.createElement('div'); c.className = 'don-result don-dismissable';
+    c.innerHTML = `<p style="margin:0 0 6px"><b>💜 Thanks for playing!</b> Help Lone Keem Studios make Kemy even better. Any amount you like, totally optional.</p>
+      <div class="don-rlinks">${L.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${l.ic} ${esc(l.label)}</a>`).join('')}</div>
+      <p class="small" style="margin:6px 0 0;opacity:.85">Kids: ask a grown-up before donating.</p>`;
+    after.after(c);
+  }
+  const api = { mountSettings, mountHome, mountAdmin, openSheet, links, isTWA, mountPill, mountButton, mountSlim, feedSlides, resultCard };
+  window.kemyDonate = api;
+  return api;
 }

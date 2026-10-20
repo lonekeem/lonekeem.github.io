@@ -266,7 +266,8 @@ export function createWatch(ctx) {
 
     $('#vstory')?.addEventListener('click', () => openStory());
     const feed = $('#vfeed'), wrap = $('#vwrap'), muteBtn = $('#vmute'), hint = $('#vunmute-hint'), sheetRoot = $('#vsheet-root');
-    const slides = [...feed.querySelectorAll('.vslide')];
+    const slides = [...feed.querySelectorAll('.vslide:not(.vdon)')];
+    if (tab === 'foryou') window.kemyDonate?.feedSlides(feed, 25);
     const byId = new Map(posts.map((p) => [p.id, p]));
     let active = -1, sheetUnsub = null;
 
@@ -674,6 +675,8 @@ export function createWatch(ctx) {
     const overlayObs = new MutationObserver(() => { const b = blocked(); if (b === wasBlocked) return; wasBlocked = b; if (b) pauseActive(); else resumeActive(); });
     overlayObs.observe(document.body, { childList: true });
     const onOtherMedia = (e) => { if (e.detail?.source !== 'feed') pauseActive(); };
+    const onBreak = () => { if (active >= 0) { judge(active); vid(active)?.pause(); closeEmbed(slides[active]); } active = -1; };
+    window.addEventListener('kemy:feed-break', onBreak);
     window.addEventListener('kemy:pause-feed', pauseActive); window.addEventListener('kemy:media-play', onOtherMedia);
 
     // Start at the deep-linked video (if any), then begin observing.
@@ -689,7 +692,7 @@ export function createWatch(ctx) {
       io.disconnect();
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVis);
-      overlayObs.disconnect(); offUnlock(); offUnlockV(); window.removeEventListener('kemy:pause-feed', pauseActive); window.removeEventListener('kemy:media-play', onOtherMedia);
+      overlayObs.disconnect(); offUnlock(); offUnlockV(); window.removeEventListener('kemy:pause-feed', pauseActive); window.removeEventListener('kemy:feed-break', onBreak); window.removeEventListener('kemy:media-play', onOtherMedia);
       if (sheetUnsub) sheetUnsub();
       slides.forEach((sl) => { const v = sl.querySelector('video'); if (v) { v.pause(); v.removeAttribute('src'); v.load(); } });
       session = null;

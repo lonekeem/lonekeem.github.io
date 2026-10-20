@@ -604,6 +604,7 @@ function renderChrome(name) {
   $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === name || a.dataset.also === name));
   const ha = document.getElementById('header-actions');
   const searchBtn = `<a class="icon-btn" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>`;
+  setTimeout(() => donate.mountPill(ha), 0);
   if (S.user && S.profile) {
     ha.innerHTML = `${searchBtn}
       ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${mod.totalCount() ? `, ${mod.totalCount()} need attention` : ''}">🛡️ Mod${mod.totalCount() ? `<span class="mod-count">${mod.totalCount() > 99 ? '99+' : mod.totalCount()}</span>` : ''}</a>` : ''}
@@ -774,6 +775,11 @@ const music = createMusic({ S, db, main, esc, openModal, stale, getWorks, gridTi
 
 // ---------------------------------------------------------------- pages: feed / explore
 const feedToggle = (active) => `<nav class="feed-toggle" aria-label="Feed"><a href="#/watch" class="${active === 'watch' ? 'active' : ''}">For You</a><a href="#/feed" class="${active === 'feed' ? 'active' : ''}">Posts</a></nav>`;
+function feedDonate() {
+  const box = $('#posts'); if (!box) return; const slot = document.createElement('div');
+  const kids = box.children; if (kids.length > 3) kids[2].after(slot); else box.append(slot);
+  donate.mountHome(slot);
+}
 async function pageFeed(token) {
   if (!S.user || !S.profile) {
     main.innerHTML = `${feedToggle('feed')}<a class="pk-quick" href="#/park" aria-label="Open Pal Park"><span class="pk-quick-ic" aria-hidden="true">🌳</span><span><b>Pal Park</b><small>Hang out with friends in 3D</small></span><span class="pk-quick-go">Play ›</span></a>
@@ -786,12 +792,12 @@ async function pageFeed(token) {
       <div id="live-now"></div>
       <div id="stories" class="stories-slot"></div>
       <h2 style="margin:26px 0 14px;font-size:1.2rem">Latest from the community</h2>
-      <div id="posts"></div><div id="don-home-card"></div>`;
-    donate.mountHome($('#don-home-card'));
+      <div id="posts"></div>`;
     live.renderFeed($('#live-now'), $('#stories'), stories.renderRow($('#stories'), token, stale), token);
     const snap = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)));
     if (stale(token)) return;
     renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet.');
+    feedDonate();
     return;
   }
   const verified = S.user.emailVerified || S.user.providerData.some((p) => p.providerId === 'google.com');
@@ -802,8 +808,7 @@ async function pageFeed(token) {
     <div id="live-now"></div>
     <div id="stories" class="stories-slot"></div>
     <div class="row"><h1 class="page-title">Posts</h1><span class="spacer"></span><a class="btn btn-sm btn-ghost" href="#/new">New post</a></div>
-    <div id="posts"><div class="spinner"></div></div><div id="don-home-card"></div>`;
-  donate.mountHome($('#don-home-card'));
+    <div id="posts"><div class="spinner"></div></div>`;
   live.renderFeed($('#live-now'), $('#stories'), stories.renderRow($('#stories'), token, stale), token);
   const rs = $('#resend'); if (rs) rs.onclick = async () => { try { await sendEmailVerification(S.user); toast('Verification email sent'); } catch (e) { toast(friendlyError(e)); } };
   const authors = [...new Set([S.user.uid, STUDIO_UID, ...S.following])].filter((u) => !S.blocked.has(u));
@@ -813,6 +818,7 @@ async function pageFeed(token) {
   const ms = (p) => p.createdAt?.toMillis?.() || Date.now();
   const posts = results.flatMap((r) => r.docs.map((d) => ({ id: d.id, ...d.data() }))).sort((a, b) => ms(b) - ms(a)).slice(0, 60);
   renderPosts($('#posts'), posts, 'Your feed is empty. <a href="#/explore">Explore</a> to find people to follow, or <a href="#/new">make your first post</a>.');
+  feedDonate();
 }
 
 async function pageExplore(tab, token) {
@@ -1040,7 +1046,7 @@ async function pageProfile(username, tab, token) {
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
-        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
+        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine || uid === STUDIO_UID ? '<span id="p-donate"></span>' : ''}${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && !blocked && !(uid === STUDIO_UID && isAdmin()) ? `<a class="btn btn-sm btn-ghost" href="#/chat/${esc(uid)}" id="msg">Message</a>` : ''}
@@ -1051,6 +1057,7 @@ async function pageProfile(username, tab, token) {
     <nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/movies" class="${tab === 'movies' ? 'active' : ''}">Movies</a><a href="#/u/${esc(u.username)}/songs" class="${tab === 'songs' ? 'active' : ''}">Songs</a><a href="#/u/${esc(u.username)}/series" class="${tab === 'series' ? 'active' : ''}">Series</a>${mine ? `<a href="#/u/${esc(u.username)}/saved" class="${tab === 'saved' ? 'active' : ''}">Saved</a>` : ''}</nav>
     <div id="posts"><div class="spinner"></div></div>`;
   $('#add-bio')?.addEventListener('click', () => sessionStorage.setItem('lks-focus-bio', '1'));
+  donate.mountButton($('#p-donate'));
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
   if (!blocked) stories.renderProfile($('#pav'), $('#pstories'), uid, u, token, stale);
   if (!blocked) games.renderProfile($('#pgames'), uid);

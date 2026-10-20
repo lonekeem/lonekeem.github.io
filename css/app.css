@@ -1651,3 +1651,11 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .tx-line { font-size: .74rem; opacity: .75; margin: 3px 0 0; color: inherit; }
 .tx-line .tx-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; font-weight: 600; }
 .bubble .tx-line { display: block; }
+.don-pill { border: 1px solid rgba(192,75,216,.55); background: rgba(138,43,226,.18); color: #f3e8ff; border-radius: 999px; padding: 5px 10px; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.don-pill:hover { background: rgba(138,43,226,.32); }
+.don-btn-sm { background: linear-gradient(135deg, #8a2be2, #c04bd8); }
+.don-slim { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 10px 0; }
+.vdon .vend-inner h2 { margin: 6px 0; }
+.don-result { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(138,43,226,.18); border: 1px solid rgba(192,75,216,.4); text-align: left; font-size: .9rem; }
+.don-rlinks { display: flex; flex-wrap: wrap; gap: 6px; }
+.don-rlinks a { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #8a2be2; color: #fff !important; text-decoration: none; font-weight: 600; min-height: 0; }
