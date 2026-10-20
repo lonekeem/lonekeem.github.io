@@ -2,7 +2,7 @@ import { openBuySheet, coinBadge } from '../buy-sheet.js';
 import { sfx, SPECIES_SOUND } from './voice.js';
 // Kemy Pals: original virtual pets that live next to your profile.
 import { playIntro } from '../theme.js';
-import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf, shade } from './art.js';
+import { SPECIES, SPEC, VIBES, BODY_PRESETS, ACC_PRESETS, EYE_PRESETS, PATTERNS, ACCESSORIES, drawPal, drawEgg, drawSnack, drawBubble, star, heart, hueHex, stageOf, shade, pal3DOn } from './art.js';
 import { liveOverlay, popups } from './overlays.js';
 import { createShopUI } from './shop.js';
 import { createPalStore } from './store.js';
@@ -77,10 +77,10 @@ export function createPals(ctx) {
   // save with level-up / glow-up detection
   async function commit(p, patch, host) {
     const before = stageOf(p.level || 1), lvBefore = p.level || 1;
-    try { await mine.store.save(p, patch); } catch (e) { toast(friendlyError(e)); return; }
+    try { await mine.store.save(p, patch); } catch (e) { console.warn('Pal save failed', e); toast(friendlyError(e)); return false; }
     if (host && patch.xpGain > 0 && patch.xpGain < 60) shop.earn('care', 5, 'for caring');
     if (stageOf(p.level) > before) glowUp(p); else if (p.level > lvBefore) toast(`${p.name} reached level ${p.level}!`);
-    host && host();
+    host && host(); return true;
   }
   function glowUp(p) {
     snd('glow');
@@ -222,11 +222,16 @@ export function createPals(ctx) {
     const cute = () => { try { if (localStorage.getItem('kemy-pals-mute') !== '1') sfx(SPECIES_SOUND[p.species] || 'chirp'); } catch { /* */ } };
     const finish = (delta, xp, msg) => { cute(); G.react = 70; for (const k in delta) st[k] = Math.max(5, Math.min(100, st[k] + delta[k])); mood = moodOf(st); meters(); hint(msg); G.mode = 'home'; commit(p, { stats: { ...st }, xpGain: xp }, meters); };
     const near = (x, y, r = 50) => Math.hypot(x - G.palX, y - (PY - SIZE * 0.35)) < r;
-    const mouth = () => ({ x: G.palX + 4, y: PY - SIZE * 0.3 });
+    // the 3D Pal is drawn taller than the 2D art (head ~0.8 x SIZE above the feet), so the mouth sits higher
+    const mouth = () => ({ x: G.palX + 4, y: PY - SIZE * (pal3DOn() ? 0.72 : 0.3) });
+    // a snack counts as fed when dropped on the mouth OR anywhere on the Pal's head/body (forgiving on phones)
+    const onPal = (x, y) => Math.abs(x - G.palX) < SIZE * 0.55 && y > PY - SIZE * (pal3DOn() ? 1.25 : 0.9) && y < PY - SIZE * 0.05;
+    const feedNow = (kind) => { const mo = mouth(); const fav = kind === 3; G.eatFood = fav ? FAV_FOOD(p.species) : ['berry', 'cookie', 'cake'][kind] || 'berry'; G.eat = 90; snd('eat'); fx.add(mo.x, mo.y - 10, 'heart', fav ? 10 : 4); const full = st.hunger > 90;
+      finish({ hunger: full ? 2 : fav ? 30 : 22, happy: fav ? 12 : 4 }, fav ? 12 : 8, fav ? `Yum yum! ${FOOD_EMO[G.eatFood]} is ${p.name}'s favourite food!` : full ? p.name + ' is full, but loved the treat!' : 'Yum! ' + p.name + ' loved that snack.'); G.mode = 'feed'; G.drag = null; };
     root.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => {
       const md = b.dataset.m; G.mode = md; G.palX = PX;
       if (md === 'shower') { G.bubbles = []; G.lather = 0; G.rinse = false; hint('Rub ' + p.name + ' to lather up bubbles!'); }
-      if (md === 'feed') { hint(`Drag a snack to ${p.name}'s mouth. The gold one is ${p.name}'s favourite ${FOOD_EMO[FAV_FOOD(p.species)]}`); }
+      if (md === 'feed') { const h = root.querySelector('.pal-hint'); h.innerHTML = `Drag or tap a snack for ${esc(p.name)}. The gold one is ${esc(p.name)}'s favourite ${FOOD_EMO[FAV_FOOD(p.species)]} <button type="button" class="btn btn-sm" data-feed-now>🍓 Feed</button>`; h.querySelector('[data-feed-now]').onclick = (ev) => { ev.stopPropagation(); feedNow(3); }; }
       if (md === 'brush') { G.brush = 0; hint('Brush ' + p.name + ' by rubbing back and forth.'); }
       if (md === 'catch') { G.throws = 0; G.catches = 0; G.ball = { x: 30, y: H - 30, vx: 0, vy: 0, fly: false }; hint('Flick the ball up into the air!'); }
       if (md === 'toys') { G.toy = null; hint('Pick a toy for ' + p.name + ' to play with!'); }
@@ -238,7 +243,7 @@ export function createPals(ctx) {
     s.cv.addEventListener('pointerdown', (e) => { const q = pos(e); G.ptr = q; G.last = { ...q, t: performance.now() }; s.cv.setPointerCapture(e.pointerId);
       if (G.mode === 'toys' && !G.toy) { TOYS.forEach((ty, i) => { if (Math.hypot(q.x - (40 + i * 44), q.y - 26) < 20) { G.toy = { id: ty[1], t: 0 }; snd('pop'); cute(); } }); }
       if (G.mode === 'home' && near(q.x, q.y, 60)) { G.react = 90; cute(); fx.add(G.palX, PY - SIZE * 0.6, 'heart', 6); fx.add(G.palX, PY - SIZE * 0.6, 'star', 4); snd('happy'); }
-      if (G.mode === 'feed') { for (let i = 0; i < 4; i++) if (Math.hypot(q.x - (40 + i * 30), q.y - 26) < 16) G.drag = { kind: i, x: q.x, y: q.y }; }
+      if (G.mode === 'feed') { for (let i = 0; i < 4; i++) if (Math.hypot(q.x - (40 + i * 30), q.y - 26) < 18) G.drag = { kind: i, x: q.x, y: q.y, x0: q.x, y0: q.y, t0: performance.now() }; }
       if (G.mode === 'bandage' && Math.hypot(q.x - 34, q.y - 30) < 22) G.drag = { kind: 'b', x: q.x, y: q.y };
       if (G.mode === 'bed') { finish({ energy: Math.min(40, 8 + G.sleepT / 6), happy: 4 }, 8, p.name + ' feels rested!'); }
       if (G.mode === 'shower' && G.rinse === 'done') {}
@@ -249,7 +254,8 @@ export function createPals(ctx) {
       if (G.drag) { G.drag.x = q.x; G.drag.y = q.y; }
       G.last = { ...G.ptr, t: G.last ? G.last.t : 0 }; G.ptr = q; G.vel = { x: dx, y: dy }; });
     s.cv.addEventListener('pointerup', () => {
-      if (G.mode === 'feed' && G.drag) { const mo = mouth(); if (Math.hypot(G.drag.x - mo.x, G.drag.y - mo.y) < 34) { const fav = G.drag.kind === 3; G.eatFood = fav ? FAV_FOOD(p.species) : ['berry', 'cookie', 'cake'][G.drag.kind] || 'berry'; G.eat = 90; snd('eat'); fx.add(mo.x, mo.y - 10, 'heart', fav ? 10 : 4); const full = st.hunger > 90; finish({ hunger: full ? 2 : fav ? 30 : 22, happy: fav ? 12 : 4 }, fav ? 12 : 8, fav ? `Yum yum! ${FOOD_EMO[G.eatFood]} is ${p.name}'s favourite food!` : full ? p.name + ' is full, but loved the treat!' : 'Yum! ' + p.name + ' loved that snack.'); G.mode = 'feed'; } G.drag = null; }
+      if (G.mode === 'feed' && G.drag) { const mo = mouth(); const tap = G.drag.t0 && performance.now() - G.drag.t0 < 350 && Math.hypot(G.drag.x - G.drag.x0, G.drag.y - G.drag.y0) < 10;
+        if (tap || Math.hypot(G.drag.x - mo.x, G.drag.y - mo.y) < 46 || onPal(G.drag.x, G.drag.y)) feedNow(G.drag.kind); G.drag = null; } // drag to the Pal, or just tap a snack
       if (G.mode === 'bandage' && G.drag) { if (near(G.drag.x, G.drag.y, 50)) { G.bandage = true; snd('sparkle'); fx.add(G.palX, PY - 70, 'heart', 8); finish({ happy: 20, energy: 10 }, 8, 'All better! ' + p.name + ' feels much braver.'); } G.drag = null; }
       if (G.mode === 'catch' && G.ball && !G.ball.fly && G.vel && Math.hypot(G.ptr.x - G.ball.x, G.ptr.y - G.ball.y) < 60) {
         const v = G.vel; if (v.y < -1) { G.ball.fly = true; G.ball.vx = Math.max(-6, Math.min(6, v.x * 0.5 + 2.5)); G.ball.vy = Math.max(-9, v.y * 0.6 - 3); G.throws++; snd('toss'); } }
