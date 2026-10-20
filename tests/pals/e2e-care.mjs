@@ -20,6 +20,7 @@ try {
   await p.evaluate(() => document.querySelector('[data-species="tiger"]').click()); await p.fill('#pal-name', 'Bloop'); await p.evaluate(() => document.querySelector('#pal-form [type=submit]').click()); await p.waitForTimeout(3000);
   const go = async (h, sel) => { await p.evaluate((h) => { document.getElementById('modal-root').innerHTML = ''; location.hash = h; }, h); await p.waitForSelector(sel, { timeout: 20000 }); await p.waitForTimeout(2500); };
   const tap = (sel) => p.evaluate((s) => document.querySelector(s).click(), sel);
+  console.log('founder (non-admin):', await p.evaluate(async () => { const { db, auth } = await import('/js/firebase-init.js'); const { createStore } = await import('/js/pals/core.js'); const st = createStore(db, auth.currentUser.uid); const l = await st.list(); try { await st.save(l[0], { species: 'founder' }); return 'ALLOWED (bad)'; } catch (e) { return 'refused: ' + e.code; } }));
   await go('#/pals/store', '#ps-cv'); await p.screenshot({ path: shot + 'store-outfits.png', fullPage: true });
   for (const id of ['f_cap_blue', 'f_hoodie_pink', 'f_skirt_pink', 'f_boots_yellow']) { await tap(`[data-id="${id}"]`); await p.waitForTimeout(200); }
   await tap('[data-tab=hand]'); await p.waitForTimeout(300); await tap('[data-id="f_balloon_red"]'); await tap('[data-tab=outfits]'); await p.waitForTimeout(300);
