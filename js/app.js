@@ -1785,3 +1785,6 @@ onAuthStateChanged(auth, async (user) => {
   document.addEventListener('focusin', (e) => { if (matchMedia('(pointer: coarse)').matches && e.target.matches?.(TXT)) document.body.classList.add('kb-open'); });
   document.addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement?.matches?.(TXT)) document.body.classList.remove('kb-open'); }, 60));
 }
+
+// 📱 images + canvases are never draggable (same as draggable=false everywhere; CSS covers WebKit's user-drag)
+document.addEventListener('dragstart', (e) => { const t = e.target; if (t && t.closest && t.closest('img, canvas, video')) e.preventDefault(); }, true);

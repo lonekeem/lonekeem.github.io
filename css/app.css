@@ -1670,3 +1670,16 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .feed-skel>div{background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(255,255,255,.14),rgba(255,255,255,.06));background-size:200% 100%;animation:skel 1.2s linear infinite}
 @keyframes skel{to{background-position:-200% 0}}
 .sec-this { font-size: .72rem; padding: 2px 8px; border-radius: 999px; background: rgba(77,163,255,.18); color: #9cc9ff; margin-left: 4px; white-space: nowrap; }
+
+/* ===== 📱 No "blue screen" on taps (iPhone + Android): no tap flash, no accidental selection / long-press callout /
+   image drag, no blue outline after a tap. Typing + selecting still work in inputs, textareas and contenteditable;
+   keyboard users still get a visible (purple) focus ring. ===== */
+*, *::before, *::after { -webkit-tap-highlight-color: transparent; }
+html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select, [contenteditable], [contenteditable] *, .selectable, .selectable * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+img, canvas, video, svg { -webkit-user-drag: none; user-drag: none; -webkit-touch-callout: none; }
+canvas, button, a, [role="button"], .btn, .card, label, summary, .ps-tile, .pal-float, .pal-pop, .pal-live { touch-action: manipulation; }
+:focus:not(:focus-visible) { outline: none; }
+:focus-visible { outline: 2px solid #9a6aff; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(154,106,255,.25); }
+input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible { outline: 2px solid #9a6aff; outline-offset: 0; }
+::selection { background: rgba(154,106,255,.35); }
