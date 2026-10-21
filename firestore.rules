@@ -2024,9 +2024,8 @@ service cloud.firestore {
       function hd() { return request.resource.data; }
       function plotNum() { return int(plot.split('h')[1]); }
       // h01..h98: the original plots (fixed map); h99..h482: city plots (style = number % 4, only the For Sale half); h483..h488 estates; h489 = admin palace
-      function cityQ() { return (plotNum() - 99) % 64; }
-      function citySale() { return (int((cityQ() - cityQ() % 16) / 16) + cityQ() % 8 + int(((cityQ() % 16) - (cityQ() % 8)) / 8)) % 2 == 0; }
-      function plotStyle() { return plotNum() <= 98 ? {'h02': 'manor', 'h05': 'cottage', 'h08': 'cottage', 'h11': 'twostory', 'h14': 'ranch', 'h17': 'twostory', 'h20': 'ranch', 'h23': 'manor', 'h26': 'cottage', 'h29': 'twostory', 'h32': 'ranch', 'h35': 'manor', 'h38': 'manor', 'h41': 'cottage', 'h44': 'twostory', 'h47': 'ranch', 'h50': 'manor', 'h53': 'cottage', 'h56': 'twostory', 'h59': 'ranch', 'h62': 'manor', 'h65': 'cottage', 'h68': 'twostory', 'h71': 'ranch', 'h74': 'manor', 'h77': 'cottage', 'h80': 'twostory', 'h83': 'ranch', 'h86': 'manor', 'h89': 'cottage', 'h92': 'twostory', 'h95': 'ranch', 'h98': 'manor'}[plot] : plotNum() <= 482 ? (citySale() ? ['cottage', 'twostory', 'ranch', 'manor'][plotNum() % 4] : null)
+      function citySale(n) { return n % 8 in [0, 3, 5, 6]; } // = layout.js city plots: half for sale, every style
+      function plotStyle() { let n = plotNum(); return n <= 98 ? {'h02': 'manor', 'h05': 'cottage', 'h08': 'cottage', 'h11': 'twostory', 'h14': 'ranch', 'h17': 'twostory', 'h20': 'ranch', 'h23': 'manor', 'h26': 'cottage', 'h29': 'twostory', 'h32': 'ranch', 'h35': 'manor', 'h38': 'manor', 'h41': 'cottage', 'h44': 'twostory', 'h47': 'ranch', 'h50': 'manor', 'h53': 'cottage', 'h56': 'twostory', 'h59': 'ranch', 'h62': 'manor', 'h65': 'cottage', 'h68': 'twostory', 'h71': 'ranch', 'h74': 'manor', 'h77': 'cottage', 'h80': 'twostory', 'h83': 'ranch', 'h86': 'manor', 'h89': 'cottage', 'h92': 'twostory', 'h95': 'ranch', 'h98': 'manor'}[plot] : n <= 482 ? (citySale(n) ? ['cottage', 'twostory', 'ranch', 'manor'][n % 4] : null)
         : {'h483': 'mansion', 'h484': 'estate', 'h485': 'mansion', 'h486': 'estate', 'h487': 'mansion', 'h488': 'estate'}[plot]; }
       function isEstate() { return plotNum() >= 483; }
       function deed() { return {'cottage': 'hs_cottage', 'twostory': 'hs_twostory', 'ranch': 'hs_ranch', 'manor': 'z_hs_manor', 'mansion': 'z_hs_mansion', 'estate': 'z_hs_estate'}[plotStyle()]; }
@@ -2036,7 +2035,7 @@ service cloud.firestore {
       function gHas(t) { return inv(gItem(t)) || (t < 7 && inv(gItem(t + 1))) || (t < 6 && inv(gItem(t + 2))); }
       function garageOk() { return hd().garage == 0 || (resource != null && hd().garage == resource.data.get('garage', 0)) || (hd().garage <= (isEstate() ? 7 : 5) && gHas(hd().garage)); }
       // parked cars (display only): 'model.colour[.PLATE.bg.fg.border.frame]' joined by ';', max 50 entries / 1800 chars
-      function carsOk(c) { return c is string && c.size() <= 1800 && c.matches('^([a-z]{2,8}[.][0-9]{1,2}([.][A-Z0-9]{1,7}[.][0-9]{1,2}[.][0-9]{1,2}[.][0-9]{1,2}[.][0-9])?(;[a-z]{2,8}[.][0-9]{1,2}([.][A-Z0-9]{1,7}[.][0-9]{1,2}[.][0-9]{1,2}[.][0-9]{1,2}[.][0-9])?){0,49})?$'); }
+      function carsOk(c) { return c is string && c.size() <= 1800 && c.matches('^[a-z]{2,8}[.][0-9][A-Z0-9.;a-z]*$|^$') && c.split(';').size() <= 50; } // clients parse + re-check each entry (and the plate word filter)
       function radioOk(r) { return r is map && r.keys().hasOnly(['k', 'url', 't', 's']) && r.k in ['link', 'kemy', 'off']
         && (r.k != 'link' || (r.url is string && r.url.size() <= 300 && r.url.matches('^https://(open[.]spotify[.]com|embed[.]music[.]apple[.]com|music[.]apple[.]com)/.*')))
         && (!('t' in r) || (r.t is int && r.t >= 0 && r.t < 50)) && (!('s' in r) || r.s is int); }

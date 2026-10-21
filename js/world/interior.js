@@ -43,6 +43,8 @@ export const DECOR = {
 // interiors are laid out in 'plan units' (the old 12 m house) and scaled up SC x on the ground plane: bigger rooms,
 // wider halls; fixtures + furniture keep their real size (only their positions spread out). Decor saves stay in plan units.
 export const SC = 1.4;
+// mansions are much bigger (rooms 1.5x wider, two floors, tall upper hall); the admin palace is the biggest of all
+export const scOf = (h) => (h && h.admin ? 2.6 : h && h.estate ? 2.1 : SC);
 // seats [x, seatTop, z, yawOffset] in a piece's local frame (front = +z)
 export const SEATS = { bd: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bc: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bk: [[0, .51, .5, 0]], br: [[-.5, .62, .6, 0], [.5, .62, .6, 0]],
   cs: [[-1, .55, .05, 0], [0, .55, .05, 0], [1, .55, .05, 0]], cl: [[-1, .55, -.5, 0], [0, .55, -.5, 0], [1, .55, .5, Math.PI / 2]], ch: [[0, .55, .05, 0]], cr: [[0, .48, .02, 0]] };
@@ -68,9 +70,9 @@ function viewTex(THREE, kind) { if (views[kind]) return views[kind]; const cv = 
 
 // build one interior in a ROOMS cell. K = { put, flush, G, std }. Returns a handle with live setters.
 export function buildInterior(api, K, h, cx, cz, decor) {
-  const { THREE, box, LOW } = api; const { put, flush, G } = K; const y = K.y ?? 0; const two = h.style === 1 || h.style === 3; const S = PAL[h.town || 'street'] || PAL.street;
+  const { THREE, box, LOW } = api; const { put, flush, G } = K; const y = K.y ?? 0; const SC = scOf(h); const two = h.style === 1 || h.style === 3 || !!h.estate; const S = PAL[h.town || 'street'] || PAL.street;
   const g = new THREE.Group(); g.name = 'interior-' + h.id; const vc = (o = {}) => (LOW ? new THREE.MeshLambertMaterial({ color: '#fff', vertexColors: true, ...o }) : new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.8, vertexColors: true, ...o }));
-  const k = 'in' + h.id; const cols = []; const HR = two ? 6.55 : 3.2; const T = S.trim, A = S.acc;
+  const k = 'in' + h.id; const cols = []; const HR = two ? (h.admin ? 8.8 : h.estate ? 7.6 : 6.55) : 3.2; const T = S.trim, A = S.acc;
   const B = (key, c, x, yy, z, sx, sy, sz, solid = 0, sh = 'box', ry = 0, fs = 0) => { x *= SC; z *= SC; if (fs) { sx *= SC; sz *= SC; } put(key, G[sh], c, cx + x, y + yy, cz + z, ry, sx, sy, sz); if (solid) { const b = { x0: cx + x - sx / 2, x1: cx + x + sx / 2, z0: cz + z - sz / 2, z1: cz + z + sz / 2, top: solid === 2 ? y + yy + sy / 2 : solid === 3 ? y + 3.2 : 99, bot: solid === 4 ? y + 3.2 : -99 }; box.push(b); cols.push(b); } };
   const Wl = (x0, x1, z0, z1, h0, h1, solid = 1) => B(k + 'w', '#ffffff', (x0 + x1) / 2, (h0 + h1) / 2, (z0 + z1) / 2, Math.max(0.18, x1 - x0), h1 - h0, Math.max(0.18, z1 - z0), solid, 'box', 0, 1);
   // outer shell (left half + hallway 3.2 m, right half full height on two-story)
@@ -99,7 +101,7 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   for (const [a, b] of [[-0.2, -0.15], [0.2, -0.15], [-0.2, 0.15], [0.2, 0.15]]) B(k + 'g', '#ef4444', -2.0 + a, 0.97, -5.6 + b, 0.22, 0.01, 0.22, 0, 'cyl');
   B(k + 's', T, -3, 2.3, -5.8, 3.8, 0.7, 0.4); B(k + 's', '#e2e8f0', -5.6, 1.0, -5.5, 0.8, 2.0, 0.8, 1); B(k + 's', '#94a3b8', -5.25, 1.2, -5.1, 0.04, 0.6, 0.04);
   // bathroom (fixed): tub, toilet, sink + mirror, bath mat
-  B(k + 's', '#f8fafc', 5.5, 0.3, 2.3, 0.9, 0.6, 2.0, 1); B(k + 's', '#7dd3fc', 5.5, 0.58, 2.3, 0.7, 0.02, 1.8); B(k + 's', '#f8fafc', 2.0, 0.25, 4.45, 0.45, 0.5, 0.6, 1); B(k + 's', '#f8fafc', 2.0, 0.65, 4.7, 0.45, 0.4, 0.15);
+  B(k + 's', '#f8fafc', 5.5, 0.3, 2.3, 0.9, 0.6, 2.0, 1); B(k + 's', '#cbd5e1', 5.5, 2.2, 2.3, 0.04, 0.04, 2.0); B(k + 's', '#cbd5e1', 5.95, 1.9, 2.3, 0.05, 0.05, 0.05); B(k + 's', '#94a3b8', 5.92, 1.85, 2.3, 0.12, 0.06, 0.06); // shower head + curtain rail B(k + 's', '#7dd3fc', 5.5, 0.58, 2.3, 0.7, 0.02, 1.8); B(k + 's', '#f8fafc', 2.0, 0.25, 4.45, 0.45, 0.5, 0.6, 1); B(k + 's', '#f8fafc', 2.0, 0.65, 4.7, 0.45, 0.4, 0.15);
   B(k + 's', '#f8fafc', 3.6, 0.45, 4.6, 0.9, 0.9, 0.5, 1); B(k + 'g', '#e0f2fe', 3.6, 1.6, 4.86, 0.8, 0.7, 0.02); B(k + 's', A, 4.2, 0.012, 2.4, 1.0, 0.02, 0.6); for (let i = -2; i <= 2; i++) B(k + 's', '#cbd5e1', 3.55, 1.2, 0.1 + 0, 5.0, 0.02, 0.01, 0, 'box', 0, 1);
   // windows (painted views) + frames
   const vk = k + 'v'; const win = (x, yy, z, ry, w, hh) => { put(vk, G.plane, '#ffffff', cx + x * SC, y + yy, cz + z * SC, ry, w, hh, 1); const fx = Math.abs(Math.sin(ry)), fz = Math.abs(Math.cos(ry)); B(k + 's', '#ffffff', x, yy - hh / 2, z, w * fz + 0.12 * fx, 0.08, w * fx + 0.12 * fz); B(k + 's', '#ffffff', x, yy + hh / 2, z, w * fz + 0.1 * fx, 0.06, w * fx + 0.1 * fz); B(k + 's', '#ffffff', x, yy, z, 0.05 * fz + 0.06 * fx, hh, 0.05 * fx + 0.06 * fz); };
@@ -125,5 +127,15 @@ export function buildInterior(api, K, h, cx, cz, decor) {
     flush(dk, vc(), !LOW, decG); flush(gk, new THREE.MeshBasicMaterial({ vertexColors: true }), false, decG); }
   setFloor(decor.floor || S.floor); setItems(items);
   function update() { /* doors removed */ }
-  return { g, two, S, update, setWall: (c) => wallMat.color.set(c || S.wall), setFloor, setItems, items: () => items, seats: () => seats, screens: () => screens, cols };
+  // kitchen + bath fixtures for homelife.js (fridge / stove / sink / shower): where to stand, where the thing is, which way to face
+  const at = (x, z) => [cx + x * SC, cz + z * SC];
+  const spots = [{ k: 'fridge', s: at(-5.6, -4.45), o: at(-5.6, -5.5), yaw: Math.PI }, { k: 'stove', s: at(-2.0, -4.6), o: at(-2.0, -5.6), yaw: Math.PI }, { k: 'sink', s: at(-3.8, -4.6), o: at(-3.8, -5.55), yaw: Math.PI },
+    { k: 'shower', s: at(4.55, 2.3), o: at(5.5, 2.3), yaw: Math.PI / 2 }].map((q) => ({ ...q, y, top: q.k === 'stove' ? y + 0.97 : y + 1 }));
+  if (h.estate) for (const [sx, sz] of h.admin ? [[5.3, -5.3], [1.8, -5.3]] : [[5.3, -5.3]]) { // mansions: more showers upstairs (glass stalls)
+    const sh = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 1.1), new THREE.MeshStandardMaterial({ color: '#e2e8f0' })); sh.position.set(cx + sx * SC, y + 3.41, cz + sz * SC); g.add(sh); const hd = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12), new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.6 })); hd.position.set(cx + sx * SC, y + 5.55, cz + sz * SC); g.add(hd);
+    spots.push({ k: 'shower', s: at(sx, sz + 0.95), o: at(sx, sz), yaw: Math.PI, y: y + 3.35, top: y + 4.3 }); }
+  // fridge door (own mesh, hinged on the right) so it can swing open
+  const fd = new THREE.Group(); fd.position.set(cx - 5.2 * SC, y + 1.0, cz - 5.1 * SC); const fdm = new THREE.Mesh(new THREE.BoxGeometry(0.8 * SC, 1.96, 0.06), new THREE.MeshStandardMaterial({ color: '#f1f5f9', roughness: 0.5 })); fdm.position.x = -0.4 * SC; fd.add(fdm);
+  const fh = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: '#94a3b8' })); fh.position.set(-0.72 * SC, 0.2, 0.05); fd.add(fh); const fin = new THREE.Mesh(new THREE.BoxGeometry(0.7 * SC, 1.8, 0.02), new THREE.MeshBasicMaterial({ color: '#e0f2fe' })); fin.position.set(cx - 5.6 * SC, y + 1.0, cz - 5.11 * SC); g.add(fin); g.add(fd);
+  return { g, two, S, update, spots, fridgeDoor: fd, setWall: (c) => wallMat.color.set(c || S.wall), setFloor, setItems, items: () => items, seats: () => seats, screens: () => screens, cols };
 }

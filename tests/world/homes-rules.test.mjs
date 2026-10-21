@@ -13,15 +13,15 @@ const ADM = env.authenticatedContext('boss', { email: 'lillykemoy1@gmail.com', e
 const KID = env.authenticatedContext('kid').firestore(); const PAL = env.authenticatedContext('pal').firestore();
 const buy = (db, u, plot, style, extra = {}) => { const b = writeBatch(db); b.set(doc(db, 'homes', plot), { owner: u, name: u === 'kid' ? 'Kid' : 'Pal', style, garage: 0, at: serverTimestamp(), ...extra }); b.set(doc(db, `users/${u}/pal/home`), { plot, at: serverTimestamp() }); return b.commit(); };
 const upd = (db, u, plot, style, extra) => setDoc(doc(db, 'homes', plot), { owner: u, name: u === 'kid' ? 'Kid' : u === 'boss' ? 'Lone Keem' : 'Pal', style, garage: 0, at: serverTimestamp(), ...extra }, { merge: true });
-// plot 99 = first Maplewood plot: j0 s-1 k0 -> sale; style 99 % 4 = 3 = manor. plot 100 (k1) not for sale.
+// city plots: for sale when n % 8 in [0,3,5,6]; style n % 4. h99 (99 % 8 = 3) -> manor; h100 (4) not for sale; h101 (5) twostory
 await ok('old plot h02 still buyable (manor)', assertSucceeds(buy(KID, 'kid', 'h02', 'manor')));
 await env.withSecurityRulesDisabled(async (c) => { await deleteDoc(doc(c.firestore(), 'homes/h02')); await deleteDoc(doc(c.firestore(), 'users/kid/pal/home')); });
 await ok('city plot h99 buyable with the formula style', assertSucceeds(buy(KID, 'kid', 'h99', 'manor')));
-await ok('wrong style on a city plot fails', assertFails(buy(PAL, 'pal', 'h103', 'ranch')));
+await ok('wrong style on a city plot fails', assertFails(buy(PAL, 'pal', 'h101', 'ranch')));
 await ok('non-sale city plot h100 fails', assertFails(buy(PAL, 'pal', 'h100', 'cottage')));
 await ok('owner writes parked cars', assertSucceeds(upd(KID, 'kid', 'h99', 'manor', { cars: 'pip.6;star.0.KEMY1.3.0.7.2' })));
 await ok('bad car string rejected', assertFails(upd(KID, 'kid', 'h99', 'manor', { cars: 'pip.6;<script>' })));
-await ok('lowercase plate rejected', assertFails(upd(KID, 'kid', 'h99', 'manor', { cars: 'star.0.kemy.3.0.7.2' })));
+await ok('symbols rejected', assertFails(upd(KID, 'kid', 'h99', 'manor', { cars: 'star.0.KE MY.3.0.7.2' })));
 await ok('others cannot write my cars', assertFails(upd(PAL, 'pal', 'h99', 'manor', { cars: 'pip.1' })));
 await ok('garage tier 5 with item', assertSucceeds(upd(KID, 'kid', 'h99', 'manor', { garage: 5 })));
 await ok('garage tier 7 on a normal house fails', assertFails(upd(KID, 'kid', 'h99', 'manor', { garage: 7 })));
@@ -32,6 +32,7 @@ await ok('pal cannot buy estate without deed', assertFails(buy(PAL, 'pal', 'h484
 await ok('nobody but admin can create the palace', assertFails(setDoc(doc(KID, 'homes/h489'), { owner: 'kid', name: 'Kid', style: 'estate', garage: 0, at: serverTimestamp() })));
 await ok('admin creates the palace', assertSucceeds(setDoc(doc(ADM, 'homes/h489'), { owner: 'boss', name: 'Lone Keem', style: 'estate', garage: 0, at: serverTimestamp() })));
 await ok('admin parks 50 cars', assertSucceeds(upd(ADM, 'boss', 'h489', 'estate', { cars: Array.from({ length: 50 }, (_, i) => 'pip.' + (i % 12)).join(';') })));
+await ok('50 plated cars ok (max size)', assertSucceeds(upd(ADM, 'boss', 'h489', 'estate', { cars: Array.from({ length: 50 }, (_, i) => 'aurum.' + (i % 12) + '.ABCDEFG.11.11.11.3').join(';') })));
 await ok('51 cars rejected', assertFails(upd(ADM, 'boss', 'h489', 'estate', { cars: Array.from({ length: 51 }, () => 'pip.1').join(';') })));
 await ok('kid cannot edit the palace', assertFails(upd(KID, 'kid', 'h489', 'estate', { cars: 'pip.1' })));
 await ok('kid cannot delete the palace', assertFails(deleteDoc(doc(KID, 'homes/h489'))));
