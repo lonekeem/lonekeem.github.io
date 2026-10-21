@@ -100,3 +100,62 @@ export function dressAccessories({ J, W, tier, fz, hat, clothed, legacyNeck }) {
     if (st === 'gem') { const big = /ffcf3a/.test(c) && w.p >= 400; const gm = add(facet(big ? 0.07 : 0.06, lo), gem(big ? '#fff2a8' : c, lo), a, 0, 0.01, A.handR0 + 0.05); gm.scale.set(1, 1.15, 0.8); for (const s of [-1, 1]) add(ball(0.012, lo), metal('#ffcf3a', lo), a, s * 0.04, 0.0, A.handR0 + 0.035); glint(a, 0.03, 0.04, A.handR0 + 0.09, big ? 1.4 : 1, C); }
     else { add(cylG(0.03, 0.012, lo), metal(c, lo), a, 0, 0, A.handR0 + 0.025).rotation.x = Math.PI / 2; glint(a, 0.02, 0.02, A.handR0 + 0.04, 0.7, C); } }
 }
+
+// 🎒 Backpacks ('bag' slot, so they can be worn together with wings / capes in the 'back' slot).
+// The torso of every body shape is approximated by an ellipsoid in Chest space (centre y, radii rx/ry/rz, taken from
+// the pal3d.js torso meshes and the blob body scale bw/bh/bd). The pack sits just off the back surface and the two
+// shoulder straps are closed tubes that hug that ellipsoid (inflated a little, more when clothed), going over the
+// shoulders, down the front and back under the arms, so they never cut into the body. Everything is parented to the
+// Chest bone, so it follows walking, dancing, sitting and sleeping.
+const BODY = (k, f) => { const bw = (f && f.bw) || 1, bh = (f && f.bh) || 1, bd = (f && f.bd) || 1;
+  return k === 'jelly' ? { cy: 0, rx: 0.62, ry: 0.52, rz: 0.58, sy: 0.3 } : k === 'star' ? { cy: 0.05, rx: 0.5, ry: 0.55, rz: 0.32, sy: 0.32 }
+    : k === 'cloud' ? { cy: 0.05, rx: 0.62, ry: 0.42, rz: 0.42, sy: 0.3 } : { cy: -0.12 * bh, rx: 0.41 * bw, ry: 0.44 * bh, rz: 0.38 * bd + ((f && f.backX) || 0), sy: 0.28 * bh }; }; // backX: shells / spikes / plates stick out of the back
+function strap(B, sx, inf, lo) { const pts = [], n = lo ? 14 : 24, q = Math.sqrt(Math.max(0.2, 1 - (sx / B.rx) ** 2)) * inf;
+  for (let i = 0; i < n; i++) { const a = (i / n) * TAU; // a = 0 at the top of the shoulder, going forward
+    let y = Math.cos(a) * B.ry * q, z = Math.sin(a) * B.rz * q; if (y > B.sy) y = B.sy + (y - B.sy) * 0.25; // flatten over the shoulder line
+    pts.push(new THREE.Vector3(sx * (1 + 0.12 * Math.max(0, -Math.cos(a))), B.cy + y, z)); }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), lo ? 28 : 56, 0.022, lo ? 5 : 8, true); }
+const rbox = (w, h, d, r, lo) => geo(`rb${w}_${h}_${d}_${lo}`, () => { const s = new THREE.Shape(), x = -w / 2, y = -h / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: true, bevelSize: Math.min(0.03, d * 0.3), bevelThickness: Math.min(0.03, d * 0.3), bevelSegments: lo ? 1 : 3, curveSegments: lo ? 3 : 6 }); g.translate(0, 0, -d / 2); return g; });
+let KLT = null; function klTex() { if (KLT) return KLT; const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d');
+  c.fillStyle = '#ffcf3a'; c.beginPath(); c.arc(64, 64, 58, 0, TAU); c.fill(); c.fillStyle = '#5a2a9a'; c.beginPath(); c.arc(64, 64, 50, 0, TAU); c.fill();
+  c.fillStyle = '#ffd84a'; c.font = '900 62px Arial Black, Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('KL', 64, 68); KLT = new THREE.CanvasTexture(cv); KLT.colorSpace = THREE.SRGBColorSpace; return KLT; }
+export function dressPack({ J, w, tier, clothed, wings }) {
+  if (!J.Chest) return; const lo = tier === 'low', C = { lo }, f = J.fit || {}, B = BODY(f.kind, f), st = w.st, c = w.col;
+  const mini = st === 'pk_mini', tall = st === 'pk_hiker', k = mini ? 0.68 : 1;
+  const PW = Math.min(0.5, B.rx * 0.95) * k, PH = Math.min(0.56, B.ry * 1.05) * k * (tall ? 1.2 : 1), PD = 0.15 * k;
+  const g = new THREE.Group(); g.userData.anchor = 1; J.Chest.add(g); const gap = clothed ? 0.04 : 0.015;
+  g.position.set(0, B.cy + B.ry * (mini ? 0.12 : 0.02) + (tall ? 0.04 : 0), -(B.rz + gap + PD / 2)); g.rotation.x = -0.08; if (wings) g.position.z -= 0.02;
+  const fz = PD / 2 + 0.012; // front (outer) face of the pack is -z, so put details at z = -fz
+  const body = plain(c, { r: 0.55 }), dark = plain(shadeHex(c, -0.25), { r: 0.6 }), lite = plain(shadeHex(c, 0.35), { r: 0.5 });
+  const shell = (geom, m = body) => add(geom, m, g);
+  const pocket = (yy = -PH * 0.18, ww = PW * 0.72, hh = PH * 0.38, m = lite) => { const p = add(rbox(ww, hh, 0.05, 0.05, lo), m, g, 0, yy, -fz - 0.01); add(cylG(0.006, ww * 0.9, lo), metal('#d0d8e8', lo), g, 0, yy + hh / 2 - 0.012, -fz - 0.04).rotation.z = Math.PI / 2; return p; };
+  if (st === 'pk_star') { const s2 = add(shapeG('pkstar' + k, star(PW * 0.62, PW * 0.3), PD), body, g); s2.scale.z = 1; add(shapeG('pkstar2' + k, star(PW * 0.3, PW * 0.14), 0.03), metal('#ffcf3a', lo), g, 0, 0, -fz); glint(g, 0.05, 0.06, -fz - 0.03, 1, C); }
+  else if (st === 'pk_heart') { add(shapeG('pkheart' + k, heart(PW * 3.2), PD), body, g, 0, -0.02, 0); add(shapeG('pkheart2', heart(PW * 1.3), 0.03), lite, g, 0, -0.03, -fz); }
+  else { shell(rbox(PW, PH, PD, 0.09 * k, lo));
+    if (st === 'pk_rainbow') { const RB = ['#ff5a5a', '#ff9f3a', '#ffd93a', '#5ccf6a', '#4aa8ff', '#a070ff']; RB.forEach((col, i) => add(geo('pkrb' + PW + PH + lo, () => new THREE.BoxGeometry(PW * 0.96, PH / 7, 0.02)), plain(col, { r: 0.5 }), g, 0, PH * 0.42 - (i + 0.5) * (PH * 0.84 / 6), -PD / 2 - 0.028)); pocket(-PH * 0.3, PW * 0.5, PH * 0.2, plain('#ffffff', { r: 0.5 })); }
+    else if (st === 'pk_kl') { pocket(-PH * 0.22, PW * 0.78, PH * 0.42, plain('#3a1a6a', { r: 0.5 })); const m = new THREE.MeshStandardMaterial({ map: klTex(), roughness: 0.4, metalness: 0.2, transparent: true }); m.userData.wear = 1;
+      const d = new THREE.Mesh(geo('kld', () => new THREE.CircleGeometry(0.1, 32)), m); d.position.set(0, -PH * 0.22, -fz - 0.045); d.rotation.y = Math.PI; d.scale.setScalar(PW / 0.42); d.userData.acc = 1; g.add(d);
+      for (const s of [-1, 1]) add(cylG(0.012, PH * 0.9, lo), metal('#ffcf3a', lo), g, s * PW * 0.47, 0, -PD / 2 - 0.02); glint(g, 0.06, -PH * 0.1, -fz - 0.07, 1.1, C); }
+    else if (st === 'pk_glitter') { pocket(); for (let i = 0; i < (lo ? 10 : 22); i++) { const r = Math.random; add(facet(0.012 + r() * 0.01, lo), gem(i % 3 ? '#ffffff' : shadeHex(c, 0.5), lo), g, (r() - 0.5) * PW * 0.9, (r() - 0.5) * PH * 0.9, -PD / 2 - 0.035); } glint(g, 0.08, 0.1, -fz - 0.04, 1.2, C); glint(g, -0.1, -0.08, -fz - 0.04, 0.9, C); }
+    else if (st === 'pk_sports') { pocket(-PH * 0.2, PW * 0.7, PH * 0.34, dark); for (const yy of [PH * 0.18, PH * 0.26]) add(geo('pksp' + PW, () => new THREE.BoxGeometry(PW * 1.0, 0.02, 0.02)), plain('#ffffff', { em: '#ffffff', ei: 0.25 }), g, 0, yy, -PD / 2 - 0.03);
+      const bt = add(cylG(0.035, 0.16, lo), plain('#4aa8ff', { r: 0.2 }), g, PW / 2 + 0.035, -PH * 0.15, 0); add(cylG(0.02, 0.03, lo), plain('#ffffff'), bt, 0, 0.09, 0); }
+    else if (st === 'pk_hiker') { pocket(-PH * 0.25, PW * 0.6, PH * 0.3, dark); const roll = add(cylG(0.07, PW * 1.05, lo), plain('#c8955f', { r: 0.8 }), g, 0, PH / 2 + 0.06, 0); roll.rotation.z = Math.PI / 2;
+      for (const s of [-1, 1]) { add(geo('pkhs' + PH, () => new THREE.BoxGeometry(0.03, PH * 0.9, 0.02)), dark, g, s * PW * 0.3, 0, -PD / 2 - 0.035); add(torus(0.075, 0.01, 12, lo), dark, g, s * PW * 0.3, PH / 2 + 0.06, 0).rotation.y = Math.PI / 2; }
+      add(torus(0.03, 0.008, 12, lo), metal('#ff8a2a', lo), g, PW / 2 - 0.02, PH * 0.3, -fz - 0.02); }
+    else if (st === 'pk_jet') { for (const s of [-1, 1]) { const t = add(cap(0.075 * k, PH * 0.6), metal(c, lo), g, s * PW * 0.32, 0.02, -0.02); const fl = add(cone(0.055, 0.14), plain('#ffb04a', { em: '#ff7a1a', ei: 0.8 }), g, s * PW * 0.32, -PH * 0.5, -0.02); fl.rotation.x = Math.PI;
+        const fin = add(shapeG('pkfin', (sh) => { sh.moveTo(0, 0); sh.lineTo(0.09, -0.05); sh.lineTo(0.09, -0.14); sh.lineTo(0, -0.08); sh.closePath(); }, 0.02), plain('#e8434f', { r: 0.4 }), g, s * PW * 0.5, -PH * 0.2, -0.02); fin.rotation.y = s < 0 ? Math.PI : 0; }
+      add(cylG(0.04, 0.02, lo), plain('#7ad0ff', { em: '#7ad0ff', ei: 0.6 }), g, 0, PH * 0.15, -fz - 0.005).rotation.x = Math.PI / 2; }
+    else { pocket(); if (st === 'pk_bunny') { for (const s of [-1, 1]) { const e = add(cap(0.05 * k, 0.2 * k), body, g, s * PW * 0.26, PH / 2 + 0.1 * k, 0); e.rotation.z = -s * 0.2; e.scale.z = 0.5; const in2 = add(cap(0.028 * k, 0.14 * k), plain('#ffc6dc'), g, s * PW * 0.26, PH / 2 + 0.1 * k, -0.025); in2.rotation.z = -s * 0.2; in2.scale.z = 0.4; } add(ball(0.05, lo), plain('#ffffff'), g, 0, -PH * 0.42, -fz - 0.02); }
+      if (st === 'pk_dino') for (let i = 0; i < 5; i++) { const sp = add(cone(0.05 * k, 0.1 * k), plain(shadeHex(c, -0.3), { r: 0.5 }), g, 0, PH / 2 - 0.02 - i * PH * 0.22, PD / 2 - 0.01); sp.rotation.x = -Math.PI / 2 - 0.5; sp.scale.x = 0.5; sp.position.z = -PD / 2 - 0.03; sp.position.x = 0; if (i) { sp.position.x = 0; } }
+      if (st === 'pk_dino') for (let i = 0; i < 3; i++) { const sp = add(cone(0.05 * k, 0.12 * k), plain(shadeHex(c, -0.3), { r: 0.5 }), g, (i - 1) * PW * 0.3, PH / 2 + 0.04 * k, 0); sp.scale.z = 0.5; }
+      if (st === 'pk_school' || st === 'pk_mini') add(torus(0.05 * k, 0.012, 14, lo), dark, g, 0, PH / 2 + 0.01, 0); } }
+  // shoulder straps (+ a chest clip across the front on the bigger packs)
+  const inf = 1.06 + (clothed ? 0.06 : 0), sx = Math.min(B.rx * 0.45, 0.2) * (mini ? 0.85 : 1), sm = st === 'pk_kl' ? metal('#ffcf3a', lo) : dark;
+  for (const s of [-1, 1]) add(geo(`pkstr${f.kind}${B.rx}${B.ry}${B.rz}${s}${inf}${sx}${lo}`, () => strap(B, s * sx, inf, lo)), sm, J.Chest);
+  if (!mini && (f.kind || 'blob') === 'blob') { const q = Math.sqrt(Math.max(0.2, 1 - (sx / B.rx) ** 2)) * inf, zf = B.rz * q * 0.92 + 0.01;
+    add(geo('pkclip' + sx, () => new THREE.BoxGeometry(sx * 2, 0.025, 0.018)), sm, J.Chest, 0, B.cy + B.ry * 0.42, zf); }
+}
+function shadeHex(hex, k) { const col = new THREE.Color(hex); const hsl = {}; col.getHSL(hsl); col.setHSL(hsl.h, hsl.s, Math.max(0, Math.min(1, hsl.l + k * (k > 0 ? 1 - hsl.l : hsl.l)))); return '#' + col.getHexString(); }
+const cap = (r, h) => geo(`cap${r}_${h}`, () => new THREE.CapsuleGeometry(r, h, 4, 10));
+const cone = (r, h) => geo(`cone${r}_${h}`, () => new THREE.ConeGeometry(r, h, 12));

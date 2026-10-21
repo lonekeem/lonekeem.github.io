@@ -13,7 +13,7 @@ import { RARE_SPECIES } from './species.js';
 addItems([...WEAR.filter((w) => w.p), ...BGS.filter((b) => b.p).map((b) => ({ ...b, kind: 'bg' })),
   ...PATTERNS.filter((p) => p.p).map((p) => ({ ...p, kind: 'look', r: p.r || 'r' })), ...RARES.map((r) => ({ ...r, kind: 'rare' })), ...RARE_SPECIES.map((sp) => ({ id: 'sp_' + sp.id, name: sp.name, kind: 'pal', p: sp.rare, r: sp.rare >= 1500 ? 'l' : 'e' }))]);
 // 🎃 Halloween premium costumes are Diamond items (config/palShop.dprices, placeholder productIds, no real money)
-addDiamondItems(WEAR.filter((w) => w.d && w.slot === 'nose').map((w) => ({ id: w.id, name: w.name, kind: 'wear', d: w.d })));
+addDiamondItems(WEAR.filter((w) => w.d && (w.slot === 'nose' || w.slot === 'bag')).map((w) => ({ id: w.id, name: w.name, kind: 'wear', d: w.d })));
 addDiamondItems(HALLOWEEN.filter((w) => w.d).map((w) => ({ id: w.id, name: w.name, kind: 'wear', d: w.d, productId: w.productId })));
 const HWCSS = `.hw-banner{position:relative;overflow:hidden;border-radius:16px;padding:12px 14px;margin:4px 0 10px;background:linear-gradient(135deg,#2a1450,#5b2a8a 55%,#ff8a1e);color:#fff;box-shadow:0 4px 16px rgba(60,20,90,.35)}.hw-banner b{font-size:1.1rem;display:block}.hw-banner small{color:#ffe8c8;display:block;margin-top:2px}.hw-banner .hw-tag{display:inline-block;background:#ffcf3a;color:#1a1028;font-weight:800;border-radius:999px;padding:2px 10px;font-size:.78rem;margin-bottom:4px}
 .hw-h{width:100%;grid-column:1/-1;margin:10px 0 2px;font-size:1rem}.ps-tile .hw-free{position:absolute;top:6px;left:6px;background:#3fbf6a;color:#06210f;font-weight:800;font-size:.7rem;border-radius:999px;padding:2px 8px;z-index:1}.ps-tile .hw-prem{position:absolute;top:6px;left:6px;background:#ffcf3a;color:#1a1028;font-weight:800;font-size:.7rem;border-radius:999px;padding:2px 8px;z-index:1}.ps-tile{position:relative}`;
@@ -22,7 +22,7 @@ const EMO = { phones: '🎧', badge: '🎖️', cap: '🧢', beanie: '🧶', buc
   round: '👓', lens: '🕶️', heart: '💖', star: '🌟', stud: '💎', hoop: '⭕', drop: '✨', beads: '📿', chain: '⛓️', locket: '💝', medal: '🏅', scarf: '🧣', tie: '👔', bowtie: '🎀', tee: '👕', hoodie: '🧥', jersey: '🎽', sweater: '🧶', puffer: '🧥', blouse: '👚',
   shorts: '🩳', skirt: '👗', tutu: '🩰', pants: '👖', dress: '👗', gown: '👸', overalls: '👖', pjs: '🌙', suit: '🤵', kit: '⚽', uniform: '🏫', coat: '🧥', swim: '🩱', dino: '🦖', astro: '🧑‍🚀', hero: '🦸', xmas: '🎄',
   sneakers: '👟', boots: '🥾', flats: '🩰', sandals: '🩴', cape: '🦸', wings: '🧚', angel: '😇', jetpack: '🚀', backpack: '🎒', purse: '👛', satchel: '💼', wand: '🪄', balloon: '🎈', icecream: '🍦', teddy: '🧸', guitar: '🎸', guitar2: '🎸', handbag: '👜', phone: '📱', bouquet: '💐', boba: '🧋', bball: '🏀', ball: '⚽', mic: '🎤', umbrella: '☂️',
-  bracelet: '💫', beadband: '📿', watch: '⌚', ring: '💍', gem: '💍', nhoop: '⭕', nstud: '💎', nstar: '⭐', nheartstud: '💗', ndouble: '➰', nheart: '💖', nchain: '⛓️', nrainbow: '🌈', ncrystal: '👑' };
+  bracelet: '💫', beadband: '📿', watch: '⌚', ring: '💍', gem: '💍', nhoop: '⭕', nstud: '💎', nstar: '⭐', pk_school: '🎒', pk_mini: '🎒', pk_star: '🌟', pk_bunny: '🐰', pk_jet: '🚀', pk_rainbow: '🌈', pk_kl: '👑', pk_heart: '💖', pk_dino: '🦖', pk_glitter: '✨', pk_sports: '⚽', pk_hiker: '🏕️', nheartstud: '💗', ndouble: '➰', nheart: '💖', nchain: '⛓️', nrainbow: '🌈', ncrystal: '👑' };
 export function createPalStore(ctx) {
   const { S, esc, toast, openModal, closeModal, friendlyError, requireAuth, econ, myPals, activeOf, commit } = ctx;
   async function page(main) {

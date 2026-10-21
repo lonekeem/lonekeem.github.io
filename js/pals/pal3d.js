@@ -10,7 +10,7 @@ import { SPEC, SPECIES, stageOf } from './art.js';
 import { ITEM } from './catalog.js';
 import { WEAR_BY } from './wardrobe.js';
 import { dressHalloween } from './halloween3d.js';
-import { accAnchors, dressAccessories } from './acc3d.js';
+import { accAnchors, dressAccessories, dressPack } from './acc3d.js';
 import { DANCES3D, clipFor } from './dances3d.js';
 import { gaitPose, jumpPose, plantFeet, springs, advancePhase } from './motion3d.js';
 
@@ -275,7 +275,7 @@ function build(pal) {
     J[n + 'UpperLeg'] = up; J[n + 'LowerLeg'] = lo; J[n + 'Foot'] = ft;
   }
   if (!legs) J.Hips.position.y = 0.95;
-  J.fit = { ar, lr, ua, la, ul, ll, legs, kind, bw, arm: armType };
+  J.fit = { ar, lr, ua, la, ul, ll, legs, kind, bw, bh, bd, arm: armType, backX: ex.has('shell') ? 0.17 : ex.has('spikes') ? 0.14 : ex.has('plates') || ex.has('fin') ? 0.08 : ex.has('wool') ? 0.05 : 0 };
   accAnchors({ J, H, headR, kind, fit: J.fit, ears: sp.ears, snout: sp.snout, fz }); // 💍 jewelry anchors (ears, face, head, neck, wrist, hand, back) on every body shape
   // tail chain (3 bones) per species
   J.tail = []; const tl = sp.tail;
@@ -505,13 +505,14 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex, legacyNeck }) {
     if (st === 'boots') { const b = mesh(cap(0.12, 0.1), M(c), J[n + 'LowerLeg']); b.position.y = -0.2; }
     if (st === 'flats') mesh(sph(0.025), M('#ffffff'), f).position.set(0, 0.02, 0.18); }
   // back
-  w = W('back'); if (w) { const st = w.st, c = w.col;
-    if (st === 'cape') { const cp = mesh(geo('cape5', () => { const g = new THREE.PlaneGeometry(0.72, 0.82, 10, 12); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); const d = 0.41 - y; p.setZ(i, -Math.abs(x) * 0.28 + Math.sin(x * 16) * 0.018 * d); p.setX(i, x * (0.7 + d * 0.5)); } g.computeVertexNormals(); return g; }), M(c, { r: 0.7 }), J.Chest); cp.material.side = THREE.DoubleSide; cp.position.set(0, -0.3, -0.44); cp.rotation.x = 0.16; const cl = mesh(geo('capecl', () => new THREE.TorusGeometry(0.25, 0.022, 8, 28, Math.PI)), M(shade(c, -0.15)), J.Chest); cl.rotation.set(Math.PI / 2 + 0.2, 0, Math.PI); cl.position.set(0, 0.12, -0.05); }
-    else if (st === 'wings' || st === 'angel') for (const s of [-1, 1]) { const m = mesh(sph(1), M(c, { op: st === 'wings' ? 0.6 : 1, em: st === 'wings' ? c : undefined }), J.Chest); m.scale.set(0.3, st === 'angel' ? 0.2 : 0.26, 0.03); m.position.set(s * 0.32, 0.12, -0.42); m.rotation.z = s * 0.4; }
-    else if (st === 'jetpack') for (const s of [-1, 1]) { const t = mesh(cap(0.08, 0.22), metal(c), J.Chest); t.position.set(s * 0.12, -0.05, -0.46); const fl = mesh(cone(0.06, 0.14), M('#ffb04a', { em: '#ff7a1a' }), t); fl.position.y = -0.24; fl.rotation.x = Math.PI; } }
+  w = W('back'); if (w) { const st = w.st, c = w.col; const pk = W('bag') && W('bag').st.startsWith('pk_') ? 0.17 : 0; // 🎒 wings / cape sit outside a backpack
+    if (st === 'cape') { const cp = mesh(geo('cape5', () => { const g = new THREE.PlaneGeometry(0.72, 0.82, 10, 12); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); const d = 0.41 - y; p.setZ(i, -Math.abs(x) * 0.28 + Math.sin(x * 16) * 0.018 * d); p.setX(i, x * (0.7 + d * 0.5)); } g.computeVertexNormals(); return g; }), M(c, { r: 0.7 }), J.Chest); cp.material.side = THREE.DoubleSide; cp.position.set(0, -0.3, -0.44 - pk); cp.rotation.x = 0.16; const cl = mesh(geo('capecl', () => new THREE.TorusGeometry(0.25, 0.022, 8, 28, Math.PI)), M(shade(c, -0.15)), J.Chest); cl.rotation.set(Math.PI / 2 + 0.2, 0, Math.PI); cl.position.set(0, 0.12, -0.05); }
+    else if (st === 'wings' || st === 'angel') for (const s of [-1, 1]) { const m = mesh(sph(1), M(c, { op: st === 'wings' ? 0.6 : 1, em: st === 'wings' ? c : undefined }), J.Chest); m.scale.set(0.3, st === 'angel' ? 0.2 : 0.26, 0.03); m.position.set(s * (0.32 + pk * 0.4), 0.12, -0.42 - pk); m.rotation.z = s * 0.4; }
+    else if (st === 'jetpack') for (const s of [-1, 1]) { const t = mesh(cap(0.08, 0.22), metal(c), J.Chest); t.position.set(s * 0.12, -0.05, -0.46 - pk); const fl = mesh(cone(0.06, 0.14), M('#ffb04a', { em: '#ff7a1a' }), t); fl.position.y = -0.24; fl.rotation.x = Math.PI; } }
   // bag
   w = W('bag'); if (w) { const st = w.st, c = w.col;
-    if (st === 'backpack') { const b = mesh(cap(0.2, 0.12), M(c), J.Chest); b.position.set(0, -0.08, -0.46); b.scale.z = 0.55; for (const s of [-1, 1]) { const st2 = mesh(geo('strp', () => new THREE.TorusGeometry(0.2, 0.018, 6, 20, Math.PI)), M(c), J.Chest); st2.rotation.y = Math.PI / 2; st2.position.set(s * 0.22, 0.02, -0.05); } }
+    if (st.startsWith('pk_')) dressPack({ J, w, tier: gfxLevel(), clothed: !!(W('body') || W('full') || HX('full')), wings: !!W('back') });
+    else if (st === 'backpack') { const b = mesh(cap(0.2, 0.12), M(c), J.Chest); b.position.set(0, -0.08, -0.46); b.scale.z = 0.55; for (const s of [-1, 1]) { const st2 = mesh(geo('strp', () => new THREE.TorusGeometry(0.2, 0.018, 6, 20, Math.PI)), M(c), J.Chest); st2.rotation.y = Math.PI / 2; st2.position.set(s * 0.22, 0.02, -0.05); } }
     else { const b = mesh(geo('bagb' + st, () => new THREE.BoxGeometry(st === 'purse' ? 0.16 : 0.22, st === 'purse' ? 0.12 : 0.16, 0.06)), M(c, { cc: 0.8 }), J.Hips); b.position.set(0.5, 0.05, 0.12); const s2 = mesh(geo('bagstrap', () => new THREE.TorusGeometry(0.55, 0.012, 6, 30)), M(c), J.Chest); s2.rotation.set(0, Math.PI / 2, 0.75); s2.position.y = -0.1; } }
   // held item (right hand)
   w = W('held'); const hand = J.RightHand; if (w && hand) { const st = w.st, c = w.col, g = new THREE.Group(); g.position.set(0, -0.1, 0.06); g.scale.setScalar(st === 'guitar2' || st === 'balloon' || st === 'handbag' || st === 'umbrella' ? 1.35 : 1.7); if (['phone', 'boba', 'mic'].includes(st)) { g.rotation.set(-0.45, 0, 0); g.position.set(0, -0.06, 0.12); g.scale.multiplyScalar(st === 'phone' ? 1.25 : 1.5); } else if (!['handbag', 'balloon', 'guitar2', 'bball', 'ball'].includes(st)) { g.rotation.x = -1.1; g.position.set(0, -0.12, 0.08); } hand.add(g); J.grip = st; if (st === 'guitar2') J.twoHand = 1;

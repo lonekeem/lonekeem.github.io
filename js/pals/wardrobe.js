@@ -57,6 +57,12 @@ const BASE = [
   ['bracelet', 'Bracelet', 'wrist', 'bracelet', 'g', ['gold', 'silver', 'pink'], 0], ['beadband', 'Bead Bracelet', 'wrist', 'beadband', 'a', ['mint', 'lilac'], 0],
   ['watch', 'Watch', 'wrist', 'watch', 'b', ['black', 'blue', 'silver'], 0], ['smartwatch', 'Glow Watch', 'wrist', 'watch', 'a', ['purple'], 110, 'r'],
   ['ring', 'Ring', 'hand', 'ring', 'a', ['gold', 'silver'], 0], ['gemring', 'Gem Ring', 'hand', 'gem', 'g', ['pink', 'blue', 'purple'], 140, 'r'], ['starring', 'Superstar Ring', 'hand', 'gem', 'a', ['gold'], 500, 'l'],
+  // 🎒 backpacks ('bag' slot: wearable together with wings / capes; 3D straps + per-body fit in acc3d.js dressPack)
+  ['pkschool', 'School Backpack', 'bag', 'pk_school', 'a', ['red', 'blue', 'navy', 'green', 'pink', 'yellow'], 60, 'c'], ['pkmini', 'Mini Backpack', 'bag', 'pk_mini', 'g', ['pink', 'lilac', 'mint', 'butter', 'sky'], 70, 'c'],
+  ['pkstar', 'Star Backpack', 'bag', 'pk_star', 'a', ['yellow', 'purple', 'sky', 'pink'], 120, 'r'], ['pkbunny', 'Bunny Ear Backpack', 'bag', 'pk_bunny', 'g', ['white', 'pink', 'lilac', 'mocha'], 110, 'r'],
+  ['pkjet', 'Toy Jet Backpack', 'bag', 'pk_jet', 'a', ['silver', 'red', 'blue', 'gold'], 180, 'r'], ['pkrainbow', 'Rainbow Backpack', 'bag', 'pk_rainbow', 'a', ['white', 'black'], 150, 'r'],
+  ['pkheart', 'Heart Backpack', 'bag', 'pk_heart', 'g', ['red', 'pink', 'purple', 'rose'], 100, 'r'], ['pkdino', 'Dino Spike Backpack', 'bag', 'pk_dino', 'a', ['green', 'orange', 'teal', 'purple'], 140, 'r'],
+  ['pksports', 'Sports Backpack', 'bag', 'pk_sports', 'b', ['black', 'red', 'blue', 'green', 'orange'], 90, 'c'], ['pkhiker', 'Hiker Backpack', 'bag', 'pk_hiker', 'a', ['forest', 'orange', 'navy', 'camel'], 130, 'r'],
   // 👃 nose rings ('nose' slot, 3D in acc3d.js on a per-snout nose anchor; cartoon, oversized, clip-on look)
   ['nosehoop', 'Nose Hoop', 'nose', 'nhoop', 'a', ['gold', 'silver'], 90, 'r'], ['nosegem', 'Gem Nose Stud', 'nose', 'nstud', 'a', ['pink', 'blue', 'mint'], 110, 'r'],
   ['nosestar', 'Star Nose Stud', 'nose', 'nstar', 'a', ['gold'], 120, 'r'], ['nosedouble', 'Double Nose Hoop', 'nose', 'ndouble', 'a', ['gold'], 140, 'r'],
@@ -75,6 +81,9 @@ for (const [id, st, col] of [['f_food_berry', 'berry', '#ff4f6f'], ['f_food_cook
   WEAR.push({ id, name: st, kind: 'wear', slot: 'held', st, col, p: 0, r: 'c', g: 'a', free: true, hidden: true });
 // 🎃 Halloween costume collection (js/pals/halloween.js): free f_hw_*, Star Coins hw_*, Diamonds z_hw_*
 for (const w of HALLOWEEN) WEAR.push(w);
+// 👑 Diamond backpacks (config/palShop.dprices)
+WEAR.push({ id: 'z_pkkl', name: 'Lone Keem Studios KL Backpack', kind: 'wear', slot: 'bag', st: 'pk_kl', col: '#6a32b8', p: 0, d: 350, prem: 1, r: 'l', g: 'a' });
+for (const k of ['pink', 'lilac', 'sky', 'gold', 'black']) WEAR.push({ id: 'z_pkglit_' + k, name: T[k] + ' Glitter Backpack', kind: 'wear', slot: 'bag', st: 'pk_glitter', col: C[k], p: 0, d: 220, prem: 1, r: 'e', g: 'a' });
 // 🤏 dainty mini nose rings (same 'nose' slot + anchors, drawn at ~55% size: mini: 1)
 for (const [id, name, st, col, p] of [['nosetinyg', 'Tiny Gold Hoop', 'nhoop', '#ffcf3a', 70], ['nosetinys', 'Tiny Silver Hoop', 'nhoop', '#d0d8e8', 70], ['nosetinyrose', 'Tiny Rose Gold Hoop', 'nhoop', '#f0a0b0', 75],
   ['noseminigem', 'Mini Crystal Stud', 'nstud', '#f4fbff', 80], ['noseministar', 'Mini Star Stud', 'nstar', '#ffcf3a', 65], ['noseminiheart', 'Mini Heart Stud', 'nheartstud', '#ff5f9e', 85]])

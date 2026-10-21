@@ -10,7 +10,7 @@ const fs = (c, f, s) => { c.fillStyle = f; c.strokeStyle = s || shade(f, -0.45);
 // outfit = { head, face, neck, body, feet, back } of item ids; layer = which pass drawPal is in
 export function drawWear(c, layer, outfit, g) {
   if (!outfit) return;
-  const slots = layer === 'back' ? ['back'] : layer === 'feet' ? ['feet'] : layer === 'body' ? (g.feet ? ['body'] : ['feet', 'body']) : ['neck', 'face', 'head'];
+  const slots = layer === 'back' ? ['bag', 'back'] : layer === 'feet' ? ['feet'] : layer === 'body' ? (g.feet ? ['body'] : ['feet', 'body']) : ['neck', 'face', 'head'];
   for (const s of slots) { const it = ITEM[outfit[s]] || WEAR_BY[outfit[s]]; if (it && it.slot === s && !it.hw) { c.save(); c.lineWidth = 0.8; try { STYLE[it.st] && STYLE[it.st](c, it.col, g); } catch {} c.restore(); } }
   // 💍 2D/flat fallback for jewelry & accessories (earrings, headphones, bracelets, watches, rings) on top of the head pass
   if (layer === 'head') for (const s of ['ears', 'nose', 'wrist', 'hand']) { const it = WEAR_BY[outfit[s]]; if (it && it.slot === s && JEWEL2D[it.st]) { c.save(); c.lineWidth = 0.7; try { JEWEL2D[it.st](c, it.col, g); } catch {} c.restore(); } }
@@ -43,7 +43,15 @@ const by = (g) => -5.5 * g.bodyG, bw = (g) => 6.9 * g.bodyG, bh = (g) => 5.3 * g
 function bodyClip(c, g) { ell(c, 0, by(g), bw(g), bh(g)); c.clip(); }
 // shoes sit on the rigged feet (g.feet = [{x,y,r}] from drawPal), or the classic spots
 function onFeet(c, g, fn) { for (const f of (g && g.feet) || [{ x: -3.3, y: 0, r: 0 }, { x: 3.3, y: 0, r: 0 }]) { c.save(); c.translate(f.x, f.y); c.rotate(f.r || 0); fn(); c.restore(); } }
-const STYLE = {
+// 🎒 2D backpack: the pack peeks out behind the body on both sides + straps over the shoulders (front pass in 'body')
+const pk2 = (deco) => function (c, col, g) { const y = by(g) - 1, w = bw(g) + 2.2, h = bh(g) * 1.35; c.beginPath(); c.roundRect(-w, y - h / 2, w * 2, h, 3); fs(c, col);
+  c.strokeStyle = shade(col, -0.4); c.lineWidth = 1.1; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 3.2, g.hy + 8); c.quadraticCurveTo(s * 4.2, by(g) - 2, s * 4.6, by(g) + 3); c.stroke(); } if (deco) deco(c, col, g, y, w, h); };
+const PK2 = { pk_school: pk2(), pk_mini: pk2(), pk_sports: pk2(), pk_hiker: pk2((c, col, g, y, w, h) => { ell(c, 0, y - h / 2 - 1.2, w * 0.9, 1.6); fs(c, '#c8955f'); }),
+  pk_star: pk2((c, col, g, y, w, h) => { starP(c, -w + 1.5, y, 2.2); fs(c, '#ffcf3a'); }), pk_bunny: pk2((c, col, g, y, w, h) => { for (const s of [-1, 1]) { ell(c, s * (w - 2), y - h / 2 - 2.5, 1.2, 3); fs(c, col); } }),
+  pk_jet: pk2((c, col, g, y, w, h) => { for (const s of [-1, 1]) { ell(c, s * (w - 1), y + h / 2 + 1.5, 1, 2); fs(c, '#ffb04a'); } }), pk_rainbow: pk2((c, col, g, y, w, h) => { ['#ff5a5a', '#ffd93a', '#5ccf6a', '#4aa8ff'].forEach((k, i) => { c.fillStyle = k; c.fillRect(-w, y - h / 2 + 1 + i * 1.4, 2.2, 1.2); c.fillRect(w - 2.2, y - h / 2 + 1 + i * 1.4, 2.2, 1.2); }); }),
+  pk_kl: pk2((c, col, g, y, w, h) => { c.fillStyle = '#ffcf3a'; c.font = 'bold 3px sans-serif'; c.fillText('KL', -w + 0.3, y + 1); }), pk_heart: pk2(), pk_dino: pk2((c, col, g, y, w, h) => { for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(-3 + i * 3 - 1.2, y - h / 2); c.lineTo(-3 + i * 3, y - h / 2 - 2.4); c.lineTo(-3 + i * 3 + 1.2, y - h / 2); fs(c, shade(col, -0.3)); } }),
+  pk_glitter: pk2((c, col, g, y, w, h) => { glint2(c, -w + 1.2, y - 1, 0.9, g.t); glint2(c, w - 1.2, y + 1, 0.9, g.t); }) };
+const STYLE = { ...PK2,
   // ---- back
   cape(c, col, g) { const sw = Math.sin(g.t * 0.08) * 1.2; c.beginPath(); c.moveTo(-5, g.hy + 7); c.quadraticCurveTo(-11 - sw, by(g), -9 - sw, 0); c.lineTo(9 + sw, 0); c.quadraticCurveTo(11 + sw, by(g), 5, g.hy + 7); c.closePath(); fs(c, col); if (col === '#2a1a6a') { c.fillStyle = '#fff'; for (const [x, y] of [[-5, -4], [4, -7], [6, -2], [-2, -9]]) { starP(c, x, y, 0.9); c.fill(); } } },
   backpack(c, col, g) { c.beginPath(); c.roundRect(-11 * g.bodyG, by(g) - 4, 6, 8, 2); fs(c, col); c.fillStyle = shade(col, 0.3); c.fillRect(-10.5 * g.bodyG, by(g), 5, 2); },
