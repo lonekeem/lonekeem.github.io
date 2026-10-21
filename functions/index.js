@@ -43,3 +43,34 @@ exports.verifyPlayPurchase = onCall({ enforceAppCheck: false }, async (req) => {
   return { ok: true, ...res, uid: undefined };
 });
 
+
+// 🏷️ Sell your house back (Kemy World). One transaction: you must own homes/{plot} and still hold its deed
+// (users/{uid}/inv/{deed}); the deed is consumed, the home doc (cars list, garage, decor, paint) + pal/home are cleared
+// and 60% of the real price (config/palShop, same currency as bought) is credited. No deed = no refund, so it pays once per purchase.
+// Garage kits stay in the inventory (a new home rebuilds them free) and are not refunded. The admin palace can't be sold.
+const HOME_DEEDS = { cottage: ['hs_cottage', 'star', 800], twostory: ['hs_twostory', 'star', 1500], ranch: ['hs_ranch', 'star', 1100],
+  manor: ['z_hs_manor', 'dia', 1200], mansion: ['z_hs_mansion', 'dia', 3000], estate: ['z_hs_estate', 'dia', 5000] };
+const SELL_RATE = 0.6;
+exports.sellHome = onCall({ enforceAppCheck: false }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const plot = String((req.data || {}).plot || '');
+  if (!/^h[0-9]{2,3}$|^hm[0-9]{4}$/.test(plot)) throw new HttpsError('invalid-argument', 'Bad plot.');
+  if (plot === 'h489') throw new HttpsError('permission-denied', 'The palace can’t be sold.');
+  const { getFirestore, FieldValue: FV } = require('firebase-admin/firestore'); const uid = req.auth.uid, fs = getFirestore();
+  const href = fs.doc('homes/' + plot), pref = fs.doc(`users/${uid}/pal/home`), sref = fs.doc('config/palShop');
+  return fs.runTransaction(async (t) => {
+    const [h, shop] = await Promise.all([t.get(href), t.get(sref)]);
+    if (!h.exists || h.data().owner !== uid) throw new HttpsError('permission-denied', 'You don’t own this home.');
+    const D = HOME_DEEDS[h.data().style]; if (!D) throw new HttpsError('failed-precondition', 'This home can’t be sold.');
+    const [item, cur, fallback] = D; const iref = fs.doc(`users/${uid}/inv/${item}`); const inv = await t.get(iref);
+    if (!inv.exists) throw new HttpsError('failed-precondition', 'No deed for this home (already sold or claimed free), so there is nothing to refund.');
+    const S = shop.exists ? shop.data() : {}; const real = cur === 'star' ? (S.prices || {})[item] : (S.dprices || {})[item];
+    const base = Number.isFinite(real) && real > 0 ? real : fallback; const n = Math.floor(base * SELL_RATE);
+    const wref = fs.doc(`users/${uid}/pal/${cur === 'star' ? 'wallet' : 'diamonds'}`); const w = await t.get(wref); const now = FV.serverTimestamp();
+    if (cur === 'star') { if (w.exists) t.update(wref, { coins: FV.increment(n), updatedAt: now }); else t.set(wref, { coins: n, total: 0, day: Math.floor(Date.now() / 86400000), earned: {}, src: '', last: now, lastBuy: '', paid: 0, buyAt: now, room: [], updatedAt: now }); }
+    else { if (w.exists) t.update(wref, { d: FV.increment(n), updatedAt: now }); else t.set(wref, { d: n, total: 0, day: Math.floor(Date.now() / 86400000), today: 0, last: now, lastBuy: '', paid: 0, buyAt: now, updatedAt: now }); }
+    t.delete(iref); t.delete(href); t.delete(pref);
+    t.set(fs.collection('homeSales').doc(), { uid, plot, style: h.data().style, cur, n, price: base, at: now });
+    return { ok: true, cur, n, price: base };
+  });
+});
