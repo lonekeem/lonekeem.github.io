@@ -1451,7 +1451,7 @@ body.cam-open .mini-player { display: none; }
 body:has(.vwrap) .pal-pop { top: 24%; }
 .vwrap[data-kind=youtube] .vunmute-hint { pointer-events: auto; }
 /* the action rail sits on the right in the feed: Pal pop-ups peek from the left there */
-body:has(.vwrap) .pal-pop.right { right: auto; left: 0; --from: -100px; }
+body:has(.vwrap) .pal-pop.right { right: auto; left: 0; --from: -140px; }
 body:has(.vwrap) .pal-pop.right .pal-pop-say { right: auto; left: 10px; }
 /* ===== Typed text: always high-contrast. Dark boxes = light text, light boxes = #111 text (see .field-light) ===== */
 :where(input:not([type]), input[type=number], input[type=tel]) { width: 100%; background: #07050c; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 16px; color: var(--text); }

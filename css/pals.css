@@ -44,7 +44,7 @@
 .pal-live-hide { position: absolute; z-index: 6; right: 10px; top: 62px; font: 600 11px Inter, sans-serif; color: #fff; background: rgba(40,18,84,.7); border: 1px solid rgba(200,160,255,.45); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 /* scroll pop-ups: mid-height edges, clear of bottom video controls */
 .pal-pop { position: fixed; z-index: 90; top: 38%; width: 90px; height: 90px; cursor: pointer; transition: transform .45s cubic-bezier(.3,1.6,.5,1), opacity .4s; animation: palpeek .55s cubic-bezier(.3,1.6,.5,1) both; }
-.pal-pop.left { left: 0; --from: -100px; } .pal-pop.right { right: 0; --from: 100px; }
+.pal-pop.left { left: 0; --from: -140px; } .pal-pop.right { right: 0; --from: 140px; }
 .pal-pop.out { opacity: 0; transform: translateX(var(--from)); }
 .pal-pop.rm { animation: palfade .3s both; transition: opacity .3s; } .pal-pop.rm.out { transform: none; }
 .pal-pop-say { position: absolute; bottom: 82px; white-space: nowrap; background: #fff; color: #2a1458; font: 700 12px Inter, sans-serif; padding: 5px 10px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }

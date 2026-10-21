@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<body style="margin:0;font:600 13px sans-serif;color:#fff;background:#111">
+<div id="g" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px"></div>
+<script type="module">
+// 🧪 Feed/live Pal overlay framing (mock Pals, no database). ?old=1 = the pre-fix 96/90 px canvases. ?w=&h= tile size (portrait/landscape)
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { LIVE_BOX, POP_BOX } from '../../js/pals/overlays.js';
+const q = new URLSearchParams(location.search), old = q.get('old'), TW = +(q.get('w') || 220), TH = +(q.get('h') || 300);
+const PALS = (q.get('p') || 'kemy:f_balloon_red,giraffe:wizhat_purple,unicorn:crown_gold,elephant:f_balloon_blue,bunny:tophat_black,dragon:f_balloon_pink,founder:,owl:fairy_lilac').split(',').map((s) => { const [sp, id] = s.split(':'); return { species: sp, level: 12, outfit: id ? { [id.includes('balloon') ? 'held' : id.startsWith('fairy') ? 'back' : 'head']: id } : {} }; });
+const fixIds = (o) => { for (const k in o) if (!o[k].match(/_/)) delete o[k]; return o; };
+const jobs = [];
+for (const [i, pal] of PALS.entries()) { const kind = i % 2 ? 'live' : 'pop'; const B = old ? (kind === 'live' ? { W: 96, H: 96, dx: 0, dy: 0 } : { W: 90, H: 90, dx: 0, dy: 0 }) : kind === 'live' ? LIVE_BOX : POP_BOX;
+  const t = document.createElement('div'); t.style.cssText = `position:relative;width:${TW}px;height:${TH}px;overflow:hidden;border-radius:10px;background:linear-gradient(#5a7a6a,#2a3a30 60%,#4a3a2a)`;
+  t.innerHTML = `<span style="position:absolute;left:6px;top:4px;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:6px">${old ? 'BEFORE' : 'AFTER'} · ${kind} · ${pal.species} ${Object.values(pal.outfit).join(' ')}</span>`;
+  const cv = document.createElement('canvas'); const d = 2; cv.width = B.W * d; cv.height = B.H * d; cv.style.cssText = `position:absolute;left:0;bottom:40px;width:${B.W}px;height:${B.H}px;outline:${q.get('box') ? '1px dashed #ff0' : 'none'}`; t.appendChild(cv); document.getElementById('g').appendChild(t);
+  const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); c.translate(B.dx, B.dy); fixIds(pal.outfit);
+  const [x, y, s] = kind === 'live' ? [48, 90, 70] : [45, 86, 68]; jobs.push(() => drawPal3D(c, x, y, old || pal.species !== 'founder' ? s : s / 1.2, pal, { t: 47, mode: 'idle' })); }
+let n = 0; const go = () => { let all = true; jobs.forEach((j, i) => { if (j.done) return; if (j()) j.done = 1; else all = false; }); if (!all && n++ < 600) requestAnimationFrame(go); else setTimeout(() => (window.ready = true), 300); }; setTimeout(go, 300);
+window.onerror = (m) => { window.err = (window.err || '') + m + '\n'; };
+</script>

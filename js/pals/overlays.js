@@ -4,6 +4,13 @@ import { doc, onSnapshot, updateDoc, serverTimestamp } from 'https://www.gstatic
 import { drawPal, drawBubble, star, heart } from './art.js';
 import { getActivePal, liveStats, moodOf, patPal } from './core.js';
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// 3D Pals are blitted as a square 1.65 x size wide, from 0.87w above the feet to 0.13w below (pal3d.js drawPal3D), so the
+// overlay canvases are sized from that box (+ headroom) instead of the old 96/90 px squares that cut off heads, ears, hats
+// and held balloons. Drawing code keeps its old coordinates; the canvas is just offset by (dx, dy).
+export function fitBox(size, x, y, pad = 6) { const w = size * 1.65, half = w / 2; const dx = Math.ceil(Math.max(0, half + pad - x)), dy = Math.ceil(Math.max(0, w * 0.87 + pad - y));
+  return { W: Math.ceil(x + dx + half + pad), H: Math.ceil(y + dy + w * 0.13 + pad), dx, dy }; }
+export const LIVE_BOX = fitBox(70, 48, 90), POP_BOX = fitBox(68, 45, 86);
+const fitSize = (pal, s) => (pal && pal.species === 'founder' ? s / 1.2 : s); // founder renders 1.2x wider
 function canvasEl(w, h) { const cv = document.createElement('canvas'); const d = Math.min(3, devicePixelRatio || 1); cv.width = w * d; cv.height = h * d; cv.style.width = w + 'px'; cv.style.height = h + 'px'; const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); return { cv, c }; }
 
 // ---------------------------------------------------------------- live overlay
@@ -15,13 +22,13 @@ export function liveOverlay({ S, db, toast }, root, { liveId, hostId, isHost }) 
     try { pal = await getActivePal(db, hostId); } catch { pal = null; }
     if (!alive || !pal || !document.body.contains(root)) return;
     el = document.createElement('div'); el.className = 'pal-live'; el.setAttribute('role', 'button'); el.setAttribute('aria-label', `${pal.name}, the streamer's Pal. Tap to pet.`); el.tabIndex = 0;
-    const { cv, c } = canvasEl(96, 96); el.appendChild(cv); root.appendChild(el); st.enter = 1;
+    const B = LIVE_BOX, { cv, c } = canvasEl(B.W, B.H); c.translate(B.dx, B.dy); el.style.width = B.W + 'px'; el.style.height = B.H + 'px'; el.appendChild(cv); root.appendChild(el); st.enter = 1;
     if (isHost) { const b = document.createElement('button'); b.className = 'pal-live-hide'; b.type = 'button'; b.textContent = 'Hide Pal'; root.appendChild(b); b.onclick = (e) => { e.stopPropagation(); setHidden(!hidden); }; st.btn = b; }
     const pos = JSON.parse(localStorage.getItem('kemy-pal-live-pos') || 'null'); if (pos) { el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px'; el.style.right = 'auto'; }
     let drag = null, moved = false, lastPet = 0;
     el.addEventListener('pointerdown', (e) => { e.stopPropagation(); drag = { x: e.clientX, y: e.clientY, l: el.offsetLeft, t: el.offsetTop }; moved = false; try { el.setPointerCapture(e.pointerId); } catch {} });
     el.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 6) moved = true; if (!moved) return;
-      const r = root.getBoundingClientRect(); el.style.left = Math.max(0, Math.min(r.width - 96, drag.l + dx)) + 'px'; el.style.top = Math.max(50, Math.min(r.height - 170, drag.t + dy)) + 'px'; el.style.right = 'auto'; });
+      const r = root.getBoundingClientRect(); el.style.left = Math.max(0, Math.min(r.width - LIVE_BOX.W, drag.l + dx)) + 'px'; el.style.top = Math.max(50, Math.min(r.height - 170, drag.t + dy)) + 'px'; el.style.right = 'auto'; });
     el.addEventListener('pointerup', (e) => { e.stopPropagation(); if (moved) localStorage.setItem('kemy-pal-live-pos', JSON.stringify({ x: el.offsetLeft, y: el.offsetTop })); else pet(); drag = null; });
     el.addEventListener('click', (e) => e.stopPropagation());
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pet(); } });
@@ -38,11 +45,11 @@ export function liveOverlay({ S, db, toast }, root, { liveId, hostId, isHost }) 
     const mood = moodOf(liveStats(pal));
     const frame = () => {
       if (!alive || !document.body.contains(el)) { cleanup(); return; }
-      st.t++; c.clearRect(0, 0, 96, 96);
+      st.t++; c.clearRect(-LIVE_BOX.dx, -LIVE_BOX.dy, LIVE_BOX.W, LIVE_BOX.H);
       if (st.enter < 40) st.enter++; const e = RM() ? 40 : st.enter; const bounce = Math.min(1, e / 22) * (1 + Math.sin(Math.min(e, 40) / 40 * Math.PI) * 0.15);
       let mode = 'idle'; if (st.react > 0) { st.react--; mode = 'react'; } else if (st.wave > 0) { st.wave--; mode = 'happy'; }
       c.save(); c.translate(48, 92); c.scale(bounce, bounce); c.translate(-48, -92);
-      drawPal(c, 48, 90, 70, pal, { t: st.t, mode, face: st.face, mood });
+      drawPal(c, 48, 90, fitSize(pal, 70), pal, { t: st.t, mode, face: st.face, mood });
       if (st.wave > 0) { c.font = '14px sans-serif'; c.fillText('👋', 70, 30); }
       c.restore();
       for (const s of st.caught) { s.y += 2.4; s.life--; c.fillStyle = '#ffd34d'; star(c, s.x, s.y, 4); c.fill(); }
@@ -84,11 +91,11 @@ export function popups({ S, db }) {
     const line = LINES[key][Math.floor(Math.random() * LINES[key].length)]; const side = Math.random() < 0.5 ? 'left' : 'right';
     const el = document.createElement('div'); el.className = `pal-pop ${side}${RM() ? ' rm' : ''}`; el.setAttribute('role', 'button'); el.setAttribute('aria-label', `${p.name} says: ${line}. Tap to say bye.`); el.tabIndex = 0;
     const say = document.createElement('span'); say.className = 'pal-pop-say'; say.textContent = line; el.appendChild(say);
-    const { cv, c } = canvasEl(90, 90); el.appendChild(cv); document.body.appendChild(el);
+    const B = POP_BOX, { cv, c } = canvasEl(B.W, B.H); c.translate(B.dx, B.dy); el.style.width = B.W + 'px'; el.style.height = B.H + 'px'; say.style.bottom = (B.H - 4) + 'px'; el.appendChild(cv); document.body.appendChild(el);
     let t = 0, poof = 0, on = true; const face = side === 'left' ? 1 : -1;
-    const f = () => { if (!on || !el.isConnected) return; t++; c.clearRect(0, 0, 90, 90);
+    const f = () => { if (!on || !el.isConnected) return; t++; c.clearRect(-POP_BOX.dx, -POP_BOX.dy, POP_BOX.W, POP_BOX.H);
       if (poof) { poof++; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; drawBubble(c, 45 + Math.cos(a) * poof * 1.4, 50 + Math.sin(a) * poof * 1.4, Math.max(1, 6 - poof * 0.2)); } if (poof > 24) { on = false; el.remove(); shown = false; } }
-      else drawPal(c, 45, 86, 68, p, { t, face, mode: t < 90 && !RM() ? 'happy' : 'idle', mood });
+      else drawPal(c, 45, 86, fitSize(p, 68), p, { t, face, mode: t < 90 && !RM() ? 'happy' : 'idle', mood });
       requestAnimationFrame(f); };
     requestAnimationFrame(f);
     const bye = (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } if (poof) return; poof = 1; el.classList.add('poof'); };
