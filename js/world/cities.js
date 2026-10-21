@@ -22,8 +22,8 @@ export function attachCities(api, W, K) {
     add(chunkKey((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), { t: 'roads', r, a, b, first: i === 0, last: i === n - 1 }); } }
   for (const b of BRIDGES) { const [ax, az] = b.a, [bx, bz] = b.b; const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 50)); for (let i = 0; i < n; i++) { const a = [ax + (bx - ax) * i / n, az + (bz - az) * i / n], c = [ax + (bx - ax) * (i + 1) / n, az + (bz - az) * (i + 1) / n]; add(chunkKey((a[0] + c[0]) / 2, (a[1] + c[1]) / 2), { t: 'bridges', b, a, c }); } }
   for (const h of HOUSES) if (h.city || h.estate) add(chunkKey(h.x, h.z), { t: 'houses', h });
-  for (const c of CITIES) add(chunkKey(c.x - 74, c.z - 80), { t: 'signs', c, x: c.x - 74, z: c.z - 80 });
-  const lotOf = (x, z) => { for (const c of CITIES) if (Math.abs(x - c.x) < 70 && Math.abs(z - c.z) < 92) return true; for (const e of ESTATES) if (Math.abs(x - e.x) < 38 && Math.abs(z - e.z) < 50) return true; return false; };
+  for (const c of CITIES) add(chunkKey(c.x - c.hx - 4, c.z - c.hz + 12), { t: 'signs', c, x: c.x - c.hx - 4, z: c.z - c.hz + 12 });
+  const lotOf = (x, z) => { for (const c of CITIES) if (Math.abs(x - c.x) < c.hx && Math.abs(z - c.z) < c.hz) return true; for (const e of ESTATES) if (Math.abs(x - e.x) < 38 && Math.abs(z - e.z) < 50) return true; return false; };
   const chunks = new Map(); // key -> { g, cols }
   const wallC = (h, r) => { const c = CITIES.find((q) => q.id === h.city); return c ? c.wall[Math.floor(r() * c.wall.length)] : '#f5f5f4'; }, roofC = (h, r) => { const c = CITIES.find((q) => q.id === h.city); return c ? c.roof[Math.floor(r() * c.roof.length)] : '#334155'; };
   function buildChunk(key) { const [ci, cj] = key.split(',').map(Number); const x0 = GX0 + ci * CH, z0 = GZ0 + cj * CH; const g = new THREE.Group(); g.name = 'chunk ' + key; const cols = []; const P = pieces.get(key) || { roads: [], houses: [], bridges: [], signs: [] }; const k = 'ck' + key + ':';

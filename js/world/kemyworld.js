@@ -3,7 +3,7 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
-import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER } from './layout.js';
+import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear } from './layout.js';
 import { attachCities } from './cities.js';
 import { attachMap } from './map.js';
 const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
@@ -308,7 +308,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   function drawMap() { const S2 = 184; const RM = W.navOn && W.navOn() ? 160 : 240; const x0 = P.x - RM, x1 = P.x + RM, z0 = P.z - RM, z1 = P.z + RM; /* centred on me (the world is big now) */ const sc = S2 / Math.max(x1 - x0, z1 - z0); const mx = (x) => (x - x0) * sc + (S2 - (x1 - x0) * sc) / 2, mz = (z) => (z - z0) * sc;
     mapX.clearRect(0, 0, S2, S2); mapX.fillStyle = 'rgba(30,60,40,.55)'; mapX.fillRect(0, 0, S2, S2); mapX.fillStyle = '#3fa7d6'; for (const w of WATER) mapX.fillRect(mx(w.x0), mz(w.z0), (w.x1 - w.x0) * sc, (w.z1 - w.z0) * sc); if (W.mapExtra) W.mapExtra(mapX, mx, mz, sc); mapX.fillStyle = 'rgba(80,160,80,.55)'; mapX.fillRect(mx(-PARK.W), mz(-PARK.H), PARK.W * 2 * sc, PARK.H * 2 * sc); mapX.fillStyle = 'rgba(70,50,120,.6)'; mapX.fillRect(mx(STREET.x0), mz(STREET.z0), (STREET.x1 - STREET.x0) * sc, (STREET.z1 - STREET.z0) * sc);
     for (const r of ALL_ROADS()) { mapX.strokeStyle = r.hw ? '#fbbf24' : '#e7e5e4'; mapX.lineWidth = r.hw ? 4 : 2.5; mapX.beginPath(); mapX.moveTo(mx(r.a[0]), mz(r.a[1])); mapX.lineTo(mx(r.b[0]), mz(r.b[1])); mapX.stroke(); }
-    mapX.fillStyle = '#ff8a1f'; for (const h of HOUSES) mapX.fillRect(mx(h.x) - 1, mz(h.z) - 1, 2, 2); if (W.mapRoute) W.mapRoute(mapX, mx, mz); if (W.mapLabels) W.mapLabels(mapX, mx, mz);
+    mapX.fillStyle = '#ff8a1f'; for (const h of housesNear(P.x, P.z, RM)) mapX.fillRect(mx(h.x) - 1, mz(h.z) - 1, 2, 2); if (W.mapRoute) W.mapRoute(mapX, mx, mz); if (W.mapLabels) W.mapLabels(mapX, mx, mz);
     mapX.fillStyle = '#7dd3fc'; for (const o of api.others.values()) { if (o.x > 392) continue; mapX.beginPath(); mapX.arc(mx(o.x), mz(o.z), 3, 0, 7); mapX.fill(); }
     mapX.fillStyle = '#ffd23f'; mapX.beginPath(); mapX.arc(mx(P.x), mz(P.z), 5, 0, 7); mapX.fill(); mapX.strokeStyle = '#ffd23f'; mapX.lineWidth = 2; mapX.beginPath(); mapX.moveTo(mx(P.x), mz(P.z)); mapX.lineTo(mx(P.x + Math.sin(P.yaw) * 14), mz(P.z + Math.cos(P.yaw) * 14)); mapX.stroke(); }
   mapC.onclick = () => { if (W.openMap) W.openMap(); };

@@ -7,6 +7,10 @@ export const PAL = {
   farm: { wall: '#f5e1c0', trim: '#7c2d12', acc: '#dc2626', floor: 'dark', view: 'farm' }, snow: { wall: '#e8d5b5', trim: '#5b3a1f', acc: '#b91c1c', floor: 'dark', view: 'snow' },
   desert: { wall: '#f4c99a', trim: '#9a3412', acc: '#0d9488', floor: 'tile', view: 'desert' }, lake: { wall: '#dbeafe', trim: '#1e3a8a', acc: '#16a34a', floor: 'wood', view: 'lake' },
   shore: { wall: '#f0fdfa', trim: '#0f766e', acc: '#f97316', floor: 'tile', view: 'shore' } };
+// per-seed look for the far-south metro homes: every house mixes wall / trim / accent / floor / view from its seed
+const ACC = ['#7c3aed', '#0ea5e9', '#dc2626', '#16a34a', '#f97316', '#db2777', '#0d9488', '#ca8a04', '#4f46e5'];
+export function palOf(h) { if (!h || (!h.num && PAL[h.town || 'street'])) return PAL[(h && h.town) || 'street'] || PAL.street; const P = Object.values(PAL), s = h.seed || 0;
+  const a = P[s % P.length], b = P[Math.floor(s / 7) % P.length]; return { wall: a.wall, trim: b.trim, acc: ACC[Math.floor(s / 3) % ACC.length], floor: ['wood', 'dark', 'tile', 'carpet'][Math.floor(s / 5) % 4], view: P[Math.floor(s / 11) % P.length].view }; }
 export const WALL_SW = ['#fde7c7', '#ffffff', '#e5e7eb', '#dbeafe', '#fce7f3', '#ecfccb', '#ede9fe', '#fef3c7', '#f4c99a', '#1f2937'];
 export const EXT_SW = ['#f6e7c8', '#ffffff', '#cfe3f0', '#f3d1dc', '#d8ecd0', '#efe0ff', '#fca5a5', '#fde047', '#93c5fd', '#475569', '#7c3aed', '#7a3b3b', '#2f5d50', '#111827'];
 export const FLOORS = { wood: { n: 'Wood', c: '#b07a4a', l: '#8a5a34' }, dark: { n: 'Dark wood', c: '#6b4423', l: '#4a2e17' }, tile: { n: 'Tile', c: '#e5e7eb', l: '#cbd5e1' }, carpet: { n: 'Carpet', c: '#a78bfa', l: null } };
@@ -52,8 +56,8 @@ export const SCREENS = { tv: [0, 1.25, .02, 2, .95], tg: [0, 1.5, .02, 3, 1.5] }
 export const decorItem = (code) => { const d = DECOR[code]; return d ? (d.d ? 'z_hd_' + code : 'hd_' + code) : null; };
 export function parseItems(s) { const out = []; for (const t of String(s || '').split(';')) { const [c, x, z, r, f] = t.split(','); if (!DECOR[c]) continue; const X = +x / 2, Z = +z / 2; if (!isFinite(X) || !isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) continue; out.push({ c, x: X, z: Z, r: (+r || 0) & 3, f: f === '1' ? 1 : 0 }); if (out.length >= 80) break; } return out; }
 export const serItems = (L) => L.map((i) => [i.c, Math.round(i.x * 2), Math.round(i.z * 2), i.r & 3].join(',') + (i.f ? ',1' : '')).join(';');
-export const defaultItems = (two) => serItems([{ c: 'cs', x: -2.2, z: 4.9, r: 2 }, { c: 'tv', x: -2.2, z: 1.0, r: 0 }, { c: 'rg', x: -2.6, z: 3, r: 0 }, { c: 'lp', x: -5.5, z: 5.5, r: 0 }, { c: 'bs', x: -5.7, z: 3, r: 1 }, { c: 'pl', x: -5.5, z: 1.1, r: 0 },
-  { c: 'ta', x: -3.2, z: -2.4, r: 0 }, { c: 'cr', x: -4.3, z: -2.4, r: 1 }, { c: 'cr', x: -2.1, z: -2.4, r: 3 }, { c: 'bd', x: 4.2, z: -4.2, r: 0 }, { c: 'dr', x: 2.1, z: -5.7, r: 0 }, { c: 'ar', x: 6, z: -2, r: 3 }, { c: 'pl', x: 5.6, z: -.5, r: 0 },
+export const defaultItems = (two, seed = 0) => serItems([{ c: ['cs', 'cs', 'cl'][seed % 3], x: -2.2, z: 4.9, r: 2 }, { c: 'tv', x: -2.2, z: 1.0, r: 0 }, { c: 'rg', x: -2.6, z: 3, r: 0 }, { c: 'lp', x: -5.5, z: 5.5, r: 0 }, { c: 'bs', x: -5.7, z: 3, r: 1 }, { c: 'pl', x: -5.5, z: 1.1, r: 0 },
+  { c: 'ta', x: -3.2, z: -2.4, r: 0 }, { c: 'cr', x: -4.3, z: -2.4, r: 1 }, { c: 'cr', x: -2.1, z: -2.4, r: 3 }, { c: ['bd', 'bd', 'bc', 'br'][Math.floor(seed / 3) % 4], x: 4.2, z: -4.2, r: 0 }, { c: 'dr', x: 2.1, z: -5.7, r: 0 }, { c: 'ar', x: 6, z: -2, r: 3 }, { c: 'pl', x: 5.6, z: -.5, r: 0 },
   ...(two ? [{ c: 'bk', x: 4.6, z: -4.4, r: 0, f: 1 }, { c: 'ta', x: 3.2, z: -1, r: 0, f: 1 }, { c: 'cr', x: 3.2, z: -.1, r: 2, f: 1 }, { c: 'rr', x: 3.4, z: -3.2, r: 0, f: 1 }, { c: 'lp', x: 1.6, z: -5.6, r: 0, f: 1 }, { c: 'ak', x: 3, z: -6, r: 0, f: 1 }] : [{ c: 'pl', x: 2, z: 5.5, r: 0 }])]);
 
 const views = {};
@@ -70,7 +74,7 @@ function viewTex(THREE, kind) { if (views[kind]) return views[kind]; const cv = 
 
 // build one interior in a ROOMS cell. K = { put, flush, G, std }. Returns a handle with live setters.
 export function buildInterior(api, K, h, cx, cz, decor) {
-  const { THREE, box, LOW } = api; const { put, flush, G } = K; const y = K.y ?? 0; const SC = scOf(h); const two = h.style === 1 || h.style === 3 || !!h.estate; const S = PAL[h.town || 'street'] || PAL.street;
+  const { THREE, box, LOW } = api; const { put, flush, G } = K; const y = K.y ?? 0; const SC = scOf(h); const two = h.style === 1 || h.style === 3 || !!h.estate; const S = palOf(h);
   const g = new THREE.Group(); g.name = 'interior-' + h.id; const vc = (o = {}) => (LOW ? new THREE.MeshLambertMaterial({ color: '#fff', vertexColors: true, ...o }) : new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.8, vertexColors: true, ...o }));
   const k = 'in' + h.id; const cols = []; const HR = two ? (h.admin ? 8.8 : h.estate ? 7.6 : 6.55) : 3.2; const T = S.trim, A = S.acc;
   const B = (key, c, x, yy, z, sx, sy, sz, solid = 0, sh = 'box', ry = 0, fs = 0) => { x *= SC; z *= SC; if (fs) { sx *= SC; sz *= SC; } put(key, G[sh], c, cx + x, y + yy, cz + z, ry, sx, sy, sz); if (solid) { const b = { x0: cx + x - sx / 2, x1: cx + x + sx / 2, z0: cz + z - sz / 2, z1: cz + z + sz / 2, top: solid === 2 ? y + yy + sy / 2 : solid === 3 ? y + 3.2 : 99, bot: solid === 4 ? y + 3.2 : -99 }; box.push(b); cols.push(b); } };
@@ -113,7 +117,7 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   flush(k + 'w', wallMat, !LOW, g); flush(k + 's', structM, !LOW, g); flush(k + 'g', glowM, false, g); flush(vk, viewM, false, g);
   // (interior doors removed: open doorways everywhere)
   // floor (rebuildable) + furniture (rebuildable)
-  let floorM = null, decG = null; let decCols = [], seats = [], screens = []; let items = parseItems(decor.items || defaultItems(two));
+  let floorM = null, decG = null; let decCols = [], seats = [], screens = []; let items = parseItems(decor.items || defaultItems(two, h.num ? h.seed : 0));
   function setFloor(t) { const F = FLOORS[t] || FLOORS[S.floor]; if (floorM) { g.remove(floorM); floorM.geometry.dispose(); } const fk = k + 'f'; put(fk, G.box, F.c, cx, y - 0.05, cz, 0, 12.4 * SC, 0.1, 12.4 * SC);
     if (t === 'tile') { for (let i = -6; i < 6; i++) for (let j = -6; j < 6; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC, SC, 1, -Math.PI / 2); }
     else if (F.l) for (let i = -5; i <= 5; i++) put(fk, G.box, F.l, cx + i * 1.1 * SC, y + 0.002, cz, 0, 0.03, 0.004, 12.2 * SC);

@@ -2,7 +2,7 @@
 // ground / bounds hooks Pal Park uses. Pure data + math (no three.js) so tests and other modules can import it.
 // Written by Lone Keem.
 export const PARK = { W: 100, H: 75 };                     // Pal Park half-size (x -100..100, z -75..75)
-export const BOUNDS = { x0: -1300, x1: 385, z0: -75, z1: 1460 };  // whole walkable world (presence 1 m = 16 units, rules allow x -40000..10000, y 0..60000)
+export const BOUNDS = { x0: -1300, x1: 385, z0: -75, z1: 3460 };  // whole walkable world (presence 1 m = 16 units, rules allow x -40000..10000, y 0..60000)
 export const OLD = { x0: -100, z1: 540 };                  // the original hand-made world (x >= -100, z <= 540); everything else streams in chunks (cities.js)
 // the east side (stage 3): a highway loop around Kemy Downtown, Clover Fields countryside and Sunny Shore beach
 export const EAST = { x0: 100, x1: 385, z0: -75, z1: 522 };
@@ -88,11 +88,12 @@ export const CITIES = [
   { id: 'pebble', name: '⚓ Pebble Harbor', x: -980, z: 1000, wall: ['#e2e8f0', '#f8fafc', '#cbd5e1', '#dbeafe'], roof: ['#1e3a8a', '#0f766e', '#334155'] },
   { id: 'honey', name: '🍯 Honeyhill', x: 0, z: 1000, wall: ['#fde68a', '#fcd34d', '#fef3c7', '#f5deb3'], roof: ['#92400e', '#78350f', '#a16207'] },
   { id: 'cloud', name: '☁️ Cloudport', x: 250, z: 960, wall: ['#f1f5f9', '#e0f2fe', '#ede9fe', '#ffffff'], roof: ['#0ea5e9', '#6366f1', '#64748b'] }];
-for (const c of CITIES) TOWNS.push({ id: c.id, name: c.name, x: c.x, z: c.z, city: 1 });
+for (const c of CITIES) { c.hx = 70; c.hz = 92; TOWNS.push({ id: c.id, name: c.name, x: c.x, z: c.z, city: 1 }); }
 export const CITY_BY_ID = Object.fromEntries(CITIES.map((c) => [c.id, c]));
 // water: rivers + the southern sea (axis-aligned rectangles; ground dips under them, roads cross on bridges)
 export const WATER = [{ id: 'rv1', name: 'Silver River', x0: -660, x1: -630, z0: -90, z1: 670 }, { id: 'rv2', name: 'Willow River', x0: -1320, x1: 100, z0: 640, z1: 670 },
-  { id: 'sea', name: 'Sparkle Sea', x0: 100, x1: 400, z0: 514, z1: 800 }];
+  { id: 'sea', name: 'Sparkle Sea', x0: 100, x1: 400, z0: 514, z1: 800 },
+  { id: 'rv3', name: 'Ribbon River', x0: -1320, x1: 400, z0: 2040, z1: 2072 }, { id: 'rv4', name: 'Lullaby Lake', x0: -1320, x1: 400, z0: 3000, z1: 3034 }];
 export const WATER_Y = 1.0;
 const HWy = (id, a, b) => ({ id, a, b, w: 12, hw: 1, big: 1 }), St = (id, a, b, w = 8) => ({ id, a, b, w, big: 1 });
 export const ROADS4 = [
@@ -111,11 +112,27 @@ export const ESTATES = [ // big private plots: hillside (north), waterfront (riv
   { x: -440, z: 604, face: -1, style: 4, spot: '🌊 Riverside Lane' }, { x: -280, z: 604, face: -1, style: 5, spot: '🌊 Riverside Lane' },
   { x: -1100, z: 1222, face: -1, style: 4, spot: '🌲 Hidden Pines Road' }, { x: 342, z: 852, face: 1, style: 5, spot: '🏖️ Cloudport Cliffs' }];
 { let n = HOUSES.length; for (const c of CITIES) for (let j = 0; j < 4; j++) for (const s of [-1, 1]) for (let k = 0; k < 8; k++) { const z = c.z - 66 + 44 * j + s * 16, x = c.x - 49 + 14 * k, face = -s; const num = ++n;
-    HOUSES.push({ id: 'h' + num, x, z, face, style: num % 4, seed: (num * 13 + k * 7) % 97, town: c.id, city: c.id, door: { x, z: z + face * 4.02 }, w: 9, d: 8, cs: [0, 3, 5, 6].includes(num % 8) }); /* half for sale, every style (rules: n % 8 in [0, 3, 5, 6]) */ }
+    HOUSES.push({ id: 'hm' + num, num, x, z, face, style: num % 4, seed: (num * 13 + k * 7) % 97, town: c.id, city: c.id, door: { x, z: z + face * 4.02 }, w: 9, d: 8, cs: [0, 3, 5, 6].includes(num % 8) }); /* half for sale, every style (rules: n % 8 in [0, 3, 5, 6]) */ }
   for (const e of ESTATES) { const num = ++n; HOUSES.push({ id: 'h' + num, x: e.x, z: e.z, face: e.face, style: e.style, seed: num % 97, town: 'estate', estate: 1, spot: e.spot, door: { x: e.x, z: e.z + e.face * 7.02 }, w: 18, d: 14 }); e.id = 'h' + num; }
   // 👑 the admin's private palace (never for sale; firestore.rules: only the admin can write homes/h489)
   HOUSES.push({ id: 'h' + (++n), x: ADMIN_HOME.x, z: ADMIN_HOME.z, face: 1, style: 5, seed: 7, town: 'estate', estate: 1, admin: 1, spot: '👑 Kemy Palace', door: { x: ADMIN_HOME.x, z: ADMIN_HOME.z + 12.02 }, w: 34, d: 24 }); }
 export const ADMIN_PLOT = 'h489';
+// 🏙️ the Far South (stage 4): 12 big metro cities, every house for sale (h1000 .. h3591, style = number % 4).
+// 6 streets x 2 sides x 18 houses each; highways between the rows, two rivers with bridges. Built only near the player (cities.js chunks).
+export const METRO0 = 1000;
+const MNAMES = [['berry', '🍓 Berrybrook'], ['butterfly', '🦋 Butterfly Bay'], ['sunflower', '🌻 Sunflower City'], ['candy', '🍭 Candy Cove'], ['shell', '🐚 Seashell Springs'], ['moon', '🌙 Moonbeam Meadows'],
+  ['clover', '🍀 Clovertown'], ['balloon', '🎈 Balloon Bluffs'], ['buzz', '🐝 Buzzby'], ['cupcake', '🧁 Cupcake Corners'], ['starfall', '🌟 Starfall'], ['melon', '🍉 Melonville']];
+const MPAL = [[['#fecdd3', '#fde2e4', '#fff1f2', '#fbcfe8'], ['#be123c', '#9f1239', '#7c3aed']], [['#dbeafe', '#e0e7ff', '#cffafe', '#f5f3ff'], ['#1d4ed8', '#0e7490', '#6d28d9']], [['#fef3c7', '#fde68a', '#fff7ed', '#ecfccb'], ['#a16207', '#4d7c0f', '#b45309']],
+  [['#fce7f3', '#e9d5ff', '#ccfbf1', '#fef9c3'], ['#db2777', '#7c3aed', '#0d9488']], [['#f0fdfa', '#e0f2fe', '#fafaf9', '#fef3c7'], ['#0f766e', '#0369a1', '#78716c']], [['#e0e7ff', '#ede9fe', '#f1f5f9', '#e2e8f0'], ['#312e81', '#1e293b', '#4c1d95']]];
+for (let i = 0; i < 12; i++) { const [id, name] = MNAMES[i]; const pal = MPAL[i % 6]; CITIES.push({ id, name, x: [-1000, -440, 120][i % 3], z: 1800 + 500 * Math.floor(i / 3), hx: 140, hz: 124, metro: 1, wall: pal[0], roof: pal[1] }); }
+export const METROS = CITIES.filter((c) => c.metro);
+for (const c of METROS) { TOWNS.push({ id: c.id, name: c.name, x: c.x, z: c.z, city: 1 }); CITY_BY_ID[c.id] = c; }
+for (const z of [1650, 2150, 2650, 3150]) ROADS4.push(HWy('S' + z, [-1240, z], [372, z]));
+ROADS4.push(HWy('SW', [-1240, 1400], [-1240, 3400]), HWy('SE', [372, 1400], [372, 3400]), HWy('SB', [-1240, 3400], [372, 3400]), HWy('SM', [-720, 1400], [-720, 3400]), HWy('SN', [-150, 1400], [-150, 3400]));
+for (const c of METROS) { for (let j = 0; j < 6; j++) ROADS4.push(St(c.id + 's' + j, [c.x - 132, c.z - 110 + 44 * j], [c.x + 132, c.z - 110 + 44 * j]));
+  for (const s of [-1, 1]) ROADS4.push(St(c.id + 'v' + (s > 0 ? 'e' : 'w'), [c.x + s * 132, c.z - 150], [c.x + s * 132, c.z + 110])); }
+{ let num = METRO0; for (const c of METROS) for (let j = 0; j < 6; j++) for (const s of [-1, 1]) for (let k = 0; k < 18; k++) { const z = c.z - 110 + 44 * j + s * 16, x = c.x - 119 + 14 * k, face = -s;
+  HOUSES.push({ id: 'hm' + num, num, x, z, face, style: num % 4, seed: (num * 13 + k * 7) % 997, town: c.id, city: c.id, door: { x, z: z + face * 4.02 }, w: 9, d: 8, cs: true }); num++; } }
 // property: every third plot is for sale (one owner each); the rest are open "neighbor" houses you can visit + knock at
 export const HOME_STYLES = [
   { key: 'cottage', name: 'Pumpkin Cottage', item: 'hs_cottage', p: 800 }, { key: 'twostory', name: 'Maple Two-Story', item: 'hs_twostory', p: 1500 },
@@ -131,7 +148,7 @@ export const ADMIN_CAP = 50;
 export const garageCap = (t) => (GARAGES[t - 1] ? GARAGES[t - 1].cap : 0);
 HOUSES.forEach((h, i) => { h.i = i; h.sale = h.admin ? false : h.estate ? true : h.city ? h.cs : i % 3 === 1; });
 export const ESTATE_IDS = HOUSES.filter((h) => h.estate).map((h) => h.id); // mansion cells (incl. the palace, last)
-export const roomOf = (h) => { if (h.estate) { const k = ESTATE_IDS.indexOf(h.id); return { cx: MROOMS.x0 + MROOMS.cell / 2 + (k % MROOMS.per) * MROOMS.cell, cz: MROOMS.z0 + MROOMS.cell / 2 + Math.floor(k / MROOMS.per) * MROOMS.cell }; } const c = h.i % ROOMS.n; return { cx: ROOMS.x0 + ROOMS.cell / 2 + (c % ROOMS.per) * ROOMS.cell, cz: ROOMS.z0 + ROOMS.cell / 2 + Math.floor(c / ROOMS.per) * ROOMS.cell }; };
+export const roomOf = (h) => { if (h.estate) { const k = ESTATE_IDS.indexOf(h.id); return { cx: MROOMS.x0 + MROOMS.cell / 2 + (k % MROOMS.per) * MROOMS.cell, cz: MROOMS.z0 + MROOMS.cell / 2 + Math.floor(k / MROOMS.per) * MROOMS.cell }; } const c = (h.num || h.i) % ROOMS.n; return { cx: ROOMS.x0 + ROOMS.cell / 2 + (c % ROOMS.per) * ROOMS.cell, cz: ROOMS.z0 + ROOMS.cell / 2 + Math.floor(c / ROOMS.per) * ROOMS.cell }; };
 export const HOUSE_BY_ID = Object.fromEntries(HOUSES.map((h) => [h.id, h]));
 const sstep = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 export function segD(x, z, r) { const [ax, az] = r.a, [bx, bz] = r.b; const dx = bx - ax, dz = bz - az; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - ax - dx * t, z - az - dz * t); }
@@ -192,8 +209,13 @@ export function worldClamp(x, z) { const { W, H } = PARK; void SNOW; void DESERT
   void W; void H; return [x, z]; }
 export const inStreet = (x, z) => z > PARK.H - 4 && x < 100;
 export function areaAt(x, z) { if (x > ROMS_X) return '🏠 Inside';
-  if (isBig(x, z)) { for (const c of CITIES) if (Math.abs(x - c.x) < 80 && Math.abs(z - c.z) < 96) return c.name; for (const e of ESTATES) if (Math.hypot(x - e.x, z - e.z) < 45) return e.spot; const b = onBridge(x, z); if (b) return '🌉 ' + (WATER.find((w) => rectD(w, x, z) < 10) || { name: 'Bridge' }).name + ' Bridge';
+  if (isBig(x, z)) { for (const c of CITIES) if (Math.abs(x - c.x) < c.hx + 10 && Math.abs(z - c.z) < c.hz + 4) return c.name; for (const e of ESTATES) if (Math.hypot(x - e.x, z - e.z) < 45) return e.spot; const b = onBridge(x, z); if (b) return '🌉 ' + (WATER.find((w) => rectD(w, x, z) < 10) || { name: 'Bridge' }).name + ' Bridge';
     if (ROADS4.some((r) => r.hw && segD(x, z, r) < 9)) return '🛣️ Kemy Highway'; return '🌲 Countryside'; } if (z > SHORE.z0 - 30 && x > 100) return '🏖️ Sunny Shore';
   if (x > 100 && z > 330) return '🛶 Willow Lake'; if (x > 100 && z > 222) return x < 244 ? '❄️ Frostberry Village' : '🌵 Sunstone Canyon'; if (x > 100 && ROADS2.some((r) => r.hw && segD(x, z, r) < 9)) return '🛣️ Loop Highway'; if (x > 100 && z < 206 && x < 244 && z > -52) return '🏙️ Kemy Downtown'; if (x >= FIELDS.x0 - 6 && x < 380 && z < FIELDS.z1 + 6) return '🌾 Clover Fields';
   if (x < PLAINS.x1 + 2 && z > PLAINS.z0 - 4) return '🌾 Open Plains';
   if (x > 104) return (x < 240 && z < 92) ? '🏙️ Kemy Downtown' : '🛣️ Loop Highway'; if (z > PARK.H + 2) return '🎃 Kemy Street'; return '🌳 Pal Park'; }
+
+// spatial index (64 m cells) so per-frame checks only touch nearby houses (there are 3,000+)
+const HG = new Map(); for (const h of HOUSES) { const k = Math.floor(h.x / 64) + ',' + Math.floor(h.z / 64); if (!HG.has(k)) HG.set(k, []); HG.get(k).push(h); }
+export function housesNear(x, z, r) { const out = []; const x0 = Math.floor((x - r) / 64), x1 = Math.floor((x + r) / 64), z0 = Math.floor((z - r) / 64), z1 = Math.floor((z + r) / 64);
+  for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) { const a = HG.get(i + ',' + j); if (a) for (const h of a) out.push(h); } return out; }

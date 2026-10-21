@@ -38,10 +38,16 @@ await ok('kid cannot edit the palace', assertFails(upd(KID, 'kid', 'h489', 'esta
 await ok('kid cannot delete the palace', assertFails(deleteDoc(doc(KID, 'homes/h489'))));
 await ok('orphan home (owner gone) can be cleared by anyone', assertSucceeds(deleteDoc(doc(PAL, 'homes/h300'))));
 await ok('a live owner home cannot be cleared by others', assertFails(deleteDoc(doc(PAL, 'homes/h483'))));
+await ok('metro plot hm1003 buyable (manor = 1003 % 4)', assertSucceeds((async () => { await env.withSecurityRulesDisabled(async (c) => { await deleteDoc(doc(c.firestore(), 'users/pal/pal/home')); }); await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), 'users/pal/inv/z_hs_manor'), { n: 1 }); }); await buy(PAL, 'pal', 'hm1003', 'manor'); })()));
+await ok('metro wrong style fails', assertFails(buy(KID, 'kid', 'hm1002', 'manor')));
+await ok('metro hm3592 out of range fails', assertFails(buy(KID, 'kid', 'hm3592', 'manor')));
+await ok('hm0999 fails', assertFails(buy(KID, 'kid', 'hm0999', 'ranch')));
 const pres = (db, u, o) => setDoc(doc(db, `parkRooms/r1/p/${u}`), { x: 100, y: 100, d: 1, e: '', eAt: 0, say: '', sayAt: 0, tgt: '', name: 'Pal', uname: 'pal', color: '#fff', pal: {}, at: serverTimestamp(), ...o });
 await ok('presence far west + south allowed', assertSucceeds(pres(PAL, 'pal', { x: Math.round(-1200 * 16 + 1600), y: Math.round(1400 * 16 + 1200) })));
 await ok('presence inside h150 (cell 150) allowed', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); const c = 149; const xm = 400 + 10 + (c % 6) * 20, zm = -70 + 10 + Math.floor(c / 6) * 20; await pres(PAL, 'pal', { x: Math.round(xm * 16 + 1600), y: Math.round(zm * 16 + 1200), in: 'h150' }); })()));
 await ok('presence inside the palace (mansion cell 6)', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { x: Math.round(420 * 16 + 1600), y: Math.round(660 * 16 + 1200), in: 'h489' }); })()));
+await ok('presence far south (z 3400) allowed', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { x: Math.round(-500 * 16 + 1600), y: Math.round(3400 * 16 + 1200) }); })()));
+await ok('presence inside hm1003 (cell 103) allowed', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); const c = 1003 % 180; const xm = 400 + 10 + (c % 6) * 20, zm = -70 + 10 + Math.floor(c / 6) * 20; await pres(PAL, 'pal', { x: Math.round(xm * 16 + 1600), y: Math.round(zm * 16 + 1200), in: 'hm1003' }); })()));
 await ok('wrong house id for the cell rejected', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { x: Math.round(420 * 16 + 1600), y: Math.round(660 * 16 + 1200), in: 'h488' }); })()));
 await ok('world save in the far south', assertSucceeds(setDoc(doc(PAL, 'users/pal/pal/world'), { x: -900, z: 1300, yaw: 0, cars: [], street: null, at: serverTimestamp() })));
 console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

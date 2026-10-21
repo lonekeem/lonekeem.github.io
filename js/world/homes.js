@@ -3,8 +3,8 @@
 // garage (the roll-up door opens for the owner and closes after), "Park here" saves the car in that bay, your last
 // spot + a car left on the street are remembered (localStorage + a throttled private Firestore doc).
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
-import { doc, getDoc, setDoc, onSnapshot, collection, serverTimestamp, writeBatch, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
-import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID } from './layout.js';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, serverTimestamp, writeBatch, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear } from './layout.js';
 import { CAR, CARS, PAINTS, buildCar, poseCar } from './cars.js';
 import { parseCar } from './drive.js';
 import { GALLERY } from './cities.js';
@@ -55,7 +55,7 @@ export function attachHomes(api, W, K) {
     const g = new THREE.Group(); const [sx, sz] = Lw(h, -6.3, h.d / 2 + 4.6); g.position.set(sx, FLAT, sz); g.rotation.y = h.face > 0 ? 0 : Math.PI;
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.9, 0.12), std('#f8fafc')); post.position.y = 0.95; const bd = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); bd.position.set(0, 1.55, 0.08); g.add(post, bd); root.add(g); signs.set(h.id, { cv, tex, g }); drawSign(h); }
   // signs exist only near the player (hundreds of plots now): made within 90 m, dropped beyond 140 m
-  let sT = 0; function signTick(dt) { if ((sT += dt) < 0.6) return; sT = 0; for (const h of HOUSES) { if (!h.sale) continue; const d = Math.abs(h.x - P.x) + Math.abs(h.z - P.z); const s0 = signs.get(h.id); if (!s0 && d < 110) makeSign(h); else if (s0 && d > 180) { root.remove(s0.g); s0.tex.dispose(); s0.g.children.forEach((c) => c.geometry && c.geometry.dispose()); signs.delete(h.id); } } }
+  let sT = 0; function signTick(dt) { if ((sT += dt) < 0.6) return; sT = 0; for (const h of housesNear(P.x, P.z, 160)) { if (!h.sale) continue; const d = Math.abs(h.x - P.x) + Math.abs(h.z - P.z); const s0 = signs.get(h.id); if (!s0 && d < 110) makeSign(h); else if (s0 && d > 180) { root.remove(s0.g); s0.tex.dispose(); s0.g.children.forEach((c) => c.geometry && c.geometry.dispose()); signs.delete(h.id); } } }
   function drawSign(h) { const s = signs.get(h.id); if (!s) return; const o = owners.get(h.id); const g = s.cv.getContext('2d'); const st = HOME_STYLES[h.style];
     g.fillStyle = o ? '#4c1d95' : '#ea580c'; g.fillRect(0, 0, 256, 128); g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeRect(4, 4, 248, 120); g.fillStyle = '#fff'; g.textAlign = 'center';
     if (o) { g.font = 'bold 26px system-ui,sans-serif'; g.fillText('🏠 ' + (o.name || 'A Pal').slice(0, 14), 128, 56); g.font = '20px system-ui,sans-serif'; g.fillText(o.owner === uid ? 'Your home!' : 'Home sweet home', 128, 96); }
@@ -115,9 +115,9 @@ export function attachHomes(api, W, K) {
   // ---------------------------------------------------------------- interiors (built on first entry, kept after)
   const rooms = new Map(); let roomLight = null, roomLight2 = null, deco = null, radioOff = null;
   function buildRoom(h) { if (rooms.has(h.id)) return rooms.get(h.id); const { cx, cz } = roomCell(h); const o = owners.get(h.id); const dec = (o && o.decor) || {};
-    const I = buildInterior(api, { put, flush, G, y: FLAT }, h, cx, cz, dec); root.add(I.g); const r0 = { g: I.g, cx, cz, I, dk: JSON.stringify(dec) }; rooms.set(h.id, r0); return r0; }
+    const I = buildInterior(api, { put, flush, G, y: FLAT }, h, cx, cz, dec); root.add(I.g); const r0 = { g: I.g, cx, cz, I, h, dk: JSON.stringify(dec) }; rooms.set(h.id, r0); return r0; }
   function applyDecor(id) { const o = owners.get(id); const dec = (o && o.decor) || {}; if (W.paintHouse && HOUSE_BY_ID[id] && HOUSE_BY_ID[id].sale) W.paintHouse(id, dec.ext || null); const r = rooms.get(id); const k = JSON.stringify(dec);
-    if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall); r.I.setFloor(dec.floor || r.I.S.floor); r.I.setItems(parseItems(dec.items || defaultItems(r.I.two))); } }
+    if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall); r.I.setFloor(dec.floor || r.I.S.floor); r.I.setItems(parseItems(dec.items || defaultItems(r.I.two, r.h && r.h.num ? r.h.seed : 0))); } }
   const canEnter = (h) => { if (!h.sale) return true; const o = owners.get(h.id); if (!o) return false; return o.owner === uid || o.open === true || (Array.isArray(o.inv) && o.inv.includes(uid)); };
   function goIn(h) { SC = scOf(h); if (!canEnter(h)) { say('🔒 Only the owner and invited friends can go inside'); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') return; const r = buildRoom(h); inside = h; roomState.box = { x0: r.cx - 5.6 * SC, x1: r.cx + 5.6 * SC, z0: r.cz - 5.6 * SC, z1: r.cz + 5.5 * SC };
     standUp(true); P.x = r.cx; P.z = r.cz + 4.6 * SC; P.yaw = Math.PI; P.y = FLAT; if (!roomLight) { roomLight = new THREE.PointLight('#fff1d6', LOW ? 22 : 32, 22, 1.6); scene.add(roomLight); } roomLight.position.set(r.cx - 3 * SC, FLAT + 2.7, r.cz + 1.5); roomLight.visible = true; if (!LOW) { if (!roomLight2) { roomLight2 = new THREE.PointLight('#fff1d6', 24, 20, 1.6); scene.add(roomLight2); } roomLight2.position.set(r.cx + 3.5 * SC, FLAT + 2.7, r.cz - 2); roomLight2.visible = true; }
@@ -200,12 +200,19 @@ export function attachHomes(api, W, K) {
       deco.items.push({ c, x: snap((P.x - r.cx + fx * 1.6) / SC), z: snap((P.z - r.cz + fz * 1.6) / SC), r: (Math.round(((P.yaw || 0) + Math.PI) / (Math.PI / 2)) % 4 + 4) % 4, f: r.I.two && P.y > FLAT + 2.5 ? 1 : 0 }); deco.sel = deco.items.length - 1; relItems(); drawDeco(); })); }
   decB.onclick = () => startDeco();
   // ---------------------------------------------------------------- owners (live) + buying
-  let unsub = null; if (uid && db) try { unsub = onSnapshot(collection(db, 'homes'), (qs) => { const prev = new Map(owners); owners.clear(); qs.forEach((d) => owners.set(d.id, d.data())); myPlot = null; myTier = 0;
+  // reads stay per-area: one listener for the classic world (ids < 'hm'), one for my own homes, and one per far-south metro city,
+  // opened the first time you get near it (or open its Find-a-home tab) and then kept (cached) for the session
+  const parts = new Map(), subs = [], metroOn = new Set(); let unsub = () => subs.forEach((f) => f && f());
+  const listen = (key, q) => { if (!(uid && db)) return; try { subs.push(onSnapshot(q, (qs) => { const m = new Map(); qs.forEach((d) => m.set(d.id, d.data())); parts.set(key, m); onOwners(); }, (e) => { console.warn('homes', key, e); if (!snapOk && key === 'old') { snapOk = true; firstSpawn(); } })); } catch (e) { console.warn(e); } };
+  function metroSub(cid) { if (metroOn.has(cid) || !db) return; const hs = HOUSES.filter((h) => h.city === cid && h.num); if (!hs.length) return; metroOn.add(cid);
+    listen('m:' + cid, query(collection(db, 'homes'), where(documentId(), '>=', hs[0].id), where(documentId(), '<=', hs[hs.length - 1].id))); }
+  let mT = 0; function metroTick(dt) { if ((mT += dt) < 2) return; mT = 0; for (const c of METROS) if (!metroOn.has(c.id) && Math.abs(P.x - c.x) < c.hx + 260 && Math.abs(P.z - c.z) < c.hz + 260) metroSub(c.id); }
+  if (uid && db) { listen('old', query(collection(db, 'homes'), where(documentId(), '<', 'hm'))); listen('mine', query(collection(db, 'homes'), where('owner', '==', uid))); }
+  function onOwners() { if (!parts.has('old')) return; const prev = new Map(owners); owners.clear(); for (const m of parts.values()) for (const [id, v] of m) owners.set(id, v); myPlot = null; myTier = 0;
       for (const [id, o] of owners) if (o.owner === uid && !HOUSE_BY_ID[id]?.admin) { myPlot = id; myTier = o.garage || 0; } if (amAdmin && owners.get(ADMIN_PLOT)?.owner === uid && !myPlot) { myPlot = ADMIN_PLOT; myTier = 0; }
-      for (const h of HOUSES) if (h.sale) { const a = prev.get(h.id), b = owners.get(h.id); if (JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); }
-      for (const h of HOUSES) if (h.sale && JSON.stringify((prev.get(h.id) || {}).decor) !== JSON.stringify((owners.get(h.id) || {}).decor)) applyDecor(h.id);
+      for (const id of new Set([...prev.keys(), ...owners.keys()])) { const h = HOUSE_BY_ID[id]; if (!h || !h.sale) continue; const a = prev.get(id), b = owners.get(id); if (JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); if (JSON.stringify((a || {}).decor) !== JSON.stringify((b || {}).decor)) applyDecor(id); }
       if (inside && !canEnter(inside)) { goOut(); say('🚪 The owner closed this home'); } else if (inside && radioKey(prev.get(inside.id)) !== radioKey(owners.get(inside.id))) { radioOff = null; startRadio(); }
-      syncCars(); ensurePalace(); if (!snapOk) { snapOk = true; firstSpawn(); } }, (e) => { console.warn('homes', e); if (!snapOk) { snapOk = true; firstSpawn(); } }); } catch (e) { console.warn(e); }
+      syncCars(); ensurePalace(); if (!snapOk) { snapOk = true; firstSpawn(); } }
   async function buyHome(h, btn) { try { if (myPlot) throw new Error('You already own a home (one per player). Move out first to buy another.'); if (owners.has(h.id)) throw new Error('Someone just bought this one!');
       busy(btn, 'Buying…'); const st = HOME_STYLES[h.style]; const { econ: e, dia: d } = await shop(); const inv = await e.inventory(true); if (!inv[st.item]) { if (st.d) await d.buy(st.item); else await e.buy(st.item); }
       const b = writeBatch(db); b.set(doc(db, 'homes', h.id), { owner: uid, name: S.profile.displayName, style: st.key, garage: 0, at: serverTimestamp() }); b.set(doc(db, 'users', uid, 'pal', 'home'), { plot: h.id, at: serverTimestamp() }); await b.commit();
@@ -224,12 +231,12 @@ export function attachHomes(api, W, K) {
     if (myPlot) { teleport(homeFront(HOUSE_BY_ID[myPlot])); say('🏠 Home sweet home'); return; }
     findHome('all', 0); };
   const placeName = (h) => (h.estate ? h.spot : h.city ? CITY_BY_ID[h.city].name : h.town ? ({ down: '🏙️ Kemy Downtown', farm: '🌾 Clover Fields', snow: '❄️ Frostberry', desert: '🌵 Sunstone', lake: '🛶 Willow Lake', shore: '🏖️ Sunny Shore' }[h.town] || h.town) : '🎃 Kemy Street');
-  function findHome(f, pg) { const all = HOUSES.filter((h) => h.sale && !owners.has(h.id)); const free = all.filter((h) => f === 'all' || (f === 'estate' ? h.estate : f === 'old' ? !h.city && !h.estate : h.city === f)); const per = 25, pages = Math.max(1, Math.ceil(free.length / per)); pg = Math.min(pg, pages - 1);
+  function findHome(f, pg) { if (CITY_BY_ID[f] && CITY_BY_ID[f].metro) metroSub(f); const all = HOUSES.filter((h) => h.sale && !owners.has(h.id)); const free = all.filter((h) => f === 'all' || (f === 'estate' ? h.estate : f === 'old' ? !h.city && !h.estate : h.city === f)); const per = 25, pages = Math.max(1, Math.ceil(free.length / per)); pg = Math.min(pg, pages - 1);
     const tabs = [['all', 'All'], ['estate', '🏰 Mansions'], ['old', '🎃 Original towns'], ...CITIES.map((c) => [c.id, c.name])];
     panel(`<h3>🏠 Find a home</h3><p><small>${all.length} homes for sale right now (Star Coins or Diamonds). Mansions are the top tier.</small></p><div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">${tabs.map(([k, n]) => `<button class="${k === f ? '' : 'g'}" data-f="${k}" style="white-space:nowrap">${n}</button>`).join('')}</div>`
       + free.slice(pg * per, pg * per + per).map((h) => `<div class="row"><span>${HOME_STYLES[h.style].name}<br><small>${h.id} · ${esc(placeName(h))}</small></span><button data-v="${h.id}">${price(HOME_STYLES[h.style])} · Visit</button></div>`).join('') + (free.length ? '' : '<p><small>Nothing for sale here right now.</small></p>')
       + (pages > 1 ? `<div class="row"><button class="g" data-p="${pg - 1}" ${pg ? '' : 'disabled'}>‹ Prev</button><small>Page ${pg + 1} / ${pages}</small><button class="g" data-p="${pg + 1}" ${pg < pages - 1 ? '' : 'disabled'}>Next ›</button></div>` : ''),
-      (c) => { c.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { pan.hidden = true; const h = HOUSE_BY_ID[b.dataset.v]; const [x, z] = Lw(h, h.estate ? -10 : -6.3, h.d / 2 + (h.estate ? 14 : 6.2)); teleport({ x, z, yaw: h.face > 0 ? Math.PI : 0 }); }));
+      (c) => { c.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { pan.hidden = true; const h = HOUSE_BY_ID[b.dataset.v]; if (h.num) metroSub(h.city); const [x, z] = Lw(h, h.estate ? -10 : -6.3, h.d / 2 + (h.estate ? 14 : 6.2)); teleport({ x, z, yaw: h.face > 0 ? Math.PI : 0 }); }));
         c.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => findHome(b.dataset.f, 0))); c.querySelectorAll('[data-p]').forEach((b) => (b.onclick = () => findHome(f, +b.dataset.p))); }); }
 
   // ---------------------------------------------------------------- sitting (beds, chairs, couches; shared via presence dn='sit')
@@ -303,10 +310,10 @@ export function attachHomes(api, W, K) {
   // ---------------------------------------------------------------- per-frame: prompts, garage doors, light
   function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * 8); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
     if (inside) { const { cx, cz } = roomCell(inside); if (Math.hypot(P.x - cx, P.z - (cz + 5.4 * SC)) < 1.8) promptNow = { id: 'kh:out', label: '🚪 Go outside' }; else if (!deco) promptNow = roomPrompt(); }
-    else if (!driving) { let best = null, bd = 2.8; for (const h of HOUSES) { const d = Math.hypot(h.door.x - P.x, h.door.z - P.z); if (d < bd) { bd = d; best = h; } }
+    else if (!driving) { let best = null, bd = 2.8; for (const h of housesNear(P.x, P.z, 12)) { const d = Math.hypot(h.door.x - P.x, h.door.z - P.z); if (d < bd) { bd = d; best = h; } }
       if (best) { const o = owners.get(best.id); if (best.sale) { if (!o) promptNow = { id: 'kh:sale:' + best.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[best.style]) }; else if (o.owner === uid) { promptNow = { id: 'kh:mine:' + best.id, label: '🏠 My home' }; showIn = best; } else if (canEnter(best)) showIn = best; else promptNow = { id: 'kh:locked:' + best.id, label: '🔒 ' + (o.name || 'A Pal') + '’s home' }; } else showIn = best; }
-      else for (const h of HOUSES) if (h.sale && !owners.has(h.id)) { const [sx, sz] = Lw(h, -6.3, h.d / 2 + 4.6); if (Math.hypot(sx - P.x, sz - P.z) < 2.4) { promptNow = { id: 'kh:sale:' + h.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[h.style]) }; break; } } }
-    garageTick(dt); signTick(dt);
+      else for (const h of housesNear(P.x, P.z, 20)) if (h.sale && !owners.has(h.id)) { const [sx, sz] = Lw(h, -6.3, h.d / 2 + 4.6); if (Math.hypot(sx - P.x, sz - P.z) < 2.4) { promptNow = { id: 'kh:sale:' + h.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[h.style]) }; break; } } }
+    garageTick(dt); signTick(dt); metroTick(dt);
     if (!inside && !promptNow) { if (driving) { if (Math.abs(m.speed) < 2 && ownHomes().some((q) => Math.hypot(q.x - m.x, q.z - m.z) < (q.estate ? 70 : 32))) promptNow = { id: 'kh:park', label: '🅿️ Park at home' }; }
       else { const n = nearMyCar(); if (n) { pendingTake = n; promptNow = { id: 'kh:take', label: '🚗 Drive ' + CAR[n.car.m].name }; } } }
     inB.hidden = !showIn; if (showIn) { inB.dataset.h = showIn.id; const ow = owners.get(showIn.id); inB.textContent = ow && ow.owner !== uid ? '🏠 Visit ' + String(ow.name || 'Pal').slice(0, 12) : '🏠 Go in'; }
