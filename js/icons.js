@@ -21,6 +21,8 @@ export const ICONS = {
   comment: svg('comment', '<path d="M20.4 11.6a8.4 8 0 0 1-12 7.2l-4.6 1.6 1.5-4.2a8 8 0 0 1-.9-4.6A8.4 8 0 0 1 20.4 11.6z"/><path d="M8.4 11.7h.01M12 11.7h.01M15.6 11.7h.01" stroke-width="2.6"/>'),
   // Curved share arrow with a notched tail and a spark at the tip.
   share: svg('share', '<path d="M13.6 5.2 20.4 11l-6.8 5.8v-3.4c-4.6 0-7.8 1.4-10 4.9.8-5.2 3.9-9.2 10-9.8z"/>' + spark(20.2, 4.2, 2.2)),
+  // Three finder squares and a few modules, for Share Kemy.
+  qr: svg('qr', '<path d="M4 4h6.2v6.2H4zM13.8 4H20v6.2h-6.2zM4 13.8h6.2V20H4z"/><path d="M14.2 14.2h2v2h-2zM17.8 14.2h2v2h-2zM14.2 17.8h2v2h-2zM17.8 17.8h2v2h-2z" fill="currentColor" stroke="none"/>'),
   // Bookmark with soft top corners and a spark inside.
   save: svg('save', '<path d="M6.6 3.6h10.8a1.2 1.2 0 0 1 1.2 1.2v15.6L12 16.2l-6.6 4.2V4.8a1.2 1.2 0 0 1 1.2-1.2z"/>' + spark(12, 9.6, 2.6)),
   // Magnifier with a glint and an angled handle.

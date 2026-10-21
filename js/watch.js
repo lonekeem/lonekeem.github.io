@@ -257,6 +257,7 @@ export function createWatch(ctx) {
           ${S.user && S.profile ? `<button class="vstory" id="vstory" aria-label="Add to your story">${avatar({ ...S.profile, uid: S.user.uid }, 'sm', false)}<span class="vplus" aria-hidden="true">+</span></button>` : ''}
           <nav class="feed-toggle on-video" aria-label="Feed"><a href="#/watch" class="active" aria-current="page">Videos</a><a href="#/feed">Posts</a></nav>
           <button class="vmute" id="vmute" aria-pressed="true" aria-label="Unmute"></button>
+          <a class="vshare" href="#/share" aria-label="Share Kemy">${ICONS.qr}</a>
           <a class="vsearch" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>
           <button class="vunmute-hint" id="vunmute-hint" tabindex="-1" aria-hidden="true"></button>
         </div>
