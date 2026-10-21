@@ -5,7 +5,7 @@
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, serverTimestamp, writeBatch, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear } from './layout.js';
-import { CAR, CARS, PAINTS, buildCar, poseCar } from './cars.js';
+import { CAR, CARS, PAINTS, buildCar, poseCar, addPlate } from './cars.js';
 import { parseCar } from './drive.js';
 import { GALLERY } from './cities.js';
 import { checkInput } from '../pals/talk.js';
@@ -103,7 +103,7 @@ export function attachHomes(api, W, K) {
     if (api.others) for (const p of api.others.values()) if (p.uid === o.owner || p.id === o.owner) { const c = parseCar(p.dn); if (c) return c.id; } return ''; }
   function placeCars(G0) { for (const m of G0.carMs) { root.remove(m); m.traverse((q) => { if (q.userData && q.userData.plateTex) q.userData.plateTex.dispose(); }); } for (const c of G0.carCols || []) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } G0.carMs = []; G0.carCols = [];
     const hide = hiddenModel(G0.h); G0.hide = hide; let si = 0, skipped = false; G0.shown = [];
-    for (const car of G0.cars) { if (!skipped && car.m === hide) { skipped = true; continue; } const s = G0.slots[si++]; if (!s) break; const m = buildCar(CAR[car.m], car.c, { lite: true, noShadow: LOW || G0.cars.length > 6 }); if (car.p && W.addPlate) W.addPlate(m, car.p); poseCar(m, { x: s.x, y: s.y, z: s.z, yaw: s.yaw }, 0, 0); m.userData.slot = s; m.userData.car = car; root.add(m); G0.carMs.push(m); G0.shown.push({ car, s });
+    for (const car of G0.cars) { if (!skipped && car.m === hide) { skipped = true; continue; } const s = G0.slots[si++]; if (!s) break; const m = buildCar(CAR[car.m], car.c, { lite: true, noShadow: LOW || G0.cars.length > 6 }); if (car.p) addPlate(m, car.p); poseCar(m, { x: s.x, y: s.y, z: s.z, yaw: s.yaw }, 0, 0); m.userData.slot = s; m.userData.car = car; root.add(m); G0.carMs.push(m); G0.shown.push({ car, s });
       if (!s.lv) { const cy = { x: s.x, z: s.z, r: CAR[car.m].Wd * 0.55, top: FLAT + CAR[car.m].H, parked: 1 }; api.cyl.push(cy); G0.carCols.push(cy); } }
     G0.overflow = Math.max(0, G0.cars.length - (skipped ? 1 : 0) - G0.slots.length); }
   function dropGarage(id) { const G0 = garages.get(id); if (!G0) return; for (const m of G0.carMs) root.remove(m); for (const c of G0.carCols || []) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } root.remove(G0.g); G0.g.traverse((q) => { if (q.userData.tex) q.userData.tex.dispose(); }); for (const c of G0.cols) { const i = box.indexOf(c); if (i >= 0) box.splice(i, 1); } garages.delete(id); }

@@ -143,7 +143,7 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
     const tire = new THREE.Mesh(new THREE.TorusGeometry(r * 0.78, r * 0.24, lite ? 8 : 14, lite ? 18 : 32), M.rubber()); tire.rotation.y = Math.PI / 2; tire.scale.set(1, 1, ww / (r * 0.48)); sp.add(tire);
     sp.add(rim(r, ww, c.style === 'truck' ? 6 : c.style === 'cruiser' ? 12 : 5)); wheels.push({ st, sp, front, s, z, x: s * tw, comp: 0, vel: 0, y: r }); }
   root.traverse((m) => { if (m.isMesh) { m.castShadow = !o.noShadow && m.material !== M.glass(); m.receiveShadow = false; } });
-  root.userData = { def: c, chassis: ch, wheels, doors, steer, seat: new THREE.Vector3(drvX, seatY + 0.07, seatZ), dashZ, color: col, tails: [] };
+  root.userData = { pl: { fz: fz + 0.035, rz: c.L / 2 + bev * 0.9 + 0.045, fy: by - 0.2, ry: c.H * 0.24 }, def: c, chassis: ch, wheels, doors, steer, seat: new THREE.Vector3(drvX, seatY + 0.07, seatZ), dashZ, color: col, tails: [] };
   ch.traverse((m) => { if (m.userData.tail) root.userData.tails.push(m); });
   return root; }
 export function setBrakeLights(car, on) { for (const t of car.userData.tails) t.material = on ? M.brake() : M.tail(); }
@@ -220,3 +220,19 @@ export function createEngineSound() { const a = ac(); if (!a) return { set() {},
   return { set(rpm, load, vol = 0.07) { const t = a.currentTime; const hz = 28 + rpm / 60 * 1.6; o1.frequency.setTargetAtTime(hz, t, 0.05); o2.frequency.setTargetAtTime(hz * 0.5, t, 0.05); f.frequency.setTargetAtTime(500 + rpm * 0.25 + load * 900, t, 0.08); g.gain.setTargetAtTime(vol * (0.45 + load * 0.55), t, 0.1); },
     stop() { try { g.gain.setTargetAtTime(0, a.currentTime, 0.05); setTimeout(() => { o1.stop(); o2.stop(); g.disconnect(); }, 400); } catch { /* */ } } }; }
 export function honk() { const a = ac(); if (!a) return; const t = a.currentTime; for (const [hz, d] of [[420, 0], [530, 0]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'square'; o.frequency.value = hz; o.connect(g); g.connect(a.destination); g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.06, t + d + 0.02); g.gain.setValueAtTime(0.06, t + 0.32); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4); o.start(t); o.stop(t + 0.45); } }
+
+// ---------------------------------------------------------------- 🔖 custom license plates (original designs; text is kid-safe filtered by the caller)
+// p = { t: 'ABC123' (1-7 A-Z/0-9), b: background idx, f: text idx, r: border idx, fr: frame idx }
+export const PLATE_COLS = ['#ffffff', '#fef3c7', '#fde047', '#fb923c', '#ef4444', '#f9a8d4', '#c084fc', '#7c3aed', '#60a5fa', '#1d4ed8', '#5eead4', '#22c55e', '#166534', '#94a3b8', '#111827', '#7c2d12'];
+export const PLATE_FRAMES = ['Plain', 'Chrome', 'Gold', 'Stars', 'Hearts', 'Rainbow', 'Dots'];
+export function drawPlate(cv, p) { const x = cv.getContext('2d'), W = cv.width, H = cv.height, C = PLATE_COLS; const bg = C[p.b] || C[0], tx = C[p.f] ?? C[14], br = C[p.r] ?? C[14];
+  x.clearRect(0, 0, W, H); const fr = p.fr | 0, pad = fr ? H * 0.12 : 0; const rr = (a, b, w, h, r) => { x.beginPath(); x.roundRect ? x.roundRect(a, b, w, h, r) : x.rect(a, b, w, h); };
+  if (fr === 1 || fr === 2) { const g = x.createLinearGradient(0, 0, 0, H); const s = fr === 1 ? ['#f8fafc', '#94a3b8', '#e2e8f0'] : ['#fef08a', '#ca8a04', '#fde68a']; g.addColorStop(0, s[0]); g.addColorStop(0.5, s[1]); g.addColorStop(1, s[2]); x.fillStyle = g; rr(0, 0, W, H, H * 0.14); x.fill(); }
+  else if (fr === 5) { const g = x.createLinearGradient(0, 0, W, 0); ['#ef4444', '#f59e0b', '#fde047', '#22c55e', '#3b82f6', '#a855f7'].forEach((c, i) => g.addColorStop(i / 5, c)); x.fillStyle = g; rr(0, 0, W, H, H * 0.14); x.fill(); }
+  else if (fr) { x.fillStyle = fr === 3 ? '#1e1b4b' : fr === 4 ? '#fce7f3' : '#0f172a'; rr(0, 0, W, H, H * 0.14); x.fill(); }
+  x.fillStyle = bg; rr(pad, pad, W - pad * 2, H - pad * 2, H * 0.1); x.fill(); x.lineWidth = H * 0.05; x.strokeStyle = br; rr(pad + H * 0.04, pad + H * 0.04, W - pad * 2 - H * 0.08, H - pad * 2 - H * 0.08, H * 0.08); x.stroke();
+  if (fr === 3 || fr === 4 || fr === 6) { x.font = `${H * 0.1}px system-ui`; x.textAlign = 'center'; x.textBaseline = 'middle'; for (let i = 0; i < 9; i++) { const ax = (i + 0.5) * W / 9; for (const ay of [pad / 2, H - pad / 2]) { if (fr === 6) { x.fillStyle = '#fde047'; x.beginPath(); x.arc(ax, ay, H * 0.03, 0, 7); x.fill(); } else x.fillText(fr === 3 ? '★' : '♥', ax, ay); } } x.fillStyle = fr === 3 ? '#fde047' : '#ec4899'; }
+  x.fillStyle = tx; x.textAlign = 'center'; x.textBaseline = 'middle'; const t = String(p.t || '').slice(0, 7); x.font = `900 ${Math.min(H * 0.56, (W - pad * 2) * 1.5 / Math.max(3, t.length))}px Inter, Arial, sans-serif`; x.fillText(t, W / 2, H / 2 + H * 0.03); }
+export function addPlate(car, p) { const c = car.userData.def; if (!c) return; for (const o of car.userData.plates || []) { o.parent && o.parent.remove(o); o.material.map.dispose(); o.material.dispose(); } car.userData.plates = []; if (!p || !p.t) return;
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; drawPlate(cv, p); const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; car.userData.plateTex = tex;
+  const ch = car.userData.chassis || car; for (const s of [1, -1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.14), new THREE.MeshBasicMaterial({ map: tex })); const q = car.userData.pl || { fz: c.L / 2 + 0.1, rz: c.L / 2 + 0.1, fy: c.H * 0.25, ry: c.H * 0.25 }; m.position.set(0, s > 0 ? q.fy : q.ry, s > 0 ? q.fz : -q.rz); m.rotation.y = s > 0 ? 0 : Math.PI; m.userData.plate = 1; ch.add(m); car.userData.plates.push(m); } }
