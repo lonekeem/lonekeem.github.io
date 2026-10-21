@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>Rapid buy test</title>
+<script type="importmap">{ "imports": { "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js": "./mock/firestore.js", "/js/inf-pass.js": "/tests/pals/mock/inf-pass.js" } }</script>
+<body style="font:15px sans-serif;background:#fff;color:#111;padding:16px"><h2>🧪 Rapid buying: 5 Star Coin items + 2 Diamond items + 5 look saves, all tapped at once (mock Firestore)</h2><pre id="o"></pre>
+<script type="module">
+// The importmap swaps the Firebase SDK for tests/pals/mock/firestore.js (never the live database).
+import { DB } from './mock/firestore.js';
+import { createEconomy } from '../../js/pals/economy.js';
+import { createDiamonds } from '../../js/pals/armory.js';
+import { createStore } from '../../js/pals/core.js';
+import { WEAR } from '../../js/pals/wardrobe.js';
+import { addItems } from '../../js/pals/catalog.js'; addItems(WEAR.filter((w) => w.p));
+const out = document.getElementById('o'), log = (s) => { out.textContent += s + '\n'; }; const uid = 'u1';
+DB.set(`users/${uid}/pal/wallet`, { coins: 5000, total: 5000, day: 0, earned: {}, room: [], last: 0, updatedAt: 0, buyAt: 0, lastBuy: '', paid: 0 });
+DB.set(`users/${uid}/pal/diamonds`, { d: 2000, total: 2000, day: 0, today: 0, last: 0, updatedAt: 0, buyAt: 0, lastBuy: '', paid: 0 });
+DB.set(`users/${uid}/pets/p1`, { xp: 0, pats: 0, stats: {}, outfit: {}, updatedAt: Date.now() - 5000, createdAt: 1 });
+const e = createEconomy({}, uid), dia = createDiamonds({}, uid), store = createStore({}, uid), t0 = performance.now();
+const coinItems = WEAR.filter((w) => w.p > 0 && !w.hw).slice(0, 5).map((w) => w.id), dItems = ['z_foam', 'z_bubble'];
+const p = { id: 'p1', xp: 0, stats: {} }; let ok = 0, bad = 0; const res = (lbl) => [(v) => { ok++; log(`✅ ${lbl} (${Math.round(performance.now() - t0)} ms)`); }, (er) => { bad++; log(`❌ ${lbl}: ${er.code || ''} ${er.message}`); }];
+const jobs = [...coinItems.map((id) => e.buy(id).then(...res('buy ' + id))), e.buy(coinItems[0]).then(...res('double-tap same item ' + coinItems[0] + ' (debounced, same purchase)')),
+  ...dItems.map((id) => dia.buy(id).then(...res('💎 buy ' + id))), ...[1, 2, 3, 4, 5].map((i) => store.save(p, { outfit: { head: coinItems[i % 5] } }).then(...res('save look ' + i)))];
+await Promise.all(jobs); const w = DB.get(`users/${uid}/pal/wallet`), d = DB.get(`users/${uid}/pal/diamonds`);
+log(`\n${ok} ok, ${bad} failed · coins left ${w.coins} · diamonds left ${d.d} · inv: ${[...DB.keys()].filter((k) => k.includes('/inv/')).map((k) => k.split('/').pop()).join(', ')}`);
+window.result = { ok, bad }; window.ready = true;
+</script>

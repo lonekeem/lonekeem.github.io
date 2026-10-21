@@ -25,20 +25,27 @@ export function newPal(id, { species, name, colors, pattern, acc }) {
 export function createStore(db, uid) {
   const col = () => collection(db, 'users', uid, 'pets');
   const ref = (id) => doc(db, 'users', uid, 'pets', id);
-  let lastWrite = 0;
+  let lastWrite = 0, chain = Promise.resolve();
   return {
     async list() { const s = await getDocs(col()); return s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); },
     async get(id) { const s = await getDoc(ref(id)); return s.exists() ? { id, ...s.data() } : null; },
     async create(id, data) { await setDoc(ref(id), newPal(id, data)); return this.get(id); },
     // save stats/xp/look. xp gain per write is capped at 60 by the rules, and writes are 1s apart.
-    async save(p, patch = {}) {
-      const wait = 1100 - (Date.now() - lastWrite); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    // Saves are queued one at a time (rapid shop taps used to fire two writes inside the rules' 1 s window and get
+    // permission-denied = "going a little fast"); the gap is measured from when the last write FINISHED, and a write
+    // that still lands too soon (network jitter, another tab) is retried after a short wait.
+    save(p, patch = {}) { const run = () => this._save(p, patch); const pr = chain.then(run, run); chain = pr.catch(() => {}); return pr; },
+    async _save(p, patch = {}) {
+      for (let tryN = 0; ; tryN++) { try { return await this._save1(p, patch); } catch (e) { if (e && e.code === 'permission-denied' && tryN < 2) { lastWrite = Date.now(); continue; } throw e; } }
+    },
+    async _save1(p, patch = {}) {
+      const wait = 1150 - (Date.now() - lastWrite); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       const xp = Math.min(p.xp + Math.min(60, Math.max(0, patch.xpGain || 0)), 4900);
       const data = { stats: patch.stats || liveStats(p), xp, level: xpToLevel(xp), at: serverTimestamp(), updatedAt: serverTimestamp() };
       for (const k of ['name', 'colors', 'pattern', 'acc', 'species', 'outfit', 'voice', 'bg', 'variant']) if (patch[k] !== undefined) data[k] = patch[k];
       // the rules only accept a real background id; "Plain Stage" (no background) removes the field instead of saving ''
       const noBg = data.bg === ''; if (noBg) data.bg = deleteField();
-      lastWrite = Date.now(); await updateDoc(ref(p.id), data);
+      try { await updateDoc(ref(p.id), data); } finally { lastWrite = Date.now(); }
       Object.assign(p, data, { at: Date.now() }); if (noBg) p.bg = ''; return p;
     },
     async remove(id) { const pats = await getDocs(collection(db, 'users', uid, 'pets', id, 'pats')); const pd = await getDocs(collection(db, 'users', uid, 'pets', id, 'playdates')); const b = writeBatch(db); pats.docs.forEach((d) => b.delete(d.ref)); pd.docs.forEach((d) => b.delete(d.ref)); b.delete(ref(id)); await b.commit(); },

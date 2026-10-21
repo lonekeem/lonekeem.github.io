@@ -39,12 +39,17 @@ export function createEconomy(db, uid) {
     });
   }
   const priceOf = (id) => { const d = todaysDeals(); return d[id] !== undefined ? d[id] : ITEM[id].p; };
-  function buy(id) {
-    return q(async () => {
+  // back-to-back purchases: queued one at a time; on a stale balance / contention (another tab, an earn landing at the
+  // same moment) re-read the wallet and try again instead of failing
+  const retry = async (fn) => { for (let i = 0; ; i++) { try { return await fn(); } catch (e) { const c = e && e.code; if (i < 2 && (c === 'permission-denied' || c === 'aborted' || c === 'failed-precondition' || c === 'unavailable')) { w = null; inv = null; await new Promise((r) => setTimeout(r, 400 + i * 600)); continue; } throw e; } } };
+  const tap = new Map(); // ~300 ms double-tap guard on the SAME item only (returns the same purchase)
+  function buy(id) { const r0 = tap.get(id); if (r0 && Date.now() - r0.t < 300) return r0.p; const p = buy0(id); tap.set(id, { t: Date.now(), p }); return p; }
+  function buy0(id) {
+    return q(() => retry(async () => {
       await wallet(true); await inventory(); const it = ITEM[id]; if (!it || it.ach) throw new Error('That item can’t be bought.');
       const paid = priceOf(id); if (w.coins < paid) throw new Error('Not enough Star Coins yet.');
       if (it.kind !== 'snack' && inv[id]) throw new Error('You already have this.');
-      await gap(); const b = writeBatch(db);
+      const b = writeBatch(db); // no client cooldown for buys (the rules only space out earns); queued by q()
       if (w.admin) { // admin: ownership only, balance untouched (rules allow paid 0 for unlimitedFor())
         b.update(wref, { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
         b.set(doc(db, 'users', uid, 'inv', id), { n: (inv[id] || 0) + 1, at: serverTimestamp() });
@@ -53,7 +58,7 @@ export function createEconomy(db, uid) {
       b.update(wref, { coins: w.coins - paid, lastBuy: id, paid, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
       b.set(doc(db, 'users', uid, 'inv', id), { n: (inv[id] || 0) + 1, at: serverTimestamp() });
       await b.commit(); lastWrite = Date.now(); w.coins -= paid; inv[id] = (inv[id] || 0) + 1; emit(); return paid;
-    });
+    }));
   }
   function use(id) {
     return q(async () => { await inventory(); if (!inv[id]) return false; await updateDoc(doc(db, 'users', uid, 'inv', id), { n: inv[id] - 1, at: serverTimestamp() }); inv[id]--; return true; });

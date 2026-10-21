@@ -38,7 +38,11 @@ export function createDiamonds(db, uid) {
     const wait = 46000 - (Date.now() - last); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const next = { d: w.d + amt, total: w.total + amt, day: dayNo(), today: today + amt, last: serverTimestamp(), updatedAt: serverTimestamp() };
     const b = writeBatch(db); b.update(ref, next); await b.commit(); Object.assign(w, next); last = Date.now(); return amt; }
-  async function buy(id) { const it = ARM[id] || DITEMS.find((x) => x.id === id); await get(true); // Armory + premium dances (z_dn_*), Halloween costumes (z_hw_*)
+  // Diamond buys are queued one at a time and retried on a stale balance, so rapid taps never collide on the doc
+  let chain = Promise.resolve();
+  function buy(id) { const run = async () => { for (let i = 0; ; i++) { try { return await buy1(id); } catch (e) { const c = e && e.code; if (i < 2 && (c === 'permission-denied' || c === 'aborted' || c === 'failed-precondition' || c === 'unavailable')) { await new Promise((r) => setTimeout(r, 400 + i * 600)); continue; } throw e; } } };
+    const pr = chain.then(run, run); chain = pr.catch(() => {}); return pr; }
+  async function buy1(id) { const it = ARM[id] || DITEMS.find((x) => x.id === id); await get(true); // Armory + premium dances (z_dn_*), Halloween costumes (z_hw_*)
     if (!it || !it.d) throw new Error('That item can’t be bought with Diamonds.'); if (w.d < it.d) throw new Error('Not enough Diamonds yet. Play a run to earn more!');
     if (w.admin) { const b = writeBatch(db); b.update(ref, { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
       b.set(doc(db, 'users', uid, 'inv', id), { n: 1, at: serverTimestamp() }); await b.commit(); return 0; }
