@@ -3,7 +3,10 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
-import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL } from './layout.js';
+import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER } from './layout.js';
+import { attachCities } from './cities.js';
+import { attachMap } from './map.js';
+const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
 import { attachEast } from './east.js';
 import { currentSeason, SEASONS } from '../seasons.js';
 const SEASONS_T = Object.fromEntries(Object.values(SEASONS).filter((x) => x.treat).map((x) => [x.treat.id, x.treat]));
@@ -21,7 +24,7 @@ export const CANDY = [{ id: 'star', name: 'Choco Star', e: '⭐' }, { id: 'moon'
 const GREET = ['Happy Halloween! 🎃', 'Ooh, great costume!', 'Here you go, sweetie! 🍬', 'Take two, you earned it!', 'Boo! Just kidding 😄', 'Stay safe out there!', 'What a cute Pal!', 'Trick or treat? Treat!'];
 export const KNOCK_CD_MS = 20 * 60 * 1000, KNOCK_DAY_CAP = 15, KNOCK_COINS = 5;
 
-export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 'halloween';
+export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 'halloween'; GV.nob = true;
   const { THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, sky, sun, hemi } = api;
   const ground = api.ground; const root = new THREE.Group(); root.name = 'kemy-world'; scene.add(root);
   const det = Q.detail || 1, R0 = rng(4242); const uid = (S.user && S.user.uid) || 'anon';
@@ -37,9 +40,13 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     out.computeBoundingSphere(); const m = new THREE.Mesh(out, material); { let v = 0; for (const g of gs) { const c = g.attributes.position.count; if (g.userData.tg) { const L = tagged.get(g.userData.tg) || []; L.push({ m, s: v, n: c, orig: g.attributes.color.array.slice(0, 3) }); tagged.set(g.userData.tg, L); } v += c; } } m.castShadow = shadow && !LOW; m.receiveShadow = true; parent.add(m); gs.forEach((g) => g.dispose()); delete batches[k]; return m; }
   const G = { box: new THREE.BoxGeometry(1, 1, 1), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 12), cyl6: new THREE.CylinderGeometry(0.5, 0.5, 1, 6), prism: new THREE.CylinderGeometry(1, 1, 1, 3), cone4: new THREE.ConeGeometry(0.7071, 1, 4), cone: new THREE.ConeGeometry(0.5, 1, 16), sph: new THREE.SphereGeometry(0.5, 14, 10), plane: new THREE.PlaneGeometry(1, 1) };
   G.plane.rotateX(-Math.PI / 2);
+  // symmetric gable roof: ridge along local x (length 1), triangle in y/z (base 1 wide at y = 0, apex at y = 1). Only yaw it:
+  // (the old prism + pitch Euler applied the tilt after the yaw, which skewed every roof that didn't face +z)
+  G.gable = (() => { const sh = new THREE.Shape([new THREE.Vector2(-0.5, 0), new THREE.Vector2(0.5, 0), new THREE.Vector2(0, 1)]); const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -0.5); g.rotateY(Math.PI / 2); return g; })();
+  G.hip = new THREE.ConeGeometry(0.7071, 1, 4); G.hip.rotateY(Math.PI / 4); // square hip roof, axis-aligned before scaling
 
   // ---------------------------------------------------------------- ground of the neighborhood (the park terrain stops at z = H + 30)
-  { const x0 = BOUNDS.x0 - 20, x1 = STREET.x1 + 40, z0 = PARK.H - 20, z1 = BOUNDS.z1 + 30; const sx = Math.round((x1 - x0) / (LOW ? 4 : 2.5)), sz = Math.round((z1 - z0) / (LOW ? 4 : 2.5));
+  { const x0 = OLD.x0, x1 = STREET.x1 + 40, z0 = PARK.H - 20, z1 = OLD.z1; const sx = Math.round((x1 - x0) / (LOW ? 4 : 2.5)), sz = Math.round((z1 - z0) / (LOW ? 4 : 2.5));
     const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, sx, sz); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2); const p = g.attributes.position, c = new Float32Array(p.count * 3);
     const cA = new THREE.Color('#3f8f3a'), cB = new THREE.Color('#5aa548'), cL = new THREE.Color('#b8862f');
     for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, ground(x, z) - (z < PARK.H + 29 ? 0.06 : 0)); const n = Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.5 + 0.5; col.copy(cA).lerp(cB, n); if (Math.sin(x * 0.7 + z * 0.3) > 0.85) col.lerp(cL, 0.25); c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; }
@@ -66,16 +73,16 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   // ---------------------------------------------------------------- houses (4 original styles, merged by material)
   const WALL = ['#f6e7c8', '#cfe3f0', '#f3d1dc', '#d8ecd0', '#efe0ff', '#ffe2b8', '#e2e8f0', '#f5d0a9'], ROOF = ['#5b3a7a', '#7a3b3b', '#3b4a7a', '#2f5d50', '#6b4a2f', '#4a3a6b'], TRIM = ['#ffffff', '#fff6e0', '#3b2a55'];
   const doors = []; const pumpkins = [], ghosts = [], bulbs = [], hay = [], lamps = [], bats = [];
-  for (const h of HOUSES) { const r = rng(h.seed * 31 + 7); const TP = h.town && TOWN_PAL[h.town]; const wall = TP ? TP.wall[Math.floor(r() * TP.wall.length)] : WALL[Math.floor(r() * WALL.length)], roof = TP ? TP.roof[Math.floor(r() * TP.roof.length)] : ROOF[Math.floor(r() * ROOF.length)], trim = TRIM[r() < 0.8 ? 0 : 1];
+  for (const h of OLDH) { const r = rng(h.seed * 31 + 7); const TP = h.town && TOWN_PAL[h.town]; const wall = TP ? TP.wall[Math.floor(r() * TP.wall.length)] : WALL[Math.floor(r() * WALL.length)], roof = TP ? TP.roof[Math.floor(r() * TP.roof.length)] : ROOF[Math.floor(r() * ROOF.length)], trim = TRIM[r() < 0.8 ? 0 : 1];
     const f = h.face, x = h.x, z = h.z, y0 = FLAT; const W = h.w, D = h.d; const ry = f > 0 ? 0 : Math.PI; const two = h.style === 1 || h.style === 3; const Hh = two ? 5.6 : 3.4;
     const L = (lx, lz) => [x + (f > 0 ? lx : -lx), z + (f > 0 ? lz : -lz)]; // local (front = +lz) -> world
     const TK = h.town ? '@' + h.town : ''; const P3 = (k, g, c, lx, ly, lz, sx, sy, sz, rot = 0, rx = 0) => { const [wx, wz] = L(lx, lz); ptag = !h.sale ? null : k === 'wall' && c === wall ? h.id + '|w' : k === 'roof' ? h.id + '|r' : k === 'trim' && c === trim ? h.id + '|t' : null; put(k + TK, g, c, wx, y0 + ly, wz, ry + rot, sx, sy, sz, rx); };
     P3('wall', G.box, '#8b8378', 0, 0.2, 0, W + 0.4, 0.4, D + 0.4); // foundation
     P3('wall', G.box, wall, 0, 0.4 + Hh / 2, 0, W, Hh, D);
-    if (h.style === 2) { P3('wall', G.box, wall, -W / 2 - 2.2, 0.4 + 1.5, -0.5, 4.4, 3, D - 1); P3('roof', G.cone4, roof, -W / 2 - 2.2, 0.4 + 3 + 0.8, -0.5, 6.4, 1.6, D + 0.4, Math.PI / 4); }
+    if (h.style === 2) { P3('wall', G.box, wall, -W / 2 - 2.2, 0.4 + 1.5, -0.5, 4.4, 3, D - 1); P3('roof', G.hip, roof, -W / 2 - 2.2, 0.4 + 3 + 0.7, -0.5, 5.2, 1.4, D - 0.4); }
     if (h.style === 3) { P3('wall', G.cyl, wall, W / 2 - 0.4, 0.4 + (Hh + 1.6) / 2, D / 2 - 0.6, 2.6, Hh + 1.6, 2.6); P3('roof', G.cone, roof, W / 2 - 0.4, 0.4 + Hh + 1.6 + 1.4, D / 2 - 0.6, 3.4, 2.8, 3.4); }
     // gable roof: triangular prism along x
-    { const rh = two ? 2.4 : 2.2; const [wx, wz] = L(0, 0); ptag = h.sale ? h.id + '|r' : null; put('roof' + TK, G.prism, roof, wx, y0 + 0.4 + Hh + rh * 0.25, wz, ry + Math.PI / 2, (D / 2 + 0.6) * 1.15, W + 0.8, rh * 0.75 * 1.15 / 0.75, Math.PI / 2, 0); }
+    { const rh = two ? 2.4 : 2.2; const [wx, wz] = L(0, 0); ptag = h.sale ? h.id + '|r' : null; put('roof' + TK, G.gable, roof, wx, y0 + 0.4 + Hh - 0.05, wz, ry, W + 0.8, rh, D + 1.2); }
     P3('wall', G.box, '#7c4a2a', W / 3, 0.4 + Hh + 1.6, -1, 0.8, 2.2, 0.8); // chimney
     // porch, steps, door frame, windows (glowing warm)
     P3('wall', G.box, '#a08c74', 0, 0.3, D / 2 + 1, 3.2, 0.25, 2); P3('wall', G.box, '#a08c74', 0, 0.12, D / 2 + 2.2, 2.4, 0.22, 0.6);
@@ -108,7 +115,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   api.nightU = api.nightU || { value: 0 };
   const sidingT = api.proceduralTex ? api.proceduralTex('siding', Q, [1, 1]) : null; const wallMat = std('#fff', { vc: true, r: 0.85 }); if (sidingT) { wallMat.normalMap = sidingT.normalMap; wallMat.normalScale = new THREE.Vector2(0.6, 0.6); }
   const townG = {}; const roofM = std('#fff', { vc: true, r: 0.7 }), trimM = std('#fff', { vc: true, r: 0.55 }), walkM = std('#fff', { vc: true, r: 0.9 });
-  for (const t of ['', ...Object.keys(TOWN_PAL)]) { const tk = t ? '@' + t : ''; let par = root; if (!t) { par = townG._street = new THREE.Group(); par.userData.c = [0, 122]; root.add(par); } if (t) { par = townG[t] = new THREE.Group(); const hs = HOUSES.filter((h) => h.town === t); par.userData.c = [hs.reduce((a, h) => a + h.x, 0) / hs.length, hs.reduce((a, h) => a + h.z, 0) / hs.length]; root.add(par); }
+  for (const t of ['', ...Object.keys(TOWN_PAL)]) { const tk = t ? '@' + t : ''; let par = root; if (!t) { par = townG._street = new THREE.Group(); par.userData.c = [0, 122]; root.add(par); } if (t) { par = townG[t] = new THREE.Group(); const hs = OLDH.filter((h) => h.town === t); par.userData.c = [hs.reduce((a, h) => a + h.x, 0) / hs.length, hs.reduce((a, h) => a + h.z, 0) / hs.length]; root.add(par); }
     flush('wall' + tk, wallMat, true, par); flush('roof' + tk, roofM, true, par); flush('trim' + tk, trimM, true, par); flush('glow' + tk, glowMat, false, par); flush('walk' + tk, walkM, false, par); }
   // instanced front doors (each one can swing open)
   const doorG = new THREE.BoxGeometry(1.2, 2.2, 0.1); doorG.translate(0.6, 1.1, 0); const doorM = new THREE.InstancedMesh(doorG, std('#fff', { r: 0.6 }), doors.length);
@@ -152,7 +159,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const lightSpots = [...lamps.map((l) => ({ x: l.x, y: FLAT + 4.2, z: l.z, c: '#ffd58a', i: 26 })), ...doors.map((d) => ({ x: d.x, y: FLAT + 2.6, z: d.z + 0, c: '#ffb050', i: 10 }))];
 
   // ---------------------------------------------------------------- autumn trees (instanced), leaf piles, park corner
-  const trees = []; { const r = rng(99); for (const h of HOUSES) { if (r() < 0.75) { const s = r() < 0.5 ? -1 : 1; const f = h.face; trees.push({ x: h.x + s * (h.w / 2 + 2), z: h.z + f * (h.d / 2 + 4.4), s: 0.8 + r() * 0.5, c: ['#f97316', '#dc2626', '#facc15', '#84cc16', '#ea580c'][Math.floor(r() * 5)] }); } }
+  const trees = []; { const r = rng(99); for (const h of OLDH) { if (r() < 0.75) { const s = r() < 0.5 ? -1 : 1; const f = h.face; trees.push({ x: h.x + s * (h.w / 2 + 2), z: h.z + f * (h.d / 2 + 4.4), s: 0.8 + r() * 0.5, c: ['#f97316', '#dc2626', '#facc15', '#84cc16', '#ea580c'][Math.floor(r() * 5)] }); } }
     for (let i = 0; i < 26 * det; i++) { const x = PARK_CORNER.x0 + 3 + r() * (PARK_CORNER.x1 - PARK_CORNER.x0 - 6), z = PARK_CORNER.z0 + 3 + r() * (PARK_CORNER.z1 - PARK_CORNER.z0 - 6); if (Math.hypot(x - 32, z - 122) < 9 || trees.some((t) => Math.hypot(t.x - x, t.z - z) < 5)) continue; trees.push({ x, z, s: 0.9 + r() * 0.6, c: ['#f97316', '#dc2626', '#facc15', '#b45309'][Math.floor(r() * 4)] }); } }
   const trunkIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.3, 3, 8), std('#6b4a2f', { r: 0.9 }), trees.length), leafG = new THREE.IcosahedronGeometry(1.7, Q.phone || LOW ? 0 : 1); { const p = leafG.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + Math.sin(p.getX(i) * 3.1 + p.getZ(i) * 2.3) * 0.12; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.85, p.getZ(i) * k); } leafG.computeVertexNormals(); }
   const leafIM = new THREE.InstancedMesh(leafG, std('#fff', { r: 0.8, x: { flatShading: false } }), trees.length * 2), pileIM = new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 10, 6), std('#fff', { r: 1 }), trees.length);
@@ -298,13 +305,13 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const BOTSAY = ['Trick or treat! 🎃', 'Love your costume!', 'Want to trade candy? 🍬', 'Wheee!', 'Happy Halloween!', 'Let’s go to the gazebo!', 'My bag is so full 😄', 'Boo! 👻 hehe'];
 
   // ---------------------------------------------------------------- minimap
-  function drawMap() { const S2 = 184; const x0 = BOUNDS.x0, x1 = BOUNDS.x1, z0 = BOUNDS.z0, z1 = BOUNDS.z1; const sc = S2 / Math.max(x1 - x0, z1 - z0); const mx = (x) => (x - x0) * sc + (S2 - (x1 - x0) * sc) / 2, mz = (z) => (z - z0) * sc;
-    mapX.clearRect(0, 0, S2, S2); if (W.mapExtra) W.mapExtra(mapX, mx, mz, sc); mapX.fillStyle = 'rgba(80,160,80,.55)'; mapX.fillRect(mx(-PARK.W), mz(-PARK.H), PARK.W * 2 * sc, PARK.H * 2 * sc); mapX.fillStyle = 'rgba(70,50,120,.6)'; mapX.fillRect(mx(STREET.x0), mz(STREET.z0), (STREET.x1 - STREET.x0) * sc, (STREET.z1 - STREET.z0) * sc);
-    mapX.strokeStyle = '#d6d3d1'; mapX.lineWidth = 3; for (const r of ALL_ROADS()) { mapX.beginPath(); mapX.moveTo(mx(r.a[0]), mz(r.a[1])); mapX.lineTo(mx(r.b[0]), mz(r.b[1])); mapX.stroke(); }
-    mapX.fillStyle = '#ff8a1f'; for (const h of HOUSES) mapX.fillRect(mx(h.x) - 1.5, mz(h.z) - 1.5, 3, 3); if (W.mapLabels) W.mapLabels(mapX, mx, mz);
+  function drawMap() { const S2 = 184; const RM = W.navOn && W.navOn() ? 160 : 240; const x0 = P.x - RM, x1 = P.x + RM, z0 = P.z - RM, z1 = P.z + RM; /* centred on me (the world is big now) */ const sc = S2 / Math.max(x1 - x0, z1 - z0); const mx = (x) => (x - x0) * sc + (S2 - (x1 - x0) * sc) / 2, mz = (z) => (z - z0) * sc;
+    mapX.clearRect(0, 0, S2, S2); mapX.fillStyle = 'rgba(30,60,40,.55)'; mapX.fillRect(0, 0, S2, S2); mapX.fillStyle = '#3fa7d6'; for (const w of WATER) mapX.fillRect(mx(w.x0), mz(w.z0), (w.x1 - w.x0) * sc, (w.z1 - w.z0) * sc); if (W.mapExtra) W.mapExtra(mapX, mx, mz, sc); mapX.fillStyle = 'rgba(80,160,80,.55)'; mapX.fillRect(mx(-PARK.W), mz(-PARK.H), PARK.W * 2 * sc, PARK.H * 2 * sc); mapX.fillStyle = 'rgba(70,50,120,.6)'; mapX.fillRect(mx(STREET.x0), mz(STREET.z0), (STREET.x1 - STREET.x0) * sc, (STREET.z1 - STREET.z0) * sc);
+    for (const r of ALL_ROADS()) { mapX.strokeStyle = r.hw ? '#fbbf24' : '#e7e5e4'; mapX.lineWidth = r.hw ? 4 : 2.5; mapX.beginPath(); mapX.moveTo(mx(r.a[0]), mz(r.a[1])); mapX.lineTo(mx(r.b[0]), mz(r.b[1])); mapX.stroke(); }
+    mapX.fillStyle = '#ff8a1f'; for (const h of HOUSES) mapX.fillRect(mx(h.x) - 1, mz(h.z) - 1, 2, 2); if (W.mapRoute) W.mapRoute(mapX, mx, mz); if (W.mapLabels) W.mapLabels(mapX, mx, mz);
     mapX.fillStyle = '#7dd3fc'; for (const o of api.others.values()) { if (o.x > 392) continue; mapX.beginPath(); mapX.arc(mx(o.x), mz(o.z), 3, 0, 7); mapX.fill(); }
     mapX.fillStyle = '#ffd23f'; mapX.beginPath(); mapX.arc(mx(P.x), mz(P.z), 5, 0, 7); mapX.fill(); mapX.strokeStyle = '#ffd23f'; mapX.lineWidth = 2; mapX.beginPath(); mapX.moveTo(mx(P.x), mz(P.z)); mapX.lineTo(mx(P.x + Math.sin(P.yaw) * 14), mz(P.z + Math.cos(P.yaw) * 14)); mapX.stroke(); }
-  mapC.onclick = () => { mapC.style.width = mapC.style.width ? '' : 'min(70vw,300px)'; mapC.style.height = mapC.style.height ? '' : 'min(70vw,300px)'; };
+  mapC.onclick = () => { if (W.openMap) W.openMap(); };
 
   // ---------------------------------------------------------------- per-frame update
   let lightT = 0, mapT = 0, cullT = 0; const peds = () => { const out = [{ x: P.x, z: P.z }]; for (const o of api.others.values()) out.push({ x: o.x, z: o.z }); for (const b of bots) out.push({ x: b.x, z: b.z }); return out; };
@@ -357,11 +364,12 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
   const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
   const D = attachDrive(api, W); W.drive = D;
-  const E = attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots });
+  const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
   const Rs = attachRespawn(api, W);
-  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Hm.update(dt, now); Rs.update(dt); update(dt, now); };
-  W.destroy = () => { for (const x of [D, E, Hm, Rs]) try { x.destroy(); } catch { /* */ } destroy(); };
+  const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat }); const Mp = attachMap(api, W);
+  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Mp.update(dt, now); Rs.update(dt); update(dt, now); };
+  W.destroy = () => { for (const x of [D, E, Ci, Hm, Mp, Rs]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];

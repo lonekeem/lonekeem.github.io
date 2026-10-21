@@ -403,7 +403,7 @@ export function createPark3D(ctx) {
     if (!document.body.contains(cv)) { R.dispose(); return; }
     $('#park-room').textContent = `Room ${room.slice(1)}`;
     const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid); let extras = true;
-    const base = () => { const [x, y] = toP(P.x, P.z); const o = { x: Math.max(-21000, Math.min(10000, x)), y: Math.max(0, Math.min(25000, y)), // big world: x -1300..385 m, z up to 1460 m (rules mirror this) d: P.d, e: P.e, eAt: P.eAt, say: P.say, sayAt: P.sayAt, tgt: P.tgt, name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2', pal: palSnap, at: serverTimestamp() };
+    const base = () => { const [x, y] = toP(P.x, P.z); const o = { x: Math.max(-21000, Math.min(10000, x)), y: Math.max(0, Math.min(25000, y)), /* big world: x -1300..385 m, z up to 1460 m (rules mirror this) */ d: P.d, e: P.e, eAt: P.eAt, say: P.say, sayAt: P.sayAt, tgt: P.tgt, name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2', pal: palSnap, at: serverTimestamp() };
       if (extras) { o.h = Math.max(0, Math.min(2000, Math.round(P.y * 10))); o.r = ((Math.round(P.yaw * 180 / Math.PI) % 360) + 360) % 360; o.dn = P.dance && Date.now() < P.danceUntil ? P.dance : ''; o.v = 3; } if (inOk && roomState.inId) o.in = roomState.inId; return o; }; let inOk = true;
     let lastSend = 0, dirty = true, sending = false; const net = { ok: 0, err: '', snaps: 0, snapErr: '' };
     const send = async (force) => { const now = Date.now(); if (sending || (!force && (!dirty || now - lastSend < SEND_MS) && now - lastSend < HB_MS)) return; sending = true; lastSend = now; dirty = false;

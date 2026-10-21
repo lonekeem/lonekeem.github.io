@@ -2,8 +2,8 @@
 // access is controlled by Firestore security rules (firestore.rules).
 export const SDK = 'https://www.gstatic.com/firebasejs/12.4.0';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { getAuth, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, connectFirestoreEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 export const firebaseConfig = {
   apiKey: 'AIzaSyCF3hTcGkjpYb_4k-35R-qYcHsDcOR9yoY',
@@ -22,4 +22,8 @@ export const STUDIO_UID = 'studio';
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 // Persistent IndexedDB cache: listeners resume cheaply and js/fs-cache.js serves repeat reads for free.
-export const db = (() => { try { return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch { return getFirestore(app); } })();
+// Local testing only: on localhost with localStorage 'kemy-emu' = '1' everything talks to the Firebase emulators
+// (firebase.emu.json: auth 9199, firestore 8199). Never active on the live site.
+export const EMU = (() => { try { return /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem('kemy-emu') === '1'; } catch { return false; } })();
+export const db = (() => { if (EMU) { const d = initializeFirestore(app, { localCache: memoryLocalCache() }); connectFirestoreEmulator(d, '127.0.0.1', 8199); connectAuthEmulator(auth, 'http://127.0.0.1:9199', { disableWarnings: true }); return d; }
+  try { return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch { return getFirestore(app); } })();
