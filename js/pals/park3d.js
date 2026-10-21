@@ -359,6 +359,7 @@ export function createPark3D(ctx) {
       for (const c of cyl) if (Math.hypot(c.x - x, c.z - z) < c.r + 0.15 && y < Math.min(c.top, 7)) return true; return false; }
     const tgt = new THREE.Vector3();
     function updateCam(dt) {
+      if (roomState.camOv) { try { if (roomState.camOv(cam, dt)) return; } catch { roomState.camOv = null; } }
       if (pov) { // eye camera: a little behind the (hidden) head so both arms + paws sit in the lower part of the view
         me.updateMatrixWorld(true); const hp = new THREE.Vector3(); J.Head.getWorldPosition(hp); const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
         cam.position.set(hp.x - fx * 0.38, hp.y + 0.12, hp.z - fz * 0.38); const pitch = C.pitch - 0.17;
