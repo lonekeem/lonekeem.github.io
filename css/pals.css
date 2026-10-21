@@ -155,7 +155,7 @@ body.typing .pal-pop { display: none !important; }
 .pal-confirm { text-align: center; padding: 8px; }
 .pal-confirm .btns { display: grid; gap: 8px; }
 /* floating companion Pal */
-.pal-float { position: fixed; left: 10px; bottom: calc(var(--bottom-h, 64px) + 16px + env(safe-area-inset-bottom)); z-index: 85; width: 84px; height: 84px; touch-action: none; cursor: grab; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); -webkit-tap-highlight-color: transparent; user-select: none; }
+.pal-float { position: fixed; left: 10px; bottom: calc(var(--bottom-h, 64px) + 16px + env(safe-area-inset-bottom)); z-index: 85; width: 118px; height: 136px; touch-action: none; cursor: grab; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); -webkit-tap-highlight-color: transparent; user-select: none; }
 body.feed-mode .pal-float:not(.moved) { bottom: calc(var(--bottom-h, 64px) + 230px + env(safe-area-inset-bottom)); }
 .pal-float.moved { bottom: auto; }
 .pal-float[hidden] { display: none; }

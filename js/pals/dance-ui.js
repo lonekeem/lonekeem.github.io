@@ -115,7 +115,11 @@ export function initFloat({ getPal, toast }) {
   document.querySelectorAll('.pal-float').forEach((e) => e.remove()); // idempotent: never two floating Pals
   const el = document.createElement('div'); el.className = 'pal-float'; el.hidden = true; el.setAttribute('role', 'button'); el.tabIndex = 0;
   el.setAttribute('aria-label', 'Your Pal. Tap for a move, double-tap to hide'); document.body.appendChild(el);
-  const { cv, c } = canvasEl(84, 84); el.appendChild(cv);
+  // 3D Pals blit a 1.65 x size square from 0.87w above the feet (pal3d.js), so size 60 needs ~99 px; the old 84 x 84 box
+  // sliced the top of the head / ears / hats off and trimmed held balloons. Box = render square + headroom for the
+  // 1.25x entry pop and dance hops; FX/FY = where the feet sit.
+  const FW = 118, FH = 136, FX = 59, FY = 114;
+  const { cv, c } = canvasEl(FW, FH); el.style.width = FW + 'px'; el.style.height = FH + 'px'; el.appendChild(cv);
   let pal = null, t = 0, running = false, special = 0, specialD = null, leaving = 0, entering = 0;
   try { const p = JSON.parse(sessionStorage.getItem(POS) || 'null'); if (p) { el.style.left = p.x + 'px'; el.style.top = p.y + 'px'; el.classList.add('moved'); } } catch { /* */ }
   const want = () => {
@@ -128,11 +132,11 @@ export function initFloat({ getPal, toast }) {
   const loop = () => { if (!running) return; t++;
     const show = want() || leaving > 0;
     if (!show) { el.hidden = true; running = false; return; }
-    c.clearRect(0, 0, 84, 84);
+    c.clearRect(0, 0, FW, FH);
     let st = { t, mode: 'idle', face: 1 };
     if (special > 0) { special--; st.dance = specialD; }
-    if (leaving > 0) { leaving--; const k = leaving / 36; c.save(); c.globalAlpha = k; c.translate(42, 80); c.scale(0.4 + k * 0.6, 0.4 + k * 0.6); drawDancer(c, 0, 0, 60, pal, { ...st, dance: TRENDING.find((d) => d.id === 'wave') }); c.restore(); if (!leaving) { el.hidden = true; } }
-    else { const k = entering > 0 ? (entering--, 1 + Math.sin((1 - entering / 24) * Math.PI) * 0.25) : 1; c.save(); c.translate(42, 80); c.scale(k, k); drawDancer(c, 0, 0, 60, pal, st); c.restore(); }
+    if (leaving > 0) { leaving--; const k = leaving / 36; c.save(); c.globalAlpha = k; c.translate(FX, FY); c.scale(0.4 + k * 0.6, 0.4 + k * 0.6); drawDancer(c, 0, 0, 60, pal, { ...st, dance: TRENDING.find((d) => d.id === 'wave') }); c.restore(); if (!leaving) { el.hidden = true; } }
+    else { const k = entering > 0 ? (entering--, 1 + Math.sin((1 - entering / 24) * Math.PI) * 0.25) : 1; c.save(); c.translate(FX, FY); c.scale(k, k); drawDancer(c, 0, 0, 60, pal, st); c.restore(); }
     requestAnimationFrame(loop); };
   const wake = () => { if (!running && want()) { el.hidden = false; running = true; if (!localStorage.getItem(HINT)) { localStorage.setItem(HINT, '1'); toast && toast('Double-tap your Pal to hide it · triple-tap the screen to bring it back'); } requestAnimationFrame(loop); } };
   const refresh = async () => { try { pal = await getPal(); } catch { pal = null; } wake(); };
@@ -142,7 +146,7 @@ export function initFloat({ getPal, toast }) {
   let taps = 0, tapT = 0, down = null, moved = false;
   el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now(), ox: el.offsetLeft, oy: el.offsetTop }; moved = false; el.setPointerCapture(e.pointerId); e.stopPropagation(); });
   el.addEventListener('pointermove', (e) => { if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y; if (Math.hypot(dx, dy) > 8) moved = true; if (!moved) return;
-    el.classList.add('moved'); el.style.left = Math.max(0, Math.min(innerWidth - 84, down.ox + dx)) + 'px'; el.style.top = Math.max(0, Math.min(innerHeight - 84, down.oy + dy)) + 'px'; });
+    el.classList.add('moved'); el.style.left = Math.max(0, Math.min(innerWidth - FW, down.ox + dx)) + 'px'; el.style.top = Math.max(0, Math.min(innerHeight - FH, down.oy + dy)) + 'px'; });
   el.addEventListener('pointerup', (e) => { if (!down) return; const dx = e.clientX - down.x, dt = performance.now() - down.t; const d0 = down; down = null; e.stopPropagation();
     if (moved) { if (Math.abs(dx) > 70 && dt < 260) { hide(); return; } try { sessionStorage.setItem(POS, JSON.stringify({ x: el.offsetLeft, y: el.offsetTop })); } catch { /* */ } return; }
     taps++; clearTimeout(tapT);

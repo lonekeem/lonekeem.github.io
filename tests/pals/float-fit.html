@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<body style="margin:0;font:600 13px sans-serif;color:#fff;background:#000">
+<div id="g" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px"></div>
+<script type="module">
+// 🧪 Floating companion Pal (.pal-float, dance-ui.js) framing over a feed video, mock Pals only. ?old=1 = pre-fix 84x84 box
+import { drawDancer, load3D } from '../../js/pals/dance.js';
+const q = new URLSearchParams(location.search), old = q.get('old'), TW = +(q.get('w') || 300), TH = +(q.get('h') || 360);
+const [FW, FH, FX, FY] = old ? [84, 84, 42, 80] : [118, 136, 59, 114];
+const PALS = [['kemy', { held: 'f_balloon_red', body: 'f_hoodie_black' }], ['founder', { held: 'f_balloon_red', body: 'f_hoodie_black' }], ['giraffe', { head: 'wizhat_purple' }], ['unicorn', { head: 'crown_gold', held: 'f_balloon_blue' }], ['bunny', { head: 'tophat_black' }], ['elephant', { head: 'f_beanie_pink', held: 'f_balloon_pink' }]];
+const jobs = [];
+for (const [sp, outfit] of PALS) { const pal = { species: sp, level: 12, outfit };
+  const t = document.createElement('div'); t.style.cssText = `position:relative;width:${TW}px;height:${TH}px;overflow:hidden;border-radius:6px;background:linear-gradient(#c9b48a,#6a6a5a 45%,#3a4a30 70%,#5a4a3a)`;
+  t.innerHTML = `<span style="position:absolute;left:6px;top:4px;background:rgba(0,0,0,.65);padding:2px 6px;border-radius:6px">${old ? 'BEFORE' : 'AFTER'} · ${sp} · ${Object.values(outfit).join(' ')}</span>`;
+  const cv = document.createElement('canvas'), d = 2; cv.width = FW * d; cv.height = FH * d; cv.style.cssText = `position:absolute;left:10px;bottom:20px;width:${FW}px;height:${FH}px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))`; t.appendChild(cv); document.getElementById('g').appendChild(t);
+  const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0);
+  jobs.push(() => { c.clearRect(0, 0, FW, FH); c.save(); c.translate(FX, FY); const r = drawDancer(c, 0, 0, 60, pal, { t: 40, mode: 'idle', face: 1 }); c.restore(); return r !== false; }); }
+load3D().catch(() => {});
+let n = 0; const go = () => { jobs.forEach((j) => { try { j(); } catch (e) { window.err = (window.err || "") + e.message; } }); if (n++ < 400) requestAnimationFrame(go); }; setTimeout(go, 300); setTimeout(() => (window.ready = true), 9000);
+window.onerror = (m) => { window.err = (window.err || '') + m + '\n'; };
+</script>
