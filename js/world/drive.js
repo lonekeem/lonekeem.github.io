@@ -9,7 +9,7 @@ import { createDriveHud } from './drivehud.js';
 import { getCfg, onCfg, buzz, linkAccount } from './drivecfg.js';
 import { createCarFx } from './carfx.js';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)); const lsg = (k) => { try { return localStorage.getItem(k); } catch { return null; } }, lss = (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } };
-export const CAMS = ['chase', 'far', 'pov']; const CAM_NAME = { chase: 'Chase', far: 'Far chase', pov: 'Driver seat' };
+export const CAMS = ['chase', 'far', 'pov']; const CAM_NAME = { chase: 'Chase', far: 'Far chase', pov: 'Cockpit view' };
 export const carCode = (id, color, door) => '~c' + CAR_IDX.indexOf(id).toString(36) + (color | 0).toString(36) + (door ? '1' : '0');
 export function parseCar(dn) { if (!dn || dn.slice(0, 2) !== '~c' || dn.length < 5) return null; const id = CAR_IDX[parseInt(dn[2], 36)]; if (!id) return null; return { id, color: parseInt(dn[3], 36) || 0, door: dn[4] === '1' }; }
 
@@ -116,7 +116,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   // ---------------------------------------------------------------- enter / exit
   function enterSync() { P.dance = myCode(); P.danceUntil = Date.now() + 864e5; api.markDirty(); }
   function getIn() { if (!my || my.state !== 'parked') return; my.state = 'enter'; my.t = 0; my.from = { x: P.x, z: P.z }; my.cy.r = 0; dropCy(); resetInput(); my.eng = my.eng || createEngineSound(); enterSync(); H.show(true); H.setFade(true); setTimeout(() => H.setFade(false), 320); buzz(20); myB.hidden = true; api.tc.root.classList.add('kd-on'); world.hud.querySelector('.ks-act').hidden = true; window.__kd && (window.__kd.state = 'enter'); }
-  function getOut() { if (!my || my.state !== 'drive') return; if (my.V.speed() > 1.2) { say('Slow down to get out 🙂'); return; } my.state = 'exit'; my.t = 0; held.gas = held.brake = 0; }
+  function getOut() { if (!my || my.state !== 'drive') return; if (my.V.speed() <= 1.2) mirrorOff(); if (my.V.speed() > 1.2) { say('Slow down to get out 🙂'); return; } my.state = 'exit'; my.t = 0; held.gas = held.brake = 0; }
   function exitNow() { if (!my) return; const c = my.m.userData.def; const s = Math.sin(my.V.yaw), co = Math.cos(my.V.yaw); const side = c.Wd / 2 + 0.8; P.x = my.V.x + co * side; P.z = my.V.z - s * side; P.y = ground(P.x, P.z); me.scale.setScalar(1); me.visible = true;
     my.state = 'parked'; my.cy.x = my.V.x; my.cy.z = my.V.z; my.cy.r = c.Wd * 0.55; if (!api.cyl.includes(my.cy)) api.cyl.push(my.cy); resetInput(); P.dance = ''; P.danceUntil = 0; api.markDirty(); H.show(false); H.setFade(true); setTimeout(() => H.setFade(false), 320); myB.hidden = false; api.tc.root.classList.remove('kd-on'); if (my.eng) { my.eng.stop(); my.eng = null; } setBrakeLights(my.m, false); }
   // ---------------------------------------------------------------- remote cars (interpolation + prediction)
@@ -141,6 +141,18 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     for (const n of ['Left', 'Right']) { if (J[n + 'UpperLeg']) J[n + 'UpperLeg'].rotation.x = -1.45; if (J[n + 'LowerLeg']) J[n + 'LowerLeg'].rotation.x = 1.35; if (J[n + 'UpperArm']) J[n + 'UpperArm'].rotation.x = -0.9; } }
   // ---------------------------------------------------------------- per frame
   const camP = new THREE.Vector3(), camL = new THREE.Vector3(); let camInit = false;
+  // 🪞 first-person cockpit: rear-view mirror (small render target, refreshed every 3rd frame), head bob + lean into turns, FOV widens with speed
+  const CK2 = { t: 0, lean: 0, yaw0: null, n: 0, fov: 72 }; let mirror = null; const rearCam = new THREE.PerspectiveCamera(55, 3.2, 0.3, 260); const fwdV = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0);
+  function mirrorOn() { if (mirror || LOW || !api.R) return mirror; const rt = new THREE.WebGLRenderTarget(256, 80); rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.wrapS = THREE.RepeatWrapping; rt.texture.repeat.x = -1; rt.texture.offset.x = 1;
+    const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.14), new THREE.MeshBasicMaterial({ color: '#111827' })); const gl = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12), new THREE.MeshBasicMaterial({ map: rt.texture, toneMapped: false })); gl.position.z = 0.002; fr.add(gl); fr.renderOrder = 9; gl.renderOrder = 10; fr.visible = false; scene.add(fr); mirror = { rt, m: fr }; return mirror; }
+  function cockpitCam(dt, rs, fx, fz) { const spd = Math.abs(my.V.vf); if (CK2.yaw0 == null) CK2.yaw0 = rs.yaw; let dyaw = rs.yaw - CK2.yaw0; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)); CK2.yaw0 = rs.yaw; const yr = dyaw / Math.max(dt, 1e-3);
+    CK2.t += dt * (1 + spd * 0.25); CK2.lean += (clamp(-yr * spd * 0.012, -0.09, 0.09) - CK2.lean) * Math.min(1, dt * 4); const bob = Math.sin(CK2.t * 7) * Math.min(0.018, spd * 0.0009);
+    seatWorld(my.m, sv); camP.set(sv.x + fx * 0.05, sv.y + 0.62 + bob, sv.z + fz * 0.05); camP.x += Math.cos(rs.yaw) * CK2.lean * 0.6; camP.z -= Math.sin(rs.yaw) * CK2.lean * 0.6; camL.set(camP.x + fx * 10, camP.y - 0.7, camP.z + fz * 10); cam.position.copy(camP); cam.lookAt(camL); cam.rotateZ(CK2.lean);
+    const fov = 72 + Math.min(16, spd * 0.45); if (Math.abs(fov - CK2.fov) > 0.2) { CK2.fov += (fov - CK2.fov) * Math.min(1, dt * 3); cam.fov = CK2.fov; cam.updateProjectionMatrix(); } me.visible = false;
+    const M2 = mirrorOn(); if (M2) { cam.getWorldDirection(fwdV); M2.m.quaternion.copy(cam.quaternion); upV.set(0, 1, 0).applyQuaternion(cam.quaternion); M2.m.position.copy(cam.position).addScaledVector(fwdV, 0.6).addScaledVector(upV, 0.33); M2.m.scale.setScalar(0.55 * Math.min(1, cam.aspect * 1.4)); M2.m.visible = true;
+      if (++CK2.n % 3 === 0) { rearCam.position.set(camP.x, camP.y + 0.15, camP.z); rearCam.lookAt(camP.x - fx * 20, camP.y - 0.6, camP.z - fz * 20); const R0 = api.R, prevT = R0.getRenderTarget(); M2.m.visible = false; R0.setRenderTarget(M2.rt); R0.render(scene, rearCam); R0.setRenderTarget(prevT); M2.m.visible = true; } }
+    window.__kd = Object.assign(window.__kd || {}, { cockpit: { fov: +CK2.fov.toFixed(1), lean: +CK2.lean.toFixed(3), mirror: !!M2 } }); }
+  const mirrorOff = () => { if (mirror) mirror.m.visible = false; CK2.yaw0 = null; };
   function update(dt, now) { const nowMs = performance.now(); remoteCars(dt, nowMs); rideTick(dt, nowMs); if (!my) return;
     const c = my.m.userData.def; my.door += (my.doorWant - my.door) * Math.min(1, dt * 5);
     if (my.state === 'enter' || my.state === 'exit') { my.t += dt; const t = my.state === 'enter' ? my.t : 1.3 - my.t; my.doorWant = t < 0.95 ? 1 : 0; if (my.state === 'exit' && my.t < 0.4) my.doorWant = 1;
@@ -172,8 +184,8 @@ export function attachDrive(api, world) { const W_EXTRA = {};
       H.blur.style.opacity = !LOW && (Q.tier === 'high' || Q.tier === 'ultra' || api.ULTRA) && drive ? clamp((Math.abs(my.V.vf) - 16) / 18, 0, 0.85) : 0;
       // camera
       if (drive || my.state === 'exit') { const fx = Math.sin(rs.yaw), fz = Math.cos(rs.yaw);
-        if (camMode === 'pov') { seatWorld(my.m, sv); camP.set(sv.x, sv.y + 0.62, sv.z).addScaledVector(new THREE.Vector3(fx, 0, fz), 0.05); camL.set(camP.x + fx * 10, camP.y - 0.7, camP.z + fz * 10); cam.position.copy(camP); cam.lookAt(camL); if (cam.fov !== 72) { cam.fov = 72; cam.updateProjectionMatrix(); } me.visible = false; }
-        else { me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = new THREE.Vector3(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
+        if (camMode === 'pov') cockpitCam(dt, rs, fx, fz);
+        else { mirrorOff(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = new THREE.Vector3(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
           if (!camInit) { camP.copy(want); camInit = true; } else camP.lerp(want, Math.min(1, dt * 5)); camL.set(rs.x + fx * 2, rs.y + 1.0, rs.z + fz * 2); cam.position.copy(camP); if (getCfg().shake && Math.abs(my.V.vf) > 14) { const k = Math.min(1, (Math.abs(my.V.vf) - 14) / 20) * 0.035, t = nowMs / 1000; camP.x += Math.sin(t * 37) * k; camP.y += Math.sin(t * 43 + 1) * k; } cam.position.copy(camP); cam.lookAt(camL); const fv = getCfg().fov + Math.min(8, Math.abs(my.V.vf) * 0.2); if (Math.abs(cam.fov - fv) > 0.3) { cam.fov = fv; cam.updateProjectionMatrix(); } } } }
     else { poseCar(my.m, my.rs, 0, my.V.spin); setDoors(my.m, my.door); FX.update(dt, null); H.blur.style.opacity = 0; }
     window.__kd = Object.assign(window.__kd || {}, { state: my.state, kmh: Math.round(Math.abs(my.V.vf) * 3.6), gear: my.V.gear, rpm: Math.round(my.V.rpm), x: my.V.x, z: my.V.z, yaw: my.V.yaw, pitch: my.rs.pitch, roll: my.rs.roll, heave: my.rs.heave, cam: camMode, remote: remote.size }); }
