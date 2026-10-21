@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff;color:#111;font:600 14px sans-serif"><div id="g" style="display:grid;grid-template-columns:repeat(4,260px);gap:10px;padding:10px"></div>
+<script type="module">
+// 🧪 Background grid (no database). ?new=1 = only the 2026 cute collection; ?pal=1 draws a Pal on each
+import { BGS, drawBg } from '../../js/pals/bgs.js'; import { drawPal3D } from '../../js/pals/pal3d.js';
+const q = new URLSearchParams(location.search); const L = q.get('new') ? BGS.slice(BGS.findIndex((b) => b.id === 'b_pastelsky')) : BGS; const SP = ['kemy', 'bunny', 'puppy', 'unicorn', 'penguin', 'dragon', 'kitten', 'owl'];
+const jobs = L.map((b, i) => { const d = document.createElement('div'); d.innerHTML = `<canvas width="520" height="360" style="width:260px;height:180px;border-radius:18px"></canvas><div>${b.name} · ${b.p ? '★ ' + b.p : 'Free'}</div>`; document.getElementById('g').appendChild(d);
+  const c = d.querySelector('canvas').getContext('2d'); c.scale(2, 2); return () => { drawBg(c, 260, 180, b.id, 30); return q.get('pal') ? drawPal3D(c, 130, 172, 95, { species: SP[i % SP.length], level: 8 }, { t: 40, mode: 'idle' }) : true; }; });
+let n = 0; const go = () => { let all = true; for (const j of jobs) if (!j.done) { if (j()) j.done = 1; else all = false; } if (!all && n++ < 400) requestAnimationFrame(go); else window.ready = true; }; setTimeout(go, 200);
+</script>
