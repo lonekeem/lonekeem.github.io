@@ -1,227 +1,456 @@
-// Star Pool UI: canvas table (portrait; rotates to landscape on wide screens), aim + ghost ball
-// guide, pull-back power, spin picker, ball in hand, calling the 8. Online, the shooter sends the
-// shot (vx, vy, spin) together with the authoritative end positions; the other client replays the
-// same deterministic simulation and then snaps to the stored positions.
+// Star Pool UI: purple felt, wood and gold rails, aim guide, fine-aim wheel, side power bar, spin.
+// Portrait on phones, landscape on wide screens. Online, the shooter sends the shot plus the
+// authoritative end positions; the other client replays the same simulation and then snaps.
+// Written by Lone Keem.
 import * as P from './pool-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
 
 const COLORS = { 1: '#f2b31b', 2: '#3d7bff', 3: '#e2558f', 4: '#8a2be2', 5: '#ff7a2f', 6: '#2bb5a8', 7: '#9b1d3a' };
 const ballColor = (id) => COLORS[id > 8 ? id - 8 : id];
 const logo = new Image(); logo.src = 'logo.png';
+const SPR = 96;
 
-function makeSprite(id, px) {
-  const c = document.createElement('canvas'); c.width = c.height = Math.ceil(px * 2 + 4);
-  const g = c.getContext('2d'), r = px, cx = c.width / 2, cy = c.height / 2;
+function star(g, x, y, rr, fill) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? rr * 0.45 : rr;
+    g.lineTo(x + q * Math.cos(a), y + q * Math.sin(a));
+  }
+  g.closePath(); g.fillStyle = fill; g.fill();
+}
+function makeSprite(id) {
+  const c = document.createElement('canvas'); c.width = c.height = SPR;
+  const g = c.getContext('2d'), r = SPR / 2 - 3, cx = SPR / 2, cy = SPR / 2;
   g.save(); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.clip();
-  if (id === 0) { g.fillStyle = '#f7f3ff'; g.fillRect(0, 0, c.width, c.height); }
-  else if (id === 8) { g.fillStyle = '#0d0a14'; g.fillRect(0, 0, c.width, c.height); }
-  else if (id < 8) { g.fillStyle = ballColor(id); g.fillRect(0, 0, c.width, c.height); }
-  else { g.fillStyle = '#f7f3ff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = ballColor(id); g.fillRect(0, cy - r * 0.55, c.width, r * 1.1); }
-  // soft light
-  const sh = g.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05);
-  sh.addColorStop(0, 'rgba(255,255,255,.55)'); sh.addColorStop(0.35, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,0,.45)');
-  g.fillStyle = sh; g.fillRect(0, 0, c.width, c.height);
-  g.restore();
-  const star = (x, y, rr, fill) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? rr * 0.45 : rr; g.lineTo(x + q * Math.cos(a), y + q * Math.sin(a)); } g.closePath(); g.fillStyle = fill; g.fill(); };
-  if (id === 0) star(cx + r * 0.3, cy + r * 0.3, r * 0.32, '#b57bff');
-  else if (id === 8) { star(cx, cy, r * 0.62, '#ffc83d'); }
+  if (id === 0) { g.fillStyle = '#f6f3ec'; g.fillRect(0, 0, SPR, SPR); }
+  else if (id === 8) { g.fillStyle = '#100e16'; g.fillRect(0, 0, SPR, SPR); }
+  else if (id < 8) { g.fillStyle = ballColor(id); g.fillRect(0, 0, SPR, SPR); }
   else {
-    g.beginPath(); g.arc(cx, cy, r * 0.48, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
-    g.fillStyle = '#1a1026'; g.font = `800 ${Math.round(r * 0.62)}px "Space Grotesk", system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(id), cx, cy + r * 0.04);
+    g.fillStyle = '#f7f4ee'; g.fillRect(0, 0, SPR, SPR);
+    g.fillStyle = ballColor(id); g.fillRect(0, cy - r * 0.34, SPR, r * 0.68);
+  }
+  const sh = g.createRadialGradient(cx - r * 0.36, cy - r * 0.42, r * 0.08, cx + r * 0.1, cy + r * 0.15, r * 1.15);
+  sh.addColorStop(0, 'rgba(255,255,255,.82)'); sh.addColorStop(0.22, 'rgba(255,255,255,.12)');
+  sh.addColorStop(0.55, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,0,.55)');
+  g.fillStyle = sh; g.fillRect(0, 0, SPR, SPR);
+  g.fillStyle = 'rgba(255,255,255,.9)';
+  g.beginPath(); g.ellipse(cx - r * 0.32, cy - r * 0.36, r * 0.18, r * 0.1, -0.7, 0, Math.PI * 2); g.fill();
+  g.restore();
+  g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 3; g.stroke();
+  if (id === 0) star(g, cx + r * 0.28, cy + r * 0.28, r * 0.28, '#8a2be2');
+  else {
+    g.beginPath(); g.arc(cx, cy, r * 0.5, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
+    g.lineWidth = id === 8 ? 4 : 2; g.strokeStyle = id === 8 ? '#ffc83d' : 'rgba(20,10,30,.25)'; g.stroke();
+    g.fillStyle = '#1a1028'; g.font = `800 ${id === 8 ? 40 : 34}px "Space Grotesk", system-ui, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(id), cx, cy + 2);
   }
   return c;
 }
 
 export function createPool(ctx) {
-  const { S, db, main, esc, $, toast, friendlyError, requireAuth, stale, ui } = ctx;
+  const { S, main, esc, $, toast, friendlyError, ui } = ctx;
   const { net } = ui;
 
-  // ------------------------------------------------------------ table view (shared)
   function mountTable(host, opts) {
-    host.innerHTML = `<div class="pl-wrap"><canvas class="pl-canvas" aria-label="Pool table"></canvas></div>
-      <div class="pl-ctrl">
-        <div class="pl-spin" role="slider" aria-label="Cue ball spin" tabindex="0"><span class="pl-spin-dot"></span></div>
-        <div class="pl-pow"><div class="pl-pull" aria-hidden="true"><span class="pl-pull-fill"></span><span class="pl-pull-txt">Pull back to shoot</span></div>
-          <label class="sr-only" for="pl-power">Power</label><input type="range" id="pl-power" min="5" max="100" value="55"></div>
-        <button class="btn btn-sm" id="pl-shoot">Shoot</button>
+    host.innerHTML = `<div class="pl-board">
+        <div class="pl-wrap"><canvas class="pl-canvas" aria-label="Pool table"></canvas></div>
+        <div class="pl-side"><div class="pl-power" role="slider" tabindex="0" aria-label="Shot power. Pull down, then let go to shoot" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="pl-power-track"><div class="pl-power-fill"></div><div class="pl-power-knob"></div></div>
+          <span class="pl-power-lab">Pull</span>
+        </div></div>
       </div>
-      <p class="muted small center pl-hint" id="pl-hint"></p>`;
+      <div class="pl-ctrl">
+        <div class="pl-aim">
+          <span class="pl-aim-lab">Fine aim</span>
+          <button type="button" class="pl-nudge" id="pl-aim-l" aria-label="Aim a little to the left">‹</button>
+          <div class="pl-wheel" role="slider" tabindex="0" aria-label="Fine-tune aim. Drag left or right" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
+          <button type="button" class="pl-nudge" id="pl-aim-r" aria-label="Aim a little to the right">›</button>
+        </div>
+        <div class="pl-spin-wrap">
+          <div class="pl-spin" role="slider" aria-label="Cue ball spin. Drag the dot. Double tap to clear" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span class="pl-spin-dot"></span></div>
+          <span class="pl-spin-lab">Spin</span>
+        </div>
+      </div>
+      <p class="small center pl-hint" id="pl-hint"></p>`;
     const cv = host.querySelector('canvas'), g = cv.getContext('2d');
     const wrap = host.querySelector('.pl-wrap');
-    const V = { balls: [], aim: { x: 0, y: -1 }, power: 0.55, spin: { x: 0, y: 0 }, canShoot: false, placing: false, kitchen: false, callMode: false, call: -1, pull: 0, anim: null, sprites: {}, rot: false, s: 1, ox: 0, oy: 0, dpr: 1, bg: null };
-    const RAIL = 0.07;
+    const V = { balls: [], aim: { x: 0, y: -1 }, power: 0.55, spin: { x: 0, y: 0 }, canShoot: false, placing: false, kitchen: false, callMode: false, call: -1, pull: 0, anim: null, rot: false, s: 1, dpr: 1, bg: null, key: '', raf: 0 };
+    const RAIL = 0.074;
+    const sprites = {};
+    const sprite = (id) => sprites[id] || (sprites[id] = makeSprite(id));
     function layout() {
-      const w = wrap.clientWidth || 340;
-      const avail = Math.max(300, window.innerHeight - 365);
-      V.rot = w > avail * 0.9 && w > 520;
-      const tw = V.rot ? H() : 1, th = V.rot ? 1 : H();
-      const sx = w / (tw + RAIL * 2), sy = (V.rot ? w * 0.6 : avail) / (th + RAIL * 2);
-      V.s = Math.min(sx, sy);
+      const board = host.querySelector('.pl-board');
+      const sideW = 64;
+      const bw = (board && board.clientWidth) || wrap.clientWidth || 320;
+      const availW = Math.max(150, bw - sideW - 8);
+      const ctrl = host.querySelector('.pl-ctrl'), hint = host.querySelector('#pl-hint');
+      const below = (ctrl ? ctrl.offsetHeight : 80) + (hint ? hint.offsetHeight : 20) + 8;
+      const em = document.querySelector('.g-emotes'), act = document.querySelector('#g-actions');
+      const tail = (em ? em.offsetHeight : 0) + (act ? act.offsetHeight : 0) + 8;
+      const top = board ? Math.max(0, board.getBoundingClientRect().top) : 100;
+      const availH = Math.max(220, window.innerHeight - top - below - tail - 28);
+      V.rot = availW > availH * 1.25 && availW > 680;
+      const tw = V.rot ? P.H : 1, th = V.rot ? 1 : P.H;
+      V.s = Math.max(48, Math.min(availW / (tw + RAIL * 2), availH / (th + RAIL * 2)));
       const cw = Math.round((tw + RAIL * 2) * V.s), ch = Math.round((th + RAIL * 2) * V.s);
+      const key = cw + 'x' + ch + (V.rot ? 'r' : 'p');
+      if (key === V.key) return;
+      V.key = key;
       V.dpr = Math.min(2, window.devicePixelRatio || 1);
-      cv.width = cw * V.dpr; cv.height = ch * V.dpr; cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
-      V.sprites = {}; V.bg = null; draw();
+      cv.width = Math.round(cw * V.dpr); cv.height = Math.round(ch * V.dpr);
+      cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+      V.bg = null; draw();
     }
-    const H = () => P.H;
-    // table -> canvas css px
     const T = (x, y) => V.rot ? [(RAIL + y) * V.s, (RAIL + (1 - x)) * V.s] : [(RAIL + x) * V.s, (RAIL + y) * V.s];
     const Tinv = (px, py) => V.rot ? [1 - (py / V.s - RAIL), px / V.s - RAIL] : [px / V.s - RAIL, py / V.s - RAIL];
+    function roundRect(b, x, y, w, h, r) { b.beginPath(); b.moveTo(x + r, y); b.arcTo(x + w, y, x + w, y + h, r); b.arcTo(x + w, y + h, x, y + h, r); b.arcTo(x, y + h, x, y, r); b.arcTo(x, y, x + w, y, r); b.closePath(); }
+    function wood(b, x, y, w, h, r) {
+      const grd = b.createLinearGradient(x, y, x + w, y + h);
+      grd.addColorStop(0, '#a8753c'); grd.addColorStop(0.22, '#6d4120'); grd.addColorStop(0.5, '#3e2412'); grd.addColorStop(0.78, '#7a4e28'); grd.addColorStop(1, '#2c160c');
+      b.fillStyle = grd; roundRect(b, x, y, w, h, r); b.fill();
+      b.save(); roundRect(b, x, y, w, h, r); b.clip();
+      b.strokeStyle = 'rgba(70, 32, 12, .35)'; b.lineWidth = 1;
+      for (let i = 6; i < h; i += 4) {
+        b.beginPath(); b.moveTo(x, y + i);
+        b.bezierCurveTo(x + w * 0.3, y + i + ((i * 3) % 5) - 2, x + w * 0.7, y + i - ((i * 5) % 4), x + w, y + i + 1);
+        b.stroke();
+      }
+      const sheen = b.createLinearGradient(x, y, x, y + h * 0.22);
+      sheen.addColorStop(0, 'rgba(255,226,170,.32)'); sheen.addColorStop(1, 'rgba(255,226,170,0)');
+      b.fillStyle = sheen; b.fillRect(x, y, w, h * 0.28);
+      b.restore();
+      b.strokeStyle = '#1a0c06'; b.lineWidth = 2; roundRect(b, 1, 1, w - 2, h - 2, r); b.stroke();
+    }
+    function bolt(b, x, y) {
+      const grd = b.createRadialGradient(x - 1, y - 1, 0.4, x, y, 3.4);
+      grd.addColorStop(0, '#fff4c8'); grd.addColorStop(0.6, '#e0b044'); grd.addColorStop(1, '#7a5418');
+      b.fillStyle = grd; b.beginPath(); b.arc(x, y, 3.3, 0, 7); b.fill();
+      b.fillStyle = '#4a3010'; b.beginPath(); b.arc(x, y, 1.1, 0, 7); b.fill();
+    }
+    function pocket(b, x, y, r) {
+      b.fillStyle = 'rgba(0,0,0,.4)'; b.beginPath(); b.ellipse(x + r * 0.08, y + r * 0.16, r * 0.95, r * 0.7, 0, 0, 7); b.fill();
+      const leather = b.createRadialGradient(x - r * 0.2, y - r * 0.25, r * 0.15, x, y, r);
+      leather.addColorStop(0, '#5a3a22'); leather.addColorStop(0.55, '#1a100c'); leather.addColorStop(1, '#000');
+      b.fillStyle = leather; b.beginPath(); b.arc(x, y, r, 0, 7); b.fill();
+      const hole = b.createRadialGradient(x - r * 0.12, y - r * 0.16, 1, x + r * 0.05, y + r * 0.08, r * 0.75);
+      hole.addColorStop(0, '#000'); hole.addColorStop(0.72, '#07040c'); hole.addColorStop(1, '#2a140c');
+      b.fillStyle = hole; b.beginPath(); b.arc(x, y, r * 0.7, 0, 7); b.fill();
+      b.strokeStyle = '#f0d078'; b.lineWidth = Math.max(1.6, r * 0.11); b.beginPath(); b.arc(x, y, r * 0.9, 0, 7); b.stroke();
+      b.strokeStyle = 'rgba(255,255,255,.35)'; b.lineWidth = 1.25; b.beginPath(); b.arc(x, y, r * 0.74, Math.PI * 1.05, Math.PI * 1.75); b.stroke();
+    }
+    function dia(b, x, y) {
+      b.save(); b.translate(x, y); b.rotate(V.rot ? Math.PI / 2 : 0);
+      b.fillStyle = '#fff6d4'; b.beginPath(); b.moveTo(0, -4.2); b.lineTo(3.4, 0); b.lineTo(0, 4.2); b.lineTo(-3.4, 0); b.closePath(); b.fill();
+      b.fillStyle = '#b8862e'; b.beginPath(); b.moveTo(0, 0); b.lineTo(3.4, 0); b.lineTo(0, 4.2); b.closePath(); b.fill();
+      b.restore();
+    }
     function background() {
       const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
       const b = c.getContext('2d'); b.scale(V.dpr, V.dpr);
       const cw = cv.width / V.dpr, ch = cv.height / V.dpr, rr = RAIL * V.s;
-      const rg = b.createLinearGradient(0, 0, cw, ch); rg.addColorStop(0, '#fff0b3'); rg.addColorStop(0.35, '#f2a900'); rg.addColorStop(0.7, '#b77a00'); rg.addColorStop(1, '#ffd36b');
-      b.fillStyle = rg; roundRect(b, 0, 0, cw, ch, rr * 0.9); b.fill();
-      b.fillStyle = '#2a0f4d'; roundRect(b, rr * 0.45, rr * 0.45, cw - rr * 0.9, ch - rr * 0.9, rr * 0.5); b.fill();
-      const fg = b.createRadialGradient(cw / 2, ch / 2, 10, cw / 2, ch / 2, Math.max(cw, ch) * 0.7); fg.addColorStop(0, '#5a20a8'); fg.addColorStop(1, '#2a0b55');
-      b.fillStyle = fg; b.fillRect(rr, rr, cw - 2 * rr, ch - 2 * rr);
-      // KL logo on the felt
-      if (logo.complete && logo.naturalWidth) { const L = Math.min(cw, ch) * 0.38; b.save(); b.beginPath(); b.arc(cw / 2, ch / 2, L * 0.47, 0, 7); b.clip(); b.globalAlpha = 0.2; b.drawImage(logo, cw / 2 - L / 2, ch / 2 - L / 2, L, L); b.restore(); b.strokeStyle = 'rgba(255,200,61,.18)'; b.lineWidth = 1.5; b.beginPath(); b.arc(cw / 2, ch / 2, L * 0.5, 0, 7); b.stroke(); }
-      // head string + spots
-      b.strokeStyle = 'rgba(255,255,255,.12)'; b.setLineDash([4, 6]); b.beginPath(); const [h1x, h1y] = T(0, P.KITCHEN_Y), [h2x, h2y] = T(1, P.KITCHEN_Y); b.moveTo(h1x, h1y); b.lineTo(h2x, h2y); b.stroke(); b.setLineDash([]);
-      for (const sp of [P.FOOT, P.HEAD]) { const [x, y] = T(sp.x, sp.y); b.fillStyle = 'rgba(255,255,255,.3)'; b.beginPath(); b.arc(x, y, 2, 0, 7); b.fill(); }
-      // diamonds
-      b.fillStyle = '#fff7d6';
-      for (let i = 1; i < 8; i++) { if (i === 4) continue; const [x1, y1] = T(-0.035, i / 4); const [x2, y2] = T(1.035, i / 4); dia(b, x1, y1); dia(b, x2, y2); }
-      for (let i = 1; i < 4; i++) { const [x1, y1] = T(i / 4, -0.035); const [x2, y2] = T(i / 4, P.H + 0.035); dia(b, x1, y1); dia(b, x2, y2); }
-      P.POCKETS.forEach((pk) => { const [x, y] = T(pk.x, pk.y); const r = pk.r * V.s * 0.95; const pg = b.createRadialGradient(x, y, 1, x, y, r); pg.addColorStop(0, '#000'); pg.addColorStop(0.8, '#05020a'); pg.addColorStop(1, '#3a1470'); b.fillStyle = pg; b.beginPath(); b.arc(x, y, r, 0, 7); b.fill(); });
+      wood(b, 0, 0, cw, ch, Math.min(26, rr * 0.85));
+      b.strokeStyle = '#f0d078'; b.lineWidth = Math.max(2, rr * 0.09);
+      roundRect(b, rr * 0.28, rr * 0.28, cw - rr * 0.56, ch - rr * 0.56, rr * 0.62); b.stroke();
+      const lip = b.createLinearGradient(0, rr * 0.4, 0, ch);
+      lip.addColorStop(0, '#8a5a30'); lip.addColorStop(1, '#3a2010');
+      b.fillStyle = lip; roundRect(b, rr * 0.42, rr * 0.42, cw - rr * 0.84, ch - rr * 0.84, rr * 0.5); b.fill();
+      const cush = rr * 0.4;
+      const cg = b.createLinearGradient(0, rr - cush, 0, rr);
+      cg.addColorStop(0, '#fff1c2'); cg.addColorStop(0.45, '#e6b43a'); cg.addColorStop(1, '#a87820');
+      b.fillStyle = cg; roundRect(b, rr - cush, rr - cush, cw - 2 * (rr - cush), ch - 2 * (rr - cush), cush * 0.8); b.fill();
+      const felt = b.createRadialGradient(cw / 2, ch * 0.42, Math.min(cw, ch) * 0.08, cw / 2, ch / 2, Math.max(cw, ch) * 0.72);
+      felt.addColorStop(0, '#7a3ad4'); felt.addColorStop(0.45, '#4a178e'); felt.addColorStop(1, '#1c063c');
+      b.fillStyle = felt; b.fillRect(rr, rr, cw - 2 * rr, ch - 2 * rr);
+      b.save(); b.beginPath(); b.rect(rr, rr, cw - 2 * rr, ch - 2 * rr); b.clip();
+      b.fillStyle = 'rgba(255,255,255,.04)';
+      for (let i = 0; i < 520; i++) b.fillRect(rr + ((i * 97) % 1000) / 1000 * (cw - 2 * rr), rr + ((i * 57) % 1000) / 1000 * (ch - 2 * rr), 1.3, 1.3);
+      b.fillStyle = 'rgba(0,0,0,.05)';
+      for (let i = 0; i < 380; i++) b.fillRect(rr + ((i * 131) % 1000) / 1000 * (cw - 2 * rr), rr + ((i * 89) % 1000) / 1000 * (ch - 2 * rr), 1.3, 1.3);
+      if (logo.complete && logo.naturalWidth) {
+        const L = Math.min(cw, ch) * 0.34;
+        b.save(); b.beginPath(); b.arc(cw / 2, ch / 2, L * 0.48, 0, 7); b.clip();
+        b.globalAlpha = 0.16; b.drawImage(logo, cw / 2 - L / 2, ch / 2 - L / 2, L, L); b.restore();
+        b.strokeStyle = 'rgba(255,200,61,.22)'; b.lineWidth = 1.5; b.beginPath(); b.arc(cw / 2, ch / 2, L * 0.5, 0, 7); b.stroke();
+      }
+      const vig = b.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.2, cw / 2, ch / 2, Math.max(cw, ch) * 0.62);
+      vig.addColorStop(0, 'rgba(255,255,255,.05)'); vig.addColorStop(0.55, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,.38)');
+      b.fillStyle = vig; b.fillRect(rr, rr, cw - 2 * rr, ch - 2 * rr);
+      b.restore();
+      b.strokeStyle = 'rgba(255,236,190,.28)'; b.setLineDash([5, 7]); b.lineWidth = 1.25;
+      b.beginPath(); const [h1x, h1y] = T(0, P.KITCHEN_Y), [h2x, h2y] = T(1, P.KITCHEN_Y); b.moveTo(h1x, h1y); b.lineTo(h2x, h2y); b.stroke(); b.setLineDash([]);
+      for (const sp of [P.FOOT, P.HEAD]) { const [x, y] = T(sp.x, sp.y); b.fillStyle = 'rgba(255,244,210,.75)'; b.beginPath(); b.arc(x, y, 2.4, 0, 7); b.fill(); }
+      for (let i = 1; i < 8; i++) { if (i === 4) continue; const [x1, y1] = T(-0.034, i / 4), [x2, y2] = T(1.034, i / 4); dia(b, x1, y1); dia(b, x2, y2); }
+      for (let i = 1; i < 4; i++) { const [x1, y1] = T(i / 4, -0.034), [x2, y2] = T(i / 4, P.H + 0.034); dia(b, x1, y1); dia(b, x2, y2); }
+      [[18, 18], [cw - 18, 18], [18, ch - 18], [cw - 18, ch - 18]].forEach(([x, y]) => bolt(b, x, y));
+      P.POCKETS.forEach((pk) => { const [x, y] = T(pk.x, pk.y); pocket(b, x, y, pk.r * V.s * 0.98); });
       return c;
     }
-    const dia = (b, x, y) => { b.beginPath(); b.moveTo(x, y - 3); b.lineTo(x + 3, y); b.lineTo(x, y + 3); b.lineTo(x - 3, y); b.closePath(); b.fill(); };
-    function roundRect(b, x, y, w, h, r) { b.beginPath(); b.moveTo(x + r, y); b.arcTo(x + w, y, x + w, y + h, r); b.arcTo(x + w, y + h, x, y + h, r); b.arcTo(x, y + h, x, y, r); b.arcTo(x, y, x + w, y, r); b.closePath(); }
-    function sprite(id) { const px = P.R * V.s * V.dpr; return V.sprites[id] || (V.sprites[id] = makeSprite(id, px)); }
-    function drawBall(id, x, y) { const sp = sprite(id), [cx, cy] = T(x, y); const s = sp.width / V.dpr; g.drawImage(sp, cx - s / 2, cy - s / 2, s, s); }
+    function pocketScale(x, y) {
+      let sc = 1;
+      for (let i = 0; i < P.POCKETS.length; i++) {
+        const pk = P.POCKETS[i], dx = x - pk.x, dy = y - pk.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < pk.r) sc = Math.min(sc, 0.32 + 0.68 * (d / pk.r));
+      }
+      return sc;
+    }
+    function drawBall(id, x, y) {
+      const sc = pocketScale(x, y), d = P.R * 2 * V.s * sc, [cx, cy] = T(x, y);
+      g.drawImage(sprite(id), cx - d / 2, cy - d / 2, d, d);
+    }
+    function arrow(x1, y1, x2, y2, color, width) {
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+      if (len < 8) return;
+      const ux = dx / len, uy = dy / len;
+      g.lineCap = 'round';
+      g.strokeStyle = 'rgba(8,4,16,.75)'; g.lineWidth = width + 2.4;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = color; g.lineWidth = width;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      const ah = Math.max(9, width * 3.4), bx = x2 - ux * ah, by = y2 - uy * ah, px = -uy * ah * 0.42, py = ux * ah * 0.42;
+      g.fillStyle = color; g.beginPath(); g.moveTo(x2, y2); g.lineTo(bx + px, by + py); g.lineTo(bx - px, by - py); g.closePath(); g.fill();
+      g.lineCap = 'butt';
+    }
+    function paintPower() {
+      const fill = host.querySelector('.pl-power-fill'), knob = host.querySelector('.pl-power-knob'), lab = host.querySelector('.pl-power-lab'), bar = host.querySelector('.pl-power');
+      const pct = Math.round((V.pull || 0) * 100);
+      if (fill) fill.style.height = pct + '%';
+      if (knob) knob.style.bottom = pct <= 0 ? '4px' : `calc(${pct}% - 16px)`;
+      if (lab) lab.textContent = pct > 3 ? pct + '%' : 'Pull';
+      if (bar) bar.setAttribute('aria-valuenow', String(pct));
+    }
     function draw(frame) {
       if (!cv.isConnected) return;
       if (!V.bg) V.bg = background();
-      g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(V.bg, 0, 0); g.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); g.drawImage(V.bg, 0, 0);
+      g.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
       const pos = frame || V.balls.map((b) => (b.on ? [b.x, b.y] : null));
-      // shadows
-      g.fillStyle = 'rgba(0,0,0,.35)';
-      pos.forEach((p) => { if (!p) return; const [x, y] = T(p[0] + 0.004, p[1] + 0.006); g.beginPath(); g.arc(x, y, P.R * V.s, 0, 7); g.fill(); });
-      if (V.call >= 0) { const pk = P.POCKETS[V.call]; const [x, y] = T(pk.x, pk.y); g.strokeStyle = '#ffc83d'; g.lineWidth = 3; g.shadowColor = '#ffc83d'; g.shadowBlur = 12; g.beginPath(); g.arc(x, y, pk.r * V.s, 0, 7); g.stroke(); g.shadowBlur = 0; }
-      if (V.callMode) P.POCKETS.forEach((pk, i) => { if (i === V.call) return; const [x, y] = T(pk.x, pk.y); g.strokeStyle = 'rgba(255,200,61,.55)'; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.arc(x, y, pk.r * V.s, 0, 7); g.stroke(); g.setLineDash([]); });
-      // guide
+      g.fillStyle = 'rgba(0,0,0,.4)';
+      pos.forEach((p) => { if (!p) return; const [x, y] = T(p[0], p[1]); g.beginPath(); g.ellipse(x + 1.6, y + 2.4, P.R * V.s * 0.95, P.R * V.s * 0.68, 0, 0, 7); g.fill(); });
       if (!frame && V.canShoot && V.balls[0] && V.balls[0].on) {
         const c = V.balls[0], a = V.aim, info = P.aimInfo(V.balls, a.x, a.y);
         const [cx, cy] = T(c.x, c.y);
-        g.lineWidth = 1.5; g.strokeStyle = 'rgba(255,255,255,.75)'; g.setLineDash([6, 5]);
-        g.beginPath(); g.moveTo(cx, cy);
-        if (info.ghost) {
-          const [gx, gy] = T(info.ghost.x, info.ghost.y); g.lineTo(gx, gy); g.stroke(); g.setLineDash([]);
-          g.strokeStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(gx, gy, P.R * V.s, 0, 7); g.stroke();
-          const ob = info.ball; const [ox, oy] = T(ob.x, ob.y); const L = 0.12 + 0.18 * Math.max(0, info.cut);
-          const [ex, ey] = T(ob.x + info.obj.x * L, ob.y + info.obj.y * L);
-          g.strokeStyle = '#ffc83d'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(ox, oy); g.lineTo(ex, ey); g.stroke();
-          const cl = 0.1 * (1 - Math.max(0, info.cut)) + 0.03; const [tx, ty] = T(info.ghost.x + info.cue.x * cl, info.ghost.y + info.cue.y * cl);
-          g.strokeStyle = 'rgba(201,166,255,.9)'; g.lineWidth = 2; g.beginPath(); g.moveTo(gx, gy); g.lineTo(tx, ty); g.stroke();
-        } else {
-          const [wx, wy] = T(info.wall.x, info.wall.y); g.lineTo(wx, wy); g.stroke(); g.setLineDash([]);
-          const [rx, ry] = T(info.wall.x + info.refl.x * 0.12, info.wall.y + info.refl.y * 0.12);
-          g.strokeStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.moveTo(wx, wy); g.lineTo(rx, ry); g.stroke();
-        }
-        // cue stick, pulled back with power
-        const back = (0.03 + V.pull * 0.16) * V.s, len = 0.75 * V.s;
+        const back = (0.028 + V.pull * 0.18) * V.s, len = 0.72 * V.s;
         const [ax, ay] = T(c.x + a.x, c.y + a.y); let ux = ax - cx, uy = ay - cy; const un = Math.hypot(ux, uy) || 1; ux /= un; uy /= un;
-        const sx = cx - ux * (P.R * V.s + back), sy = cy - uy * (P.R * V.s + back);
-        const grad = g.createLinearGradient(sx, sy, sx - ux * len, sy - uy * len); grad.addColorStop(0, '#fff3c4'); grad.addColorStop(0.08, '#2bb5a8'); grad.addColorStop(0.1, '#e8d8b0'); grad.addColorStop(0.7, '#8a2be2'); grad.addColorStop(1, '#2a0f4d');
-        g.strokeStyle = grad; g.lineCap = 'round'; g.lineWidth = Math.max(4, P.R * V.s * 0.55); g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx - ux * len, sy - uy * len); g.stroke(); g.lineCap = 'butt';
+        const sx = cx - ux * (P.R * V.s + 3 + back), sy = cy - uy * (P.R * V.s + 3 + back);
+        const grad = g.createLinearGradient(sx, sy, sx - ux * len, sy - uy * len);
+        grad.addColorStop(0, '#f3e2b0'); grad.addColorStop(0.045, '#1c1c1c'); grad.addColorStop(0.07, '#f7f4ee'); grad.addColorStop(0.5, '#e2c48a'); grad.addColorStop(1, '#6a3b1c');
+        g.strokeStyle = grad; g.lineCap = 'round'; g.lineWidth = Math.max(5, P.R * V.s * 0.62);
+        g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx - ux * len, sy - uy * len); g.stroke(); g.lineCap = 'butt';
+        g.setLineDash([6, 5]); g.lineWidth = 2.25;
+        if (info.ghost) {
+          const [gx, gy] = T(info.ghost.x, info.ghost.y);
+          const [ex, ey] = T(c.x + a.x * P.R * 1.15, c.y + a.y * P.R * 1.15);
+          g.strokeStyle = 'rgba(10,6,20,.7)'; g.lineWidth = 4.5; g.beginPath(); g.moveTo(ex, ey); g.lineTo(gx, gy); g.stroke();
+          g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 2.25; g.beginPath(); g.moveTo(ex, ey); g.lineTo(gx, gy); g.stroke();
+          g.setLineDash([]);
+          g.fillStyle = 'rgba(255,255,255,.14)'; g.strokeStyle = '#fff'; g.lineWidth = 2;
+          g.beginPath(); g.arc(gx, gy, P.R * V.s, 0, 7); g.fill(); g.stroke();
+          const ob = info.ball;
+          const objRay = P.rayHit(V.balls, ob.x, ob.y, info.obj.x, info.obj.y, [0, ob.id]);
+          let ox = objRay.x, oy = objRay.y;
+          if (objRay.ball) { ox -= info.obj.x * P.R; oy -= info.obj.y * P.R; }
+          const [osx, osy] = T(ob.x + info.obj.x * P.R * 1.2, ob.y + info.obj.y * P.R * 1.2);
+          const [oex, oey] = T(ox, oy);
+          arrow(osx, osy, oex, oey, '#ffc83d', 3);
+          if (Math.hypot(info.cue.x, info.cue.y) > 0.08) {
+            const cueRay = P.rayHit(V.balls, info.ghost.x, info.ghost.y, info.cue.x, info.cue.y, [ob.id]);
+            let qx = cueRay.x, qy = cueRay.y;
+            if (cueRay.ball) { qx -= info.cue.x * P.R; qy -= info.cue.y * P.R; }
+            const [csx, csy] = T(info.ghost.x + info.cue.x * P.R * 1.15, info.ghost.y + info.cue.y * P.R * 1.15);
+            const [cex, cey] = T(qx, qy);
+            arrow(csx, csy, cex, cey, '#e7d4ff', 2.6);
+          }
+          const px = -info.obj.y, py = info.obj.x;
+          let [bx, by] = T(ob.x + px * 0.075, ob.y + py * 0.075);
+          const mw = cv.width / V.dpr, mh = cv.height / V.dpr;
+          bx = Math.max(22, Math.min(mw - 22, bx)); by = Math.max(22, Math.min(mh - 22, by));
+          g.beginPath(); g.arc(bx, by, 20, 0, 7); g.fillStyle = 'rgba(14,8,28,.8)'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#ffc83d'; g.stroke();
+          g.drawImage(sprite(ob.id), bx - 16, by - 16, 32, 32);
+        } else if (info.wall) {
+          const [ex, ey] = T(c.x + a.x * P.R * 1.15, c.y + a.y * P.R * 1.15);
+          const [wx, wy] = T(info.wall.x, info.wall.y);
+          g.strokeStyle = 'rgba(10,6,20,.7)'; g.lineWidth = 4.5; g.beginPath(); g.moveTo(ex, ey); g.lineTo(wx, wy); g.stroke();
+          g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 2.25; g.beginPath(); g.moveTo(ex, ey); g.lineTo(wx, wy); g.stroke();
+          g.setLineDash([]);
+          const [rx, ry] = T(info.wall.x + info.refl.x * 0.28, info.wall.y + info.refl.y * 0.28);
+          arrow(wx, wy, rx, ry, 'rgba(255,255,255,.85)', 2.4);
+        }
+        g.setLineDash([]);
       }
       pos.forEach((p, id) => { if (p) drawBall(id, p[0], p[1]); });
-      if (!frame && V.placing && V.balls[0]) { const [x, y] = T(V.balls[0].x, V.balls[0].y); g.strokeStyle = '#ffc83d'; g.lineWidth = 2; g.setLineDash([3, 3]); g.beginPath(); g.arc(x, y, P.R * V.s * 1.7, 0, 7); g.stroke(); g.setLineDash([]); }
+      if (V.call >= 0) { const pk = P.POCKETS[V.call]; const [x, y] = T(pk.x, pk.y); g.strokeStyle = '#ffc83d'; g.lineWidth = 3; g.shadowColor = '#ffc83d'; g.shadowBlur = 12; g.beginPath(); g.arc(x, y, pk.r * V.s, 0, 7); g.stroke(); g.shadowBlur = 0; }
+      if (!frame && V.callMode) P.POCKETS.forEach((pk, i) => { if (i === V.call) return; const [x, y] = T(pk.x, pk.y); g.strokeStyle = 'rgba(255,230,170,.8)'; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.arc(x, y, pk.r * V.s + 3, 0, 7); g.stroke(); g.setLineDash([]); });
+      if (!frame && V.placing && V.balls[0] && V.balls[0].on) {
+        const [x, y] = T(V.balls[0].x, V.balls[0].y);
+        g.strokeStyle = '#ffc83d'; g.lineWidth = 2; g.setLineDash([4, 3]); g.beginPath(); g.arc(x, y, 32, 0, 7); g.stroke(); g.setLineDash([]);
+        const label = V.kitchen ? 'Drag the cue ball behind the line' : 'Drag the cue ball';
+        g.font = '700 13px "Space Grotesk", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        const lx = cv.width / V.dpr / 2, ly = Math.min(cv.height / V.dpr - 18, Math.max(18, y + 46));
+        g.lineWidth = 3; g.strokeStyle = '#140a24'; g.strokeText(label, lx, ly); g.fillStyle = '#fff6d4'; g.fillText(label, lx, ly);
+      }
+      paintPower();
     }
-    // play a recorded simulation at 60fps
     function play(frames, done) {
-      cancelAnimationFrame(V.raf); let i = 0, t0 = performance.now(); V.anim = true;
+      cancelAnimationFrame(V.raf); let i = 0; const t0 = performance.now(); V.anim = true;
       const step = (now) => {
-        if (!cv.isConnected) return;
+        if (!cv.isConnected) { V.anim = false; return; }
         i = Math.min(frames.length - 1, Math.floor((now - t0) / (1000 / 60)));
         draw(frames[i]);
-        if (i < frames.length - 1) V.raf = requestAnimationFrame(step); else { V.anim = false; done && done(); }
+        if (i < frames.length - 1) V.raf = requestAnimationFrame(step);
+        else { V.anim = false; done && done(); }
       };
       V.raf = requestAnimationFrame(step);
     }
-    // ---- input
     let dragging = null;
-    const pt = (e) => { const r = cv.getBoundingClientRect(); return Tinv(e.clientX - r.left, e.clientY - r.top); };
+    const pt = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, t: Tinv(e.clientX - r.left, e.clientY - r.top) }; };
     cv.addEventListener('pointerdown', (e) => {
-      if (!V.canShoot || V.anim) return;
-      const [x, y] = pt(e); const c = V.balls[0];
+      if (!V.canShoot || V.anim || !V.balls[0]) return;
+      const p = pt(e), [x, y] = p.t;
       if (V.callMode) {
-        let best = -1, bd = 0.025;
-        P.POCKETS.forEach((pk, i) => { const d = (pk.x - x) ** 2 + (pk.y - y) ** 2; if (d < bd) { bd = d; best = i; } });
+        let best = -1, bd = 0.12;
+        P.POCKETS.forEach((pk, i) => { const d = Math.hypot(pk.x - x, pk.y - y); if (d < bd) { bd = d; best = i; } });
         if (best >= 0) { V.call = best; opts.onCall && opts.onCall(best); ui.sfx.play('tap'); draw(); return; }
       }
-      if (V.placing && (c.x - x) ** 2 + (c.y - y) ** 2 < (P.R * 7) ** 2) dragging = 'cue'; else dragging = 'aim';
-      cv.setPointerCapture(e.pointerId); move(x, y);
+      const [bx, by] = T(V.balls[0].x, V.balls[0].y);
+      dragging = V.placing && Math.hypot(p.x - bx, p.y - by) < 36 ? 'cue' : 'aim';
+      try { cv.setPointerCapture(e.pointerId); } catch { /* already gone */ }
+      move(x, y);
     });
     const move = (x, y) => {
-      const c = V.balls[0];
+      const c = V.balls[0]; if (!c) return;
       if (dragging === 'cue') { if (P.canPlace(V.balls, x, y, V.kitchen)) { c.x = x; c.y = y; } }
-      else if (dragging === 'aim') { let dx = x - c.x, dy = y - c.y; const n = Math.sqrt(dx * dx + dy * dy); if (n > 1e-4) V.aim = { x: dx / n, y: dy / n }; }
+      else if (dragging === 'aim') { const dx = x - c.x, dy = y - c.y, n = Math.hypot(dx, dy); if (n > 0.02) V.aim = { x: dx / n, y: dy / n }; }
       draw();
     };
-    cv.addEventListener('pointermove', (e) => { if (!dragging) return; const [x, y] = pt(e); move(x, y); });
-    cv.addEventListener('pointerup', () => { dragging = null; });
-    cv.addEventListener('pointercancel', () => { dragging = null; });
-    const pull = host.querySelector('.pl-pull'), fill = host.querySelector('.pl-pull-fill'), range = host.querySelector('#pl-power');
-    let pullStart = null;
-    pull.addEventListener('pointerdown', (e) => { if (!V.canShoot || V.anim) return; pullStart = e.clientX; pull.setPointerCapture(e.pointerId); });
-    pull.addEventListener('pointermove', (e) => { if (pullStart == null) return; V.pull = Math.max(0, Math.min(1, (e.clientX - pullStart) / (pull.clientWidth * 0.8))); fill.style.width = V.pull * 100 + '%'; draw(); });
-    pull.addEventListener('pointerup', () => { if (pullStart == null) return; pullStart = null; const p = V.pull; V.pull = 0; fill.style.width = '0'; if (p > 0.04) { V.power = p; range.value = Math.round(p * 100); shoot(); } else draw(); });
-    range.oninput = () => { V.power = range.value / 100; V.pull = V.power; draw(); };
-    range.onchange = () => { V.pull = 0; draw(); };
-    host.querySelector('#pl-shoot').onclick = () => { V.power = range.value / 100; shoot(); };
+    cv.addEventListener('pointermove', (e) => { if (!dragging) return; const [x, y] = pt(e).t; move(x, y); });
+    const endDrag = () => { dragging = null; };
+    cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+    function nudge(rad) {
+      const a = Math.atan2(V.aim.y, V.aim.x) + rad;
+      V.aim = { x: Math.cos(a), y: Math.sin(a) }; draw();
+    }
+    let rep = 0;
+    const stopNudge = () => { clearInterval(rep); rep = 0; };
+    host.querySelectorAll('.pl-nudge').forEach((btn) => {
+      const dir = btn.id === 'pl-aim-l' ? -1 : 1;
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); if (!V.canShoot || V.anim) return;
+        nudge(dir * 0.01); stopNudge(); rep = setInterval(() => nudge(dir * 0.01), 55);
+      });
+      btn.addEventListener('pointerup', stopNudge); btn.addEventListener('pointercancel', stopNudge); btn.addEventListener('pointerleave', stopNudge);
+    });
+    const wheel = host.querySelector('.pl-wheel');
+    let wheelX = null;
+    wheel.addEventListener('pointerdown', (e) => { if (!V.canShoot || V.anim) return; wheelX = e.clientX; try { wheel.setPointerCapture(e.pointerId); } catch { /* noop */ } });
+    wheel.addEventListener('pointermove', (e) => { if (wheelX == null) return; nudge((e.clientX - wheelX) * 0.0024); wheelX = e.clientX; });
+    wheel.addEventListener('pointerup', () => { wheelX = null; }); wheel.addEventListener('pointercancel', () => { wheelX = null; });
+    const power = host.querySelector('.pl-power');
+    let pullY = null;
+    power.addEventListener('pointerdown', (e) => { if (!V.canShoot || V.anim) return; pullY = e.clientY; try { power.setPointerCapture(e.pointerId); } catch { /* noop */ } });
+    power.addEventListener('pointermove', (e) => {
+      if (pullY == null) return;
+      const travel = Math.max(80, power.clientHeight * 0.72);
+      V.pull = Math.max(0, Math.min(1, (e.clientY - pullY) / travel));
+      draw();
+    });
+    const endPull = () => {
+      if (pullY == null) return; pullY = null;
+      const p = V.pull; V.pull = 0;
+      if (p > 0.04) { V.power = p; shoot(); } else draw();
+    };
+    power.addEventListener('pointerup', endPull); power.addEventListener('pointercancel', endPull);
     const spin = host.querySelector('.pl-spin'), dot = host.querySelector('.pl-spin-dot');
-    const setSpin = (x, y) => { const n = Math.hypot(x, y); if (n > 1) { x /= n; y /= n; } V.spin = { x, y }; dot.style.transform = `translate(${x * 18}px, ${y * 18}px)`; };
-    spin.addEventListener('pointerdown', (e) => { const r = spin.getBoundingClientRect(); setSpin((e.clientX - r.left - r.width / 2) / (r.width / 2 - 6), (e.clientY - r.top - r.height / 2) / (r.height / 2 - 6)); ui.sfx.play('tap'); });
+    const setSpin = (x, y) => { const n = Math.hypot(x, y); if (n > 1) { x /= n; y /= n; } V.spin = { x, y }; dot.style.transform = `translate(${x * 22}px, ${y * 22}px)`; };
+    let spinning = false;
+    const spinAt = (e) => { const r = spin.getBoundingClientRect(); setSpin((e.clientX - r.left - r.width / 2) / (r.width / 2 - 10), (e.clientY - r.top - r.height / 2) / (r.height / 2 - 10)); };
+    spin.addEventListener('pointerdown', (e) => { spinning = true; spinAt(e); try { spin.setPointerCapture(e.pointerId); } catch { /* noop */ } ui.sfx.play('tap'); });
+    spin.addEventListener('pointermove', (e) => { if (spinning) spinAt(e); });
+    spin.addEventListener('pointerup', () => { spinning = false; }); spin.addEventListener('pointercancel', () => { spinning = false; });
     spin.addEventListener('dblclick', () => setSpin(0, 0));
+    function onKey(e) {
+      if (!cv.isConnected || !V.canShoot || V.anim) return;
+      if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-0.012); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(0.012); }
+      else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); V.power = V.power || 0.55; shoot(); }
+    }
+    window.addEventListener('keydown', onKey);
     function shoot() {
-      if (!V.canShoot || V.anim) return;
+      if (!V.canShoot || V.anim || !V.balls[0] || !V.balls[0].on) return;
       if (V.callMode && V.call < 0) { toast('Tap a pocket to call the 8 first'); return; }
       const sp = 0.25 + V.power * (P.MAX_SPEED - 0.25);
       const r6 = (v) => Math.round(v * 1e6) / 1e6;
       ui.sfx.play('capture');
       opts.onShoot({ vx: r6(V.aim.x * sp), vy: r6(V.aim.y * sp), follow: r6(-V.spin.y), side: r6(V.spin.x) }, { x: V.balls[0].x, y: V.balls[0].y });
+      setSpin(0, 0); V.pull = 0; paintPower();
     }
-    const ro = new ResizeObserver(() => layout()); ro.observe(wrap);
+    let layoutQueued = false;
+    const queueLayout = () => {
+      if (layoutQueued) return;
+      layoutQueued = true;
+      requestAnimationFrame(() => { layoutQueued = false; if (cv.isConnected) layout(); });
+    };
+    const ro = new ResizeObserver(() => queueLayout());
+    const stage = host.closest('.pl-stage');
+    if (stage && stage.parentElement) ro.observe(stage.parentElement);
+    const onResize = () => { V.key = ''; queueLayout(); };
+    window.addEventListener('resize', onResize);
     logo.onload = () => { V.bg = null; draw(); };
     layout();
     const api = {
       V, draw, play, layout,
-      set(balls, o = {}) { V.balls = balls; Object.assign(V, o); host.querySelector('.pl-ctrl').classList.toggle('off', !V.canShoot); draw(); },
+      set(balls, o = {}) {
+        V.balls = balls; Object.assign(V, o);
+        if (!V.canShoot) V.pull = 0;
+        host.querySelector('.pl-ctrl').classList.toggle('off', !V.canShoot);
+        host.querySelector('.pl-side').classList.toggle('off', !V.canShoot);
+        draw();
+      },
       hint(t) { const h = host.querySelector('#pl-hint'); if (h) h.textContent = t; },
-      aimAt(x, y) { const c = V.balls[0]; let dx = x - c.x, dy = y - c.y; const n = Math.sqrt(dx * dx + dy * dy); V.aim = { x: dx / n, y: dy / n }; draw(); },
-      stop() { ro.disconnect(); cancelAnimationFrame(V.raf); }
+      aimAt(x, y) { const c = V.balls[0]; if (!c) return; const dx = x - c.x, dy = y - c.y, n = Math.hypot(dx, dy) || 1; V.aim = { x: dx / n, y: dy / n }; draw(); },
+      stop() { ro.disconnect(); window.removeEventListener('resize', onResize); window.removeEventListener('keydown', onKey); stopNudge(); cancelAnimationFrame(V.raf); V.anim = false; }
     };
     return api;
   }
 
-  // ------------------------------------------------------------ helpers
   const groupLabel = (gname) => (gname === 'solid' ? 'Solids' : gname === 'stripe' ? 'Stripes' : '');
   function rackRow(balls, gname) {
     const ids = gname === 'solid' ? [1, 2, 3, 4, 5, 6, 7] : gname === 'stripe' ? [9, 10, 11, 12, 13, 14, 15] : [];
-    return ids.map((id) => `<i class="pl-mini ${balls[id] && balls[id].on ? '' : 'gone'} ${id > 8 ? 'st' : ''}" style="--bc:${ballColor(id)}"></i>`).join('');
+    return ids.map((id) => `<i class="pl-mini ${balls[id] && balls[id].on ? '' : 'gone'} ${id > 8 ? 'st' : ''}" style="--bc:${ballColor(id)}">${id}</i>`).join('');
   }
   function playersHtml(ps, st, turn, balls, timer, done) {
-    return ps.map((p, i) => `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${ui.chip(p)}<span class="pl-grp">${st.groups[i] ? `<b>${groupLabel(st.groups[i])}</b><span class="pl-rack">${rackRow(balls, st.groups[i])}</span>` : '<span class="muted">open</span>'}</span>${!done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : ''}</div>`).join('<span class="g-vs">vs</span>');
+    return ps.map((p, i) => {
+      const grp = st.groups[i] ? `<b>${groupLabel(st.groups[i])}</b><span class="pl-rack">${rackRow(balls, st.groups[i])}</span>` : '<span class="pl-open">Open table</span>';
+      const clock = !done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : '';
+      return `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${ui.chip(p)}${clock}<span class="pl-grp">${grp}</span></div>`;
+    }).join('<span class="g-vs">vs</span>');
+  }
+  function statusLine(st, seat, mine, left, otherName) {
+    const grp = groupLabel(st.groups[seat]);
+    const who = mine ? 'Your shot' : `${otherName}’s shot`;
+    const urgent = mine && left != null && left <= 10 ? ` · ${left}s` : '';
+    const msg = st.msg ? String(st.msg).trim() : '';
+    return [msg, who + (grp ? ` · ${grp}` : ' · open table') + urgent].filter(Boolean).join(' ');
   }
   function shell(title, back) {
     ui.shell(esc(title), `<div class="g-players pl-players" id="g-players"></div><div class="g-status" id="g-status" aria-live="polite"></div>
       <div class="g-stage pl-stage"><div class="g-fx"></div><div id="pl-table"></div></div>${ui.emoteBar()}<div class="g-actions" id="g-actions"></div>`, back);
     document.body.classList.add('pool-mode');
-    setTimeout(() => { const el = document.getElementById('g-players'); if (el && window.innerWidth < 600) window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - 70) }); }, 60);
+    setTimeout(() => { const el = document.getElementById('g-players'); if (el && window.innerWidth < 600) window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - 8) }); }, 60);
     S.unsubs.push(() => document.body.classList.remove('pool-mode'));
   }
   function turnHint(st, seat, balls, mine) {
+    const keys = window.matchMedia('(pointer: fine)').matches ? ' Arrow keys nudge. Space shoots.' : '';
     if (!mine) return '';
-    if (st.bih) return st.brk ? 'Place the cue ball behind the line, aim, then pull back to break.' : 'Ball in hand: drag the cue ball anywhere, then shoot.';
-    if (P.needsCall(st, seat, balls)) return 'On the 8: tap a pocket to call it, then shoot.';
-    return 'Drag on the table to aim. Pull back (or slide power) to shoot. Set spin on the white ball dial.';
+    if (P.needsCall(st, seat, balls)) return 'On the 8: tap the pocket you want. The gold ring marks it. Then pull the side bar to shoot.';
+    if (st.bih && st.brk) return 'Break: drag the cue ball behind the line, then pull the side bar down and let go.' + keys;
+    if (st.bih) return 'Ball in hand: drag the cue ball anywhere it fits, then pull the side bar to shoot.';
+    return 'Drag on the table to aim. Gold line is the object ball, purple is the cue ball. Use Fine aim for small changes. Pull the side bar down and let go to shoot.' + keys;
   }
 
-  // ------------------------------------------------------------ vs computer
+  let killLocal = () => {};
   function local(params) {
+    killLocal();
     const lvl = ['easy', 'medium', 'hard'].includes(params.lvl) ? params.lvl : 'medium';
     shell('Star Pool', '#/games/pool');
     ui.wireEmotes(main, '', () => '');
@@ -229,20 +458,37 @@ export function createPool(ctx) {
     const me = { uid: ui.myUid(), name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' };
     const cpu = { uid: 'cpu1', name: `CPU · ${lvl[0].toUpperCase() + lvl.slice(1)}` };
     const ps = human === 0 ? [me, cpu] : [cpu, me];
-    let balls = P.decode(P.rack()), st = P.newState(), turn = 0, alive = true, over = false;
-    S.unsubs.push(() => { alive = false; table.stop(); });
+    let balls = P.decode(P.rack()), st = P.newState(), turn = 0, alive = true, over = false, stamp = Date.now(), shown = -2, cpuT = 0;
     $('#g-actions').innerHTML = `<button class="btn btn-sm btn-ghost" id="pl-new">New game</button><a class="btn btn-sm btn-ghost" href="#/games/pool">Leave</a>`;
     $('#pl-new').onclick = () => local(params);
     const table = mountTable($('#pl-table'), { onShoot: (shot, cuePos) => take(shot, cuePos), onCall: (p) => { st.call = p; } });
+    const tick = setInterval(() => {
+      if (!alive || over || !$('#g-players')) return;
+      const left = Math.max(0, TURN_SECONDS - Math.floor((Date.now() - stamp) / 1000));
+      const el = document.querySelector('#g-players .g-pl.on .g-timer');
+      if (el) { el.textContent = left + 's'; el.classList.toggle('low', left <= 10); }
+      if (left === 0 && turn === human && table.V.canShoot && !table.V.anim) {
+        st = { ...st, groups: [...st.groups], foul: true, bih: true, msg: "Time's up. Ball in hand." };
+        turn = 1 - turn; refresh();
+      }
+    }, 250);
+    killLocal = () => { alive = false; clearInterval(tick); clearTimeout(cpuT); table.stop(); };
+    S.unsubs.push(killLocal);
     function refresh() {
+      if (!alive) return;
+      if (turn !== shown) { shown = turn; stamp = Date.now(); }
       const mine = turn === human && !over;
-      $('#g-players').innerHTML = playersHtml(ps, st, turn, balls, null, over);
-      $('#g-status').textContent = over ? '' : (st.msg ? st.msg + ' ' : '') + (mine ? 'Your shot' : 'Computer is lining up…');
+      const left = Math.max(0, TURN_SECONDS - Math.floor((Date.now() - stamp) / 1000));
+      $('#g-players').innerHTML = playersHtml(ps, st, turn, balls, left, over);
+      const status = $('#g-status');
+      status.textContent = over ? (st.msg || '') : statusLine(st, turn, mine, left, 'Computer');
+      status.className = 'g-status' + (over ? '' : st.foul ? ' foul' : mine ? ' you' : ' wait');
       const callMode = mine && P.needsCall(st, turn, balls);
       table.set(balls, { canShoot: mine, placing: mine && st.bih, kitchen: st.brk, callMode, call: callMode ? st.call : -1 });
       table.hint(turnHint(st, turn, balls, mine));
-      if (mine && !st.bih && !st.brk) { /* keep aim */ } else if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
-      if (!over && turn !== human) setTimeout(cpuTurn, 900);
+      if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
+      clearTimeout(cpuT);
+      if (!over && turn !== human) cpuT = setTimeout(cpuTurn, 700);
     }
     function take(shot, cuePos) {
       const before = balls.map((b) => ({ ...b }));
@@ -270,13 +516,13 @@ export function createPool(ctx) {
       if (shot.call >= 0 || P.needsCall(st, turn, balls)) st.call = shot.call >= 0 ? shot.call : 0;
       if (shot.place) { balls[0] = { ...balls[0], x: shot.place.x, y: shot.place.y, on: true }; }
       table.set(balls, { canShoot: false, call: st.call });
-      const n = Math.hypot(shot.vx, shot.vy); table.V.aim = { x: shot.vx / n, y: shot.vy / n }; table.V.canShoot = true; table.V.pull = n / P.MAX_SPEED; table.draw(); table.V.canShoot = false;
-      setTimeout(() => { if (alive) { ui.sfx.play('capture'); take(shot, null); } }, 650);
+      const n = Math.hypot(shot.vx, shot.vy) || 1;
+      table.V.aim = { x: shot.vx / n, y: shot.vy / n }; table.V.canShoot = true; table.V.pull = Math.min(1, n / P.MAX_SPEED); table.draw(); table.V.canShoot = false;
+      cpuT = setTimeout(() => { if (alive) { ui.sfx.play('capture'); take(shot, null); } }, 650);
     }
     refresh();
   }
 
-  // ------------------------------------------------------------ online
   async function online(g0, token) {
     const gid = g0.id;
     let g = g0, ended = false, stopHb = null, claimT = 0, lastMove = g0.moveNo, playing = false, iEnded = false, joinTried = false;
@@ -297,9 +543,9 @@ export function createPool(ctx) {
       const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - (tsMs(g.turnAt) || Date.now())) / 1000)) : null;
       $('#g-players').innerHTML = playersHtml(ps, st, g.turn, balls, left, done);
       const status = $('#g-status');
-      if (g.status === 'waiting') status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
-      else if (g.status === 'done') status.textContent = g.endReason === 'cancelled' ? 'Cancelled' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;
-      else status.textContent = (st.msg ? st.msg + ' ' : '') + (side === g.turn ? `Your shot${left <= 15 ? ` · ${left}s` : ''}` : `${g.names[g.turn]}’s shot`);
+      if (g.status === 'waiting') { status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players'; status.className = 'g-status wait'; }
+      else if (g.status === 'done') { status.textContent = g.endReason === 'cancelled' ? 'Cancelled' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`; status.className = 'g-status'; }
+      else { status.textContent = statusLine(st, g.turn, side === g.turn, left, g.names[g.turn] || 'Opponent'); status.className = 'g-status' + (st.foul ? ' foul' : side === g.turn ? ' you' : ' wait'); }
     }
     let syncKey = '';
     function sync() {
@@ -312,6 +558,7 @@ export function createPool(ctx) {
       table.set(balls, { canShoot: mine, placing: mine && st.bih, kitchen: st.brk, callMode, call: callMode ? localCall : -1 });
       table.hint(g.status === 'active' ? turnHint(st, side, balls, mine) : '');
       const ctl = document.querySelector('.pl-ctrl'); if (ctl) ctl.style.display = side < 0 ? 'none' : '';
+      const sideEl = document.querySelector('.pl-side'); if (sideEl) sideEl.style.display = side < 0 ? 'none' : '';
       if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
       header(); actions();
     }
@@ -332,12 +579,10 @@ export function createPool(ctx) {
       const wp = net.update(gid, upd).then(() => { if (j.winner >= 0) iEnded = true; }, (e) => { console.warn('pool: shot rejected', e.code || e.message, g.moveNo, upd.moveNo, g.turn, side); toast(friendlyError(e)); });
       table.play(r.frames, () => {
         if (r.events.pocketed.length) ui.sfx.play('drop');
-        // the snapshot listener already holds the latest state (ours, or the server's if the write failed)
         wp.finally(() => { playing = false; localCall = -1; syncKey = ''; sync(); if (g.status === 'done') onEnd(); });
       });
     }
-    function replay(prev) {
-      // opponent's shot: re-simulate from the stored start, then snap to the authoritative result
+    function replay() {
       const sh = g.shot; if (!sh || !sh.from) { sync(); return; }
       playing = true; syncKey = '';
       const r = P.simulate(P.decode(sh.from), sh);
