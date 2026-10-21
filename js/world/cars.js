@@ -17,6 +17,23 @@ export const CARS = [
     L: 4.5, Wd: 2.0, H: 1.12, wr: 0.36, mass: 1400, torque: 600, redline: 8400, gears: [3.1, 2.2, 1.65, 1.3, 1.08, 0.92, 0.8], fd: 3.5, grip: 1.3, steer: 0.5, top: 35, susp: 44, damp: 4.0, color: 1 },
   { id: 'aurora', name: 'Aurora GT', style: 'gt', emoji: '🌌', d: 1600, prem: 1, blurb: 'A long-nose grand tourer with an aurora light strip. Premium.',
     L: 4.8, Wd: 1.98, H: 1.2, wr: 0.37, mass: 1550, torque: 650, redline: 7800, gears: [3.0, 2.1, 1.6, 1.28, 1.05, 0.88, 0.76], fd: 3.4, grip: 1.22, steer: 0.5, top: 33, susp: 38, damp: 3.6, color: 4 },
+  // ✨ premium sports line (original designs, no real brands): faster + grippier than the regular cars
+  { id: 'nova', name: 'Nova Arrow', style: 'super', emoji: '💫', d: 1800, prem: 1, sport: 1, blurb: 'A razor-thin supercar with a split light bar. Premium sports.',
+    L: 4.5, Wd: 2.0, H: 1.08, wr: 0.36, mass: 1350, torque: 680, redline: 8800, gears: [3.1, 2.25, 1.7, 1.36, 1.12, 0.95, 0.82], fd: 3.6, grip: 1.38, steer: 0.52, top: 39, susp: 46, damp: 4.2, color: 10 },
+  { id: 'blaze', name: 'Solar Blaze', style: 'super', emoji: '🔥', d: 2200, prem: 1, sport: 1, blurb: 'A hypercar with a tall glowing fin and twin wings. Premium sports.',
+    L: 4.7, Wd: 2.06, H: 1.06, wr: 0.37, mass: 1300, torque: 780, redline: 9200, gears: [3.0, 2.2, 1.7, 1.38, 1.15, 0.98, 0.86], fd: 3.6, grip: 1.45, steer: 0.5, top: 44, susp: 50, damp: 4.6, color: 4 },
+  { id: 'tide', name: 'Tidal Spark', style: 'coupe', emoji: '🌊', p: 2400, sport: 1, blurb: 'A curvy sports coupe with a ducktail and ocean shine.',
+    L: 4.35, Wd: 1.9, H: 1.24, wr: 0.35, mass: 1250, torque: 460, redline: 8000, gears: [3.3, 2.2, 1.6, 1.28, 1.04, 0.86], fd: 3.7, grip: 1.28, steer: 0.56, top: 33, susp: 38, damp: 3.6, color: 3 },
+  { id: 'breeze', name: 'Sunny Breeze', style: 'coupe', conv: 1, emoji: '🌞', p: 2800, sport: 1, blurb: 'A top-down roadster for sunny drives. Convertible.',
+    L: 4.2, Wd: 1.86, H: 1.18, wr: 0.34, mass: 1180, torque: 430, redline: 7800, gears: [3.3, 2.2, 1.6, 1.28, 1.04, 0.86], fd: 3.7, grip: 1.3, steer: 0.58, top: 32, susp: 38, damp: 3.6, color: 9 },
+  { id: 'glide', name: 'Velvet Glide', style: 'gt', conv: 1, emoji: '🎀', d: 1700, prem: 1, sport: 1, blurb: 'A long open-top grand tourer with a soft light strip. Premium convertible.',
+    L: 4.8, Wd: 1.98, H: 1.16, wr: 0.37, mass: 1500, torque: 640, redline: 7800, gears: [3.0, 2.1, 1.6, 1.28, 1.05, 0.88, 0.76], fd: 3.4, grip: 1.3, steer: 0.52, top: 37, susp: 40, damp: 3.8, color: 6 },
+  { id: 'storm', name: 'Thunder Kite', style: 'gt', emoji: '⚡', d: 2000, prem: 1, sport: 1, blurb: 'A muscular GT with a lightning stripe glow. Premium sports.',
+    L: 4.75, Wd: 2.02, H: 1.18, wr: 0.38, mass: 1520, torque: 720, redline: 8200, gears: [3.0, 2.15, 1.62, 1.3, 1.08, 0.9, 0.78], fd: 3.5, grip: 1.36, steer: 0.5, top: 40, susp: 42, damp: 4.0, color: 8 },
+  { id: 'aurum', name: 'Golden Meteor', style: 'super', emoji: '🌠', d: 3000, prem: 1, sport: 1, blurb: 'The fastest Kemy hypercar: low, wide and gleaming. Premium sports.',
+    L: 4.8, Wd: 2.1, H: 1.04, wr: 0.38, mass: 1280, torque: 860, redline: 9500, gears: [2.95, 2.2, 1.72, 1.4, 1.18, 1.0, 0.88], fd: 3.6, grip: 1.5, steer: 0.5, top: 48, susp: 52, damp: 4.8, color: 9 },
+  { id: 'pixie', name: 'Pixie Dash', style: 'coupe', conv: 1, emoji: '🧚', p: 2000, sport: 1, blurb: 'A tiny, zippy sports convertible that corners like a go-kart.',
+    L: 3.8, Wd: 1.76, H: 1.12, wr: 0.32, mass: 980, torque: 330, redline: 8400, gears: [3.4, 2.3, 1.7, 1.34, 1.1, 0.92], fd: 3.9, grip: 1.34, steer: 0.62, top: 30, susp: 40, damp: 3.6, color: 11 },
 ];
 export const CAR = Object.fromEntries(CARS.map((c) => [c.id, c]));
 export const CAR_IDX = CARS.map((c) => c.id); // append-only: used in the compact multiplayer code
@@ -81,11 +98,11 @@ function rim(r, w, spokes) { const g = new THREE.Group(); const ch = M.chrome();
 // One car model. Returns a Group (root: position/yaw) with .userData: chassis (pitch/roll/heave), wheels, doors, steer
 export function buildCar(def, color, o = {}) { const c = typeof def === 'string' ? CAR[def] : def; const col = PAINTS[color ?? c.color] || PAINTS[0]; const lite = !!o.lite;
   const root = new THREE.Group(); const ch = new THREE.Group(); root.add(ch); const paint = paintMat(col);
-  const pr = profiles(c); const W = c.Wd, r = c.wr; const bev = Math.min(0.16, W * 0.08);
+  const pr = profiles(c); const cab0 = pr.cabin; if (c.conv) { const f = c.L / 2, H = c.H; pr.cabin = [[f - c.L * 0.3, H * 0.55], [f - c.L * 0.4, H * 0.84], [f - c.L * 0.43, H * 0.84], [f - c.L * 0.37, H * 0.55]]; } const W = c.Wd, r = c.wr; const bev = Math.min(0.16, W * 0.08);
   const body = new THREE.Mesh(sculpt(extrudeSide(pr.body, W, bev, lite ? 6 : 12), c, c.H * 0.3, c.H * 0.62), paint); ch.add(body);
   const cabW = W * pr.roofW; const cab = new THREE.Mesh(sculpt(extrudeSide(pr.cabin, cabW, 0.1, lite ? 6 : 12), c, c.H * 0.55, c.H, 1.1), M.glass()); cab.renderOrder = 2; ch.add(cab);
   // roof skin (paint) as a thin slab following the top of the cabin
-  { const top = pr.cabin.filter((p, i) => i === 1 || i === 2).map((p) => p.length === 4 ? [p[2], p[3]] : p); const x0 = Math.min(top[0][0], top[1][0]) , x1 = Math.max(top[0][0], top[1][0]); const y = Math.max(top[0][1], top[1][1]);
+  if (!c.conv) { const top = pr.cabin.filter((p, i) => i === 1 || i === 2).map((p) => p.length === 4 ? [p[2], p[3]] : p); const x0 = Math.min(top[0][0], top[1][0]) , x1 = Math.max(top[0][0], top[1][0]); const y = Math.max(top[0][1], top[1][1]);
     const roof = new THREE.Mesh(extrudeSide([[x0 + 0.05, y - 0.06], [x1 - 0.05, y - 0.06], [x1 - 0.12, y + 0.03], [x0 + 0.12, y + 0.03]], cabW * 0.9, 0.05, 4), paint); ch.add(roof); }
   // wheel arch flares
   const axF = c.L * 0.33, axR = -c.L * 0.32, tw = W / 2 - r * 0.2;
@@ -108,9 +125,9 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
     const bar = new THREE.Mesh(new THREE.BoxGeometry(W * 0.7, 0.08, 0.1), M.glow('#fff7cc')); bar.position.set(0, c.H * 1.0, c.L * 0.08); ch.add(bar);
     for (const s of [-1, 1]) { const rl = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, c.L * 0.34, 6), M.chrome()); rl.rotation.x = Math.PI / 2; rl.position.set(s * W * 0.42, c.H * 0.75, -c.L * 0.29); ch.add(rl); } }
   // interior: seats, dash, steering wheel (visible through the glass, used by the POV camera)
-  const seatY = Math.max(r * 0.9, c.H * 0.38), drvX = W * 0.22, seatZ = (pr.cabin[0][0] + pr.cabin[pr.cabin.length - 1][0]) / 2 - 0.1;
+  const seatY = Math.max(r * 0.9, c.H * 0.38), drvX = W * 0.22, seatZ = (cab0[0][0] + cab0[cab0.length - 1][0]) / 2 - 0.1;
   for (const s of [1, -1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.14, 0.48), M.seat()); st.position.set(s * drvX, seatY, seatZ); ch.add(st); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.6, 0.12), M.seat()); bk.position.set(s * drvX, seatY + 0.32, seatZ - 0.26); bk.rotation.x = -0.18; ch.add(bk); }
-  const dashZ = pr.cabin[0][0] - 0.12; const dash = new THREE.Mesh(new THREE.BoxGeometry(W * 0.74, 0.16, 0.36), M.dash()); dash.position.set(0, seatY + 0.26, dashZ - 0.22); ch.add(dash);
+  const dashZ = cab0[0][0] - 0.12; const dash = new THREE.Mesh(new THREE.BoxGeometry(W * 0.74, 0.16, 0.36), M.dash()); dash.position.set(0, seatY + 0.26, dashZ - 0.22); ch.add(dash);
   const gauge = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), M.glow('#7dd3fc')); gauge.position.set(drvX, seatY + 0.35, dashZ - 0.41); gauge.rotation.x = -0.4; gauge.rotation.y = Math.PI; ch.add(gauge);
   const steer = new THREE.Group(); steer.position.set(drvX, seatY + 0.4, dashZ - 0.5); steer.rotation.x = -0.45; ch.add(steer);
   { const wr = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 24), M.trim()); steer.add(wr); const sp = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.02), M.trim()); steer.add(sp); const cen = new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), M.badge()); cen.position.z = -0.012; cen.rotation.y = Math.PI; steer.add(cen); }
@@ -143,18 +160,19 @@ export function createVehicle(def, groundAt) { const c = typeof def === 'string'
   V.speed = () => Math.abs(V.vf);
   function step(h, inp) { // inp: { thr 0..1, brk 0..1, steer -1..1, hand }
     // smoothed input: gradual throttle, speed-sensitive steering
-    V.thr += ((inp.thr || 0) - V.thr) * Math.min(1, h * 3.5); V.brk += ((inp.brk || 0) - V.brk) * Math.min(1, h * 8);
-    const spd = Math.abs(V.vf); const maxSt = c.steer / (1 + spd * 0.055) * (V.abs === false && V.brk > 0.8 && spd > 6 ? 0.4 : 1); V.steer += (((inp.steer || 0) * maxSt) - V.steer) * Math.min(1, h * 6);
+    // easy-drive assists (on by default): gentle throttle ramp, quick release, firm predictable brakes
+    const tIn = inp.thr || 0; V.thr += (tIn - V.thr) * Math.min(1, h * (tIn > V.thr ? 2.2 : 7)); V.brk += ((inp.brk || 0) - V.brk) * Math.min(1, h * 9);
+    const spd = Math.abs(V.vf); const maxSt = c.steer / (1 + spd * 0.085) * (V.abs === false && V.brk > 0.8 && spd > 6 ? 0.4 : 1); const sIn = inp.steer || 0; V.steer += ((sIn * maxSt) - V.steer) * Math.min(1, h * (Math.abs(sIn) < 0.05 ? 7 : 4.5)); // speed-scaled, smoothed, self-centring
     // reverse: brake held when (nearly) stopped
-    if (V.brk > 0.5 && V.vf < 0.6 && !V.rev && V.thr < 0.1) V.revT = (V.revT || 0) + h; else V.revT = 0; if (V.revT > 0.35) V.rev = true; if (V.rev && (V.thr > 0.1 || V.vf > 0.3) && V.brk < 0.1) V.rev = false;
+    if (V.brk > 0.5 && V.vf < 1.0 && !V.rev && V.thr < 0.1) V.revT = (V.revT || 0) + h; else V.revT = 0; if (V.revT > 0.2) V.rev = true; if (V.rev && (V.thr > 0.1 || V.vf > 0.3) && V.brk < 0.1) V.rev = false;
     // gears + rpm (auto box)
     const wheelRpm = Math.abs(V.vf) / c.wr * 60 / (2 * Math.PI); const ratio = (V.rev ? 3.2 : c.gears[V.gear - 1]) * c.fd;
     let rpm = Math.max(900, wheelRpm * ratio); if (!V.rev) { if (V.manual) { if (V.wantShift) { V.gear = Math.max(1, Math.min(c.gears.length, V.gear + V.wantShift)); V.shiftT = 0.2; V.wantShift = 0; } } else if (rpm > c.redline * 0.9 && V.gear < c.gears.length) { V.gear++; V.shiftT = 0.25; V.shifted = 1; } else if (V.gear > 1 && rpm < c.redline * 0.38) V.gear--; } else V.gear = 1;
     V.shiftT = Math.max(0, (V.shiftT || 0) - h); const pedal = V.rev ? V.brk : V.thr;
     rpm = Math.min(c.redline, Math.max(rpm, 900 + pedal * 2200 * (spd < 3 ? 1 : 0.2))); V.rpm += (rpm - V.rpm) * Math.min(1, h * 10);
     let Fd = (V.shiftT > 0 ? 0.3 : 1) * pedal * torqueAt(V.rpm) * ratio * 0.9 / c.wr; if (V.rpm >= c.redline * 0.995) Fd *= 0.2; if (V.tc && V.slip > 0.5 && !V.drift) Fd *= 0.55; if (V.rev) Fd = -Fd * 0.6;
-    if (spd > c.top && !V.rev) Fd = Math.min(Fd, 0);
-    const brakeF = (V.rev ? 0 : V.brk) * m * g * 0.95 + (inp.hand ? m * g * 0.6 : 0);
+    if (spd > c.top && !V.rev) Fd = Math.min(Fd, 0); if (V.rev && V.vf < -6) Fd = Math.max(Fd, 0); // calm reverse speed
+    const brakeF = (V.rev ? 0 : V.brk) * m * g * 1.15 + (inp.hand ? m * g * 0.6 : 0);
     const Fb = Math.abs(V.vf) < 0.05 ? 0 : -Math.sign(V.vf) * Math.min(brakeF, Math.abs(V.vf) * m / h * 0.9);
     const drag = -V.vf * Math.abs(V.vf) * 0.42 - V.vf * 14 - Math.sign(V.vf) * (Math.abs(V.vf) > 0.05 ? m * 0.012 * g : 0);
     // tires (bicycle model): slip angles -> lateral forces capped by grip * load (weight transfer)
@@ -166,7 +184,9 @@ export function createVehicle(def, groundAt) { const c = typeof def === 'string'
       const Cf = m * 9, Cr = m * 9.6; const Fyf = Math.max(-mu * Nf, Math.min(mu * Nf, -Cf * sf)), rg = inp.hand ? 0.6 : V.drift && Math.abs(V.steer) > 0.15 && V.thr > 0.5 ? 0.9 : 1.12, Fyr = Math.max(-mu * Nr * rg, Math.min(mu * Nr * rg, -Cr * sr));
       V.slip = Math.max(Math.abs(sf), Math.abs(sr)) * (Math.abs(Cr * sr) > mu * Nr ? 1.6 : 0.6);
       V.acc = (Fd + Fb + drag - Fyf * Math.sin(V.steer)) / m; const ay = (Fyr + Fyf * Math.cos(V.steer)) / m - V.vf * V.r; V.ay = ay;
-      V.vf += V.acc * h; V.vl += ay * h; V.r += (a * Fyf * Math.cos(V.steer) - b * Fyr) / I * h; V.vl *= 1 - h * 0.6; V.r *= 1 - h * 0.25; const rmax = mu * g * (inp.hand ? 1.6 : 1.15) / Math.max(spd, 3); V.r = Math.max(-rmax, Math.min(rmax, V.r)); }
+      V.vf += V.acc * h; V.vl += ay * h; V.r += (a * Fyf * Math.cos(V.steer) - b * Fyr) / I * h; V.vl *= 1 - h * 0.6; V.r *= 1 - h * 0.25; const rmax = mu * g * (inp.hand ? 1.6 : 1.15) / Math.max(spd, 3); V.r = Math.max(-rmax, Math.min(rmax, V.r));
+      // grip assist: pull yaw rate toward what the wheels ask for and bleed off sideways slide (no spin-outs)
+      if (V.assist !== false && !inp.hand && !V.drift) { const rk = V.vf * Math.tan(V.steer) / L; V.r += (rk - V.r) * Math.min(1, h * 3.2); V.vl *= 1 - Math.min(1, h * 2.4); } }
     if (Math.abs(V.vf) < 0.03 && pedal < 0.05) V.vf = 0;
     // integrate world position
     let sy = Math.sin(V.yaw), cy = Math.cos(V.yaw); V.yaw += V.r * h;

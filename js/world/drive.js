@@ -12,7 +12,7 @@ export const CAMS = ['chase', 'far', 'pov']; const CAM_NAME = { chase: 'Chase', 
 export const carCode = (id, color, door) => '~c' + CAR_IDX.indexOf(id).toString(36) + (color | 0).toString(36) + (door ? '1' : '0');
 export function parseCar(dn) { if (!dn || dn.slice(0, 2) !== '~c' || dn.length < 5) return null; const id = CAR_IDX[parseInt(dn[2], 36)]; if (!id) return null; return { id, color: parseInt(dn[3], 36) || 0, door: dn[4] === '1' }; }
 
-export function attachDrive(api, world) {
+export function attachDrive(api, world) { const W_EXTRA = {};
   const { THREE, scene, P, me, view, S, db, cam, ground, LOW, Q } = api; const uid = (S.user && S.user.uid) || 'anon'; const hud = world.hud; const say = world.say;
   const CK = 'kemy-car-cam', SK = 'kemy-car-cam-set', MK = 'kemy-mycars-' + uid;
   let camMode = CAMS.includes(lsg(CK)) ? lsg(CK) : 'chase'; let camSet = { dist: 6.5, h: 2.4 }; try { camSet = { ...camSet, ...(JSON.parse(lsg(SK) || '{}') || {}) }; } catch { /* */ }
@@ -20,7 +20,9 @@ export function attachDrive(api, world) {
   const owned = new Set(CARS.filter((c) => c.free).map((c) => c.id)); let invLoaded = false;
   let econ = null, dia = null; async function loadInv() { try { const [{ createEconomy }, { createDiamonds }] = await Promise.all([import('../pals/economy.js'), import('../pals/armory.js')]); await registerCarItems(); econ = econ || createEconomy(db, uid); dia = dia || createDiamonds(db, uid);
     const inv = await econ.inventory(true); for (const c of CARS) if (inv[carItem(c)]) owned.add(c.id); invLoaded = true; } catch (e) { console.warn('cars inv', e); } }
-  loadInv();
+  const invP = loadInv(); const carsChanged = () => dispatchEvent(new CustomEvent('kemy:cars-changed'));
+  // every car I own (+ my paint pick + plate) for homes.js (parked at my house for everyone)
+  async function ownedCars() { await invP; if (lsg('kemy-pals-debug') === '1' && pref.fakeAll) CARS.forEach((c) => owned.add(c.id)); return CARS.filter((c) => owned.has(c.id)).map((c) => ({ id: c.id, color: pref.colors[c.id] ?? c.color, plate: (pref.plates || {})[c.id] || null })); }
   // ---------------------------------------------------------------- my car (one active car at a time)
   let my = null; // { id, color, m, V, state: 'parked'|'enter'|'drive'|'exit', t, door, eng, cy }
   const inp = { thr: 0, brk: 0, steer: 0, hand: 0 }; const held = { gas: 0, brake: 0 };
@@ -85,11 +87,11 @@ export function attachDrive(api, world) {
         return `<div class="kd-car"><span class="e">${c.emoji}</span><div><b>${c.name}</b>${c.prem ? ' <small style="display:inline;color:#ffd23f">PREMIUM</small>' : ''}<small>${c.blurb}</small></div><div class="row">${PAINTS.map((p, i) => `<button type="button" class="kd-sw${i === col ? ' on' : ''}" style="background:${p}" data-col="${c.id}:${i}" aria-label="Paint ${i + 1}"></button>`).join('')}</div>
           <div class="row">${own ? `<button type="button" data-spawn="${c.id}">▶ Drive it</button>` : c.p ? `<button type="button" data-buy="${c.id}">Buy · ⭐ ${c.p}</button>` : `<button type="button" data-buy="${c.id}">Buy · 💎 ${c.d}</button>`}${my && my.id === c.id ? '<button type="button" class="ghost" data-park>Put away</button>' : ''}</div></div>`; }).join('')}</div><button type="button" class="ghost" data-close style="width:100%">Close</button></div>`; };
     paint(); d.onclick = async (e) => { const b = e.target.closest('button'); if (e.target === d || (b && b.dataset.close !== undefined)) { d.remove(); return; } if (!b) return;
-      if (b.dataset.col) { const [id, i] = b.dataset.col.split(':'); pref.colors[id] = +i; lss(MK, JSON.stringify(pref)); if (my && my.id === id) { const st = my.state; const pos = { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; const wasIn = st === 'drive'; removeCar(); spawnCar(id, +i, pos); if (wasIn) { my.state = 'drive'; enterSync(); } } paint(); return; }
+      if (b.dataset.col) { const [id, i] = b.dataset.col.split(':'); pref.colors[id] = +i; lss(MK, JSON.stringify(pref)); carsChanged(); if (my && my.id === id) { const st = my.state; const pos = { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; const wasIn = st === 'drive'; removeCar(); spawnCar(id, +i, pos); if (wasIn) { my.state = 'drive'; enterSync(); } } paint(); return; }
       if (b.dataset.spawn) { const id = b.dataset.spawn; spawnCar(id, pref.colors[id] ?? CAR[id].color); d.remove(); say(`🚗 ${CAR[id].name} is parked nearby. Walk up and tap Enter car!`); return; }
       if (b.dataset.park !== undefined) { removeCar(); paint(); return; }
       if (b.dataset.buy) { const c = CAR[b.dataset.buy]; if (!confirm(`Buy ${c.name} for ${c.p ? '⭐ ' + c.p + ' Star Coins' : '💎 ' + c.d + ' Diamonds'}?`)) return; b.disabled = true; b.textContent = 'Buying…';
-        try { await loadInv(); if (c.p) await econ.buy(carItem(c)); else await dia.buy(carItem(c)); owned.add(c.id); say(`🎉 ${c.name} is yours!`); } catch (er) { say(er && er.code === 'permission-denied' ? 'The shop isn’t ready for cars yet (prices not published). Try again soon!' : (er && er.message) || 'Could not buy right now'); } paint(); } }; }
+        try { await loadInv(); if (c.p) await econ.buy(carItem(c)); else await dia.buy(carItem(c)); owned.add(c.id); carsChanged(); say(`🎉 ${c.name} is yours!`); } catch (er) { say(er && er.code === 'permission-denied' ? 'The shop isn’t ready for cars yet (prices not published). Try again soon!' : (er && er.message) || 'Could not buy right now'); } paint(); } }; }
   myB.onclick = openMyCars;
   // ---------------------------------------------------------------- enter / exit
   function enterSync() { P.dance = myCode(); P.danceUntil = Date.now() + 864e5; api.markDirty(); }
@@ -133,8 +135,10 @@ export function attachDrive(api, world) {
       if (drive && g.autoBrake && my.V.vf > 2) { const look = 2 + my.V.vf * 0.5, ax = my.V.x + Math.sin(my.V.yaw) * look, az = my.V.z + Math.cos(my.V.yaw) * look; const [bx, bz] = api.collide(ax, az, ground(ax, az)); if (Math.abs(bx - ax) + Math.abs(bz - az) > 1e-3) { inp.brk = Math.max(inp.brk, 0.85); inp.thr = 0; } }
       const rs = my.V.update(dt, inp, (V) => { // collisions (world colliders), soft: slide + lose speed
         const s = Math.sin(V.yaw), co = Math.cos(V.yaw); let px = 0, pz = 0; for (const f of [c.L * 0.38, 0, -c.L * 0.38]) { const x = V.x + s * f, z = V.z + co * f; const [nx, nz] = api.collide(x, z, ground(x, z)); if (Math.abs(nx - x) + Math.abs(nz - z) > 1e-4) { V.x += (nx - x); V.z += (nz - z); px += nx - x; pz += nz - z; } }
-        const pl = Math.hypot(px, pz); if (pl > 1e-4) { const into = -(s * px + co * pz) / pl; if (into * V.vf > 0) { if (Math.abs(V.vf) > 3 && performance.now() - (my.bz || 0) > 400) { my.bz = performance.now(); buzz(25); } V.vf *= 0.9; } V.vl *= 0.85; } });
+        const pl = Math.hypot(px, pz); if (pl > 1e-4) { const into = -(s * px + co * pz) / pl; if (into * V.vf > 0) { const nowB = performance.now(); if (Math.abs(V.vf) > 3 && nowB - (my.bz || 0) > 400) { my.bz = nowB; buzz(25); V.vf = -V.vf * 0.28; /* soft bounce off */ } else V.vf *= 0.9; } V.vl *= 0.85; } });
       if (drive) { const want = Math.max(inp.thr, V_REV(my) ? inp.brk : 0); if (want > 0.3 && my.V.speed() < 0.35) { my.stuckT = (my.stuckT || 0) + dt; if (my.stuckT > 1.5) { my.nudges = (my.nudges || 0) + 1; resetCar(my.nudges > 2); if (my.nudges > 2) { my.nudges = 0; say('🔄 Car reset onto the road'); } } } else { my.stuckT = 0; if (my.V.speed() > 3) my.nudges = 0; } }
+      // lane assist: hands off the wheel on a road -> gently line up with the road (either direction)
+      if (drive && Math.abs(inp.steer) < 0.05 && my.V.vf > 7) { my.laT = (my.laT || 0) - dt; if (my.laT <= 0) { my.laT = 0.25; my.la = nearestRoad(my.V.x, my.V.z); } const r0 = my.la; if (r0 && r0.d < 7) { let dy = r0.yaw - my.V.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); if (Math.abs(dy) > Math.PI / 2) dy = Math.atan2(Math.sin(dy + Math.PI), Math.cos(dy + Math.PI)); if (Math.abs(dy) < 0.3) my.V.yaw += dy * Math.min(1, dt * 0.9); } }
       my.rs = rs; poseCar(my.m, rs, my.V.steer, my.V.spin); setDoors(my.m, my.door); setBrakeLights(my.m, inp.brk > 0.1 && !my.V.rev);
       if (drive) { seatWorld(my.m, sv); me.position.copy(sv); me.rotation.y = rs.yaw; me.scale.setScalar(0.6); sitPose(me, dt); }
       P.x = my.V.x; P.z = my.V.z; P.yaw = my.V.yaw; P.y = ground(P.x, P.z); P.vy = 0; if (my.V.speed() > 0.05) api.markDirty();
@@ -158,9 +162,12 @@ export function attachDrive(api, world) {
   const myCode = () => carCode(my.id, my.color, my.door > 0.5) + (rider ? 'o' + rider : '');
   const riderOf = (dn) => (dn && dn.slice(0, 2) === '~c' && dn[5] === 'o' ? dn.slice(6, 14) : null);
   const seatP = (car, out) => { car.updateMatrixWorld(true); out.copy(car.userData.seat); out.x = -out.x; out.y -= 0.1; return out.applyMatrix4(car.userData.chassis.matrixWorld); };
-  const rcss = document.createElement('style'); rcss.textContent = `.kr-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(14px,env(safe-area-inset-bottom)) + 74px);display:flex;gap:8px;pointer-events:auto;z-index:9}.kr-bar[hidden],.kr-pop[hidden]{display:none}.kr-bar button,.kr-pop button{border:2px solid #fff;border-radius:999px;background:rgba(30,20,60,.8);color:#fff;font:800 14px Inter,sans-serif;height:44px;padding:0 16px}
+  const rcss = document.createElement('style'); rcss.textContent = `.kr-k{left:auto!important;transform:none!important;right:calc(max(8px,env(safe-area-inset-right)) + 6px);bottom:calc(max(14px,env(safe-area-inset-bottom)) + 236px)!important}.kr-k button{font-size:12px!important;padding:6px 10px!important}.kr-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(14px,env(safe-area-inset-bottom)) + 74px);display:flex;gap:8px;pointer-events:auto;z-index:9}.kr-bar[hidden],.kr-pop[hidden]{display:none}.kr-bar button,.kr-pop button{border:2px solid #fff;border-radius:999px;background:rgba(30,20,60,.8);color:#fff;font:800 14px Inter,sans-serif;height:44px;padding:0 16px}
 .kr-pop{position:absolute;left:50%;transform:translateX(-50%);top:calc(max(10px,env(safe-area-inset-top)) + 60px);background:rgba(255,255,255,.97);color:#111;border-radius:16px;padding:10px 12px;pointer-events:auto;z-index:20;font:700 14px Inter,sans-serif;text-align:center;max-width:90vw}.kr-pop button{background:#6d28d9;margin:6px 4px 0;height:40px}.kr-pop button.g{background:#9ca3af}`; document.head.appendChild(rcss);
   const rbar = document.createElement('div'); rbar.className = 'kr-bar'; rbar.hidden = true; rbar.innerHTML = '<button data-c>🎥 Camera</button><button data-x>🚪 Exit ride</button>'; hud.appendChild(rbar);
+  // driver side: drop the passenger (they can ask again later; a dropped rider is not auto-accepted for 2 min)
+  const kbar = document.createElement('div'); kbar.className = 'kr-bar kr-k'; kbar.hidden = true; kbar.innerHTML = '<button data-k>👋 Drop passenger</button>'; hud.appendChild(kbar); const kicked = new Map();
+  kbar.querySelector('[data-k]').onclick = () => { if (!rider) return; kicked.set(rider, performance.now()); rider = null; if (my) { P.dance = myCode(); P.danceUntil = Date.now() + 864e5; api.markDirty(); } say('👋 Passenger dropped off'); kbar.hidden = true; };
   const rpop = document.createElement('div'); rpop.className = 'kr-pop'; rpop.hidden = true; hud.appendChild(rpop);
   rbar.querySelector('[data-x]').onclick = () => leaveRide('🚪 You hopped out'); rbar.querySelector('[data-c]').onclick = () => { if (ride) { ride.cam = ride.cam === 'pov' ? 'chase' : ride.cam === 'chase' ? 'far' : 'pov'; say('🎥 ' + ride.cam); } };
   function askRide(du) { const o = api.others.get(du); if (!o || !parseCar(o.dn)) return; if (my && my.state !== 'parked') return; ride = { drv: du, st: 'ask', t: performance.now(), cam: 'chase' }; P.dance = '~q' + U8(du); P.danceUntil = Date.now() + 864e5; api.markDirty(); say('🧑‍🤝‍🧑 Asking ' + (o.name || 'the driver') + ' for a ride…'); }
@@ -169,10 +176,11 @@ export function attachDrive(api, world) {
   function accept(o) { rider = U8(o.uid); riderSeen = performance.now(); rpop.hidden = true; if (my) { P.dance = myCode(); P.danceUntil = Date.now() + 864e5; api.markDirty(); } say('🧑‍🤝‍🧑 ' + (o.name || 'A Pal') + ' hopped in!'); }
   function rideTick(dt, nowMs) {
     // driver side: requests + my passenger in my car
-    if (my && my.state !== 'parked') { for (const o of api.others.values()) { if (o.dn === '~q' + me8 && !rider && !asked.has(o.uid)) { asked.set(o.uid, nowMs); isFriend(o.uid).then((f) => { if (rider || !my || my.state === 'parked') return; if (f) accept(o); else { rpop.innerHTML = `🧑‍🤝‍🧑 <b>${String(o.name || 'A Pal').replace(/[<>&]/g, '')}</b> wants to ride along<br><button data-a>Accept</button><button class="g" data-n>No thanks</button>`; rpop.hidden = false; rpop.querySelector('[data-a]').onclick = () => accept(o); rpop.querySelector('[data-n]').onclick = () => { rpop.hidden = true; }; setTimeout(() => { rpop.hidden = true; }, 40000); } }); }
+    if (my && my.state !== 'parked') { for (const o of api.others.values()) { if (o.dn === '~q' + me8 && !rider && !asked.has(o.uid) && !(kicked.has(U8(o.uid)) && nowMs - kicked.get(U8(o.uid)) < 120000)) { asked.set(o.uid, nowMs); isFriend(o.uid).then((f) => { if (rider || !my || my.state === 'parked') return; if (f) accept(o); else { rpop.innerHTML = `🧑‍🤝‍🧑 <b>${String(o.name || 'A Pal').replace(/[<>&]/g, '')}</b> wants to ride along<br><button data-a>Accept</button><button class="g" data-n>No thanks</button>`; rpop.hidden = false; rpop.querySelector('[data-a]').onclick = () => accept(o); rpop.querySelector('[data-n]').onclick = () => { rpop.hidden = true; }; setTimeout(() => { rpop.hidden = true; }, 40000); } }); }
         if (rider && U8(o.uid) === rider && (o.dn === '~r' + me8 || o.dn === '~q' + me8)) { riderSeen = nowMs; if (o.obj && o.dn === '~r' + me8) { seatP(my.m, sp); o.obj.position.copy(sp); o.obj.rotation.y = my.V.yaw; o.obj.scale.setScalar(0.6); sitPose(o.obj, dt); } } }
       if (rider && nowMs - riderSeen > 8000) { rider = null; P.dance = myCode(); api.markDirty(); } }
     else if (rider) rider = null;
+    kbar.hidden = !(rider && my && my.state === 'drive');
     for (const [u, t] of asked) if (nowMs - t > 30000) asked.delete(u);
     // third parties: show other drivers' passengers in their cars
     for (const o of api.others.values()) if (o.obj && o.dn && o.dn.slice(0, 2) === '~r' && o.dn.slice(2) !== me8) { for (const [du, R] of remote) if (U8(du) === o.dn.slice(2) && riderOf(api.others.get(du)?.dn) === U8(o.uid)) { seatP(R.m, sp); o.obj.position.copy(sp); o.obj.rotation.y = R.s.yaw; o.obj.scale.setScalar(0.6); sitPose(o.obj, dt); } }
@@ -196,6 +204,7 @@ export function attachDrive(api, world) {
   function stash() { if (!my) return; exitNow(); removeCar(); } // park in a garage bay: hop out and the car stays in the bay
   function place(id, color, at, enter) { if (!CAR[id]) return null; spawnCar(id, color, at); if (enter) getIn(); return my; }
   function isOwned(id) { return owned.has(id); }
-  return { update, destroy() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); rcss.remove(); rbar.remove(); rpop.remove(); H.destroy(); FX.destroy(); }, spawnCar, mine, stash, place, removeCar, isOwned, resetCar, resetAt: (p) => { if (!my) return; my.V.place(p.x, p.z, p.yaw || 0); my.V.rev = false; my.V.gear = 1; my.stuckT = 0; api.markDirty(); } };
+  W_EXTRA.ownedCars = ownedCars; W_EXTRA.pref = pref; W_EXTRA.savePref = () => { lss(MK, JSON.stringify(pref)); carsChanged(); }; W_EXTRA.owned = owned;
+  return { ...W_EXTRA, update, destroy() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); rcss.remove(); rbar.remove(); rpop.remove(); H.destroy(); FX.destroy(); }, spawnCar, mine, stash, place, removeCar, isOwned, resetCar, resetAt: (p) => { if (!my) return; my.V.place(p.x, p.z, p.yaw || 0); my.V.rev = false; my.V.gear = 1; my.stuckT = 0; api.markDirty(); } };
 }
 void FLAT;
