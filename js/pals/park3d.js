@@ -439,7 +439,7 @@ export function createPark3D(ctx) {
     }, (e) => { net.snapErr = e.code || String(e); }); };
     let unsubL = listen();
     const recenter = () => { const cx = (ctr.i + 0.5) * CELL, cz = (ctr.j + 0.5) * CELL; if (Math.abs(P.x - cx) < CELL / 2 + 30 && Math.abs(P.z - cz) < CELL / 2 + 30) return; ctr = { i: Math.floor(P.x / CELL), j: Math.floor(P.z / CELL) }; net.recenters = (net.recenters || 0) + 1; if (unsubL) { unsubL(); unsubL = listen(); } };
-    setInterval(() => { if (document.body.contains(cv)) { recenter(); let n = 0; for (const o of others.values()) if (Math.hypot(o.x - P.x, o.z - P.z) < 150) n++; nearN = n; } }, 1000);
+    setInterval(() => { if (document.body.contains(cv)) { recenter(); let n = 0; for (const o of others.values()) if (Math.hypot(o.x - P.x, o.z - P.z) < 150) n++; nearN = n; const rl = $('#park-room'); if (rl) { const t = `Room ${room.slice(1)} · 👥 ${others.size + 1}`; if (rl.textContent !== t) { rl.textContent = t; rl.title = `Up to ${MAX_ROOM} players per room; new rooms open automatically`; } } } }, 1000);
     const onVis = () => { if (document.hidden) { if (unsubL) { unsubL(); unsubL = null; } } else if (!unsubL && document.body.contains(cv)) { unsubL = listen(); send(true); } };
     document.addEventListener('visibilitychange', onVis);
     const unsub = () => { document.removeEventListener('visibilitychange', onVis); if (unsubL) unsubL(); unsubL = null; };
