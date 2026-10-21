@@ -11,9 +11,11 @@ export const PAL = {
 const ACC = ['#7c3aed', '#0ea5e9', '#dc2626', '#16a34a', '#f97316', '#db2777', '#0d9488', '#ca8a04', '#4f46e5'];
 export function palOf(h) { if (!h || (!h.num && PAL[h.town || 'street'])) return PAL[(h && h.town) || 'street'] || PAL.street; const P = Object.values(PAL), s = h.seed || 0;
   const a = P[s % P.length], b = P[Math.floor(s / 7) % P.length]; return { wall: a.wall, trim: b.trim, acc: ACC[Math.floor(s / 3) % ACC.length], floor: ['wood', 'dark', 'tile', 'carpet'][Math.floor(s / 5) % 4], view: P[Math.floor(s / 11) % P.length].view }; }
-export const WALL_SW = ['#fde7c7', '#ffffff', '#e5e7eb', '#dbeafe', '#fce7f3', '#ecfccb', '#ede9fe', '#fef3c7', '#f4c99a', '#1f2937'];
+export const WALL_SW = ['#fde7c7', '#ffffff', '#e5e7eb', '#dbeafe', '#fce7f3', '#ecfccb', '#ede9fe', '#fef3c7', '#f4c99a', '#1f2937', '#bae6fd', '#a7f3d0', '#fecaca', '#fbcfe8', '#ddd6fe', '#fde68a', '#99f6e4', '#c7d2fe', '#d9f99d', '#475569'];
+export const WALL_ROOMS = [['L', 'Living room'], ['K', 'Kitchen'], ['B', 'Bedroom'], ['T', 'Bathroom'], ['H', 'Hallway'], ['U', 'Upstairs']];
+export const parseWalls = (s) => { const o = {}; for (const t of String(s || '').split(',')) { const m = /^([LKBTHU]):(#[0-9a-f]{6})$/i.exec(t); if (m) o[m[1].toUpperCase()] = m[2]; } return o; };
 export const EXT_SW = ['#f6e7c8', '#ffffff', '#cfe3f0', '#f3d1dc', '#d8ecd0', '#efe0ff', '#fca5a5', '#fde047', '#93c5fd', '#475569', '#7c3aed', '#7a3b3b', '#2f5d50', '#111827'];
-export const FLOORS = { wood: { n: 'Wood', c: '#b07a4a', l: '#8a5a34' }, dark: { n: 'Dark wood', c: '#6b4423', l: '#4a2e17' }, tile: { n: 'Tile', c: '#e5e7eb', l: '#cbd5e1' }, carpet: { n: 'Carpet', c: '#a78bfa', l: null } };
+export const FLOORS = { wood: { n: 'Wood', c: '#b07a4a', l: '#8a5a34' }, dark: { n: 'Dark wood', c: '#6b4423', l: '#4a2e17' }, tile: { n: 'Tile', c: '#e5e7eb', l: '#cbd5e1' }, carpet: { n: 'Carpet', c: '#a78bfa', l: null }, marble: { n: 'Marble', c: '#f1f5f9', l: '#e2e8f0' }, mint: { n: 'Mint tile', c: '#a7f3d0', l: '#6ee7b7' }, rose: { n: 'Rose wood', c: '#c2847a', l: '#9f5f56' }, night: { n: 'Night sky', c: '#312e81', l: '#1e1b4b' }, gold: { n: 'Gold tile', c: '#fcd34d', l: '#d97706' } };
 // furniture: parts [shape, colour ('A' accent, 'T' trim), x, y, z, sx, sy, sz, glow?]; foot = collider [w, d] or null
 export const DECOR = {
   bd: { n: 'Cozy Bed', e: '🛏️', foot: [2, 2.9], p: [['box', 'T', 0, .25, 0, 2, .5, 2.9], ['box', '#f8fafc', 0, .56, 0, 1.9, .14, 2.8], ['box', 'A', 0, .65, .4, 1.95, .08, 1.9], ['box', '#fff', 0, .7, -1.05, 1.3, .14, .45], ['box', 'T', 0, .8, -1.4, 2, 1.1, .12]] },
@@ -34,6 +36,14 @@ export const DECOR = {
   pl: { n: 'Fern', e: '🪴', foot: [.6, .6], p: [['cyl', '#a16207', 0, .3, 0, .5, .6, .5], ['sph', '#16a34a', 0, 1, 0, .9, .9, .9]] },
   pc: { n: 'Cactus', e: '🌵', foot: [.5, .5], p: [['cyl', '#ea580c', 0, .2, 0, .45, .4, .45], ['cyl', '#15803d', 0, .9, 0, .28, 1.1, .28], ['cyl', '#15803d', .22, 1, 0, .14, .5, .14]] },
   pt: { n: 'Indoor Tree', e: '🌳', c: 180, foot: [.7, .7], p: [['cyl', '#a16207', 0, .3, 0, .6, .6, .6], ['cyl', '#78350f', 0, 1.2, 0, .15, 1.6, .15], ['sph', '#22c55e', 0, 2.1, 0, 1.4, 1.2, 1.4]] },
+  bb: { n: 'Bean Bag', e: '🫘', c: 120, foot: [1, 1], p: [['sph', 'A', 0, .3, 0, 1.1, .6, 1.1], ['sph', 'A', 0, .55, -.25, .8, .5, .5]] },
+  bp: { n: 'Pink Bean Bag', e: '🩷', c: 120, foot: [1, 1], p: [['sph', '#f9a8d4', 0, .3, 0, 1.1, .6, 1.1], ['sph', '#f472b6', 0, .55, -.25, .8, .5, .5]] },
+  ws: { n: 'Wall Shelf', e: '🗄️', c: 100, foot: null, p: [['box', 'T', 0, 1.5, 0, 1.4, .06, .35], ['box', '#f59e0b', -.4, 1.65, 0, .2, .25, .2], ['sph', '#22c55e', .1, 1.66, 0, .25, .25, .25], ['box', '#3b82f6', .45, 1.62, 0, .3, .18, .25]] },
+  pm: { n: 'Monstera', e: '🌿', c: 90, foot: [.7, .7], p: [['cyl', '#f8fafc', 0, .25, 0, .55, .5, .55], ['sph', '#15803d', -.15, .9, 0, .7, .6, .5], ['sph', '#16a34a', .2, 1.1, .1, .6, .6, .5]] },
+  ps: { n: 'Sunflower Pot', e: '🌻', c: 80, foot: [.5, .5], p: [['cyl', '#b45309', 0, .2, 0, .45, .4, .45], ['cyl', '#15803d', 0, .7, 0, .05, .8, .05], ['cyl', '#facc15', 0, 1.15, .05, .45, .05, .45, 1], ['cyl', '#78350f', 0, 1.15, .08, .2, .06, .2]] },
+  lt: { n: 'Table Lamp', e: '🛋️', c: 90, foot: [.6, .6], p: [['box', 'T', 0, .35, 0, .6, .7, .6], ['cyl', '#94a3b8', 0, .85, 0, .06, .3, .06], ['cone4', '#fde68a', 0, 1.1, 0, .45, .35, .45, 1]] },
+  rh: { n: 'Heart Rug', e: '💗', c: 120, foot: null, p: [['cyl6', '#f9a8d4', -.45, .012, -.2, 1.5, .02, 1.5], ['cyl6', '#f9a8d4', .45, .012, -.2, 1.5, .02, 1.5], ['cone4', '#f9a8d4', 0, .012, .45, 1.9, .02, 1.6]] },
+  am: { n: 'Mountain Art', e: '🏔️', c: 120, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#7dd3fc', 0, 1.9, .03, 1.1, .6, .01], ['cone4', '#64748b', -.2, 1.65, .04, .6, .4, .01], ['cone4', '#94a3b8', .25, 1.62, .04, .5, .3, .01]] },
   ar: { n: 'Sunset Art', e: '🖼️', foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#f59e0b', 0, 1.95, .03, 1.1, .35, .01], ['box', '#ef4444', 0, 1.62, .03, 1.1, .35, .01]] },
   ak: { n: 'Kemy Star Art', e: '✨', c: 120, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#4c1d95', 0, 1.8, .03, 1.1, .7, .01], ['cyl6', '#facc15', 0, 1.8, .05, .4, .4, .02]] },
   aa: { n: 'Abstract Art', e: '🎨', c: 120, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#0ea5e9', -.3, 1.9, .03, .5, .5, .01], ['box', '#f43f5e', .25, 1.7, .035, .5, .4, .01], ['box', '#facc15', .1, 2.0, .04, .3, .2, .01]] },
@@ -78,7 +88,10 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   const g = new THREE.Group(); g.name = 'interior-' + h.id; const vc = (o = {}) => (LOW ? new THREE.MeshLambertMaterial({ color: '#fff', vertexColors: true, ...o }) : new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.8, vertexColors: true, ...o }));
   const k = 'in' + h.id; const cols = []; const HR = two ? (h.admin ? 8.8 : h.estate ? 7.6 : 6.55) : 3.2; const T = S.trim, A = S.acc;
   const B = (key, c, x, yy, z, sx, sy, sz, solid = 0, sh = 'box', ry = 0, fs = 0) => { x *= SC; z *= SC; if (fs) { sx *= SC; sz *= SC; } put(key, G[sh], c, cx + x, y + yy, cz + z, ry, sx, sy, sz); if (solid) { const b = { x0: cx + x - sx / 2, x1: cx + x + sx / 2, z0: cz + z - sz / 2, z1: cz + z + sz / 2, top: solid === 2 ? y + yy + sy / 2 : solid === 3 ? y + 3.2 : 99, bot: solid === 4 ? y + 3.2 : -99 }; box.push(b); cols.push(b); } };
-  const Wl = (x0, x1, z0, z1, h0, h1, solid = 1) => B(k + 'w', '#ffffff', (x0 + x1) / 2, (h0 + h1) / 2, (z0 + z1) / 2, Math.max(0.18, x1 - x0), h1 - h0, Math.max(0.18, z1 - z0), solid, 'box', 0, 1);
+  const roomAt = (x, z, h0) => (h0 >= 3.1 ? 'U' : x < -0.95 ? (z < -1 ? 'K' : 'L') : x > 0.95 ? (z < 0 ? 'B' : 'T') : 'H');
+  const Wl = (x0, x1, z0, z1, h0, h1, solid = 1) => { const lx = x1 - x0 > z1 - z0; const cuts = lx ? [-1, 1] : ((x0 + x1) / 2 < 0 ? [-1] : [0]); for (const c of cuts) { const a = lx ? x0 : z0, b = lx ? x1 : z1; if (c > a + 0.3 && c < b - 0.3) { if (lx) { Wl(x0, c, z0, z1, h0, h1, solid); Wl(c, x1, z0, z1, h0, h1, solid); } else { Wl(x0, x1, z0, c, h0, h1, solid); Wl(x0, x1, c, z1, h0, h1, solid); } return; } }
+    if (h1 - h0 > 1 && h0 < 3.1 && h1 > 3.3) { Wl(x0, x1, z0, z1, h0, 3.2, solid); Wl(x0, x1, z0, z1, 3.2, h1, solid); return; } return WlR(roomAt((x0 + x1) / 2, (z0 + z1) / 2, h0), x0, x1, z0, z1, h0, h1, solid); };
+  const WlR = (rm, x0, x1, z0, z1, h0, h1, solid) => B(k + 'w' + rm, '#ffffff', (x0 + x1) / 2, (h0 + h1) / 2, (z0 + z1) / 2, Math.max(0.18, x1 - x0), h1 - h0, Math.max(0.18, z1 - z0), solid, 'box', 0, 1);
   // outer shell (left half + hallway 3.2 m, right half full height on two-story)
   Wl(-6.2, 1, -6.2, -6.0, 0, 3.2); Wl(1, 6.2, -6.2, -6.0, 0, HR); Wl(-6.2, -6.0, -6.2, 6.2, 0, 3.2); Wl(6.0, 6.2, -6.2, 6.2, 0, HR); Wl(-6.2, -0.7, 6.0, 6.2, 0, 3.2); Wl(0.7, 6.2, 6.0, 6.2, 0, HR); Wl(-0.7, 0.7, 6.0, 6.2, 2.3, 3.2, 0);
   // hallway walls (x = -1 with two archways; x = 1 with bedroom + bath doors, open to the stairs/closet at the front)
@@ -114,7 +127,7 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   // ceiling lamps (glow) per room
   for (const [x, z, yy] of [[-3.5, 3.2, 3.15], [-3.5, -3, 3.15], [3.5, -3, 3.15], [3.8, 2.4, 3.15], [0, 0, 3.15], [0, 4.5, 3.15], ...(two ? [[3.5, -2.5, HR - 0.05]] : [])]) { B(k + 'g', '#fff7d6', x, yy, z, 0.6, 0.06, 0.6, 0, 'cyl'); B(k + 's', '#cbd5e1', x, yy + 0.04, z, 0.7, 0.02, 0.7, 0, 'cyl'); }
   const wallMat = vc({ color: decor.wall || S.wall }); const structM = vc(); const glowM = new THREE.MeshBasicMaterial({ vertexColors: true }); const viewM = new THREE.MeshBasicMaterial({ map: viewTex(THREE, S.view), vertexColors: true });
-  flush(k + 'w', wallMat, !LOW, g); flush(k + 's', structM, !LOW, g); flush(k + 'g', glowM, false, g); flush(vk, viewM, false, g);
+  const wallMs = {}; for (const [rm] of WALL_ROOMS) { wallMs[rm] = rm === 'L' ? wallMat : wallMat.clone(); flush(k + 'w' + rm, wallMs[rm], !LOW, g); } const setWalls = (base, per) => { const P0 = parseWalls(per); for (const [rm] of WALL_ROOMS) wallMs[rm].color.set(P0[rm] || base || S.wall); }; setWalls(decor.wall, decor.walls); flush(k + 's', structM, !LOW, g); flush(k + 'g', glowM, false, g); flush(vk, viewM, false, g);
   // (interior doors removed: open doorways everywhere)
   // floor (rebuildable) + furniture (rebuildable)
   let floorM = null, decG = null; let decCols = [], seats = [], screens = []; let items = parseItems(decor.items || defaultItems(two, h.num ? h.seed : 0));
@@ -141,5 +154,5 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   // fridge door (own mesh, hinged on the right) so it can swing open
   const fd = new THREE.Group(); fd.position.set(cx - 5.2 * SC, y + 1.0, cz - 5.1 * SC); const fdm = new THREE.Mesh(new THREE.BoxGeometry(0.8 * SC, 1.96, 0.06), new THREE.MeshStandardMaterial({ color: '#f1f5f9', roughness: 0.5 })); fdm.position.x = -0.4 * SC; fd.add(fdm);
   const fh = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.05), new THREE.MeshStandardMaterial({ color: '#94a3b8' })); fh.position.set(-0.72 * SC, 0.2, 0.05); fd.add(fh); const fin = new THREE.Mesh(new THREE.BoxGeometry(0.7 * SC, 1.8, 0.02), new THREE.MeshBasicMaterial({ color: '#e0f2fe' })); fin.position.set(cx - 5.6 * SC, y + 1.0, cz - 5.11 * SC); g.add(fin); g.add(fd);
-  return { g, two, S, update, spots, fridgeDoor: fd, setWall: (c) => wallMat.color.set(c || S.wall), setFloor, setItems, items: () => items, seats: () => seats, screens: () => screens, cols };
+  return { g, two, S, update, spots, fridgeDoor: fd, setWall: (c, per) => setWalls(c, per), setFloor, setItems, items: () => items, seats: () => seats, screens: () => screens, cols };
 }

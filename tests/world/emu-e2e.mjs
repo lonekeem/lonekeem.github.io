@@ -110,5 +110,14 @@ await step('plate', async () => { await p.evaluate(() => window.__khApi.drive.pl
   await p.fill('.kd-plate input', 'KEMY7'); await p.click('.kd-plate [data-save]'); await W(p, 500);
   await p.evaluate(() => { window.__kdApi.spawn('nova', 1, { x: -30, z: 98, yaw: 0 }); window.__p3.teleport(-30, 90); }); await W(p, 6000); await p.screenshot({ path: shot + 'plate-car.png', timeout: 120000 }).catch(() => 0);
   return { typed, msgBad, saved: await p.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => /kemy-cars|drive/.test(k)) || 'null'))) }; });
+await step('deco', async () => { const id = await p.evaluate(() => window.__kh.myPlot); if (!id) throw new Error('no home'); for (const it of ['hd_bb', 'hd_ws', 'hd_pm', 'hd_lt']) await seed(`users/${uid}/inv/${it}`, { n: { integerValue: '1' } });
+  await p.evaluate((id) => window.__khApi.goIn(id), id); await W(p, 3000); await p.evaluate(() => window.__khApi.startDeco()); await W(p, 2500);
+  await p.evaluate(() => document.querySelector('[data-tab="p"]').click()); await W(p, 300); await p.evaluate(() => document.querySelector('[data-wr="L"]').click()); await W(p, 200); await p.evaluate(() => document.querySelector('[data-w="#bae6fd"]').click());
+  await p.evaluate(() => document.querySelector('[data-wr="K"]').click()); await W(p, 200); await p.evaluate(() => document.querySelector('[data-w="#a7f3d0"]').click()); await p.evaluate(() => document.querySelector('[data-fl="marble"]').click()); await W(p, 300);
+  await p.screenshot({ path: shot + 'deco-paint.png', timeout: 120000 }).catch(() => 0);
+  await p.evaluate(() => document.querySelector('[data-tab="f"]').click()); await W(p, 300); for (const c of ['bb', 'ws', 'pm']) { await p.evaluate((c) => document.querySelector(`[data-add="${c}"]`).click(), c); await W(p, 400); }
+  await p.screenshot({ path: shot + 'deco-shop.png', timeout: 120000 }).catch(() => 0); const n = await p.evaluate(() => window.__khApi.deco().items.length); await p.evaluate(() => document.querySelector('[data-sv]').click()); await W(p, 3000);
+  const doc = await fetch(EMU + 'homes/' + id, { headers: { Authorization: 'Bearer owner' } }).then((r) => r.json()); const dec = doc.fields?.decor?.mapValue?.fields || {};
+  await p.screenshot({ path: shot + 'deco-saved.png', timeout: 120000 }).catch(() => 0); return { n, walls: dec.walls?.stringValue, floor: dec.floor?.stringValue, items: (dec.items?.stringValue || '').split(';').length, toasts: await p.evaluate(() => document.getElementById('ks-toast')?.textContent) }; });
 await step('park', async () => { await p.evaluate(() => window.__p3.teleport(0, 60)); await W(p, 1500); return await p.evaluate(() => ({ pos: window.__p3.pos && { x: window.__p3.pos.x, z: window.__p3.pos.z }, fps: window.__p3.fps })); });
 console.log(JSON.stringify(out, null, 1)); console.log('errors:', errors.slice(0, 25).join('\n') || 'none'); await browser.close();
