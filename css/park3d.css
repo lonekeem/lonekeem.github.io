@@ -54,7 +54,8 @@ body.p3-on .gm.top-right { z-index: 95; }
 /* driving HUD clean-up (iPhone landscape): no minimap / candy pill / radio pill behind the driving controls, chat log moves to the top centre */
 body.p3-drive .gm-radio, body.p3-drive .gmp-card.min, body.p3-drive .gmr-toast { display: none !important; }
 @media (max-height: 500px) {
-  body.p3-drive .ks-map, body.p3-drive .ks-bagb { display: none !important; }
+  body.p3-drive .ks-bagb { display: none !important; } /* the round heading-up minimap stays while driving (top-right, above the driving buttons) */
+  body.p3-drive .ks-map { width: 58px !important; height: 58px !important; }
   body.p3-drive .p3-log { left: 50%; transform: translateX(-50%); top: calc(max(8px, env(safe-area-inset-top)) + 46px); width: min(300px, 40vw); max-height: 54px; }
   body.p3-drive .p3-chat { width: min(360px, calc(100vw - 420px)); }
 }
