@@ -16,7 +16,7 @@ registerMinigame({ id: 'show', name: 'Kemy Challenge Show', emoji: '🎪', color
   open: async (ctx, q) => { const m = await import('./show-lobby.js'); (ctx.slobby = ctx.slobby || m.createShowLobby(ctx)); return ctx.slobby.page(q || {}); } });
 registerMinigame({ id: 'armory', name: 'Zombie Armory', emoji: '🛡️', color: '#5b3a1e', tag: 'Shop', desc: 'Weapons, upgrades and armor for Zombie Survival. Pay with 💎 Diamonds or ★ Star Coins.',
   open: async (ctx) => { const m = await import('./armory.js'); return m.createArmory(ctx).page(ctx.main); } });
-registerMinigame({ id: 'palgames', name: 'Pal Games', emoji: '🐾', color: '#2a6a4a', tag: 'Race · Bubbles · Stars · Dance', desc: 'The classic Pal mini-games (vs other players or a bot).', href: '#/games/pals' });
+// Pal Games lives on the Games page (#/games/pals), not here, so kids see it in one place.
 export function createArcade(ctx) {
   const { main, esc, requireAuth } = ctx;
   function hub() {
