@@ -4,7 +4,7 @@
 // Diamonds live in users/{uid}/pal/diamonds; owned items are users/{uid}/inv/z_* (same inventory as the Pal Store).
 import { doc, getDoc, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { addItems, addDiamondItems, DITEMS, dayNo } from './catalog.js';
-import { createEconomy, isAdminUid } from './economy.js';
+import { createEconomy, isAdminUid, ensureLive, buyError, ShopError } from './economy.js';
 export const ARMORY = [
   { id: 'z_foam', kind: 'zweapon', name: 'Foam Launcher', icon: '🧽', d: 80, desc: 'Bouncy foam balls that splash 3 zombies.' },
   { id: 'z_bubble', kind: 'zweapon', name: 'Bubble Cannon', icon: '🫧', d: 150, desc: 'Big slow bubbles that float zombies away.' },
@@ -41,9 +41,9 @@ export function createDiamonds(db, uid) {
   // Diamond buys are queued one at a time and retried on a stale balance, so rapid taps never collide on the doc
   let chain = Promise.resolve();
   function buy(id) { const run = async () => { for (let i = 0; ; i++) { try { return await buy1(id); } catch (e) { const c = e && e.code; if (i < 2 && (c === 'permission-denied' || c === 'aborted' || c === 'failed-precondition' || c === 'unavailable')) { await new Promise((r) => setTimeout(r, 400 + i * 600)); continue; } throw e; } } };
-    const pr = chain.then(run, run); chain = pr.catch(() => {}); return pr; }
+    const pr = chain.then(run, run).catch((e) => { throw buyError(e); }); chain = pr.catch(() => {}); return pr; }
   async function buy1(id) { const it = ARM[id] || DITEMS.find((x) => x.id === id); await get(true); // Armory + premium dances (z_dn_*), Halloween costumes (z_hw_*)
-    if (!it || !it.d) throw new Error('That item can’t be bought with Diamonds.'); if (w.d < it.d) throw new Error('Not enough Diamonds yet. Play a run to earn more!');
+    if (!it || !it.d) throw new ShopError('That item can’t be bought with Diamonds.', 'kemy/no-item'); if (w.d < it.d) throw new ShopError('Not enough Diamonds yet. Play a run to earn more!', 'kemy/diamonds'); await ensureLive(db, id, true);
     if (w.admin) { const b = writeBatch(db); b.update(ref, { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
       b.set(doc(db, 'users', uid, 'inv', id), { n: 1, at: serverTimestamp() }); await b.commit(); return 0; }
     const b = writeBatch(db); b.update(ref, { d: w.d - it.d, lastBuy: id, paid: it.d, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });

@@ -1435,6 +1435,15 @@ async function adminShopDoc() {
   await import('./pals/store.js'); await import('./pals/armory.js'); const du = await import('./pals/dance-ui.js'); await du.registerDanceItems(); await (await import('./world/cars.js')).registerCarItems(); await (await import('./world/homes.js')).registerHomeItems(); // Kemy World cars (⭐ car_*, 💎 z_car_*)
   return (await import('./pals/catalog.js')).shopDoc();
 }
+// 🛍️ Admin only (config/palShop is admin-write in the rules): publish prices for items that aren't live yet, MERGED into
+// the live doc (never removes or lowers anything already live), so new shop items are buyable without the manual button.
+async function adminAutoPublish() {
+  if (!isAdmin()) return false; const want = await adminShopDoc(); const s = await getDoc(doc(db, 'config', 'palShop')); const live = s.exists() ? s.data() : {};
+  const miss = (a, b) => Object.keys(a || {}).filter((k) => !(k in (b || {})));
+  if (!miss(want.prices, live.prices).length && !miss(want.dprices, live.dprices).length && !miss(want.kinds, live.kinds).length) return false;
+  await setDoc(doc(db, 'config', 'palShop'), { ...live, prices: { ...want.prices, ...(live.prices || {}) }, dprices: { ...(want.dprices || {}), ...(live.dprices || {}) }, kinds: { ...want.kinds, ...(live.kinds || {}) }, deals: live.deals || want.deals, v: live.v || want.v });
+  return true;
+}
 async function adminShopStatus() {
   const want = await adminShopDoc(); const s = await getDoc(doc(db, 'config', 'palShop'));
   const lp = (s.exists() && s.data().prices) || {}, ld = (s.exists() && s.data().dprices) || {};
@@ -1755,6 +1764,7 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     try {
       await Promise.race([loadSession(), new Promise((r) => setTimeout(r, 8000))]);
+      if (isAdmin()) import('./pals/economy.js').then((m) => { m.setShopAutoPublish(adminAutoPublish); setTimeout(() => adminAutoPublish().then((did) => did && console.info('Shop: published new item prices')).catch(() => {}), 6000); }).catch(() => {});
       if (!S.profile && pendingProfile) {
         const p = pendingProfile; pendingProfile = null;
         try { await createProfile(p.displayName, p.username); } catch (e) { toast(friendlyError(e)); }

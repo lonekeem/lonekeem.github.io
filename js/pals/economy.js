@@ -6,6 +6,23 @@ import { ITEM, EARN, dayNo, todaysDeals } from './catalog.js';
 import { isUnlimited } from '../inf-pass.js';
 // Unlimited (admin or ∞ Pass, js/inf-pass.js): balance shows Infinity ('∞'); purchases record ownership but don't deduct.
 export const isAdminUid = isUnlimited; // kept name for older imports (now async)
+// ---- live price check (config/palShop, admin-write only; the rules check every purchase against it)
+// A brand-new item whose price isn't published yet used to fail with a generic permission-denied ("going a little
+// fast"). Now: buys check the live doc first. For the admin, a registered hook auto-publishes the missing prices
+// (merging, never removing anything) and the buy continues; everyone else gets a clear "not available yet".
+let SHOP = null, shopAt = 0, autoPub = null;
+export const setShopAutoPublish = (fn) => { autoPub = fn; };
+export class ShopError extends Error { constructor(msg, kind) { super(msg); this.kind = kind; } }
+export async function ensureLive(db, id, diamonds) {
+  const has = () => SHOP && id in ((diamonds ? SHOP.dprices : SHOP.prices) || {}) && id in (SHOP.kinds || {});
+  if (!has() || Date.now() - shopAt > 60000) { const s = await getDoc(doc(db, 'config', 'palShop')); SHOP = s.exists() ? s.data() : {}; shopAt = Date.now(); }
+  if (has()) return true;
+  if (autoPub) { try { await autoPub(); } catch (e) { console.warn('auto-publish prices failed', e); } const s = await getDoc(doc(db, 'config', 'palShop')); SHOP = s.exists() ? s.data() : {}; shopAt = Date.now(); if (has()) return true; }
+  throw new ShopError('This item isn’t available yet. Check back soon!', 'kemy/not-live');
+}
+// clear words for a purchase that the server refused after all our own checks passed
+export function buyError(e) { if (e instanceof ShopError || !e || !e.code) return e; if (e.code === 'permission-denied') return new ShopError('That purchase didn’t go through. Please try again.', 'kemy/denied');
+  if (e.code === 'unavailable' || e.code === 'deadline-exceeded') return new ShopError('You seem to be offline. Check your connection and try again.', 'kemy/offline'); return e; }
 export function createEconomy(db, uid) {
   const wref = doc(db, 'users', uid, 'pal', 'wallet');
   let w = null, inv = null, chain = Promise.resolve(), lastWrite = 0; const subs = new Set();
@@ -43,12 +60,13 @@ export function createEconomy(db, uid) {
   // same moment) re-read the wallet and try again instead of failing
   const retry = async (fn) => { for (let i = 0; ; i++) { try { return await fn(); } catch (e) { const c = e && e.code; if (i < 2 && (c === 'permission-denied' || c === 'aborted' || c === 'failed-precondition' || c === 'unavailable')) { w = null; inv = null; await new Promise((r) => setTimeout(r, 400 + i * 600)); continue; } throw e; } } };
   const tap = new Map(); // ~300 ms double-tap guard on the SAME item only (returns the same purchase)
-  function buy(id) { const r0 = tap.get(id); if (r0 && Date.now() - r0.t < 300) return r0.p; const p = buy0(id); tap.set(id, { t: Date.now(), p }); return p; }
+  function buy(id) { const r0 = tap.get(id); if (r0 && Date.now() - r0.t < 300) return r0.p; const p = buy0(id).catch((e) => { throw buyError(e); }); tap.set(id, { t: Date.now(), p }); return p; }
   function buy0(id) {
     return q(() => retry(async () => {
-      await wallet(true); await inventory(); const it = ITEM[id]; if (!it || it.ach) throw new Error('That item can’t be bought.');
-      const paid = priceOf(id); if (w.coins < paid) throw new Error('Not enough Star Coins yet.');
-      if (it.kind !== 'snack' && inv[id]) throw new Error('You already have this.');
+      await wallet(true); await inventory(); const it = ITEM[id]; if (!it || it.ach) throw new ShopError('That item can’t be bought.', 'kemy/no-item');
+      const paid = priceOf(id); if (w.coins < paid) throw new ShopError('Not enough Star Coins yet.', 'kemy/coins');
+      if (it.kind !== 'snack' && inv[id]) throw new ShopError('You already have this.', 'kemy/owned');
+      await ensureLive(db, id, false);
       const b = writeBatch(db); // no client cooldown for buys (the rules only space out earns); queued by q()
       if (w.admin) { // admin: ownership only, balance untouched (rules allow paid 0 for unlimitedFor())
         b.update(wref, { lastBuy: id, paid: 0, buyAt: serverTimestamp(), updatedAt: serverTimestamp() });
