@@ -1,0 +1,9 @@
+// 64 emulator bot players in parkRooms/r1 (admin REST, emulator only). Half near spawn (0,60), half spread across the world. Each moving bot writes 1/s.
+const EMU = 'http://127.0.0.1:8199/v1/projects/lone-keem-studios/databases/(default)/documents/';
+const N = +process.env.N || 64, T = +process.env.T || 120; const toP = (x, z) => [Math.round(x * 16 + 1600), Math.round(z * 16 + 1200)];
+const bots = Array.from({ length: N }, (_, i) => { const near = i < N / 2; return { id: 'bot' + i, x: near ? (Math.random() - 0.5) * 60 : -1200 + Math.random() * 1500, z: near ? 60 + (Math.random() - 0.5) * 60 : 300 + Math.random() * 3000, a: Math.random() * 6 }; });
+const put = (b) => { const [x, y] = toP(b.x, b.z); const c = Math.floor(b.x / 160) + '_' + Math.floor(b.z / 160);
+  return fetch(EMU + 'parkRooms/r1/p/' + b.id, { method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { x: { integerValue: x }, y: { integerValue: y }, c: { stringValue: c }, d: { integerValue: 1 }, name: { stringValue: 'Bot ' + b.id.slice(3) }, uname: { stringValue: b.id }, color: { stringValue: '#7c3aed' }, pal: { mapValue: { fields: { species: { stringValue: 'tiger' }, name: { stringValue: 'B' } } } }, at: { timestampValue: new Date().toISOString() }, e: { stringValue: '' }, eAt: { integerValue: 0 }, say: { stringValue: '' }, sayAt: { integerValue: 0 }, tgt: { stringValue: '' } } }) }); };
+const end = Date.now() + T * 1000; let w = 0;
+while (Date.now() < end) { const t0 = Date.now(); await Promise.all(bots.map((b) => { b.a += (Math.random() - 0.5) * 0.6; b.x += Math.sin(b.a) * 1.4; b.z += Math.cos(b.a) * 1.4; w++; return put(b); })); await new Promise((r) => setTimeout(r, Math.max(0, 1000 - (Date.now() - t0)))); }
+console.log('bot writes', w);

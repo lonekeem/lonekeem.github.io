@@ -231,6 +231,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "p",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "c",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
