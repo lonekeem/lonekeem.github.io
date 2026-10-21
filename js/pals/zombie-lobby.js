@@ -4,6 +4,7 @@ import { collection, getDocs, query, where, orderBy, limit } from 'https://www.g
 import { createNet, palSnap, cleanCode, MAX_TEAM, ZTABS, zSayIdx, zText } from './zombie-net.js';
 import { renderQuickChat } from './emote-wheel.js';
 import { getActivePal } from './core.js';
+import { createEconomy } from './economy.js';
 const CSS = `.zl{max-width:620px;margin:0 auto;padding:14px;color:#fff}.zl-card{background:linear-gradient(160deg,#2b1d55,#1b1240);border-radius:22px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
 .zl h2{margin:0 0 4px;font-size:26px}.zl .sub{opacity:.8;margin:0 0 14px}.zl-btns{display:grid;gap:10px}.zl-b{min-height:64px;border:0;border-radius:18px;font-size:19px;font-weight:800;display:flex;align-items:center;gap:12px;padding:0 18px;cursor:pointer;color:#2b1d55;background:#ffd23f;text-align:left}
 .zl-b small{display:block;font-size:13px;font-weight:600;opacity:.75}.zl-b.alt{background:#7ee08a}.zl-b.alt2{background:#8fd8ff}.zl-b.ghost{background:rgba(255,255,255,.12);color:#fff}
@@ -12,7 +13,7 @@ const CSS = `.zl{max-width:620px;margin:0 auto;padding:14px;color:#fff}.zl-card{
 .zl-row button{min-height:48px;border-radius:14px;border:0;padding:0 16px;font-weight:800;background:rgba(255,255,255,.14);color:#fff}
 .zl-ps{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}.zl-p{background:rgba(255,255,255,.08);border-radius:16px;padding:8px;text-align:center;border:3px solid transparent}.zl-p.rdy{border-color:#7ee08a}.zl-p canvas{width:100%;max-width:150px;aspect-ratio:1;display:block;margin:0 auto}
 .zl-p b{display:block}.zl-p .st{font-size:13px;font-weight:800}.zl-empty{opacity:.45;display:flex;align-items:center;justify-content:center;min-height:120px;border:2px dashed rgba(255,255,255,.3)}
-.zl-qc{margin-top:8px;background:#2b1d55;border-radius:14px;padding:8px}.zl-say{display:inline-block;margin-top:4px;background:#fff;color:#2b1d55;border-radius:12px;padding:3px 9px;font-weight:800;font-size:13px}.zl-err{color:#ffb3c9;font-weight:700;min-height:1.2em;margin:8px 0 0}.zl-inv{display:grid;gap:6px;margin-top:8px}.zl-inv button{min-height:48px;border-radius:12px;border:0;background:#3d2a7a;color:#fff;font-weight:700;display:flex;justify-content:space-between;align-items:center;padding:0 14px}`;
+.zl-qc{margin-top:8px;background:#2b1d55;border-radius:14px;padding:8px}.zl-say{display:inline-block;margin-top:4px;background:#fff;color:#2b1d55;border-radius:12px;padding:3px 9px;font-weight:800;font-size:13px}.zl-err{color:#ffb3c9;font-weight:700;min-height:1.2em;margin:8px 0 0}.zl-inv{display:grid;gap:6px;margin-top:8px}.zl-inv button{min-height:48px;border-radius:12px;border:0;background:#3d2a7a;color:#fff;font-weight:700;display:flex;justify-content:space-between;align-items:center;padding:0 14px}.zl .credit{opacity:.75;text-align:center;margin:12px 0 0;font-size:13px}`;
 export function createZombieLobby(ctx) {
   const { S, db, main, esc, toast } = ctx; let sess = null, starting = false;
   const css = () => { if (!document.getElementById('zl-css')) { const s = document.createElement('style'); s.id = 'zl-css'; s.textContent = CSS; document.head.appendChild(s); } };
@@ -27,14 +28,28 @@ export function createZombieLobby(ctx) {
       <button class="zl-b alt" data-a="create">👥 <span>Create Team<small>Get a code and invite friends</small></span></button>
       <button class="zl-b alt2" data-a="quick">⚡ <span>Quick Match<small>Join an open team</small></span></button>
       <div class="zl-join"><input id="zl-code" maxlength="5" placeholder="CODE" autocomplete="off" aria-label="Team code" value="${esc(cleanCode(q.join))}"><button class="zl-b ghost" data-a="join">🔑 Join</button></div>
-      <a class="zl-b ghost" href="#/arcade/armory">🛡️ <span>Zombie Armory<small>Weapons, upgrades and armor</small></span></a></div><p class="zl-err" role="alert"></p></div></section>`;
+      <button class="zl-b ghost" data-a="shop">🛒 <span>Weapon Shop<small>Spend splat coins you earned in a run</small></span></button>
+      <a class="zl-b ghost" href="#/arcade/armory">🛡️ <span>Zombie Armory<small>Weapons, upgrades and armor</small></span></a></div><p class="zl-err" role="alert"></p><p class="credit">Written by Lone Keem</p></div></section>`;
     const err = (t) => (main.querySelector('.zl-err').textContent = t || '');
     const busy = async (fn) => { main.querySelectorAll('button').forEach((b) => (b.disabled = true)); try { await fn(); } catch (e) { err(e.code === 'permission-denied' ? 'Could not join that team.' : e.message || 'Something went wrong'); main.querySelectorAll('button').forEach((b) => (b.disabled = false)); } };
     main.querySelector('[data-a=solo]').onclick = async () => (await game()).open({ pal: me.rawPal });
+    main.querySelector('[data-a=shop]').onclick = () => openLobbyShop();
     main.querySelector('[data-a=create]').onclick = () => busy(async () => room(await net.create(me, false), me));
     main.querySelector('[data-a=quick]').onclick = () => busy(async () => room(await net.quick(me), me));
     main.querySelector('[data-a=join]').onclick = () => busy(async () => { const c = cleanCode(main.querySelector('#zl-code').value); if (c.length !== 5) throw new Error('Codes have 5 letters.'); room(await net.join(c, me), me); });
     if (q.join && cleanCode(q.join).length === 5) main.querySelector('[data-a=join]').click();
+  }
+  let shopHost = null, shopOff = null;
+  async function openLobbyShop() {
+    if (shopHost) return;
+    let inv = {};
+    try { if (db && S.user) inv = await createEconomy(db, S.user.uid).inventory(true); } catch { inv = {}; }
+    const { openWeaponShop } = await import('./zombie-shop.js');
+    if (shopHost) return;
+    const drop = () => { if (shopOff) { shopOff(); shopOff = null; } };
+    shopHost = openWeaponShop({ parent: document.body, uid: S.user.uid, inv, esc, onClose: () => { shopHost = null; drop(); } });
+    const onH = () => { const h = shopHost; shopHost = null; drop(); if (h && h._zwClose) h._zwClose(); };
+    addEventListener('hashchange', onH); shopOff = () => removeEventListener('hashchange', onH);
   }
   function room(code, me) {
     const uid = S.user.uid; sess = createNet(db, uid).session(code); starting = false;
