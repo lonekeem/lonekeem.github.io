@@ -395,6 +395,7 @@
         .header-top { display: contents; }
         .header-top .brand { order: 1; }
         .nav { order: 2; margin-left: auto; }
+        .header-tools { display: flex; align-items: center; gap: 8px; order: 3; }
         .account-slot { display: flex; align-items: center; min-height: 40px; order: 3; }
         .acct-pill {
             display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: #fff; font-weight: 600; font-size: .92rem;
@@ -459,6 +460,7 @@
             .btn { width: 100%; justify-content: center; }
         }
     </style>
+    <link rel="stylesheet" href="css/share.css">
 </head>
 <body>
 <!-- Cold-start splash (inline so it paints before any JS/CSS loads). Written by Lone Keem -->
@@ -492,7 +494,10 @@ function ready(){var m=document.getElementById('main');if(false){return m&&m.chi
                     <img src="kemy-logo.png" alt="Kemy app icon" width="42" height="42" style="border-radius:22%">
                 <span>Kemy</span>
                 </a>
-                <div class="account-slot" id="account-slot"><a class="acct-pill" href="app.html#/login">Sign in</a></div>
+                <div class="header-tools">
+                    <a class="share-home" href="#share-kemy" aria-label="Share Kemy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6.2v6.2H4zM13.8 4H20v6.2h-6.2zM4 13.8h6.2V20H4z"/><path d="M14.2 14.2h2v2h-2zM17.8 14.2h2v2h-2zM14.2 17.8h2v2h-2zM17.8 17.8h2v2h-2z" fill="currentColor" stroke="none"/></svg></a>
+                    <div class="account-slot" id="account-slot"><a class="acct-pill" href="app.html#/login">Sign in</a></div>
+                </div>
             </div>
             <nav class="nav" aria-label="Main">
                 <a href="#music-videos"><span class="long">Music </span>Videos</a>
@@ -515,6 +520,7 @@ function ready(){var m=document.getElementById('main');if(false){return m&&m.chi
                         Get Kemy, it’s free
                     </button>
                     <a class="btn btn-ghost" href="app.html">Open Kemy</a>
+                    <a class="btn btn-ghost" href="#share-kemy">Share Kemy</a>
                     <button class="btn btn-ghost" type="button" data-watch-intro>▶ Watch intro</button>
                     <button class="btn btn-ghost" type="button" data-watch-howto>📱 How to save Kemy</button>
                 </div>
@@ -727,6 +733,15 @@ function ready(){var m=document.getElementById('main');if(false){return m&&m.chi
             </div>
         </section>
 
+        <section class="section" id="share-kemy" aria-labelledby="share-kemy-title">
+            <div class="container" id="share-kemy-root">
+                <div class="section-head">
+                    <h2 id="share-kemy-title">Share Kemy</h2>
+                    <p>Play Kemy: 10+ free games, no ads! <a href="https://lonekeem.github.io/">https://lonekeem.github.io/</a></p>
+                </div>
+            </div>
+        </section>
+
         <section class="section" id="about" aria-labelledby="about-title">
             <div class="container">
                 <div class="section-head">
@@ -752,6 +767,7 @@ function ready(){var m=document.getElementById('main');if(false){return m&&m.chi
     <footer class="site-footer">
         <div class="container">
             <p class="foot-links">
+                <a href="#share-kemy">Share Kemy</a>
                 <a href="kemy/">About the Kemy app</a>
                 <a href="kemy-quest.html">Bubble Quest</a>
                 <a href="app.html#/feed">Community</a>
@@ -764,6 +780,20 @@ function ready(){var m=document.getElementById('main');if(false){return m&&m.chi
     </footer>
 
     <script type="module" src="js/home.js"></script>
+    <script type="module">
+        const root = document.getElementById('share-kemy-root');
+        if (root) {
+            const load = () => import('./js/share-kemy.js').then((m) => m.mountShare(root, { variant: 'home' }));
+            if (location.hash === '#share-kemy' || !('IntersectionObserver' in window)) load();
+            else {
+                const io = new IntersectionObserver((es) => {
+                    if (es.some((e) => e.isIntersecting)) { io.disconnect(); load(); }
+                }, { rootMargin: '240px' });
+                io.observe(root);
+                addEventListener('hashchange', () => { if (location.hash === '#share-kemy') load(); });
+            }
+        }
+    </script>
     <script src="js/welcome.js" defer></script>
     <script>
         // Highlight the nav link for the section currently on screen

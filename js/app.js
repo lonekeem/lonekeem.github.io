@@ -626,10 +626,11 @@ async function showWelcome() {
 function renderChrome(name) {
   $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === name || a.dataset.also === name));
   const ha = document.getElementById('header-actions');
+  const shareBtn = `<a class="icon-btn sk-nav" href="#/share" aria-label="Share Kemy">${ICONS.qr}</a>`;
   const searchBtn = `<a class="icon-btn" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>`;
   setTimeout(() => donate.mountPill(ha), 0);
   if (S.user && S.profile) {
-    ha.innerHTML = `${searchBtn}
+    ha.innerHTML = `${shareBtn}${searchBtn}
       ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${mod.totalCount() ? `, ${mod.totalCount()} need attention` : ''}">🛡️<span class="mod-word"> Mod</span>${mod.totalCount() ? `<span class="mod-count">${mod.totalCount() > 99 ? '99+' : mod.totalCount()}</span>` : ''}</a>` : ''}
       ${isAdmin() ? `<a class="icon-btn" href="#/admin" aria-label="Admin">${ICON.shield}</a>` : ''}
       <a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a>
@@ -637,10 +638,10 @@ function renderChrome(name) {
       ${avatar({ ...S.profile, uid: S.user.uid }, 'sm')}`;
     mountHeaderChip(ha);
   } else if (S.user && !S.profile) {
-    ha.innerHTML = `<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a><button class="icon-btn" id="hdr-signout">Sign out</button>`;
+    ha.innerHTML = `${shareBtn}<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a><button class="icon-btn" id="hdr-signout">Sign out</button>`;
     $('#hdr-signout').onclick = () => signOut(auth);
   } else {
-    ha.innerHTML = `${searchBtn}<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a><a class="signin-pill" href="#/login">Sign in</a>`;
+    ha.innerHTML = `${shareBtn}${searchBtn}<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a><a class="signin-pill" href="#/login">Sign in</a>`;
   }
   document.getElementById('msg-dot').hidden = !S.unreadChats;
   // Full-screen feed hides the header: keep a floating Moderator button there.
@@ -675,6 +676,7 @@ const routes = [
   [/^#\/street$/, () => park.page(), 'games'], // Kemy Street: the Halloween district of the Pal Park world (js/world/)
   [/^#\/arcade(?:\/([\w-]+))?(?:\?(.*))?$/, (id, q) => import('./pals/minigames.js').then((m) => (arcade = arcade || m.createArcade({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal, sendMessage, getProfile })).page(id, q)), 'games'],
   [/^#\/scores(?:\/([\w-]+))?(?:\?(.*))?$/, (g, q, t) => import('./leaderboard.js').then((m) => m.scoreboardPage(main, { game: g || 'all', tab: new URLSearchParams(q || '').get('tab') || 'all', S, stale: () => stale(t) })), 'games'],
+  [/^#\/share$/, () => import('./share-kemy.js').then((m) => m.mountShare(main, { toast, back: '#/games' })), 'games'],
   [/^#\/games\/pals(?:\/([\w-]+))?(?:\?(.*))?$/, (b, q) => palGames.page(b, Object.fromEntries(new URLSearchParams(q || ''))), 'games'],
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],

@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Kemy QR card</title></head>
+<body><pre id="out">loading</pre>
+<script type="module">
+import { cardDataUrl } from '../../js/share-kemy.js';
+const url = await cardDataUrl();
+document.getElementById('out').textContent = url;
+</script>
+</body>
+</html>
