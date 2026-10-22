@@ -16,14 +16,17 @@ export const THEME4_ARTIST = 'Keem';
 export const THEME5_TITLE = "You're the One";
 export const THEME5_ARTIST = 'Keem';
 export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
+const PRODUCED = 'Produced by Lone Keem';
 // Theme playlist (original song files, unchanged). Track 1 is always the welcome / hatch song.
+// New tracks are appended so saved indexes (kemy-theme-track, kemy-radio-track) stay valid.
 export const TRACKS = [
-  { title: THEME_TITLE, artist: 'Keem', src: THEME_SRC, dur: 124.8 },
-  { title: THEME3_TITLE, artist: THEME3_ARTIST, src: new URL('../assets/audio/kemy-theme3.m4a?v=1', import.meta.url).href, dur: 167.6 },
-  { title: THEME4_TITLE, artist: THEME4_ARTIST, src: new URL('../assets/audio/kemy-theme4.m4a?v=1', import.meta.url).href, dur: 186.8 },
-  { title: THEME5_TITLE, artist: THEME5_ARTIST, src: new URL('../assets/audio/kemy-theme5.m4a?v=1', import.meta.url).href, dur: 229.2 },
+  { title: THEME_TITLE, artist: 'Keem', src: THEME_SRC, dur: 124.8, credit: PRODUCED },
+  { title: THEME3_TITLE, artist: THEME3_ARTIST, src: new URL('../assets/audio/kemy-theme3.m4a?v=1', import.meta.url).href, dur: 167.6, credit: PRODUCED },
+  { title: THEME4_TITLE, artist: THEME4_ARTIST, src: new URL('../assets/audio/kemy-theme4.m4a?v=1', import.meta.url).href, dur: 186.8, credit: PRODUCED },
+  { title: THEME5_TITLE, artist: THEME5_ARTIST, src: new URL('../assets/audio/kemy-theme5.m4a?v=1', import.meta.url).href, dur: 229.2, credit: PRODUCED },
+  { title: 'Another Week', artist: 'Lone Keem', src: new URL('../assets/music/another-week.mp3', import.meta.url).href, cover: new URL('../assets/music/another-week-cover.jpg', import.meta.url).href, dur: 129.24, credit: 'Produced by Lone Keem · Made with Suno', lazy: true },
 ];
-export const PLAYLIST_CREDIT = `Theme songs: ${TRACKS.map((t) => `${t.title} by ${t.artist}`).join(', ')} — Lone Keem Studios`;
+export const PLAYLIST_CREDIT = TRACKS.map((t) => `${t.title} — ${t.credit}`).join('. ');
 const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)
 export function getPick() { const v = ls.get(PICK); return v === 'shuffle' || (v && TRACKS[+v]) ? v : 'all'; }
 let cur = 0;
@@ -60,8 +63,8 @@ export function isPlaying() { return !!el && !el.paused && !el.dataset.stopping;
 function otherMediaPlaying() { return [...document.querySelectorAll('video, audio')].some((m) => m !== el && !m.paused && !m.ended && !m.muted && m.volume > 0); }
 function ensureEl() {
   if (el) return el;
-  el = new Audio(); el.preload = 'auto'; el.loop = false; el.dataset.kemyTheme = '1'; el.src = TRACKS[cur].src;
-  el.addEventListener('ended', () => { const pk = getPick(); if (pk !== 'all' && pk !== 'shuffle') { el.currentTime = 0; el.play().catch(() => {}); return; } loadTrack(nextIndex()); el.play().catch(() => {}); }); el.setAttribute('playsinline', '');
+  el = new Audio(); const t = TRACKS[cur]; el.preload = t.lazy ? 'none' : 'auto'; el.loop = false; el.dataset.kemyTheme = '1'; if (!t.lazy) el.src = t.src;
+  el.addEventListener('ended', () => { const pk = getPick(); if (pk !== 'all' && pk !== 'shuffle') { el.currentTime = 0; el.play().catch(() => {}); return; } loadTrack(nextIndex(), { fetch: true }); el.play().catch(() => {}); }); el.setAttribute('playsinline', '');
   try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { actx = new AC(); gain = actx.createGain(); gain.gain.value = 0; const srcN = actx.createMediaElementSource(el); srcN.connect(gain); gain.connect(actx.destination); analyser = actx.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.5; srcN.connect(analyser); /* analyser is a dead end: it never changes loudness */ } } catch { actx = null; gain = null; }
   el.addEventListener('play', emit); el.addEventListener('pause', () => { emit(); paintFab(); });
   return el;
@@ -81,6 +84,8 @@ export async function play({ fromStart = false, force = false } = {}) {
   else if (a.ended) { try { a.currentTime = 0; } catch { /* */ } }
   try { if (actx && actx.state !== 'running') await actx.resume(); } catch { /* */ }
   if (!actx) a.volume = 0; else gain.gain.value = Math.min(gain.gain.value, 0.0001);
+  const now = TRACKS[cur];
+  if (now.lazy) { a.preload = 'none'; if (a.src !== now.src) a.src = now.src; }
   try { await a.play(); } catch { return false; }
   ramp(heard(getVolume()), FADE); emit(); paintFab(); return true;
 }
@@ -95,10 +100,18 @@ export const silence = () => stop(0.25);
 export function playIntro() { const m = getMode(); if (m === '') { ask(); return Promise.resolve(false); } return m === 'play' ? play({ fromStart: true }) : Promise.resolve(false); }
 export const playShort = playIntro;
 function nextIndex() { const pk = getPick(); if (pk === 'shuffle') { if (TRACKS.length < 2) return 0; let n; do n = Math.floor(Math.random() * TRACKS.length); while (n === cur); return n; } if (pk !== 'all') return +pk; return (cur + 1) % TRACKS.length; }
-function loadTrack(i) { cur = i; if (el && el.src !== TRACKS[i].src) { el.src = TRACKS[i].src; el.load(); } emit(); }
+// Lazy tracks (the mp3) stay unfetched until playback. fetch:false only remembers the index.
+function loadTrack(i, { fetch } = {}) {
+  cur = i; const t = TRACKS[i]; const doFetch = fetch != null ? fetch : !t.lazy;
+  if (el && doFetch) {
+    el.preload = t.lazy ? 'none' : 'auto';
+    if (!el.getAttribute('src') || el.src !== t.src) { el.src = t.src; if (!t.lazy) el.load(); }
+  }
+  emit();
+}
 // Settings: choose the playlist order or one track; starts it if the theme is on.
-export function setPick(v) { ls.set(PICK, v); const i = v === 'all' || v === 'shuffle' ? (v === 'shuffle' ? nextIndex() : 0) : +v; if (el) { const was = isPlaying(); loadTrack(i); if (was) { el.play().catch(() => {}); } } else cur = i; }
-export function skip() { if (!el) return; const was = isPlaying(); loadTrack(nextIndex()); if (was) el.play().catch(() => {}); }
+export function setPick(v) { ls.set(PICK, v); const i = v === 'all' || v === 'shuffle' ? (v === 'shuffle' ? nextIndex() : 0) : +v; if (el) { const was = isPlaying(); loadTrack(i, { fetch: was }); if (was) { el.play().catch(() => {}); } } else cur = i; }
+export function skip() { if (!el) return; const was = isPlaying(); loadTrack(nextIndex(), { fetch: was }); if (was) el.play().catch(() => {}); }
 export function gainInfo() { return { track: cur, title: TRACKS[cur].title, currentTime: el ? el.currentTime : null, webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume(), duration: el ? el.duration : null, src: el ? el.currentSrc : null }; }
 
 // ---- UI: floating button + first-run prompt ----

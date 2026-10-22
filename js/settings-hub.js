@@ -4,6 +4,7 @@ import { auth, db } from './firebase-init.js';
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { loadSettings, saveSettings } from './controls.js';
+import { mountRemap } from './input.js';
 import { getVolume as themeVol, setVolume as setThemeVol, getMode as themeMode, setMode as setThemeMode, getPick as themePick, setPick as setThemePick, TRACKS as THEME_TRACKS, PLAYLIST_CREDIT, play as playTheme, stop as stopTheme, isPlaying as themePlaying } from './theme.js';
 import { setVolume as setMusicVol, setRadioEnabled } from './gamemusic.js';
 import { masterVol, setMasterVol, sfxVol, setSfxVol } from './volume.js';
@@ -206,7 +207,7 @@ function html(ctx) {
         <label class="set-row" for="set-pal-dance"><span>Pals dance to music</span><input id="set-pal-dance" type="checkbox" disabled></label>
         <label class="set-row" for="set-pal-keep"><span>Keep Pal on screen while scrolling</span><input id="set-pal-keep" type="checkbox" disabled></label>
       </article>
-      <article class="set-sec" data-sec="controls" data-k="controls drive joystick steering sensitivity button size opacity camera wheel tilt look haptics left">
+      <article class="set-sec" data-sec="controls" data-k="controls drive joystick steering sensitivity button size opacity camera wheel tilt look haptics left keyboard gamepad controller remap touchpad invert">
         <div class="set-head"><span class="set-ic" aria-hidden="true">🎮</span><h2>Controls</h2></div>
         <p>Walking joystick</p>
         <div class="set-slider"><label for="set-size">Button size <span class="muted" id="set-size-n">${joy.size}</span></label><input id="set-size" type="range" min="64" max="110" step="1" value="${joy.size}"></div>
@@ -214,6 +215,7 @@ function html(ctx) {
         <div class="set-slider"><label for="set-op">Button opacity <span class="muted" id="set-op-n">${Math.round(joy.opacity * 100)}%</span></label><input id="set-op" type="range" min="0.3" max="1" step="0.05" value="${joy.opacity}"></div>
         <label class="set-row" for="set-left"><span>Left-handed<small>Swaps the walk stick and the look side.</small></span><input id="set-left" type="checkbox" ${joy.left ? 'checked' : ''}></label>
         <label class="set-row" for="set-hap"><span>Vibration</span><input id="set-hap" type="checkbox" ${joy.haptics ? 'checked' : ''}></label>
+        <div id="set-remap"></div>
         <p>Driving, camera and drive buttons</p>
         <div id="set-drive" class="set-drive"></div>
       </article>
@@ -415,6 +417,7 @@ export async function page(main, ctx) {
     document.getElementById(id).oninput = saveJoy;
     document.getElementById(id).onchange = saveJoy;
   });
+  mountRemap(document.getElementById('set-remap'));
   renderDriveSettings(document.getElementById('set-drive'));
 
   paintWallet(S);
