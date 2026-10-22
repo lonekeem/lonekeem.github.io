@@ -1,7 +1,8 @@
 // Lone Keem Studios - Scoreboards for every game (Firestore: leaderboard/{uid}_{game}, written by the
 // player's own client at game end; rules bound every change). Overall board = game "all".
 // Older online results are merged in from gameStats / palStats so earlier players show up too.
-import { auth, db } from './firebase-init.js';
+import { auth, db, STUDIO_UID } from './firebase-init.js';
+import { faceName, adminNameClass, isAdminUid, ownerBadgeHtml } from './kemy-name.js';
 import { doc, getDoc, getDocs, setDoc, writeBatch, collection, query, where, orderBy, limit, startAfter, serverTimestamp, getCountFromServer }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
@@ -181,7 +182,7 @@ async function rowHtml(game, tab, r, rank, mine) {
   const img = (await palThumb(r.pal)) || EGG; const t = scoreText(game, r, tab); const medal = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
   return `<li class="lb-row ${medal} ${mine ? 'me' : ''}" data-u="${esc(r.uname || '')}" tabindex="0" role="link" aria-label="Rank ${rank}: ${esc(r.name)}, ${esc(t.big)}">
     <span class="lb-rank-n">${medal ? `<span class="lb-medal" aria-hidden="true">★</span>` : ''}${rank}</span>
-    <span class="lb-who"><b>${esc(r.name || 'Player')}</b><small>@${esc(r.uname || '')}${mine ? ' · you' : ''}</small></span>
+    <span class="lb-who"><b class="${adminNameClass(r.uid)}">${esc(faceName(r.uid, r.name || 'Player'))}</b>${r.uid === STUDIO_UID || isAdminUid(r.uid) ? ownerBadgeHtml() : (window.kemyModBadge ? window.kemyModBadge(r.uid) : '')}<small>@${esc(r.uname || '')}${mine ? ' · you' : ''}</small></span>
     <img class="lb-pal" src="${img}" alt="${r.pal ? esc((r.pal.name || 'Pal') + ' the ' + r.pal.species) : 'No Pal yet (egg)'}" width="40" height="40" loading="lazy">
     <span class="lb-score"><b>${esc(t.big)}</b><small>${esc(t.small)}</small></span></li>`;
 }

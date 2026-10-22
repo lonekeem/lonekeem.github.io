@@ -8,6 +8,7 @@ import { hideKey, isHidden } from './chat-hide.js';
 import * as safety from './safety.js';
 import { spamOk } from './spam.js';
 import { attachComposer, mediaHtml, hydrateStickers } from './richcomments.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 
 const MEDIA_LABEL = { gif: 'sent a GIF', photo: 'sent a photo', sticker: 'sent a Pal sticker' };
 export const commentLabel = (c) => (c && c.text) || (c && c.media && MEDIA_LABEL[c.media.kind]) || '';
@@ -112,7 +113,7 @@ export function createComments(ctx) {
       const liked = likedCache.get(p.id + '/' + c.id) === true;
       const n = Math.max(0, c.likeCount || 0);
       el.innerHTML = `${avatar({ uid: c.authorId, displayName: c.authorName, username: c.authorUsername, color: c.authorColor }, 'sm')}
-        <div class="body"><div><a class="cname" href="#/u/${esc(c.authorUsername)}">${esc(c.authorName)}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
+        <div class="body"><div><a class="cname${adminNameClass(c.authorId) ? ' ' + adminNameClass(c.authorId) : ''}" href="#/u/${esc(c.authorUsername)}">${esc(faceName(c.authorId, c.authorName))}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
         ${c.text ? `<div class="text">${linkify(esc(c.text))}</div>` : ''}${mediaHtml(c)}
         <div class="cacts small">${me() && S.profile && safety.canPostNow() ? '<button type="button" class="link-btn small" data-c="reply">Reply</button>' : ''}${me() && !mine ? '<button type="button" class="link-btn small" data-c="report">Report</button><button type="button" class="link-btn small" data-c="block">Block</button>' : ''}${canDelete ? '<button type="button" class="link-btn small cdel-btn" data-c="del">Delete</button>' : ''}</div></div>
         <button type="button" class="cstar ${liked ? 'on' : ''}" data-c="star" aria-pressed="${liked}" aria-label="${liked ? 'Remove your star' : 'Give this comment a star'}">${STAR}<span class="cn">${n ? fmtCount(n) : ''}</span></button>`;

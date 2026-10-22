@@ -6,6 +6,7 @@ import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetec
 import { startAutoplayAll } from './autoplay-all.js';
 import { isYtBlocked, setYtReporter, checkYtForUpload } from './ytcheck.js';
 import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
+import { KEMY_NAME, reservedKemy, noteAdminUid, rememberKemy, isAdminUid, faceName, adminNameClass, ownerBadgeHtml } from './kemy-name.js';
 import { mountHeaderChip, gameChip } from './wallet-chip.js';
 import { mountGameMusic, hideGameMusic } from './gamemusic.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
@@ -113,7 +114,11 @@ let hydrateRaf = 0;
 new MutationObserver(() => { cancelAnimationFrame(hydrateRaf); hydrateRaf = requestAnimationFrame(hydrateAvatars); })
   .observe(document.body, { childList: true, subtree: true });
 const refreshAvatarsFor = (uid, url) => document.querySelectorAll(`.avatar[data-uid="${CSS.escape(uid)}"]`).forEach((el) => paintAvatar(el, url));
-const badge = (uid) => uid === STUDIO_UID ? '<span class="badge" title="Official studio account" aria-label="Official studio account">✓</span>' : (mod ? mod.badge(uid) : '');
+const badge = (uid) => (uid === STUDIO_UID || isAdminUid(uid)) ? ownerBadgeHtml() : (mod ? mod.badge(uid) : '');
+window.kemyFaceBadge = (uid) => badge(uid);
+const shown = (uid, name) => esc(faceName(uid, name));
+const nameCls = (base, uid) => base + (adminNameClass(uid) ? ' ' + adminNameClass(uid) : '');
+const reservedNameMsg = (displayName, username) => (!isAdmin() && (reservedKemy(displayName) || reservedKemy(username))) ? 'That name is reserved.' : '';
 function timeAgo(ts) {
   if (!ts) return 'just now';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -176,6 +181,7 @@ async function getProfile(uid) {
   if (!profileInflight.has(uid)) {
     profileInflight.set(uid, getDoc(doc(db, 'users', uid)).then((snap) => {
       const p = snap.exists() ? { uid, ...snap.data() } : null;
+      if (p) rememberKemy(uid, p.displayName);
       profileCache.set(uid, p); profileInflight.delete(uid);
       return p;
     }, (e) => { profileInflight.delete(uid); throw e; }));
@@ -186,11 +192,11 @@ async function getProfile(uid) {
 async function refreshProfile(uid) {
   if (S.user && uid === S.user.uid && S.profile) {
     const snap = await getDoc(doc(db, 'users', uid));
-    if (snap.exists()) { S.profile = snap.data(); profileCache.set(uid, { uid, ...S.profile }); }
+    if (snap.exists()) { S.profile = snap.data(); rememberKemy(uid, S.profile.displayName); profileCache.set(uid, { uid, ...S.profile }); }
     return S.profile;
   }
   const snap = await cachedDoc('u:' + uid, doc(db, 'users', uid), 300e3); // ≤1 read / 5 min per profile (stories row)
-  const p = snap.exists() ? { uid, ...snap.data() } : null; profileCache.set(uid, p); return p;
+  const p = snap.exists() ? { uid, ...snap.data() } : null; if (p) rememberKemy(uid, p.displayName); profileCache.set(uid, p); return p;
 }
 async function uidForUsername(username) {
   const snap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
@@ -338,7 +344,7 @@ function mediaHtml(p) {
   if (p.mediaUrl && p.mediaType === 'video') {
     return `<div class="post-media"><video controls playsinline preload="metadata" controlsList="nodownload" ${dims} ${poster ? `poster="${esc(poster)}"` : ''} src="${esc(p.mediaUrl)}"></video><div class="media-note" hidden role="status"></div></div>`;
   }
-  if (p.mediaUrl && p.mediaType === 'image') return `<div class="post-media"><img src="${esc(p.mediaUrl)}" ${dims} alt="Photo posted by ${esc(p.authorName)}" loading="lazy"></div>`;
+  if (p.mediaUrl && p.mediaType === 'image') return `<div class="post-media"><img src="${esc(p.mediaUrl)}" ${dims} alt="Photo posted by ${shown(p.authorId, p.authorName)}" loading="lazy"></div>`;
   if (p.linkUrl) {
     const yt = youTubeId(p.linkUrl);
     if (yt && /^[\w-]+$/.test(yt)) {
@@ -373,7 +379,7 @@ function postCard(p, { detail = false } = {}) {
     <div class="post-head">
       ${avatar(p)}
       <div class="who">
-        <a class="name" href="#/u/${esc(p.authorUsername)}">${esc(p.authorName)}</a>${badge(p.authorId)}
+        <a class="${nameCls('name', p.authorId)}" href="#/u/${esc(p.authorUsername)}">${shown(p.authorId, p.authorName)}</a>${badge(p.authorId)}
         <div class="handle">@${esc(p.authorUsername)} · <a href="#/post/${esc(p.id)}" class="muted" style="text-decoration:none">${esc(timeAgo(p.createdAt))}</a></div>
       </div>
       <div class="menu-wrap">
@@ -892,7 +898,7 @@ const prettyUrl = (u) => u.replace(/^https:\/\/(www\.)?/i, '').replace(/\/$/, ''
 function wireCounter(input, out, max) { const f = () => { out.textContent = `${input.value.length}/${max}`; out.classList.toggle('warn', input.value.length > max - 15); }; input.addEventListener('input', f); f(); }
 function limitLines(ta, n = BIO_LINES) { ta.addEventListener('input', () => { const l = ta.value.split('\n'); if (l.length > n) { const pos = ta.selectionStart; ta.value = l.slice(0, n).join('\n') + ' ' + l.slice(n).join(' '); ta.selectionStart = ta.selectionEnd = Math.min(pos, ta.value.length); ta.dispatchEvent(new Event('input')); } }); }
 
-const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${avatar(u, '', false)}<div class="meta"><b>${esc(u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${u.bio ? ' · ' + esc(cleanBio(u.bio).replace(/\n/g, ' ')) : ''}</p></div></a>`;
+const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${avatar(u, '', false)}<div class="meta"><b class="${nameCls('', u.uid)}">${shown(u.uid, u.displayName)}</b>${badge(u.uid)}<p>@${esc(u.username)}${u.bio ? ' · ' + esc(cleanBio(u.bio).replace(/\n/g, ' ')) : ''}</p></div></a>`;
 
 // ---------------------------------------------------------------- compose (Post tab)
 // Camera / photo / library flow lives in js/create.js; the text + link form stays here.
@@ -1076,7 +1082,7 @@ async function pageProfile(username, tab, token) {
       <div class="profile-head">
         <div class="pav" id="pav">${avatar(u, 'lg', false)}</div>
         <div style="min-width:0">
-          <h1>${esc(u.displayName)}${badge(uid)}</h1>
+          <h1 class="${nameCls('', uid)}">${shown(uid, u.displayName)}${badge(uid)}</h1>
           <div class="muted">@${esc(u.username)}${u.pronouns ? ` · <span class="pronouns">${esc(String(u.pronouns).slice(0, 20))}</span>` : ''}</div>
           <div class="stats small">
             <span><b>${pc.data().count}</b> posts</span>
@@ -1207,7 +1213,7 @@ async function pageSettings() {
       </div>
       ${safety.limited()
         ? `<div class="field"><label for="s-safe">Display name</label><select id="s-safe">${nameOptionsHtml(p.displayName)}</select><p class="small muted" style="margin:4px 0 0">Pick a name from the list. Real names stay off Kemy.</p></div>`
-        : `<div class="field"><label for="s-name">Display name</label><input id="s-name" type="text" maxlength="50" required value="${esc(p.displayName)}"></div>`}
+        : `<div class="field"><label for="s-name">Display name</label><input id="s-name" type="text" maxlength="50" required value="${esc(isAdmin() ? KEMY_NAME : p.displayName)}"></div>`}
       <div class="field"><label for="s-user">Username</label><input id="s-user" type="text" maxlength="20" required value="${esc(p.username)}" autocapitalize="none" autocomplete="off" spellcheck="false">
         <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore.</p></div>
       <div class="field" ${safety.limited() ? 'hidden' : ''}><div class="row"><label for="s-bio">Bio</label><span class="spacer"></span><span class="small muted counter" id="s-bio-n" aria-live="polite"></span></div><textarea id="s-bio" maxlength="160" rows="4" style="min-height:96px" placeholder="Tell people about yourself ✨ Use @names and #tags">${esc(p.bio)}</textarea>
@@ -1268,7 +1274,7 @@ async function pageSettings() {
     ev.preventDefault();
     const err = $('#s-err'); err.textContent = '';
     const young = safety.limited();
-    const displayName = young ? ($('#s-safe')?.value || '').trim() : $('#s-name').value.trim();
+    const displayName = isAdmin() ? KEMY_NAME : (young ? ($('#s-safe')?.value || '').trim() : $('#s-name').value.trim());
     const username = $('#s-user').value.trim().toLowerCase().replace(/^@/, '');
     const bio = young ? '' : cleanBio($('#s-bio').value);
     if (bio !== (p.bio || '')) { if (safety.contactBlocked(bio)) { err.textContent = safety.SAFETY_NOTE; return; } if (!safety.piiOk(bio)) return; safety.scanAge(bio, 'user', S.user.uid); }
@@ -1276,7 +1282,8 @@ async function pageSettings() {
     const website = young ? '' : normWebsite($('#s-web').value);
     if (website === null) { err.textContent = 'Website must be a valid https:// link (up to 100 characters).'; return; }
     const color = $('input[name=color]:checked')?.value || p.color;
-    if (!displayName || (young && !safeNameOk(displayName))) { err.textContent = young ? 'Pick a name from the list.' : 'Please enter a display name.'; return; }
+    if (!displayName || (young && !isAdmin() && !safeNameOk(displayName))) { err.textContent = young ? 'Pick a name from the list.' : 'Please enter a display name.'; return; }
+    const reserved = reservedNameMsg(displayName, username); if (reserved) { err.textContent = reserved; return; }
     if (window.kemyNameBad && (window.kemyNameBad(displayName) || window.kemyNameBad(username) || window.kemyNameBad(bio))) {
       if (window.kemyModWarn) window.kemyModWarn();
       if (window.kemyModFlag) window.kemyModFlag(displayName, 'name', '');
@@ -1348,7 +1355,7 @@ async function pageNotifications(asStudio, token) {
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     const href = n.type === 'message' ? '#/messages' : n.type === 'game' ? (String(n.text || '').includes('Pal Games') ? `#/games/pals/${esc(n.postId)}` : `#/game/${esc(n.postId)}`) : n.type === 'house' ? '#/street' : n.type === 'daily' ? '#/pals' : n.type === 'announce' ? (String(n.postId || '').startsWith('#/') ? esc(n.postId) : '#/feed') : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
-      <div class="meta"><div><b>${esc(n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
+      <div class="meta"><div><b class="${nameCls('', n.fromUid)}">${shown(n.fromUid, n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
   }).join('') : '<div class="empty">No notifications yet.</div>';
   items.filter((n) => !n.read).forEach((n) => updateDoc(doc(db, 'users', owner, 'notifications', n.id), { read: true }).catch(() => {}));
 }
@@ -1597,6 +1604,7 @@ async function pageSignup() {
       return;
     }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
+    const reserved = reservedNameMsg(displayName, username); if (reserved) { err.textContent = reserved; return; }
     pendingBirthday = bd;
     const btn = $('#p-btn'); btn.disabled = true; btn.textContent = 'Creating…';
     try {
@@ -1634,6 +1642,7 @@ async function pageOnboard() {
       return;
     }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
+    const reserved = reservedNameMsg(displayName, username); if (reserved) { err.textContent = reserved; return; }
     try { await createProfile(displayName, username); go(pendingNext || '#/feed'); pendingNext = null; }
     catch (e) { err.textContent = friendlyError(e); }
   };
@@ -1652,6 +1661,7 @@ async function pageReset() {
 
 // Creates the profile, reserves the username, and auto-follows the studio, all in one batch.
 async function createProfile(displayName, username) {
+  const reserved = reservedNameMsg(displayName, username); if (reserved) throw new Error(reserved);
   if (await uidForUsername(username)) throw new Error('That username is taken. Try another.');
   const uid = S.user.uid;
   const name = displayName.slice(0, 50);
@@ -1690,6 +1700,7 @@ async function loadSession() {
   S.profile = snap.exists() ? snap.data() : null;
   safety.syncChatMode();
   if (!S.profile) return;
+  if (isAdmin()) await applyAdminName(uid);
   if (!S.profile.createdAt) {
     try { await updateDoc(doc(db, 'users', uid), { createdAt: serverTimestamp() }); }
     catch (e) { console.warn('createdAt', e.code || e.message); }
@@ -1725,6 +1736,28 @@ async function loadSession() {
   }, () => {}));
   S.unreadChats = false;
   const dot = document.getElementById('msg-dot'); if (dot) dot.hidden = !S.modThreadUnread;
+}
+
+// The admin account keeps its id. Only the name people see is "Kemy".
+async function applyAdminName(uid) {
+  noteAdminUid(uid);
+  if (!S.profile || S.profile.displayName === KEMY_NAME) return;
+  const displayName = KEMY_NAME;
+  const patch = { displayName, ...userSearchFields({ displayName, username: S.profile.username }) };
+  try {
+    await updateDoc(doc(db, 'users', uid), patch);
+    Object.assign(S.profile, patch);
+    profileCache.set(uid, { uid, ...S.profile });
+    updateProfile(S.user, { displayName }).catch(() => {});
+    updateDoc(doc(db, 'members', uid), { displayName, displayNameLower: patch.displayNameLower }).catch(() => {});
+  } catch (e) { console.warn('admin name', e.code || e.message); }
+}
+
+async function loadOfficialAdmins() {
+  try {
+    const snap = await getDocs(query(collection(db, 'users'), where('displayName', '==', KEMY_NAME), limit(8)));
+    snap.forEach((d) => noteAdminUid(d.id));
+  } catch (e) { console.warn('kemy admins', e.code || e.message); }
 }
 
 // Lazy search-index backfill: when someone signs in, add the search fields to their own
@@ -1770,7 +1803,7 @@ onAuthStateChanged(auth, async (user) => {
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; S.unreadNotes = S.unreadChats = false;
   if (user) {
     try {
-      await Promise.race([loadSession(), new Promise((r) => setTimeout(r, 8000))]);
+      await Promise.race([Promise.all([loadSession(), loadOfficialAdmins()]), new Promise((r) => setTimeout(r, 8000))]);
       if (isAdmin()) import('./pals/economy.js').then((m) => { m.setShopAutoPublish(adminAutoPublish); setTimeout(() => adminAutoPublish().then((did) => did && console.info('Shop: published new item prices')).catch(() => {}), 6000); }).catch(() => {});
       if (!S.profile && pendingProfile) {
         const p = pendingProfile; pendingProfile = null;
@@ -1778,6 +1811,7 @@ onAuthStateChanged(auth, async (user) => {
       }
     } catch (e) { console.error(e); }
   }
+  if (!user) await loadOfficialAdmins();
   await mod.rolesReady;
   if (user && S.profile) { devices.start(user); import('./push.js').then((m) => m.start(user)).catch(() => {}); }
   else { devices.stop(); import('./push.js').then((m) => m.stop()).catch(() => {}); }

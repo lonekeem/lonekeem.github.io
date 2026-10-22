@@ -9,6 +9,7 @@ import { createSeries } from './series.js';
 import { stripExif } from './safety.js';
 import { postStamp, postDone } from './spam.js';
 import { guardUpload } from './mediascan.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 
 export const GENRES = {
   movie: ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Fantasy', 'Romance', 'Animation', 'Music', 'Documentary', 'Other'],
@@ -77,7 +78,7 @@ export function createWorks(ctx) {
   function card(p) {
     const el = document.createElement('article');
     el.className = 'card post wcard'; el.dataset.postId = p.id;
-    el.innerHTML = `<div class="post-head">${avatar(p)}<div class="who"><a class="name" href="#/u/${esc(p.authorUsername)}">${esc(p.authorName)}</a>${badge(p.authorId)}
+    el.innerHTML = `<div class="post-head">${avatar(p)}<div class="who"><a class="name${adminNameClass(p.authorId) ? ' ' + adminNameClass(p.authorId) : ''}" href="#/u/${esc(p.authorUsername)}">${esc(faceName(p.authorId, p.authorName))}</a>${badge(p.authorId)}
       <div class="handle">shared a ${p.type === 'song' ? 'song' : 'movie'} · ${esc(timeAgo(p.createdAt))}</div></div></div>
       <div class="wcard-body">${tile(p, { size: 'wide' })}${p.text ? `<p class="wcard-desc">${esc(p.text.slice(0, 160))}${p.text.length > 160 ? '…' : ''}</p>` : ''}</div>`;
     return el;
@@ -359,7 +360,7 @@ export function createWorks(ctx) {
       <div class="wbody">
         <h1 class="wtitle">${esc(w.title)}</h1>
         <div class="wsub">${isSong ? `<b>${esc(w.artist || p.authorName)}</b> · ` : ''}${esc(w.genre)}${w.runtime ? ' · ' + fmtRuntime(w.runtime) : ''}${!isSong && w.rating ? ` · <span class="wb-r inline">${w.rating === 'all' ? 'All ages' : esc(w.rating) + '+'}</span>` : ''} ${AI_BADGE}${w.explicit ? E_BADGE : ''}${p.featured ? '<span class="wb-pick">★ Studio Pick</span>' : ''}</div>
-        <div class="wby">${avatar(p)}<div><a class="name" href="#/u/${esc(p.authorUsername)}">${esc(p.authorName)}</a>${badge(p.authorId)}<div class="muted small">${esc(timeAgo(p.createdAt))} · <span class="wviews">${Number(p.viewCount) || 0}</span> ${isSong ? 'plays' : 'views'}</div></div></div>
+        <div class="wby">${avatar(p)}<div><a class="name${adminNameClass(p.authorId) ? ' ' + adminNameClass(p.authorId) : ''}" href="#/u/${esc(p.authorUsername)}">${esc(faceName(p.authorId, p.authorName))}</a>${badge(p.authorId)}<div class="muted small">${esc(timeAgo(p.createdAt))} · <span class="wviews">${Number(p.viewCount) || 0}</span> ${isSong ? 'plays' : 'views'}</div></div></div>
         <div class="wacts">
           <button class="wact like" data-a="like" aria-pressed="false" aria-label="Give a gold star">${STAR}<span class="n">${Number(p.likeCount) || 0}</span></button>
           <button class="wact" data-a="save" aria-pressed="false" aria-label="Save">Save</button>
@@ -372,7 +373,7 @@ export function createWorks(ctx) {
         ${w.aiTools ? `<p class="small muted">Made with: ${esc(w.aiTools)}</p>` : ''}
         ${isSong && w.lyrics ? `<details class="wlyr"><summary>Lyrics</summary><pre>${esc(w.lyrics)}</pre></details>` : ''}
       </div>
-      <div class="wmore" hidden><h2>More from ${esc(p.authorName)}</h2><div class="wrow"></div></div>`;
+      <div class="wmore" hidden><h2>More from ${esc(faceName(p.authorId, p.authorName))}</h2><div class="wrow"></div></div>`;
     slot.appendChild(el);
     const q = (s) => el.querySelector(s);
     // views / plays
