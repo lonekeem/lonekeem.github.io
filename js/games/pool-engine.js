@@ -1,8 +1,9 @@
 // Star Pool engine: deterministic fixed-timestep table physics + 8-ball rules + computer player.
 // Only + - * / and Math.sqrt are used inside the simulation so every browser computes the same
 // result from the same quantized start positions and shot (vx, vy, spin). Table: x 0..1, y 0..2.
+// Written by Lone Keem.
 export const W = 1, H = 2, R = 0.0225, DT = 1 / 400;
-const FRICTION = 1.25, RAIL_E = 0.78, BALL_E = 0.95, STOP = 0.004, MAX_T = 18;
+const FRICTION = 1.12, RAIL_E = 0.8, BALL_E = 0.95, STOP = 0.008, MAX_T = 16;
 export const MAX_SPEED = 4.8;
 export const POCKETS = [
   { x: 0.004, y: 0.004, r: 0.062 }, { x: 0.996, y: 0.004, r: 0.062 },
@@ -11,11 +12,12 @@ export const POCKETS = [
 ];
 export const FOOT = { x: 0.5, y: 0.5 }, HEAD = { x: 0.5, y: 1.5 }, KITCHEN_Y = 1.5;
 export const groupOf = (id) => (id === 0 ? 'cue' : id === 8 ? 'eight' : id < 8 ? 'solid' : 'stripe');
-const inMouth = (x, y) => {
-  if ((x < 0.075 || x > W - 0.075) && (y < 0.075 || y > H - 0.075)) return true;
-  if ((x < 0.06 || x > W - 0.06) && y > 1 - 0.05 && y < 1 + 0.05) return true;
+// Pocket jaws. Kept tight so the cushions still reach the hole and a ball cannot rest in the gap.
+function inMouth(x, y) {
+  if ((x < 0.05 || x > W - 0.05) && (y < 0.05 || y > H - 0.05)) return true;
+  if ((x < 0.042 || x > W - 0.042) && y > 0.955 && y < 1.045) return true;
   return false;
-};
+}
 
 // ---- encoding: 16 balls, each "xxxxyyyy" (x*5000, y*5000) or "--------" when pocketed
 const q = (v) => Math.max(0, Math.min(9999, Math.round(v * 5000)));
@@ -40,6 +42,120 @@ export function rack() {
 }
 export const newState = () => ({ groups: ['', ''], open: true, brk: true, bih: true, call: -1, msg: 'Break!', foul: false });
 
+function capture(o, p, ev) {
+  if (!o.on || o.drop != null) return;
+  o.drop = p; o.vx = 0; o.vy = 0;
+  ev.pocketed.push(o.id); ev.pockets[o.id] = p;
+}
+function segHits(x0, y0, x1, y1, cx, cy, r) {
+  const fx = x0 - cx, fy = y0 - cy;
+  if (fx * fx + fy * fy < r * r) return true;
+  const gx = x1 - cx, gy = y1 - cy;
+  if (gx * gx + gy * gy < r * r) return true;
+  const dx = x1 - x0, dy = y1 - y0, a = dx * dx + dy * dy;
+  if (a === 0) return false;
+  const bq = 2 * (fx * dx + fy * dy), cq = fx * fx + fy * fy - r * r;
+  let disc = bq * bq - 4 * a * cq;
+  if (disc < 0) return false;
+  disc = Math.sqrt(disc);
+  const t1 = (-bq - disc) / (2 * a);
+  if (t1 >= 0 && t1 <= 1) return true;
+  const t2 = (-bq + disc) / (2 * a);
+  return t2 >= 0 && t2 <= 1;
+}
+function markRail(o, hit, ev, shot) {
+  if (!hit) return;
+  if (ev.first >= 0) ev.railAfter = true;
+  if (o.id === 0 && shot.side) {
+    const s = shot.side * 0.22 * Math.sqrt(o.vx * o.vx + o.vy * o.vy);
+    if (hit <= 2) o.vy += hit === 1 ? -s : s; else o.vx += hit === 3 ? s : -s;
+    ev.cueRails++;
+  }
+}
+// A ball in the jaw either falls in, bounces back onto the cloth, or is nudged out so it cannot sit there.
+function resolveMouth(o, ev, shot) {
+  const p = nearestPocket(o.x, o.y), P = POCKETS[p];
+  const dx = o.x - P.x, dy = o.y - P.y, d2 = dx * dx + dy * dy;
+  if (d2 < P.r * P.r) { capture(o, p, ev); return; }
+  const d = Math.sqrt(d2) || 1;
+  const toward = -(o.vx * dx + o.vy * dy) / d;
+  const off = o.x < R || o.x > W - R || o.y < R || o.y > H - R;
+  if (off && (d < P.r * 1.12 || toward > 0.2)) { capture(o, p, ev); return; }
+  if (off) {
+    let hit = 0;
+    if (o.x < R) { o.x = R + (R - o.x); o.vx = Math.abs(o.vx) * RAIL_E; hit = 1; }
+    else if (o.x > W - R) { o.x = 2 * (W - R) - o.x; o.vx = -Math.abs(o.vx) * RAIL_E; hit = 2; }
+    if (o.y < R) { o.y = R + (R - o.y); o.vy = Math.abs(o.vy) * RAIL_E; hit = hit || 3; }
+    else if (o.y > H - R) { o.y = 2 * (H - R) - o.y; o.vy = -Math.abs(o.vy) * RAIL_E; hit = hit || 4; }
+    markRail(o, hit, ev, shot);
+    return;
+  }
+  const sp2 = o.vx * o.vx + o.vy * o.vy;
+  if (sp2 < 0.0009) {
+    const nx = dx / d, ny = dy / d;
+    for (let k = 0; k < 24 && inMouth(o.x, o.y); k++) { o.x += nx * 0.005; o.y += ny * 0.005; }
+    if (o.x < R) o.x = R; else if (o.x > W - R) o.x = W - R;
+    if (o.y < R) o.y = R; else if (o.y > H - R) o.y = H - R;
+    o.vx = 0; o.vy = 0;
+  }
+}
+function collidePairs(b, ev, shot, spinUsed) {
+  const R2 = 4 * R * R;
+  let moving = false, used = spinUsed;
+  for (let i = 0; i < 16; i++) {
+    const a = b[i]; if (!a.on || a.drop != null) continue;
+    for (let j = i + 1; j < 16; j++) {
+      const c = b[j]; if (!c.on || c.drop != null) continue;
+      const dx = c.x - a.x, dy = c.y - a.y, d2 = dx * dx + dy * dy;
+      if (d2 >= R2 || d2 === 0) continue;
+      const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+      const rel = (a.vx - c.vx) * nx + (a.vy - c.vy) * ny;
+      const overlap = (2 * R - d) / 2;
+      a.x -= nx * overlap; a.y -= ny * overlap; c.x += nx * overlap; c.y += ny * overlap;
+      if (rel <= 0) continue;
+      if (ev.first < 0 && (i === 0 || j === 0)) ev.first = i === 0 ? j : i;
+      const pre = i === 0 ? [a.vx, a.vy] : null;
+      const imp = rel * (1 + BALL_E) / 2;
+      a.vx -= imp * nx; a.vy -= imp * ny; c.vx += imp * nx; c.vy += imp * ny;
+      if (pre && !used && shot.follow) {
+        used = true;
+        const k = shot.follow * 0.62 * imp / Math.max(rel, 1e-9);
+        a.vx += pre[0] * k * 0.5; a.vy += pre[1] * k * 0.5;
+      }
+      moving = true;
+    }
+  }
+  return { moving, spinUsed: used };
+}
+function settle(balls) {
+  for (let n = 0; n < 12; n++) {
+    let hit = false;
+    for (let i = 0; i < 16; i++) {
+      const a = balls[i]; if (!a.on) continue;
+      for (let j = i + 1; j < 16; j++) {
+        const c = balls[j]; if (!c.on) continue;
+        const dx = c.x - a.x, dy = c.y - a.y, d2 = dx * dx + dy * dy;
+        const min = 2 * R;
+        if (d2 === 0) { a.x -= 0.001; hit = true; continue; }
+        if (d2 >= min * min) continue;
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, push = (min - d) / 2 + 0.00005;
+        a.x -= nx * push; a.y -= ny * push; c.x += nx * push; c.y += ny * push;
+        hit = true;
+      }
+      if (inMouth(a.x, a.y)) {
+        const P = POCKETS[nearestPocket(a.x, a.y)];
+        const dx = a.x - P.x, dy = a.y - P.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+        a.x += dx / d * 0.012; a.y += dy / d * 0.012;
+        hit = true;
+      }
+      if (!a.on) continue;
+      if (a.x < R) { a.x = R; hit = true; } else if (a.x > W - R) { a.x = W - R; hit = true; }
+      if (a.y < R) { a.y = R; hit = true; } else if (a.y > H - R) { a.y = H - R; hit = true; }
+    }
+    if (!hit) break;
+  }
+}
+
 // ---- simulation. shot = { vx, vy, follow, side } ; returns { frames, events, balls }
 export function simulate(start, shot, { record = true } = {}) {
   const b = start.map((o) => ({ ...o, vx: 0, vy: 0 }));
@@ -50,73 +166,69 @@ export function simulate(start, shot, { record = true } = {}) {
   const frames = []; let t = 0, nextFrame = 0;
   const pushFrame = () => frames.push(b.map((o) => (o.on ? [o.x, o.y] : null)));
   if (record) pushFrame();
-  const R2 = 4 * R * R;
+  const SINK = 0.55;
   while (t < MAX_T) {
     let moving = false;
     for (const o of b) {
       if (!o.on) continue;
-      const sp2 = o.vx * o.vx + o.vy * o.vy;
-      if (sp2 === 0) continue;
-      const sp = Math.sqrt(sp2), dec = FRICTION * DT;
-      if (sp <= dec || sp < STOP) { o.vx = 0; o.vy = 0; continue; }
-      const k = (sp - dec) / sp; o.vx *= k; o.vy *= k;
-      o.x += o.vx * DT; o.y += o.vy * DT;
-      moving = true;
-      // pockets
-      for (let p = 0; p < 6; p++) {
-        const P = POCKETS[p], dx = o.x - P.x, dy = o.y - P.y;
-        if (dx * dx + dy * dy < P.r * P.r) { o.on = false; o.vx = 0; o.vy = 0; ev.pocketed.push(o.id); ev.pockets[o.id] = p; break; }
+      if (o.drop != null) {
+        const P = POCKETS[o.drop], dx = P.x - o.x, dy = P.y - o.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 0.004) { o.on = false; o.x = P.x; o.y = P.y; o.drop = null; }
+        else { const k = Math.min(1, SINK * DT / d); o.x += dx * k; o.y += dy * k; moving = true; }
+        continue;
       }
-      if (!o.on) continue;
-      // cushions (no cushion in the pocket mouths)
-      if (!inMouth(o.x, o.y)) {
+      const x0 = o.x, y0 = o.y;
+      const sp2 = o.vx * o.vx + o.vy * o.vy;
+      if (sp2 > 0) {
+        const sp = Math.sqrt(sp2), dec = FRICTION * DT;
+        if (sp <= dec || sp < STOP) { o.vx = 0; o.vy = 0; }
+        else {
+          const k = (sp - dec) / sp; o.vx *= k; o.vy *= k;
+          o.x += o.vx * DT; o.y += o.vy * DT;
+          moving = true;
+        }
+      }
+      let fell = false;
+      for (let p = 0; p < 6; p++) {
+        const P = POCKETS[p];
+        if (segHits(x0, y0, o.x, o.y, P.x, P.y, P.r)) { capture(o, p, ev); fell = true; break; }
+      }
+      if (fell) { moving = true; continue; }
+      if (inMouth(o.x, o.y)) resolveMouth(o, ev, shot);
+      else {
         let hit = 0;
         if (o.x < R) { o.x = 2 * R - o.x; o.vx = -o.vx * RAIL_E; hit = 1; }
         else if (o.x > W - R) { o.x = 2 * (W - R) - o.x; o.vx = -o.vx * RAIL_E; hit = 2; }
         if (o.y < R) { o.y = 2 * R - o.y; o.vy = -o.vy * RAIL_E; hit = hit || 3; }
         else if (o.y > H - R) { o.y = 2 * (H - R) - o.y; o.vy = -o.vy * RAIL_E; hit = hit || 4; }
-        if (hit) {
-          if (ev.first >= 0) ev.railAfter = true;
-          if (o.id === 0 && shot.side) {
-            // side spin ("english") kicks the cue ball along the rail
-            const s = shot.side * 0.22 * Math.sqrt(o.vx * o.vx + o.vy * o.vy);
-            if (hit <= 2) o.vy += hit === 1 ? -s : s; else o.vx += hit === 3 ? s : -s;
-            ev.cueRails++;
-          }
-        }
-      } else if (o.x < -0.05 || o.x > W + 0.05 || o.y < -0.05 || o.y > H + 0.05) { o.on = false; ev.pocketed.push(o.id); ev.pockets[o.id] = nearestPocket(o.x, o.y); }
-    }
-    // ball-ball collisions
-    for (let i = 0; i < 16; i++) {
-      const a = b[i]; if (!a.on) continue;
-      for (let j = i + 1; j < 16; j++) {
-        const c = b[j]; if (!c.on) continue;
-        const dx = c.x - a.x, dy = c.y - a.y, d2 = dx * dx + dy * dy;
-        if (d2 >= R2 || d2 === 0) continue;
-        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
-        const rel = (a.vx - c.vx) * nx + (a.vy - c.vy) * ny;
-        const overlap = (2 * R - d) / 2;
-        a.x -= nx * overlap; a.y -= ny * overlap; c.x += nx * overlap; c.y += ny * overlap;
-        if (rel <= 0) continue;
-        if (ev.first < 0 && (i === 0 || j === 0)) ev.first = i === 0 ? j : i;
-        const pre = i === 0 ? [a.vx, a.vy] : null;
-        const imp = rel * (1 + BALL_E) / 2;
-        a.vx -= imp * nx; a.vy -= imp * ny; c.vx += imp * nx; c.vy += imp * ny;
-        if (pre && !spinUsed && shot.follow) {
-          // follow (top) carries the cue ball on; draw (back) pulls it back
-          spinUsed = true;
-          const k = shot.follow * 0.62 * imp / Math.max(rel, 1e-9);
-          a.vx += pre[0] * k * 0.5; a.vy += pre[1] * k * 0.5;
-        }
-        moving = true;
+        markRail(o, hit, ev, shot);
       }
+      if (o.drop != null) moving = true;
+    }
+    for (let pass = 0; pass < 4; pass++) {
+      const c = collidePairs(b, ev, shot, spinUsed);
+      spinUsed = c.spinUsed;
+      if (c.moving) moving = true;
     }
     t += DT;
     if (record && t >= nextFrame) { pushFrame(); nextFrame += 1 / 60; }
     if (!moving) break;
   }
+  b.forEach((o) => { if (o.drop != null) o.on = false; o.vx = 0; o.vy = 0; o.drop = null; });
+  // Anything still sitting in a hole has fallen. Count it once, then separate whatever is left on the cloth.
+  for (const o of b) {
+    if (!o.on) continue;
+    for (let p = 0; p < 6; p++) {
+      const P = POCKETS[p], dx = o.x - P.x, dy = o.y - P.y;
+      if (dx * dx + dy * dy < P.r * P.r * 0.85) {
+        o.on = false;
+        if (ev.pocketed.indexOf(o.id) < 0) { ev.pocketed.push(o.id); ev.pockets[o.id] = p; }
+        break;
+      }
+    }
+  }
+  settle(b);
   if (record) pushFrame();
-  b.forEach((o) => { o.vx = 0; o.vy = 0; });
   return { frames, events: ev, balls: b };
 }
 function nearestPocket(x, y) {
@@ -192,6 +304,29 @@ export function aimInfo(balls, dx, dy) {
   }
   const ex = c.x + dx * tw, ey = c.y + dy * tw;
   return { wall: { x: ex, y: ey }, refl: walls[0] < walls[1] ? { x: -dx, y: dy } : { x: dx, y: -dy } };
+}
+
+// Ray from (x, y) along a unit direction. skip is a list of ball ids to ignore.
+// Used for the guide line only (not the rules). Returns the first ball or cushion.
+export function rayHit(balls, x, y, dx, dy, skip) {
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1e-8) return { x, y, wall: true, refl: { x: 0, y: 0 } };
+  dx /= len; dy /= len;
+  let best = Infinity, hit = null;
+  for (const o of balls) {
+    if (!o.on || (skip && skip.indexOf(o.id) >= 0)) continue;
+    const fx = x - o.x, fy = y - o.y;
+    const bq = fx * dx + fy * dy, cq = fx * fx + fy * fy - 4 * R * R, disc = bq * bq - cq;
+    if (disc < 0) continue;
+    const t = -bq - Math.sqrt(disc);
+    if (t > 0.0001 && t < best) { best = t; hit = o; }
+  }
+  const tx = dx < 0 ? (R - x) / dx : dx > 0 ? (W - R - x) / dx : Infinity;
+  const ty = dy < 0 ? (R - y) / dy : dy > 0 ? (H - R - y) / dy : Infinity;
+  const tw = tx < ty ? tx : ty;
+  if (hit && best < tw) return { t: best, x: x + dx * best, y: y + dy * best, ball: hit };
+  const tt = tw > 0 && tw < 1e8 ? tw : 0;
+  return { t: tt, x: x + dx * tt, y: y + dy * tt, wall: true, refl: tx < ty ? { x: -dx, y: dy } : { x: dx, y: -dy } };
 }
 
 // ---- computer player. Returns { vx, vy, follow, side, place?: {x,y}, call }
