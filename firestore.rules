@@ -163,6 +163,12 @@ service cloud.firestore {
         && request.resource.data.house is bool && request.resource.data.daily is bool
         && request.resource.data.announce is bool
         && request.resource.data.updatedAt == request.time;
+      // Notification sound (js/chime.js). Owner only. Saved on the device too.
+      allow create, update: if signedIn() && uid == me() && docId == 'chime' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['sound', 'updatedAt'])
+        && request.resource.data.sound is string
+        && request.resource.data.sound.matches('^[a-z0-9-]{2,32}$')
+        && request.resource.data.updatedAt == request.time;
       // Which What's New entry this player has opened (js/updates.js). Owner only.
       allow create, update: if signedIn() && uid == me() && docId == 'updates' && sessionOk(uid)
         && request.resource.data.keys().hasOnly(['seen', 'updatedAt'])

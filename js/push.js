@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'https://www.gst
 import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-messaging.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import { deviceId, deviceLabel } from './devices.js';
-import { chimeOn, setChimeOn, playChime } from './chime.js';
+import { chimeOn, setChimeOn, playChime, chimeSound, setChimeSound, previewSound, CHIME_SOUNDS, validChime } from './chime.js';
 
 const TYPES = [
   ['invite', 'Friend invites and game challenges', 'When someone follows you or asks you to play.'],
@@ -133,6 +133,7 @@ export async function start(user) {
   }
   if (!uid) return;
   await loadPrefs();
+  await pullChime();
   if (prefs && prefs.enabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     try {
       const got = await obtainToken();
@@ -164,14 +165,15 @@ function paint() {
   box.appendChild(hint);
   box.appendChild(row(
     'push-chime',
-    'Soft Breeze',
-    'A calm chime while Kemy is open, and when the What’s New dot shows up. If Kemy is in the background, your phone plays its own sound.',
+    'Chime',
+    'Plays your notification sound while Kemy is open, including the What’s New dot. Tap Play below to hear one first.',
     chimeOn(),
     (ev) => {
       setChimeOn(ev.target.checked);
       if (ev.target.checked) playChime();
     }
   ));
+  box.appendChild(soundPicker());
 
   if (!on) {
     const btn = document.createElement('button');
@@ -290,9 +292,70 @@ async function setType(key, on) {
   }
 }
 
+async function pullChime() {
+  if (!uid) return;
+  try {
+    const s = await getDoc(doc(db, 'users', uid, 'prefs', 'chime'));
+    const id = s.exists() ? s.data().sound : '';
+    if (validChime(id)) setChimeSound(id);
+  } catch { /* keep the sound saved on this device */ }
+}
+async function chooseSound(id) {
+  setChimeSound(id);
+  if (!uid) return;
+  try {
+    await setDoc(doc(db, 'users', uid, 'prefs', 'chime'), { sound: id, updatedAt: serverTimestamp() });
+  } catch { say('Saved on this device. It could not be saved on the account.'); }
+}
+function soundPicker() {
+  const wrap = document.createElement('div');
+  wrap.className = 'chime-pick';
+  const h = document.createElement('h3');
+  h.className = 'chime-h';
+  h.id = 'chime-h';
+  h.textContent = 'Notification sound';
+  const note = document.createElement('p');
+  note.className = 'muted small chime-note';
+  note.textContent = 'When Kemy is closed, your phone plays its own sound. Kemy can’t change that. These play while Kemy is open.';
+  const list = document.createElement('div');
+  list.className = 'chime-list';
+  list.setAttribute('role', 'radiogroup');
+  list.setAttribute('aria-labelledby', 'chime-h');
+  const current = chimeSound();
+  for (const s of CHIME_SOUNDS) {
+    const row = document.createElement('div');
+    row.className = 'chime-opt';
+    const lab = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'chime-sound';
+    input.value = s.id;
+    input.checked = s.id === current;
+    input.setAttribute('aria-label', s.name);
+    input.onchange = () => { if (input.checked) chooseSound(s.id); };
+    const name = document.createElement('span');
+    name.textContent = s.name;
+    lab.append(input, name);
+    row.append(lab);
+    if (s.file) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm btn-ghost';
+      btn.textContent = 'Play';
+      btn.setAttribute('aria-label', 'Play ' + s.name);
+      btn.onclick = () => previewSound(s.id);
+      row.append(btn);
+    }
+    list.append(row);
+  }
+  wrap.append(h, note, list);
+  return wrap;
+}
+
 export async function wireSettings(toast) {
   toastFn = typeof toast === 'function' ? toast : toastFn;
   await loadPrefs();
+  await pullChime();
   paint();
 }
 
