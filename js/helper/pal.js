@@ -146,11 +146,11 @@ export function attachHelper(api, W) {
   btn.type = 'button';
   btn.className = 'kh-act';
   btn.hidden = true;
-  btn.textContent = 'Report a problem';
+  btn.textContent = 'Kemy Helper';
   const panel = document.createElement('div');
   panel.className = 'ks-panel';
   panel.hidden = true;
-  panel.innerHTML = `<div class="ks-card kh-card"><h3 data-title>Kemy Helper</h3><p class="kh-job" data-job></p><p style="margin:0 0 8px;opacity:.9">Tell me what went wrong. Skip names, emails, and phone numbers.</p><textarea maxlength="140" placeholder="What happened?" aria-label="What happened?"></textarea><div class="row"><button type="button" data-s>Send note</button><button type="button" class="ghost" data-x>Close</button></div></div>`;
+  panel.innerHTML = `<div class="ks-card kh-card"><h3 data-title>Kemy Helper</h3><p class="kh-job" data-job></p><p style="margin:0 0 8px;opacity:.9">I keep chat kind. You can report a player, or tell me if something in the game is broken.</p><textarea maxlength="140" placeholder="A broken spot (optional)" aria-label="What happened?"></textarea><div class="row"><button type="button" data-r>Report</button><button type="button" data-s>Send note</button><button type="button" class="ghost" data-x>Close</button></div></div>`;
   (W.hud || view).append(btn, panel);
   const box = panel.querySelector('textarea');
   const sendB = panel.querySelector('[data-s]');
@@ -159,6 +159,10 @@ export function attachHelper(api, W) {
   let focus = members[0];
   panel.querySelector('[data-x]').onclick = () => { panel.hidden = true; };
   panel.onclick = (e) => { if (e.target === panel) panel.hidden = true; };
+  panel.querySelector('[data-r]').onclick = () => {
+    panel.hidden = true;
+    if (window.kemyModReport) window.kemyModReport({ targetType: 'chat message', targetId: 'helper', name: focus && focus.lead ? 'Kemy Helper' : 'Helper' });
+  };
   btn.onclick = () => {
     titleEl.textContent = focus && focus.lead ? 'Kemy Helper' : 'Helper';
     const job = focus ? focus.job : '';
@@ -176,6 +180,24 @@ export function attachHelper(api, W) {
     if (W.say) W.say('Thanks. Kemy Helper wrote that down.');
   };
 
+  let griefAt = 0;
+  let griefFrom = null;
+  let griefSent = 0;
+  const SPAWNS = [[0, 8], [30, 31]];
+  function watchGrief() {
+    const now = Date.now();
+    if (now - griefAt < 1000) return;
+    griefAt = now;
+    let near = false;
+    for (let i = 0; i < SPAWNS.length; i++) if (Math.hypot(P.x - SPAWNS[i][0], P.z - SPAWNS[i][1]) < 2.2) near = true;
+    if (!griefFrom) griefFrom = { x: P.x, z: P.z, t: now };
+    const moved = Math.hypot(P.x - griefFrom.x, P.z - griefFrom.z);
+    if (!near || moved > 1.2) { griefFrom = { x: P.x, z: P.z, t: now }; return; }
+    if (now - griefFrom.t >= 45000 && now - griefSent > 600000 && window.kemyModFlag) {
+      griefSent = now;
+      window.kemyModFlag('', 'grief', '', now - griefFrom.t);
+    }
+  }
   let cap = members.length;
   let flagT = 0;
   let scanT = 0;
@@ -473,6 +495,7 @@ export function attachHelper(api, W) {
       if (g && g.role !== 'sit') glance(g);
     }
     scan(dt);
+    watchGrief();
     const lead = members[0];
     const pub = window.__kh || (window.__kh = {});
     pub.x = lead.x;

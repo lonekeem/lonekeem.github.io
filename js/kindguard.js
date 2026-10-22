@@ -26,7 +26,7 @@ export function sneakyWord(t) {
   return '';
 }
 const FIELD = 'input:not([type]), input[type=text], input[type=search], textarea';
-export function initKindGuard({ onBypass } = {}) {
+export function initKindGuard({ onBypass, onBlock } = {}) {
   let tries = [];
   const box = (el) => el.closest('form') || el.parentElement;
   const hintFor = (el) => { let h = el._kindHint; if (!h) { h = document.createElement('div'); h.className = 'kind-hint'; h.setAttribute('role', 'status'); h.setAttribute('aria-live', 'polite'); el._kindHint = h; el.insertAdjacentElement('afterend', h); } return h; };
@@ -68,6 +68,7 @@ export function initKindGuard({ onBypass } = {}) {
     if (!w && !sn) return false;
     e.preventDefault(); e.stopImmediatePropagation();
     if (sn) { const h = hintFor(el); h.hidden = false; h.innerHTML = '💜 <b>Let’s keep it kind.</b> Tricky spellings of mean words aren’t allowed either.'; el.classList.add('kind-bad'); }
+    if (onBlock) onBlock({ text: String(el.value || '').slice(0, 200), word: sn || w });
     blocked(el, el.value, sn); return true;
   };
   document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && e.target.matches && e.target.matches('input')) guard(e.target, e); }, true);

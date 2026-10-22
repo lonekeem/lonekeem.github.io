@@ -20,6 +20,9 @@ export function createComments(ctx) {
   const likedCache = new Map(); // "postId/cid" -> bool
 
   async function addComment(p, text, reply, media) {
+    const gate = window.kemyChatGate ? window.kemyChatGate(text || '', 'comment', '') : { ok: true, text: text || '' };
+    if (!gate.ok) return null;
+    text = gate.text || '';
     const ref = doc(collection(db, 'posts', p.id, 'comments'));
     const b = writeBatch(db);
     const base = { authorId: S.user.uid, authorName: S.profile.displayName, authorUsername: S.profile.username, authorColor: S.profile.color, text: text.slice(0, 500), createdAt: serverTimestamp(), likeCount: 0 };

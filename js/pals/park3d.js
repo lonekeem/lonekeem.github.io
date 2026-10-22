@@ -12,7 +12,7 @@ import { getCountFromServer, doc, getDocs, setDoc, deleteDoc, collection, query,
 import { THREE, makePal3D, posePal3D, gfxLevel } from './pal3d.js';
 import { WALK_V } from './motion3d.js';
 import { getActivePal } from './core.js';
-import { clean, checkInput } from './talk.js';
+import { clean } from './talk.js';
 import { treasures, EMOTES, PHRASES, PORTALS } from './park.js';
 import { createControls } from '../controls.js';
 import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
@@ -559,12 +559,17 @@ export function createPark3D(ctx) {
       else if (!b.hidden) b.hidden = true;
     }
     // chat log
-    const log = $('#p3-log'); function logMsg(name, text, color) { const d = document.createElement('div'); d.className = 'p3-msg'; const b = document.createElement('b'); b.textContent = (name || 'Someone') + ': '; b.style.color = color || '#d9c2ff'; d.append(b, document.createTextNode(text)); log.appendChild(d); while (log.children.length > 30) log.firstChild.remove(); log.scrollTop = log.scrollHeight; log.classList.add('fresh'); clearTimeout(log._t); log._t = setTimeout(() => log.classList.remove('fresh'), 8000); }
+    const log = $('#p3-log'); function logMsg(name, text, color) { const d = document.createElement('div'); d.className = 'p3-msg'; const b = document.createElement('b'); b.textContent = (name || 'Someone') + ': '; b.style.color = color || '#d9c2ff'; d.append(b, document.createTextNode(text)); log.appendChild(d); while (log.children.length > 30) log.firstChild.remove(); log.scrollTop = log.scrollHeight; log.classList.add('fresh'); clearTimeout(log._t); log._t = setTimeout(() => log.classList.remove('fresh'), 8000); if (window.kemyModLine) window.kemyModLine((name || 'Someone') + ': ' + text); }
     log.addEventListener('click', () => log.classList.toggle('open'));
     // chat input
     let lastSay = 0, burst = [];
-    function say(t) { const now = Date.now(); burst = burst.filter((x) => now - x < 30000); if (now - lastSay < 2500 || burst.length >= 6) { toast('Slow down a bit 💜'); return false; } if (!spamOk('park', t)) return false; lastSay = now; burst.push(now); P.say = clean(t).slice(0, 60); P.sayAt = now; dirty = true; send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color); return true; }
-    $('#p3-chat').onsubmit = (e) => { e.preventDefault(); const inp = $('#p3-t'); const v = inp.value.trim(); if (!v) { inp.blur(); return; } if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } if (say(v)) { inp.value = ''; inp.blur(); } };
+    function say(t) {
+      const gate = window.kemyChatGate ? window.kemyChatGate(t, 'park', '') : { ok: true, text: t };
+      if (!gate.ok) return false;
+      t = gate.text;
+      const now = Date.now(); burst = burst.filter((x) => now - x < 30000); if (now - lastSay < 2500 || burst.length >= 6) { toast('Slow down a bit 💜'); return false; } if (!spamOk('park', t)) return false; lastSay = now; burst.push(now); P.say = clean(t).slice(0, 60); P.sayAt = now; dirty = true; send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color); return true;
+    }
+    $('#p3-chat').onsubmit = (e) => { e.preventDefault(); const inp = $('#p3-t'); const v = inp.value.trim(); if (!v) { inp.blur(); return; } if (say(v)) { inp.value = ''; inp.blur(); } };
     const panel = $('#park-panel'); const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };
     // quick chat: tabbed tap-to-say phrases (greetings, teamwork, GG, compliments, park, emoji); the text bar stays too
     $('#p3-quick').onclick = () => { if (!toggle('c')) return; renderQuickChat(panel, (x) => { if (say(x)) panel.hidden = true; }); };
@@ -581,7 +586,7 @@ export function createPark3D(ctx) {
         <div class="btns"><a class="btn btn-sm" href="#/u/${esc(o.uname)}" data-close>View profile</a><button class="btn btn-sm btn-ghost" id="pc-pet">🐾 Pet their Pal</button><button class="btn btn-sm btn-ghost" id="pc-mute">${isM ? '🔈 Unmute' : '🔇 Mute chat'}</button><button class="btn btn-sm btn-ghost" id="pc-rep">Report</button><button class="btn btn-sm btn-ghost" id="pc-block">Block</button></div></div>`);
       document.getElementById('pc-pet').onclick = () => { closeModal(); emote('🐾', o.uid); toast(`You petted ${(o.pal && o.pal.name) || 'their Pal'}! 💜`); };
       document.getElementById('pc-mute').onclick = () => { if (isM) muted.delete(o.uid); else muted.add(o.uid); lss(MK, JSON.stringify([...muted])); closeModal(); toast(isM ? `Unmuted @${o.uname}` : `Muted @${o.uname}. You won’t see their chat.`); };
-      document.getElementById('pc-rep').onclick = () => { closeModal(); report(o); };
+      document.getElementById('pc-rep').onclick = () => { closeModal(); if (window.kemyModReport) window.kemyModReport({ targetType: 'user', targetId: o.uid, targetUid: o.uid, name: '@' + (o.uname || 'player') }); else report(o); };
       document.getElementById('pc-block').onclick = async () => { if (!confirm(`Block @${o.uname}? You won’t see them in Pal Park.`)) return; try { await setDoc(doc(db, 'users', S.user.uid, 'blocks', o.uid), { createdAt: serverTimestamp() }); blocked.add(o.uid); drop(o.uid); closeModal(); toast(`Blocked @${o.uname}`); } catch (er) { toast(friendlyError(er)); } }; }
     function report(o) {
       openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="park-card" id="pr-f"><h2>Report @${esc(o.uname)}</h2><select id="pr-r"><option>Mean or rude chat</option><option>Inappropriate name or Pal</option><option>Spam</option><option>Something else</option></select><textarea id="pr-t" maxlength="300" placeholder="What happened? (optional)"></textarea><button class="btn">Send report</button></form>`);

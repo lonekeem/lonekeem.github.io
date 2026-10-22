@@ -88,3 +88,5 @@ exports.countMemberCreated = membersApi.countMemberCreated;
 exports.recountMembers = memberStats.recountMembers;
 // Once-a-day admin digest of open Kemy Helper notes. Counts only.
 exports.pushHelperDigest = require('./helper-digest').pushHelperDigest;
+// Chat moderation: mask or remove, warn, then a 10-minute mute. Never a ban.
+Object.assign(exports, require('./moderate'));

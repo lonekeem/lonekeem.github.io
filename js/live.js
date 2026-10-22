@@ -189,7 +189,7 @@ export function createLive(ctx) {
   function watchChat(id, root, onStars) {
     let first = true;
     const list = root.querySelector('.lv-chat');
-    list.addEventListener('click', (e) => { const b = e.target.closest('[data-rep]'); if (!b) return; const t = b.closest('.lv-msg').querySelector('.lv-t')?.textContent || ''; ctx.reportDialog('live chat', `${id}/${b.dataset.rep}`, id, t); });
+    list.addEventListener('click', (e) => { const b = e.target.closest('[data-rep]'); if (!b) return; const t = b.closest('.lv-msg').querySelector('.lv-t')?.textContent || ''; if (window.kemyModLine) window.kemyModLine(t); if (window.kemyModReport) window.kemyModReport({ targetType: 'live chat', targetId: `${id}/${b.dataset.rep}`, postId: id, name: 'live chat' }); else ctx.reportDialog('live chat', `${id}/${b.dataset.rep}`, id, t); });
     return onSnapshot(query(collection(db, 'lives', id, 'chat'), orderBy('createdAt'), limitToLast(30)), (qs) => {
       qs.docChanges().forEach((ch) => {
         if (ch.type !== 'added') return;
@@ -208,6 +208,9 @@ export function createLive(ctx) {
     }, () => {});
   }
   async function sendChat(id, text) {
+    const gate = window.kemyChatGate ? window.kemyChatGate(text, 'live', '') : { ok: true, text };
+    if (!gate.ok) return;
+    text = gate.text;
     const p = S.profile;
     const b = writeBatch(db);
     b.set(doc(collection(db, 'lives', id, 'chat')), { authorId: me(), name: p.displayName, username: p.username, color: p.color, type: 'msg', text, count: 0, createdAt: serverTimestamp() });

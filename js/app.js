@@ -47,6 +47,7 @@ import { loadDiscover } from './discover.js';
 import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, setMode as setThemeMode, THEME_TITLE } from './theme.js';
 import { page as pageSettingsHub } from './settings-hub.js';
 import { startHelper } from './helper/watch.js';
+import { startMod } from './helper/mod.js';
 // Heavy feature modules load on demand (their route, or idle time after the feed): calls are queued until the
 // module arrives, so the feed never downloads games, Pals, live streaming or three.js. Written by Lone Keem
 function lazyMod(load) {
@@ -127,6 +128,7 @@ function toast(msg) {
   toast.t = setTimeout(() => (root.innerHTML = ''), 3200);
 }
 startHelper({ toast });
+startMod();
 let busyAt = 0; window.kemyBusy = () => { if (Date.now() - busyAt > 60e3) { busyAt = Date.now(); toast(BUSY_MSG + ' (showing saved posts)'); } };
 function friendlyError(e) {
   const c = e && (e.code || '');
@@ -213,6 +215,11 @@ const chatIdFor = (a, b) => [a, b].sort().join('_');
 async function sendMessage(otherUid, text, me = S.user.uid, snapData = null) {
   if (me !== STUDIO_UID && !(await safety.gate())) throw Object.assign(new Error('Messages are switched off for your account.'), { code: 'kemy/safety' });
   if (me !== STUDIO_UID && !snapData && !spamOk('dm', text, { to: otherUid })) throw Object.assign(new Error('Slow down a bit 💜'), { code: 'kemy/spam' });
+  if (me !== STUDIO_UID && !snapData) {
+    const gate = window.kemyChatGate ? window.kemyChatGate(text, 'dm', otherUid) : { ok: true, text };
+    if (!gate.ok) throw Object.assign(new Error("Kemy Helper: let's keep it kind!"), { code: 'kemy/kind' });
+    text = gate.text;
+  }
   if (me !== STUDIO_UID) safety.scanAge(text, 'chat message', chatIdFor(me, otherUid));
   const cid = chatIdFor(me, otherUid);
   const chatRef = doc(db, 'chats', cid);
@@ -301,7 +308,7 @@ const comments = createComments({
   reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x)
 });
 // Kind-words filter on every text box; tricks / repeated tries => 1-hour timeout + Mod Hub item.
-initKindGuard({ onBypass: ({ text, word, sneaky }) => safety.autoPause({ text, word, reason: sneaky ? 'Tried to sneak a mean word past the kind-words filter' : 'Kept trying to send mean words' }) });
+initKindGuard({ onBlock: ({ text }) => { if (window.kemyModWarn) window.kemyModWarn(); if (window.kemyModFlag) window.kemyModFlag(text || '', 'park', ''); } });
 // Auto-translate removed; clear its leftovers.
 try { ['kemy-translate', 'kemy-tx-cache', 'kemy-tx-quota'].forEach((k) => localStorage.removeItem(k)); } catch { /* */ }
 // Moderators, reports inbox, suspensions (js/moderation.js).
@@ -692,7 +699,7 @@ const routes = [
 ];
 function gated(fn) { return async (...a) => { if (!requireAuth()) return; if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; } return fn(...a); }; }
 safety.initSafety({ S, db, esc, openModal, closeModal, toast, isAdmin: () => isAdmin(), friendlyError });
-initSpam({ S, toast, isAdmin: () => isAdmin(), autoPause: (o) => safety.autoPause({ ...o, note: 'Slow down a bit 💜 Lots of repeats, so your account is paused for 1 hour.' }) });
+initSpam({ S, toast, isAdmin: () => isAdmin(), autoPause: (o) => { if (window.kemyModWarn) window.kemyModWarn(); if (window.kemyModFlag) window.kemyModFlag(o.text || 'spam', 'park', ''); } });
 initMediaScan({ S, db, isAdmin: () => isAdmin() });
 // 3+ reports from different people: hidden from everyone except moderators and the author until a
 // moderator keeps it (reportOk) or removes it.
@@ -1279,6 +1286,12 @@ async function pageSettings() {
     if (website === null) { err.textContent = 'Website must be a valid https:// link (up to 100 characters).'; return; }
     const color = $('input[name=color]:checked')?.value || p.color;
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
+    if (window.kemyNameBad && (window.kemyNameBad(displayName) || window.kemyNameBad(username) || window.kemyNameBad(bio))) {
+      if (window.kemyModWarn) window.kemyModWarn();
+      if (window.kemyModFlag) window.kemyModFlag(displayName, 'name', '');
+      err.textContent = "Kemy Helper: let's keep it kind! Try a different name.";
+      return;
+    }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
     try {
       const b = writeBatch(db);
@@ -1440,6 +1453,7 @@ async function pageAdmin(token) {
   main.innerHTML = `<h1 class="page-title">🛡️ Admin</h1>
     <p class="muted small">Signed in as ${esc(S.user.email)}. Only you can see this page.</p>
     <div id="kh-admin"></div>
+    <div id="mod-admin"></div>
     <a class="card pad adm-tool nm-card" href="#/members" id="nm-open">
       <span class="nm-card-row"><span><b id="nm-card-title">Members</b><span class="muted small">Everyone who joined, newest first.</span></span><span class="nm-badge" id="nm-badge" hidden>0</span></span>
     </a>
@@ -1467,6 +1481,7 @@ async function pageAdmin(token) {
   donate.mountAdmin($('#adm-donate'));
   import('./push.js').then((m) => { const h = document.getElementById('push-admin-host'); if (h) h.innerHTML = m.adminHtml(); m.wireAdmin(toast); }).catch(() => {});
   import('./helper/admin.js').then((m) => { if (!stale(token)) m.mountHelperAdmin(document.getElementById('kh-admin'), { stale, token, toast }); }).catch(() => {});
+  import('./helper/mod-admin.js').then((m) => { if (!stale(token)) m.mountModAdmin(document.getElementById('mod-admin'), { toast }); }).catch(() => {});
   import('./members.js').then((m) => {
     if (stale(token)) return;
     const unsub = m.watchAdminBadge(document.getElementById('nm-badge'));
@@ -1615,6 +1630,12 @@ async function pageSignup() {
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
+    if (window.kemyNameBad && (window.kemyNameBad(displayName) || window.kemyNameBad(username))) {
+      if (window.kemyModWarn) window.kemyModWarn();
+      if (window.kemyModFlag) window.kemyModFlag(displayName, 'name', '');
+      err.textContent = "Kemy Helper: let's keep it kind! Try a different name.";
+      return;
+    }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
     const bd = safety.readBirthday('sbd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; }
     pendingBirthday = bd;
@@ -1641,6 +1662,12 @@ async function pageOnboard() {
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
+    if (window.kemyNameBad && (window.kemyNameBad(displayName) || window.kemyNameBad(username))) {
+      if (window.kemyModWarn) window.kemyModWarn();
+      if (window.kemyModFlag) window.kemyModFlag(displayName, 'name', '');
+      err.textContent = "Kemy Helper: let's keep it kind! Try a different name.";
+      return;
+    }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
     if (!pendingBirthday) { const bd = safety.readBirthday('obd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; } pendingBirthday = bd; }
     try { await createProfile(displayName, username); go(pendingNext || '#/feed'); pendingNext = null; }

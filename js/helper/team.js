@@ -4,7 +4,7 @@
 export const TEAM_KEY = 'kemy-helper-team';
 
 const PARK = [
-  [0, 6], [22, 6], [22, -24], [-20, -24], [-20, 18], [0, 34],
+  [0, 6], [22, 6], [30, 31], [22, 6], [22, -24], [-20, -24], [-20, 18], [0, 34],
   [0, 88], [-46, 100], [46, 100], [46, 142], [-46, 142], [0, 108], [0, 62]
 ];
 // Starts beside the leader, then follows the sidewalk out across Open Plains.
@@ -28,12 +28,12 @@ const COUNTRY_DRIVE = [
 ];
 
 export const ROSTER = [
-  { id: 'lead', role: 'walk', name: 'Kemy Helper', lead: true, speed: 1.35, side: 0, path: PARK, dist: 0, job: 'Walking Pal Park and Kemy Street, looking for stuck spots' },
-  { id: 'street', role: 'drive', name: 'Helper', speed: 6.2, side: 1.5, path: STREET_DRIVE, dist: 70, job: 'Driving Kemy Street, checking the car stays on the road' },
-  { id: 'play', role: 'sit', name: 'Helper', speed: 0, side: 0, x: 30, z: 31, yaw: Math.PI, job: 'Playing a quick game to see that it finishes' },
-  { id: 'plains', role: 'walk', name: 'Helper', speed: 1.35, side: 0, path: PLAINS, dist: 0, job: 'Walking Open Plains, looking for holes and floating bits' },
-  { id: 'towns', role: 'walk', name: 'Helper', speed: 1.4, side: 0, path: TOWNS, dist: 30, job: 'Walking the towns, looking for stuck spots' },
-  { id: 'country', role: 'drive', name: 'Helper', speed: 7, side: -1.5, path: COUNTRY_DRIVE, dist: 40, job: 'Driving the country roads, checking the car stays on the road' }
+  { id: 'lead', role: 'walk', name: 'Kemy Helper', lead: true, speed: 1.35, side: 0, path: PARK, dist: 0, job: 'Keeping chat kind in Pal Park and on Kemy Street. Also watching for stuck spots.' },
+  { id: 'street', role: 'drive', name: 'Helper', speed: 6.2, side: 1.5, path: STREET_DRIVE, dist: 70, job: 'Patrolling Kemy Street so chat stays kind, and checking the car stays on the road.' },
+  { id: 'play', role: 'sit', name: 'Helper', speed: 0, side: 0, x: 30, z: 31, yaw: Math.PI, job: 'Watching the game tables so play stays fair, and checking that a quick game finishes.' },
+  { id: 'plains', role: 'walk', name: 'Helper', speed: 1.35, side: 0, path: PLAINS, dist: 0, job: 'Patrolling Open Plains, keeping chat kind and watching for holes.' },
+  { id: 'towns', role: 'walk', name: 'Helper', speed: 1.4, side: 0, path: TOWNS, dist: 30, job: 'Patrolling the towns, staying near players and checking stuck spots.' },
+  { id: 'country', role: 'drive', name: 'Helper', speed: 7, side: -1.5, path: COUNTRY_DRIVE, dist: 40, job: 'Patrolling the country roads so chat stays kind, and checking the car stays on the road.' }
 ];
 
 export function teamShown() {

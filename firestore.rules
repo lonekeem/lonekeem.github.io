@@ -24,6 +24,11 @@ service cloud.firestore {
     function isStr(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
     // Modded-keyboard tricks: zero-width / bidi / invisible fillers, or zalgo (3+ stacked combining marks). ZWJ (U+200D) stays for emoji.
     function cleanStr(v, min, max) { return isStr(v, min, max) && !v.matches('(?s).*([\\x{200B}\\x{200C}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{FEFF}\\x{3164}\\x{115F}\\x{1160}\\x{FFA0}\\x{00AD}]|[\\x{0300}-\\x{036F}]{3,}).*'); }
+    // Kid-safe chat and names. The Cloud Function does the full check (leet, repeats, strikes).
+    // This stops a raw message or name from being stored in the first place.
+    function kidSafe(t) {
+      return t is string && !t.lower().matches('(?s).*(\\bfuck|\\bshit|\\bbitch|\\basshole|\\bcunt|\\bslut|\\bwhore|\\bnigg|\\bfagg|\\bretard|\\bporn|\\bpenis|\\bvagina|\\bsex\\b|https?://|www\\.|[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}|[0-9]{3}[-. ]?[0-9]{3}[-. ]?[0-9]{4}|discord\\.gg|snapchat|instagram|whatsapp).*');
+    }
     function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     // "Sign out everywhere" (js/devices.js): sessions that signed in before users/{uid}.sessionsValidAfter are refused
@@ -101,8 +106,11 @@ service cloud.firestore {
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
         && cleanStr(d.displayName, 1, 50)
+        && kidSafe(d.displayName)
         && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+        && kidSafe(d.username)
         && cleanStr(d.bio, 0, 160)
+        && kidSafe(d.bio)
         && (!('pronouns' in d) || isStr(d.pronouns, 0, 20))
         && (!('website' in d) || d.website == ''
             || (isStr(d.website, 12, 100) && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
@@ -219,7 +227,9 @@ service cloud.firestore {
       function memberShape(d) {
         return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive'])
           && cleanStr(d.displayName, 1, 50)
+          && kidSafe(d.displayName)
           && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+          && kidSafe(d.username)
           && isStr(d.displayNameLower, 0, 100)
           && isStr(d.color, 1, 20)
           && (d.photoURL == '' || cloudinaryImageUrl(d.photoURL))
@@ -777,6 +787,7 @@ service cloud.firestore {
           && request.resource.data.authorUsername == me_().username
           && isStr(request.resource.data.authorColor, 1, 20)
           && validBody(request.resource.data)
+          && kidSafe(request.resource.data.text)
           && (isAdmin() || linksOk(request.resource.data.text, me_()))
           && request.resource.data.createdAt == request.time
           && request.resource.data.get('likeCount', 0) == 0
@@ -984,14 +995,14 @@ service cloud.firestore {
       // Live chat + stars, tied to the signed-in author, max ~1 per second (lastMessageAt).
       match /chat/{c} {
         allow read: if true;
-        allow create: if signedIn() && liveOn() && !blockedBy(live().hostId)
+        allow create: if signedIn() && liveOn() && notBanned() && !blockedBy(live().hostId)
           && live().get('chatOn', true) == true
           && request.resource.data.keys().hasOnly(['authorId', 'name', 'username', 'color', 'type', 'text', 'count', 'createdAt'])
           && request.resource.data.authorId == me()
           && request.resource.data.name == get(userPath(me())).data.displayName
           && request.resource.data.username == get(userPath(me())).data.username
           && isStr(request.resource.data.color, 1, 20)
-          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && !tooManyLinks(request.resource.data.text) && request.resource.data.count == 0)
+          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && kidSafe(request.resource.data.text) && !tooManyLinks(request.resource.data.text) && request.resource.data.count == 0)
               || (request.resource.data.type == 'star' && request.resource.data.text == ''
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
@@ -1049,6 +1060,7 @@ service cloud.firestore {
             || (exists(/databases/$(database)/documents/follows/$(request.resource.data.lastSender + '_' + otherOf(request.resource.data.lastSender)))
                 && exists(/databases/$(database)/documents/follows/$(otherOf(request.resource.data.lastSender) + '_' + request.resource.data.lastSender))))
         && isStr(request.resource.data.lastMessage, 0, 1000)
+        && kidSafe(request.resource.data.lastMessage)
         // Anti-spam: starting new conversations is limited (lastNewChatAt, one per 8 s).
         && ('studio' in request.resource.data.participants || isMod()
             || getAfter(userPath(request.resource.data.lastSender)).data.get('lastNewChatAt', null) == request.time)
@@ -1057,6 +1069,7 @@ service cloud.firestore {
       allow update: if inChat()
         && changed().hasOnly(['lastMessage', 'lastAt', 'lastSender'])
         && isStr(request.resource.data.lastMessage, 0, 1000)
+        && kidSafe(request.resource.data.lastMessage)
         && request.resource.data.lastSender in parts()
         && actingAs(request.resource.data.lastSender)
         && request.resource.data.lastAt == request.time
@@ -1072,6 +1085,7 @@ service cloud.firestore {
           && request.resource.data.senderId in parts()
           && actingAs(request.resource.data.senderId)
           && cleanStr(request.resource.data.text, 1, 1000)
+          && kidSafe(request.resource.data.text)
           && ('studio' in parts() || linksOk(request.resource.data.text, get(userPath(request.resource.data.senderId)).data))
           && request.resource.data.createdAt == request.time
           && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
@@ -1326,7 +1340,7 @@ service cloud.firestore {
       // Quick-chat emotes from players and signed-in spectators (preset ids only).
       match /chat/{cid} {
         allow read: if true;
-        allow create: if signedIn() && !pcOff(get(userPath(me())).data, 'chat') && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
+        allow create: if signedIn() && notBanned() && !pcOff(get(userPath(me())).data, 'chat') && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
           && request.resource.data.uid == me() && request.resource.data.e is int
           && ((request.resource.data.e >= 0 && request.resource.data.e <= 9) || (request.resource.data.e >= 100 && request.resource.data.e <= 199)) && request.resource.data.at == request.time; // 100+: Pal emote (game-emotes.js)
         allow delete: if isAdmin();
@@ -1609,6 +1623,37 @@ service cloud.firestore {
         && request.resource.data.status == 'fixed'
         && request.resource.data.fixedAt == request.time;
       allow delete: if false;
+    }
+
+    // Chat strikes written by the moderation function. The player can read their own.
+    // Keem can warn from the admin page. Nobody else writes this.
+    match /helperStrikes/{uid} {
+      allow read: if signedIn() && (uid == me() || isAdmin());
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['n', 'warn', 'warnAt', 'ban'])
+        && request.resource.data.n == 0
+        && request.resource.data.warn == true
+        && request.resource.data.warnAt == request.time
+        && request.resource.data.ban == false;
+      allow update: if isAdmin()
+        && changed().hasOnly(['warn', 'warnAt'])
+        && request.resource.data.warn == true
+        && request.resource.data.warnAt == request.time;
+      allow delete: if false;
+    }
+    // A short note the helper sends to the moderation function (park chat, a bad
+    // name attempt, or someone blocking a spawn). Not a public chat log.
+    match /worldChat/{id} {
+      allow read: if signedIn() && (isAdmin() || resource.data.uid == me());
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.keys().hasOnly(['uid', 'text', 'area', 'target', 'at', 'still'])
+        && request.resource.data.uid == me()
+        && isStr(request.resource.data.text, 0, 200)
+        && request.resource.data.area in ['park', 'street', 'plains', 'towns', 'dm', 'live', 'comment', 'game', 'name', 'grief']
+        && isStr(request.resource.data.get('target', ''), 0, 128)
+        && request.resource.data.at == request.time
+        && (!('still' in request.resource.data) || (request.resource.data.still is int && request.resource.data.still >= 0 && request.resource.data.still <= 600000));
+      allow update, delete: if false;
     }
 
     // ∞ Pass (unlimited Star Coins + Diamonds): public (profile badge), written ONLY by the admin.
@@ -2327,7 +2372,7 @@ service cloud.firestore {
         // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
         && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= -21000 && pp().x <= 10000 && pp().y is int && pp().y >= 0 && pp().y <= 60000
-        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && isStr(pp().tgt, 0, 128)
+        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && kidSafe(pp().say) && isStr(pp().tgt, 0, 128)
         && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
         && pp().uname == get(/databases/$(database)/documents/users/$(uid)).data.username
         // Parental Controls: chat off means no new 'say' text (same profile doc as above, no extra lookup)
