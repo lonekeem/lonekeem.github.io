@@ -3,7 +3,7 @@
 // ends, scores by speed (500 for right + up to 500 for fast) and advances rounds.
 import { shuffle } from './cards.js';
 import { isBot, tsMs } from './net.js';
-import { normLevel, botPlayer, seatName, triviaRoll, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, lastLevel, onlyBots } from './bots.js';
+import { normLevel, botPlayer, seatName, triviaRoll, fillToggleHtml, wireFill, fillBots, whenOffer, stopOffer, offerHtml, lastLevel, onlyBots } from './bots.js';
 import { syncPlates } from './plates.js';
 
 const ROUNDS = 10, ROUND_S = 15, REVEAL_MS = 4200;
@@ -181,7 +181,7 @@ export function createTrivia(ctx) {
     const names = (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; };
     ui.wireEmotes(main, gid, names);
     const players = () => g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
-    S.unsubs.push(() => { clearTimeout(hostTimer); clearTimeout(autoStart); botTimers.forEach(clearTimeout); if (stopHb) stopHb(); if (unsubAns) unsubAns(); });
+    S.unsubs.push(() => { clearTimeout(hostTimer); clearTimeout(autoStart); botTimers.forEach(clearTimeout); stopOffer(gid); if (stopHb) stopHb(); if (unsubAns) unsubAns(); });
 
     function lobby() {
       const box = $('#tv-body'); if (!box) return;
@@ -285,7 +285,9 @@ export function createTrivia(ctx) {
     }
     let v = {};
     function render() {
-      $('#g-actions').innerHTML = member() && g.status !== 'done' ? `<a class="btn btn-sm btn-ghost" href="#/games">Leave room</a>` : `<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;
+      const acts = $('#g-actions');
+      if (!acts) return;
+      acts.innerHTML = member() && g.status !== 'done' ? `<a class="btn btn-sm btn-ghost" href="#/games">Leave room</a>` : `<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;
       if (g.status === 'waiting') { lobby(); return; }
       if (g.status === 'done') {
         if (!ended) {

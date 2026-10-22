@@ -5,7 +5,7 @@
 // re-run the shuffle and check their own deal. Computer players fill empty seats.
 import * as C from './cards.js';
 import { isBot, tsMs } from './net.js';
-import { ask, normLevel, botPlayer, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, lastLevel, onlyBots } from './bots.js';
+import { ask, normLevel, botPlayer, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, stopOffer, offerHtml, lastLevel, onlyBots } from './bots.js';
 import { syncPlate, syncPlates } from './plates.js';
 
 const TURN_S = 30;
@@ -227,7 +227,7 @@ export function createStarCards(ctx) {
     frame('Star Cards', '#/games');
     ui.wireEmotes(main, gid, (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; });
     const tick = setInterval(() => { if (g.status === 'active') draw(); }, 1000);
-    S.unsubs.push(() => { clearInterval(tick); if (stopHb) stopHb(); if (unsubHand) unsubHand(); dealer.stop(); });
+    S.unsubs.push(() => { clearInterval(tick); stopOffer(gid); if (stopHb) stopHb(); if (unsubHand) unsubHand(); dealer.stop(); });
 
     // ---------------- dealer (runs only on the host's client)
     const dealer = (() => {
@@ -407,7 +407,9 @@ export function createStarCards(ctx) {
       if (key !== lastTurnKey) lastTurnKey = key;
       const left = Math.max(0, TURN_S - Math.floor((net.serverNow() - (tsMs(g.turnAt) || net.serverNow())) / 1000));
       paint({ seats: seats(), mySeat: seat, pv, hand: seat >= 0 ? hand.hand || [] : [], drawn: hand.drawn, timerLeft: pv.roundWinner < 0 ? left : null, verified, msg: eventMsg(pv.ev, seats()) }, { send, call });
-      $('#g-actions').innerHTML = g.status === 'done' ? `<a class="btn btn-sm btn-ghost" href="#/games">Games</a>` : `<button class="btn btn-sm btn-ghost" id="sc-copy2">Share link</button><a class="btn btn-sm btn-ghost" href="#/games">Leave</a>`;
+      const acts = $('#g-actions');
+      if (!acts) return;
+      acts.innerHTML = g.status === 'done' ? `<a class="btn btn-sm btn-ghost" href="#/games">Games</a>` : `<button class="btn btn-sm btn-ghost" id="sc-copy2">Share link</button><a class="btn btn-sm btn-ghost" href="#/games">Leave</a>`;
       const c2 = $('#sc-copy2'); if (c2) c2.onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
     }
     async function verify() {
