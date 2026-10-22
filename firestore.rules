@@ -117,7 +117,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
-                               'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt',
+                               'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt', 'ageHonestAt',
                                'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter', 'pc'])
         && (!('pc' in d) || validPc(d.pc))
         && validBirth(d)
@@ -136,7 +136,8 @@ service cloud.firestore {
         && isStr(d.color, 1, 20)
         && (!('activePet' in d) || (d.activePet is string && d.activePet.matches('^(p[1-6])?$')))
         && d.welcomed is bool
-        && d.createdAt is timestamp;
+        && d.createdAt is timestamp
+        && (!('ageHonestAt' in d) || d.ageHonestAt is timestamp);
     }
     // Search fields (lowercase copies used for prefix search). Optional for older profiles.
     function validUserSearch(d) {
@@ -362,6 +363,7 @@ service cloud.firestore {
         && validProfile(request.resource.data)
         && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt', 'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter'])
         && request.resource.data.createdAt == request.time
+        && (!('ageHonestAt' in request.resource.data) || request.resource.data.ageHonestAt == request.time)
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if actingAs(uid)
         && (uid != me() || !('sessionsValidAfter' in resource.data) || (request.auth.token.auth_time + 1) * 1000 > resource.data.sessionsValidAfter.toMillis())
@@ -383,6 +385,8 @@ service cloud.firestore {
         && (!('birthY' in resource.data) || (request.resource.data.get('birthY', 0) == resource.data.birthY && request.resource.data.get('birthM', 0) == resource.data.birthM))
         // Rules agreement: set to now, once.
         && (!('rulesAt' in changed()) || (!('rulesAt' in resource.data) && request.resource.data.rulesAt == request.time))
+        // Honest-age note: shown once, then kept.
+        && (!('ageHonestAt' in changed()) || (!('ageHonestAt' in resource.data) && request.resource.data.ageHonestAt == request.time))
         // Profile photo: '' (removed) or an image on our Cloudinary cloud (blocked until the
         // real cloud name is set, same placeholder as media posts). Checked only when it changes.
         && (!('photoURL' in changed()) || request.resource.data.photoURL == ''

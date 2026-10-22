@@ -42,8 +42,48 @@ export function birthdayFields(id = 'bd') {
   return `<fieldset class="field bd-field" style="border:0;padding:0;margin:0 0 12px"><legend style="font-weight:500;font-size:.92rem;margin-bottom:6px">Your birthday <span class="muted small">(month and year)</span></legend>
     <div class="row" style="gap:8px"><label class="sr-only" for="${id}-m">Month</label><select id="${id}-m" required class="bd-sel"><option value="">Month</option>${MONTHS.map((n, i) => `<option value="${i + 1}">${n}</option>`).join('')}</select>
     <label class="sr-only" for="${id}-y">Year</label><select id="${id}-y" required class="bd-sel"><option value="">Year</option>${Array.from({ length: 100 }, (_, i) => y - i).map((v) => `<option value="${v}">${v}</option>`).join('')}</select></div>
+    <p class="bd-honest">Please enter your real birthday. It keeps Kemy safe and fun.</p>
     <p class="small muted" style="margin:4px 0 0">We only keep the month and year. Once saved it can't be changed (a moderator can fix mistakes).</p></fieldset>`;
 }
+// Shown once before a player can continue past the birthday step. Saved on the account when we can.
+let ageHonestAck = false, ageHonestWait = null;
+const ageHonestHtml = () => `<div class="age-honest"><p class="age-honest-mark" aria-hidden="true">🎂</p>
+  <h2 id="age-honest-title">Be honest about your age</h2>
+  <p>Please enter your real birthday. It keeps Kemy safe and fun for everyone. Accounts with a fake age may be limited or banned.</p>
+  <button class="btn btn-block" type="button" id="age-honest-ok">I understand</button></div>`;
+export function askAgeHonest() {
+  const S = C && C.S;
+  if (S && S.profile && S.profile.ageHonestAt) return Promise.resolve(true);
+  if (ageHonestAck) return Promise.resolve(true);
+  if (ageHonestWait) return ageHonestWait;
+  ageHonestWait = new Promise((res) => {
+    C.openModal(ageHonestHtml(), { dismissable: false });
+    const root = document.getElementById('modal-root');
+    const box = root && root.querySelector('.modal');
+    if (box) box.setAttribute('aria-labelledby', 'age-honest-title');
+    document.getElementById('age-honest-ok').onclick = async () => {
+      ageHonestAck = true;
+      const btn = document.getElementById('age-honest-ok');
+      if (btn) btn.disabled = true;
+      try {
+        if (S && S.user && S.profile && !S.profile.ageHonestAt) {
+          await updateDoc(doc(C.db, 'users', S.user.uid), { ageHonestAt: serverTimestamp() });
+          S.profile.ageHonestAt = new Date();
+        }
+      } catch { /* signup writes the same stamp with the new profile */ }
+      ageHonestWait = null;
+      C.closeModal();
+      res(true);
+    };
+  });
+  return ageHonestWait;
+}
+export function ageHonestPatch() {
+  const S = C && C.S;
+  if (!ageHonestAck || (S && S.profile && S.profile.ageHonestAt)) return {};
+  return { ageHonestAt: serverTimestamp() };
+}
+export function ageHonestSaved() { ageHonestAck = false; }
 export function readBirthday(id = 'bd') {
   const m = Number(document.getElementById(id + '-m')?.value), y = Number(document.getElementById(id + '-y')?.value);
   return m >= 1 && m <= 12 && y > 1900 ? { birthY: y, birthM: m } : null;
@@ -100,6 +140,7 @@ export async function gate() {
   if (C.isAdmin()) return true;
   if (await underageFlag(S.user.uid)) { showBlocked(true); return false; }
   if (!Number.isInteger(S.profile.birthY)) {
+    if (!(await askAgeHonest())) return false;
     const ok = await new Promise((res) => {
       C.openModal(`<h2 style="font-size:1.25rem">Quick safety check 🎂</h2><p>Before you post, tell us your birthday. This keeps Kemy safe for kids and teens.</p>
         <form id="bd-form" style="text-align:left">${birthdayFields('gbd')}<p class="form-error" id="bd-err"></p>
@@ -107,7 +148,7 @@ export async function gate() {
       const f = document.getElementById('bd-form');
       f.querySelector('[data-close]').addEventListener('click', () => res(false));
       f.onsubmit = async (ev) => { ev.preventDefault(); const bd = readBirthday('gbd'); if (!bd) { document.getElementById('bd-err').textContent = 'Pick a month and a year.'; return; }
-        try { await updateDoc(doc(C.db, 'users', S.user.uid), bd); Object.assign(S.profile, bd); C.closeModal(); res(true); }
+        try { await updateDoc(doc(C.db, 'users', S.user.uid), { ...bd, ...ageHonestPatch() }); Object.assign(S.profile, bd); ageHonestSaved(); C.closeModal(); res(true); }
         catch (e) { document.getElementById('bd-err').textContent = C.friendlyError(e); } };
     });
     if (!ok) return false;

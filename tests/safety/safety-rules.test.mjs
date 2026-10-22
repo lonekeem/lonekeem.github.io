@@ -82,4 +82,9 @@ await ok('bio with an email is refused', assertFails((async () => { const d = (a
 await ok('plain bio is allowed', assertSucceeds((async () => { const d = (await getDoc(doc(db('teen'), 'users/teen'))).data(); return setDoc(doc(db('teen'), 'users/teen'), { ...d, bio: 'I like racing' }); })()));
 await ok('admin can mark and undo', assertSucceeds(setDoc(doc(ADMIN, 'underage/kid'), { by: 'admin', reason: '', at: serverTimestamp() }).then(() => deleteDoc(doc(ADMIN, 'underage/kid')))));
 await ok('signup with birthday', assertSucceeds((() => { const f = db('newbie'); const b = writeBatch(f); b.set(doc(f, 'usernames/newbie'), { uid: 'newbie' }); b.set(doc(f, 'users/newbie'), { ...prof('newbie', { birthY: Y - 14, birthM: 2 }), createdAt: serverTimestamp() }); return b.commit(); })()));
+const sign = (id, extra) => { const f = db(id); const b = writeBatch(f); b.set(doc(f, 'usernames', id), { uid: id }); b.set(doc(f, 'users', id), { ...prof(id, { birthY: Y - 14, birthM: 2 }), createdAt: serverTimestamp(), ...extra }); return b.commit(); };
+await ok('signup records the honest-age note', assertSucceeds(sign('honest', { ageHonestAt: serverTimestamp() })));
+await ok('honest-age note must be the current time', assertFails(sign('fakeage', { ageHonestAt: Timestamp.fromMillis(0) })));
+await ok('honest-age note is saved once', assertSucceeds(updateDoc(doc(db('norules'), 'users/norules'), { ageHonestAt: serverTimestamp() })));
+await ok('honest-age note cannot be changed', assertFails(updateDoc(doc(db('norules'), 'users/norules'), { ageHonestAt: serverTimestamp() })));
 console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

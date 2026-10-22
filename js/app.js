@@ -540,7 +540,7 @@ async function unblockUser(uid, username) {
 // ---------------------------------------------------------------- modal
 function openModal(inner, { dismissable = true } = {}) {
   const root = document.getElementById('modal-root');
-  root.innerHTML = `<div class="modal-backdrop" role="dialog" aria-modal="true"><div class="card modal">${inner}</div></div>`;
+  root.innerHTML = `<div class="modal-backdrop" role="dialog" aria-modal="true"${dismissable ? '' : ' data-lock="1"'}><div class="card modal">${inner}</div></div>`;
   const bd = $('.modal-backdrop', root);
   if (dismissable) bd.addEventListener('click', (e) => { if (e.target === bd || e.target.closest('[data-close]')) closeModal(); });
   setTimeout(() => $('.modal input, .modal textarea, .modal .btn', root)?.focus(), 30);
@@ -552,7 +552,7 @@ const accountDeleter = createAccountDeleter({
   // Stop live listeners first so they don't error while data disappears.
   beforeDelete: () => { S.unsubs.forEach((u) => u()); S.unsubs = []; S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !document.querySelector('#modal-root [data-lock]')) closeModal(); });
 
 // The welcome "Watch now" button always points at the studio's newest video post.
 async function newestStudioVideo() {
@@ -1532,7 +1532,8 @@ async function pageSignup() {
     </form>
     ${googleBlock}
     <p class="center small muted" style="margin-top:18px">Already have an account? <a href="#/login">Log in</a></p>`);
-  $('#google').onclick = () => {
+  $('#google').onclick = async () => {
+    if (!(await safety.askAgeHonest())) return;
     if (!$('#p-agree').checked) { $('#p-err').textContent = 'Please agree to the Terms and Community Rules first.'; return; }
     const bd = safety.readBirthday('sbd'); if (!bd) { $('#p-err').textContent = 'Please pick your birthday month and year.'; return; }
     pendingBirthday = bd;
@@ -1540,6 +1541,7 @@ async function pageSignup() {
   };
   $('#signup-form').onsubmit = async (ev) => {
     ev.preventDefault();
+    if (!(await safety.askAgeHonest())) return;
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
@@ -1561,6 +1563,7 @@ async function pageSignup() {
       sendEmailVerification(cred.user).catch(() => {});
     } catch (e) { pendingProfile = null; err.textContent = friendlyError(e); btn.disabled = false; btn.textContent = 'Create account'; }
   };
+  safety.askAgeHonest();
 }
 async function pageOnboard() {
   if (!S.user) { location.replace('#/signup'); return; }
@@ -1570,8 +1573,10 @@ async function pageOnboard() {
     <button class="btn btn-block" type="submit">Continue</button></form>
     <p class="center small muted" style="margin-top:14px"><button class="link-btn" id="ob-out">Use a different account</button></p>`);
   $('#ob-out').onclick = () => signOut(auth);
+  if (!pendingBirthday) safety.askAgeHonest();
   $('#onboard-form').onsubmit = async (ev) => {
     ev.preventDefault();
+    if (!pendingBirthday && !(await safety.askAgeHonest())) return;
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
     if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
@@ -1613,6 +1618,7 @@ async function createProfile(displayName, username) {
     displayName: name, username, bio: '', color,
     ...userSearchFields({ displayName: name, username }),
     ...(pendingBirthday ? { birthY: pendingBirthday.birthY, birthM: pendingBirthday.birthM } : {}),
+    ...safety.ageHonestPatch(),
     createdAt: serverTimestamp(), welcomed: false
   });
   b.set(doc(db, 'members', uid), {
@@ -1623,6 +1629,7 @@ async function createProfile(displayName, username) {
   pendingBirthday = null;
   b.set(doc(db, 'follows', `${uid}_${STUDIO_UID}`), { follower: uid, followee: STUDIO_UID, createdAt: serverTimestamp() });
   await b.commit();
+  safety.ageHonestSaved();
   try { const t = JSON.parse(sessionStorage.getItem('kemy-topics') || '[]'); if (t.length) { pickTopics(t); } sessionStorage.removeItem('kemy-topics'); } catch { /* */ }
   await loadSession();
 }
