@@ -1,6 +1,7 @@
-// Original Kemy notification chime, synthesized in the browser.
-// A soft two-note bloop-bling and a short sparkle, under a second. No recorded or third-party audio.
+// Chime player: mute, inbox, foreground push, and the What's New dot.
+// The sound itself is js/chime-sound.js. Swap that file without changing this one.
 // Written by Lone Keem.
+import { playChimeSound } from './chime-sound.js';
 const MUTE_KEY = 'kemy-chime-mute';
 const BADGE_KEY = 'kemy-chime-badge';
 
@@ -30,42 +31,6 @@ function audio() {
   return ctx;
 }
 
-function tone(a, when, freq, dur, peak, glide) {
-  const o = a.createOscillator();
-  const g = a.createGain();
-  const filter = a.createBiquadFilter();
-  o.type = 'sine';
-  o.frequency.setValueAtTime(freq * glide, when);
-  o.frequency.exponentialRampToValueAtTime(freq, when + dur * 0.5);
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(1600, when);
-  g.gain.setValueAtTime(0.0001, when);
-  g.gain.exponentialRampToValueAtTime(peak, when + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-  o.connect(filter);
-  filter.connect(g);
-  g.connect(master);
-  o.start(when);
-  o.stop(when + dur + 0.02);
-}
-
-function sparkle(a, when) {
-  [1760, 2093, 2637].forEach((freq, i) => {
-    const o = a.createOscillator();
-    const g = a.createGain();
-    const st = when + i * 0.045;
-    o.type = 'sine';
-    o.frequency.setValueAtTime(freq, st);
-    g.gain.setValueAtTime(0.0001, st);
-    g.gain.exponentialRampToValueAtTime(0.03, st + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, st + 0.07);
-    o.connect(g);
-    g.connect(master);
-    o.start(st);
-    o.stop(st + 0.08);
-  });
-}
-
 // Returns true when a chime actually started. Muted, overlapping, or blocked playback returns false.
 export async function playChime() {
   if (!chimeOn()) return false;
@@ -78,10 +43,7 @@ export async function playChime() {
     try { await a.resume(); } catch { lastAt = 0; return false; }
     if (a.state === 'suspended') { lastAt = 0; return false; }
   }
-  const t = a.currentTime + 0.02;
-  tone(a, t, 523, 0.18, 0.14, 1.45);
-  tone(a, t + 0.16, 784, 0.2, 0.11, 1.12);
-  sparkle(a, t + 0.34);
+  playChimeSound(a, master, a.currentTime + 0.02);
   return true;
 }
 
