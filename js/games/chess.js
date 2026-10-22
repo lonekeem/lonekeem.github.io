@@ -2,6 +2,7 @@
 // (in a module worker when available); online play with an optional chess clock.
 import * as C from './chess-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
+import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
 
 // Original piece art: simple rounded silhouettes, gold (white) and purple (black), star on the king.
 const SHAPES = {
@@ -18,19 +19,6 @@ export function pieceSvg(q) {
 }
 const NAMES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
 const fmt = (ms) => { ms = Math.max(0, ms); const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-let worker = null;
-function think(board, cx, lvl) {
-  return new Promise((res) => {
-    try {
-      if (!worker) worker = new Worker(new URL('./chess-engine.js', import.meta.url), { type: 'module' });
-      const id = Math.random();
-      const on = (e) => { if (e.data.id !== id) return; worker.removeEventListener('message', on); res(e.data.move); };
-      worker.addEventListener('message', on);
-      worker.onerror = () => { worker = null; res(C.aiMove(board, cx, lvl)); };
-      worker.postMessage({ board, cx, lvl, id });
-    } catch { setTimeout(() => res(C.aiMove(board, cx, lvl)), 30); }
-  });
-}
 
 export function createChess(ctx) {
   const { S, main, esc, $, toast, friendlyError, openModal, closeModal, ui } = ctx;
@@ -90,12 +78,13 @@ export function createChess(ctx) {
 
   // ------------------------------------------------------------ vs computer
   function local(params) {
-    const lvl = ['easy', 'medium', 'hard'].includes(params.lvl) ? params.lvl : 'medium';
+    const lvl = normLevel(params.lvl);
+    const pal = palByLevel(lvl);
     shell('Chess', '#/games/chess');
     ui.wireEmotes(main, '', () => '');
     const human = params.side === 'b' ? 1 : params.side === 'w' ? 0 : Math.random() < 0.5 ? 0 : 1;
     const me = { uid: ui.myUid(), name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' };
-    const cpu = { uid: 'cpu1', name: `CPU · ${lvl[0].toUpperCase() + lvl.slice(1)}` };
+    const cpu = { uid: 'cpu1', name: pal.name, bot: true };
     const ps = human === 0 ? [me, cpu] : [cpu, me];
     let ml = [], pos = C.parse(C.START), keys = [C.key(pos)], sans = [], sel = -1, last = '', over = null, alive = true, thinking = false;
     S.unsubs.push(() => { alive = false; });
@@ -105,7 +94,7 @@ export function createChess(ctx) {
       const turn = pos.w ? 0 : 1;
       $('#g-players').innerHTML = bar(ps, turn, !!over);
       const o = C.outcome(pos, keys);
-      $('#g-status').textContent = over ? endText(over, ps.map((p) => p.name)) : (o.check ? 'Check! ' : '') + (turn === human ? 'Your move' : 'Computer is thinking…');
+      $('#g-status').textContent = over ? endText(over, ps.map((p) => p.name)) : (o.check ? 'Check! ' : '') + (turn === human ? 'Your move' : `${pal.name} is thinking…`);
       paintBoard({ pos, mySide: human, live: !over && turn === human, sel, last, onSelect: (s) => { sel = s; refresh(); }, onMove: (m) => doMove(m) });
       paintMoves(sans);
       if (!over && turn !== human && !thinking) cpuTurn();
@@ -119,7 +108,7 @@ export function createChess(ctx) {
         over = o; refresh();
         const res = o.winner === 'draw' ? 'd' : (o.winner === 'w') === (human === 0) ? 'w' : 'l';
         ui.addCpuResult('chess', res);
-        ui.resultModal({ title: res === 'd' ? 'Draw' : res === 'w' ? 'You win!' : 'The computer wins', sub: o.why, win: res === 'w', buttons: [{ label: 'Play again', onClick: () => local({ ...params, side: '' }) }, { label: 'Back to games', href: '#/games' }] });
+        ui.resultModal({ title: res === 'd' ? 'Draw' : res === 'w' ? 'You win!' : `${pal.name} wins`, sub: o.why, win: res === 'w', vsBot: true, buttons: [{ label: 'Play again', onClick: () => local({ ...params, side: '' }) }, { label: 'Back to games', href: '#/games' }] });
         return;
       }
       if (o.check) ui.sfx.play('pop');
@@ -127,9 +116,7 @@ export function createChess(ctx) {
     }
     async function cpuTurn() {
       thinking = true;
-      const t0 = Date.now();
-      const s = await think(C.boardOf(pos), C.cxOf(pos), lvl);
-      await new Promise((r) => setTimeout(r, Math.max(0, 450 - (Date.now() - t0))));
+      const s = await ask({ kind: 'chess', board: C.boardOf(pos), cx: C.cxOf(pos), level: lvl });
       thinking = false;
       if (!alive || over) return;
       const m = s && C.findMove(pos, s); if (m) doMove(m);
@@ -188,11 +175,15 @@ export function createChess(ctx) {
     function actions() {
       const box = $('#g-actions'); if (!box) return;
       const me = side();
-      if (g.status === 'waiting') box.innerHTML = `${me === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}`;
+      if (g.status === 'waiting') {
+        const offer = me === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => actions());
+        box.innerHTML = `${me === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
+      }
       else if (g.status === 'active') box.innerHTML = me >= 0 ? '<button class="btn btn-sm btn-danger" id="g-forfeit">Resign</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>' : '<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>';
       else box.innerHTML = `${me >= 0 && g.endReason !== 'cancelled' ? (g.rematch ? `<a class="btn btn-sm" href="#/game/${esc(g.rematch)}">Go to rematch</a>` : '<button class="btn btn-sm" id="g-rematch">Rematch</button>') : ''}<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;
       const sh = $('#g-share'); if (sh) sh.onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
       const cn = $('#g-cancel'); if (cn) cn.onclick = async () => { try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('chess', g.mode, gid); location.hash = '#/games'; } catch (e) { toast(friendlyError(e)); } };
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = async () => { stopOffer(gid); try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('chess', g.mode, gid); } catch { /* already gone */ } location.hash = `#/games/chess/cpu?lvl=${lastLevel()}&mode=${g.mode || ''}`; };
       const ff = $('#g-forfeit'); if (ff) ff.onclick = () => { if (confirm('Resign this game? It counts as a loss.')) net.update(gid, { status: 'done', winnerUid: g.players[1 - side()], endReason: 'forfeit' }).catch((e) => toast(friendlyError(e))); };
       const rm = $('#g-rematch'); if (rm) rm.onclick = async () => {
         rm.disabled = true;
@@ -205,10 +196,12 @@ export function createChess(ctx) {
       if (stopHb) { stopHb(); stopHb = null; }
       if (g.endReason === 'cancelled') return;
       const me = side();
-      if (me >= 0) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      const botGame = onlyBots(g.players, ui.myUid());
+      if (me >= 0 && !botGame) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      if (me >= 0 && botGame) ui.addCpuResult('chess', g.winnerUid === ui.myUid() ? 'w' : g.winnerUid === 'draw' ? 'd' : 'l');
       const win = me >= 0 && g.winnerUid === ui.myUid();
       const p = C.parse(g.board, g.cx), o = C.outcome(p, C.replay(g.ml).keys);
-      ui.resultModal({ title: g.winnerUid === 'draw' ? 'Draw' : me < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Resigned.' : g.endReason === 'timeout' ? 'Time ran out.' : o.over ? o.why + '.' : '', win,
+      ui.resultModal({ title: g.winnerUid === 'draw' ? 'Draw' : me < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Resigned.' : g.endReason === 'timeout' ? 'Time ran out.' : o.over ? o.why + '.' : '', win, vsBot: botGame,
         buttons: me >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
     }
     function scheduleClaim() {

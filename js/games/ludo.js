@@ -5,6 +5,7 @@
 // Firestore rules check every reveal against the previous link and the die against the reveals.
 import * as L from './ludo-engine.js';
 import { isBot, tsMs, TURN_SECONDS } from './net.js';
+import { ask, normLevel, botPlayer, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, stopOffer, onlyBots, lastLevel } from './bots.js';
 
 const BOT_NAMES = ['Nova', 'Echo', 'Pixel', 'Juno'];
 const CELL = 20;
@@ -72,12 +73,12 @@ export function createLudo(ctx) {
 
   // ------------------------------------------------------------ vs computer
   function local(params) {
-    const lvl = ['easy', 'medium', 'hard'].includes(params.lvl) ? params.lvl : 'medium';
+    const lvl = normLevel(params.lvl);
     const n = Math.max(2, Math.min(4, +params.mode || 4));
     shell('Ludo', '#/games/ludo');
     ui.wireEmotes(main, '', () => '');
     const me = { uid: ui.myUid(), name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' };
-    const seats = [me, ...Array.from({ length: n - 1 }, (_, i) => ({ uid: 'cpu' + (i + 1), name: `${BOT_NAMES[i]} · ${lvl[0].toUpperCase() + lvl.slice(1)}` }))];
+    const seats = [me, ...Array.from({ length: n - 1 }, (_, i) => botPlayer(i, lvl))];
     let st = L.newGame(n), die = 0, rolling = false, movable = [], phase = 'roll', alive = true;
     S.unsubs.push(() => { alive = false; });
     $('#g-actions').innerHTML = `<button class="btn btn-sm btn-ghost" id="lu-new">New game</button><a class="btn btn-sm btn-ghost" href="#/games/ludo">Leave</a>`;
@@ -92,7 +93,7 @@ export function createLudo(ctx) {
     function afterRoll() {
       movable = L.legal(st, die); phase = 'pick'; refresh();
       if (!movable.length) later(() => apply(-1), 900);
-      else if (st.turn !== 0) later(() => apply(L.aiPick(st, die, lvl)), 650);
+      else if (st.turn !== 0) ask({ kind: 'ludo', st, die, level: lvl }).then((t) => { if (alive && phase === 'pick') apply(t); });
       else if (movable.length === 1) later(() => { if (phase === 'pick') apply(movable[0]); }, 700);
     }
     function pick(t) { if (phase === 'pick' && st.turn === 0 && movable.includes(t)) apply(t); }
@@ -100,7 +101,7 @@ export function createLudo(ctx) {
       const prev = st; st = L.step(st, die, t); phase = 'roll'; movable = []; sound(prev, st);
       if (st.winner >= 0) {
         refresh(); const win = st.winner === 0; ui.addCpuResult('ludo', win ? 'w' : 'l');
-        ui.resultModal({ title: win ? 'You win!' : `${seats[st.winner].name.split(' ·')[0]} wins`, sub: 'All four tokens home.', win, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
+        ui.resultModal({ title: win ? 'You win!' : `${seats[st.winner].name} wins`, sub: 'All four tokens home.', win, vsBot: true, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
         return;
       }
       refresh();
@@ -189,7 +190,7 @@ export function createLudo(ctx) {
       const die = dieK[key];
       if (mover() !== me()) return;
       const moves = L.legal(st, die);
-      if (isBot(g.players[st.turn])) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) submit(st, die, L.aiPick(st, die, 'hard')); }, 750); }
+      if (isBot(g.players[st.turn])) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) ask({ kind: 'ludo', st, die, level: lastLevel() }).then((t) => { if (g.lv && g.lv.k === k) submit(st, die, t); }); }, 80); }
       else if (!moves.length) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) submit(st, die, -1); }, 1000); }
       else if (moves.length === 1) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) submit(st, die, moves[0]); }, 900); }
     }
@@ -214,7 +215,7 @@ export function createLudo(ctx) {
     async function drop(uid) {
       const i = g.players.indexOf(uid); if (i < 0 || dropTried === uid + g.lv.k) return; dropTried = uid + g.lv.k;
       const rep = (a, v) => a.map((x, j) => (j === i ? v : x));
-      try { await net.update(gid, { players: rep(g.players, 'cpu' + i), names: rep(g.names, BOT_NAMES[i] + ' (CPU)'), unames: rep(g.unames, ''), colors: rep(g.colors, ''), left: [...(g.left || []), uid], turnAt: net.fs.serverTimestamp() }); }
+      try { await net.update(gid, { players: rep(g.players, 'cpu' + i), names: rep(g.names, seatName(i)), unames: rep(g.unames, ''), colors: rep(g.colors, ''), left: [...(g.left || []), uid], turnAt: net.fs.serverTimestamp() }); }
       catch (e) { console.warn('ludo drop', e.code || e.message); }
     }
     function lobby() {
@@ -222,16 +223,18 @@ export function createLudo(ctx) {
       const ps = seats(), ready = humans().every((u) => (g.rv || {})[u]);
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
         <button class="btn btn-sm btn-ghost" id="lu-copy">Copy invite link</button>
-        <p class="muted small">${maxSeats()} seats · computer players fill empty seats</p>
+        <p class="muted small">${maxSeats()} seats. Bots wear a Bot tag.</p>
         <h3>${ps.length} / ${maxSeats()} seats</h3><div class="g-seats">${ps.map((p, i) => `<div class="g-seat" style="--lc:${L.COLORS[L.seatColors(maxSeats())[i] ?? i]}">${ui.chip(p, p.uid === g.host ? 'host' : '')}${!isBot(p.uid) ? `<span class="muted small">${(g.rv || {})[p.uid] ? 'dice locked in' : 'locking dice…'}</span>` : ''}${isHost() && isBot(p.uid) ? `<button class="link-btn small" data-rm="${i}">remove</button>` : ''}</div>`).join('')}</div>
-        ${isHost() ? `<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="lu-bot" ${ps.length >= maxSeats() ? 'disabled' : ''}>+ Computer player</button><button class="btn btn-sm" id="lu-start" ${ready ? '' : 'disabled'}>Start game</button></div>`
+        ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="lu-bot" ${ps.length >= maxSeats() ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="lu-start" ${ready ? '' : 'disabled'}>Start game</button></div>${!g.invitee && humans().length < 2 && whenOffer(gid, () => draw()) ? offerHtml() : ''}`
           : member() ? '<p class="muted center">Waiting for the host to start…</p>'
           : ui.signedIn() ? '<button class="btn btn-block" id="lu-join">Take a seat</button>' : `<a class="btn btn-block" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to join</a>`}
         <p class="muted small center">Fair dice: everyone locks in a secret before the game; each roll mixes everyone’s next secret, so nobody can choose a number.</p></div>`;
       $('#lu-copy').onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
+      wireFill(box);
       const bt = $('#lu-bot'); if (bt) bt.onclick = () => addBot();
       box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => removeSeat(+b.dataset.rm));
-      const sb = $('#lu-start'); if (sb) sb.onclick = () => start();
+      const sb = $('#lu-start'); if (sb) sb.onclick = () => start(false);
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = () => start(true);
       const jn = $('#lu-join'); if (jn) jn.onclick = async () => { jn.disabled = true; try { await net.join(gid); } catch (e) { toast(friendlyError(e)); jn.disabled = false; } };
       clearTimeout(lobby.t);
       if (isHost() && g.quick && humans().length >= 2 && ready) lobby.t = setTimeout(() => start(), humans().length >= maxSeats() ? 1500 : 12000);
@@ -239,18 +242,19 @@ export function createLudo(ctx) {
     async function addBot() {
       const used = new Set(g.players), i = g.players.length;
       if (i >= maxSeats() || used.has('cpu' + i)) return;
-      try { await net.update(gid, { players: [...g.players, 'cpu' + i], names: [...g.names, BOT_NAMES[i] + ' (CPU)'], unames: [...g.unames, ''], colors: [...g.colors, ''] }); } catch (e) { toast(friendlyError(e)); }
+      try { await net.update(gid, { players: [...g.players, 'cpu' + i], names: [...g.names, seatName(i)], unames: [...g.unames, ''], colors: [...g.colors, ''] }); } catch (e) { toast(friendlyError(e)); }
     }
     async function removeSeat(i) {
       const f = (a) => a.filter((_, j) => j !== i);
       const ps = f(g.players).map((u, j) => (isBot(u) ? 'cpu' + j : u));
       try { await net.update(gid, { players: ps, names: f(g.names), unames: f(g.unames), colors: f(g.colors) }); } catch (e) { toast(friendlyError(e)); }
     }
-    async function start() {
+    async function start(force) {
       if (!isHost() || g.status !== 'waiting') return;
       clearTimeout(lobby.t);
       const players = [...g.players], names = [...g.names], unames = [...g.unames], colors = [...g.colors];
-      while (players.length < maxSeats()) { const i = players.length; players.push('cpu' + i); names.push(BOT_NAMES[i] + ' (CPU)'); unames.push(''); colors.push(''); }
+      if (force || fillBots()) while (players.length < maxSeats()) { const i = players.length; players.push('cpu' + i); names.push(seatName(i)); unames.push(''); colors.push(''); }
+      if (players.length < 2) { toast('Waiting for a real player. You can fill empty seats with bots.'); return; }
       const st = L.newGame(players.length);
       try { await net.update(gid, { players, names, unames, colors, status: 'active', lv: toLv(st), moveNo: 0, turnAt: net.fs.serverTimestamp() }); net.leaveQueue('ludo', g.mode, gid); }
       catch (e) { toast(friendlyError(e)); }
@@ -301,10 +305,12 @@ export function createLudo(ctx) {
       if (g.status === 'done' && !ended) {
         ended = true; if (stopHb) { stopHb(); stopHb = null; }
         const mine = member() || (g.left || []).includes(me());
-        if (mine) setTimeout(() => net.recordResult(g, iEnded || (member() && (g.left || []).length > 0)), iEnded ? 0 : 2500);
+        if (mine && !onlyBots(g.players, me())) setTimeout(() => net.recordResult(g, iEnded || (member() && (g.left || []).length > 0)), iEnded ? 0 : 2500);
         const win = g.winnerUid === me();
         const wi = g.players.indexOf(g.winnerUid);
-        ui.resultModal({ title: win ? 'You win!' : `${wi >= 0 ? g.names[wi] : 'Someone'} wins`, sub: 'All four tokens home.', win, buttons: [{ label: 'New room', onClick: () => $('#lu-again')?.click() }, { label: 'Back to games', href: '#/games' }] });
+        const botGame = onlyBots(g.players, me());
+        if (botGame && mySeat() >= 0) ui.addCpuResult('ludo', win ? 'w' : 'l');
+        ui.resultModal({ title: win ? 'You win!' : `${wi >= 0 ? g.names[wi] : 'Someone'} wins`, sub: 'All four tokens home.', win, vsBot: botGame, buttons: [{ label: 'New room', onClick: () => $('#lu-again')?.click() }, { label: 'Back to games', href: '#/games' }] });
       }
     }, (e) => toast(friendlyError(e)));
     S.unsubs.push(unsub);

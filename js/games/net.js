@@ -210,6 +210,8 @@ export function createNet({ db, S }) {
   // `all` = write everyone's record (the client that ended the game); otherwise only our own.
   async function recordResult(g, all = false) {
     if (!S.user || g.status !== 'done' || !g.winnerUid) return;
+    const foes = (g.players || []).filter((u) => u !== S.user.uid);
+    if (foes.length && foes.every(isBot)) return;
     const left = g.left || [];
     if (!g.players.includes(S.user.uid) && !left.includes(S.user.uid)) return;
     const humans = [...g.players, ...left].filter((u, i, a) => !isBot(u) && a.indexOf(u) === i && (all || u === S.user.uid));

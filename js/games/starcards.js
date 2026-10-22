@@ -5,9 +5,10 @@
 // re-run the shuffle and check their own deal. Computer players fill empty seats.
 import * as C from './cards.js';
 import { isBot, tsMs } from './net.js';
+import { ask, normLevel, botPlayer, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, lastLevel, onlyBots } from './bots.js';
 
 const TURN_S = 30;
-const BOT_NAMES = ['Nova', 'Echo', 'Pixel', 'Juno', 'Orbit', 'Lyric'];
+const CATCH = { easy: 0.35, medium: 0.55, hard: 0.8, expert: 0.95 };
 const SUIT = { p: '#8a2be2', g: '#f2b31b', t: '#2bb5a8', r: '#e2558f' };
 const ICON = {
   S: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="7.5"/><path d="M7 17 17 7"/></svg>',
@@ -122,7 +123,7 @@ export function createStarCards(ctx) {
     const w = st.roundWinner;
     const win = w === mySeat;
     if (final) {
-      ui.resultModal({ title: st.matchWinner === mySeat ? 'You win the match!' : `${seats[st.matchWinner].name} wins`, sub: st.target ? `First to ${st.target}: ${st.scores[st.matchWinner]} points` : `+${st.roundPoints} points`, win: st.matchWinner === mySeat, buttons });
+      ui.resultModal({ title: st.matchWinner === mySeat ? 'You win the match!' : `${seats[st.matchWinner].name} wins`, sub: st.target ? `First to ${st.target}: ${st.scores[st.matchWinner]} points` : `+${st.roundPoints} points`, win: st.matchWinner === mySeat, vsBot: seats.every((p, i) => i === mySeat || isBot(p.uid) || p.bot), buttons });
       return;
     }
     toast(win ? `You won the round! +${st.roundPoints}` : `${seats[w].name} won the round (+${st.roundPoints})`);
@@ -132,13 +133,13 @@ export function createStarCards(ctx) {
 
   // ------------------------------------------------------------ vs computer
   function local(params) {
-    const lvl = params.lvl === 'easy' ? 'easy' : 'hard';
+    const lvl = normLevel(params.lvl);
     const bots = Math.max(1, Math.min(5, parseInt(params.bots, 10) || 3));
     const target = params.mode === 'round' ? 0 : 500;
     frame('Star Cards', '#/games/starcards');
     ui.wireEmotes(main, '', () => '');
     const seats = [{ uid: ui.myUid() || '', name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' },
-      ...C.shuffle(BOT_NAMES, String(Math.random())).slice(0, bots).map((n, i) => ({ uid: 'cpu' + (i + 1), name: n }))];
+      ...Array.from({ length: bots }, (_, i) => botPlayer(i, lvl))];
     let st = C.newRound(C.newSeed(), seats.length, { target }), msg = 'Your deal. Match colour or number.', alive = true, timer = 0, catchT = 0;
     S.unsubs.push(() => { alive = false; clearTimeout(timer); clearTimeout(catchT); });
     $('#g-actions').innerHTML = `<button class="btn btn-sm btn-ghost" id="sc-new">New game</button><a class="btn btn-sm btn-ghost" href="#/games/starcards">Leave</a>`;
@@ -167,9 +168,9 @@ export function createStarCards(ctx) {
         clearTimeout(catchT);
         const ex = st.exposed;
         const catcher = seats.findIndex((p, i) => i > 0 && i !== ex);
-        if (catcher > 0) catchT = setTimeout(() => { if (alive && st.exposed === ex && Math.random() < (lvl === 'hard' ? 0.85 : 0.4)) doAct(catcher, { t: 'catch' }); }, 2200 + Math.random() * 1500);
+        if (catcher > 0) catchT = setTimeout(() => { if (alive && st.exposed === ex && Math.random() < (CATCH[lvl] || 0.7)) doAct(catcher, { t: 'catch' }); }, 1600 + Math.random() * 1200);
       }
-      if (st.turn !== 0) timer = setTimeout(() => { if (!alive) return; doAct(st.turn, C.aiAction(st, st.turn, lvl)); }, 750 + Math.random() * 600);
+      if (st.turn !== 0) ask({ kind: 'cards', st, seat: st.turn, level: lvl }).then((a) => { if (alive && st.turn !== 0) doAct(st.turn, a); });
     }
     ui.sfx.play('deal');
     after();
@@ -264,7 +265,7 @@ export function createStarCards(ctx) {
           return;
         }
         const who = g.players[st.turn];
-        if (isBot(who)) botT = setTimeout(() => { if (st && isBot(g.players[st.turn])) { apply(st.turn, C.aiAction(st, st.turn, 'hard')); plan(); } }, 900 + Math.random() * 700);
+        if (isBot(who)) botT = setTimeout(() => { if (st && isBot(g.players[st.turn])) ask({ kind: 'cards', st, seat: st.turn, level: lastLevel() }).then((a) => { if (st && isBot(g.players[st.turn])) { apply(st.turn, a); plan(); } }); }, 80);
         else afkT = setTimeout(() => { if (!st) return; apply(st.turn, st.drew ? { t: 'pass' } : { t: 'draw' }); if (st.drew) apply(st.turn, { t: 'pass' }); plan(); }, (TURN_S + 2) * 1000);
         if (st.exposed >= 0 && st.exposed !== exposedSeen) {
           exposedSeen = st.exposed;
@@ -317,13 +318,15 @@ export function createStarCards(ctx) {
         <button class="btn btn-sm btn-ghost" id="sc-copy">Copy invite link</button>
         <p class="muted small">${g.mode === 'round' ? 'Single round' : 'First to 500 points'}</p>
         <h3>${ps.length} / 6 seats</h3><div class="g-seats">${ps.map((p, i) => `<div class="g-seat">${ui.chip(p, p.uid === g.host ? 'host' : '')}${isHost() && isBot(p.uid) ? `<button class="link-btn small" data-rm="${i}">remove</button>` : ''}</div>`).join('')}</div>
-        ${isHost() ? `<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="sc-bot" ${ps.length >= 6 ? 'disabled' : ''}>+ Computer player</button><button class="btn btn-sm" id="sc-start" ${ps.length < 2 ? 'disabled' : ''}>Deal cards</button></div>${g.quick && ps.length >= 2 ? '<p class="muted small center">Quick rooms deal on their own in a few seconds.</p>' : ''}`
+        ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="sc-bot" ${ps.length >= 6 ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="sc-start" ${ps.length < 2 && !fillBots() ? 'disabled' : ''}>Deal cards</button></div>${!g.invitee && ps.filter((p) => !isBot(p.uid)).length < 2 && whenOffer(gid, () => draw()) ? offerHtml() : ''}${g.quick && ps.filter((p) => !isBot(p.uid)).length >= 2 ? '<p class="muted small center">Quick rooms deal on their own in a few seconds.</p>' : ''}`
           : member() ? '<p class="muted center">Waiting for the host to deal…</p>'
           : ui.signedIn() ? '<button class="btn btn-block" id="sc-join">Take a seat</button>' : `<a class="btn btn-block" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to join</a>`}</div>`;
       $('#sc-copy').onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
+      wireFill(box);
       const bt = $('#sc-bot'); if (bt) bt.onclick = () => addBot();
       box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => removeSeat(+b.dataset.rm));
-      const stb = $('#sc-start'); if (stb) stb.onclick = () => startGame();
+      const stb = $('#sc-start'); if (stb) stb.onclick = () => startGame(false);
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = () => startGame(true);
       const jn = $('#sc-join'); if (jn) jn.onclick = async () => { jn.disabled = true; try { await net.join(gid); } catch (e) { toast(friendlyError(e)); jn.disabled = false; } };
       clearTimeout(lobby.t);
       if (isHost() && g.quick && ps.filter((p) => !isBot(p.uid)).length >= 2) lobby.t = setTimeout(() => startGame(), 12000);
@@ -331,17 +334,23 @@ export function createStarCards(ctx) {
     async function addBot() {
       const used = new Set(g.players);
       const k = [1, 2, 3, 4, 5].find((i) => !used.has('cpu' + i)); if (!k) return;
-      const nm = BOT_NAMES[k - 1] + ' (CPU)';
+      const nm = seatName(k - 1);
       try { await net.update(gid, { players: [...g.players, 'cpu' + k], names: [...g.names, nm], unames: [...g.unames, ''], colors: [...g.colors, ''] }); } catch (e) { toast(friendlyError(e)); }
     }
     async function removeSeat(i) {
       const f = (a) => a.filter((_, j) => j !== i);
       try { await net.update(gid, { players: f(g.players), names: f(g.names), unames: f(g.unames), colors: f(g.colors) }); } catch (e) { toast(friendlyError(e)); }
     }
-    async function startGame() {
-      if (!isHost() || g.status !== 'waiting' || g.players.length < 2) return;
+    async function startGame(force) {
+      if (!isHost() || g.status !== 'waiting') return;
       clearTimeout(lobby.t);
-      try { await dealer.start(); net.leaveQueue('starcards', '', gid); } catch (e) { toast(friendlyError(e)); }
+      const players = [...g.players], names = [...g.names], unames = [...g.unames], colors = [...g.colors];
+      if (force || fillBots()) while (players.length < 4) { const k = players.length; players.push('cpu' + k); names.push(seatName(k)); unames.push(''); colors.push(''); }
+      if (players.length < 2) { toast('Waiting for a real player. You can fill empty seats with bots.'); return; }
+      try {
+        if (players.length !== g.players.length) { await net.update(gid, { players, names, unames, colors }); g = { ...g, players, names, unames, colors }; }
+        await dealer.start(); net.leaveQueue('starcards', '', gid);
+      } catch (e) { toast(friendlyError(e)); }
     }
     function draw() {
       if (g.status === 'waiting') { lobby(); return; }
@@ -396,7 +405,9 @@ export function createStarCards(ctx) {
       prevRoundWinner = g.pv ? g.pv.roundWinner : -1;
       if (g.status === 'done' && !ended) {
         ended = true; if (stopHb) { stopHb(); stopHb = null; }
-        if (member()) setTimeout(() => net.recordResult(g, iEnded), iEnded ? 0 : 2500);
+        const botGame = onlyBots(g.players, me());
+        if (member() && !botGame) setTimeout(() => net.recordResult(g, iEnded), iEnded ? 0 : 2500);
+        if (member() && botGame) ui.addCpuResult('starcards', g.winnerUid === me() ? 'w' : g.winnerUid === 'draw' ? 'd' : 'l');
         const mw = g.players.indexOf(g.winnerUid);
         roundModal({ ...g.pv, matchWinner: mw }, seats(), mySeat(), { final: true, buttons: [{ label: 'New room', onClick: async () => { try { location.hash = '#/game/' + await net.createGame('starcards', g.mode); } catch (e) { toast(friendlyError(e)); } } }, { label: 'Back to games', href: '#/games' }] });
       }

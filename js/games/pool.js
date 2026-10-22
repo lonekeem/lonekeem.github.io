@@ -4,6 +4,7 @@
 // same deterministic simulation and then snaps to the stored positions.
 import * as P from './pool-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
+import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
 
 const COLORS = { 1: '#f2b31b', 2: '#3d7bff', 3: '#e2558f', 4: '#8a2be2', 5: '#ff7a2f', 6: '#2bb5a8', 7: '#9b1d3a' };
 const ballColor = (id) => COLORS[id > 8 ? id - 8 : id];
@@ -243,12 +244,13 @@ export function createPool(ctx) {
 
   // ------------------------------------------------------------ vs computer
   function local(params) {
-    const lvl = ['easy', 'medium', 'hard'].includes(params.lvl) ? params.lvl : 'medium';
+    const lvl = normLevel(params.lvl);
+    const pal = palByLevel(lvl);
     shell('Star Pool', '#/games/pool');
     ui.wireEmotes(main, '', () => '');
     const human = Math.random() < 0.5 ? 0 : 1;
     const me = { uid: ui.myUid(), name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' };
-    const cpu = { uid: 'cpu1', name: `CPU · ${lvl[0].toUpperCase() + lvl.slice(1)}` };
+    const cpu = { uid: 'cpu1', name: pal.name, bot: true };
     const ps = human === 0 ? [me, cpu] : [cpu, me];
     let balls = P.decode(P.rack()), st = P.newState(), turn = 0, alive = true, over = false;
     S.unsubs.push(() => { alive = false; table.stop(); });
@@ -258,12 +260,12 @@ export function createPool(ctx) {
     function refresh() {
       const mine = turn === human && !over;
       $('#g-players').innerHTML = playersHtml(ps, st, turn, balls, null, over);
-      $('#g-status').textContent = over ? '' : (st.msg ? st.msg + ' ' : '') + (mine ? 'Your shot' : 'Computer is lining up…');
+      $('#g-status').textContent = over ? '' : (st.msg ? st.msg + ' ' : '') + (mine ? 'Your shot' : `${pal.name} is lining up…`);
       const callMode = mine && P.needsCall(st, turn, balls);
       table.set(balls, { canShoot: mine, placing: mine && st.bih, kitchen: st.brk, callMode, call: callMode ? st.call : -1 });
       table.hint(turnHint(st, turn, balls, mine));
       if (mine && !st.bih && !st.brk) { /* keep aim */ } else if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
-      if (!over && turn !== human) setTimeout(cpuTurn, 900);
+      if (!over && turn !== human && !lining) { lining = true; cpuTurn(); }
     }
     function take(shot, cuePos) {
       const before = balls.map((b) => ({ ...b }));
@@ -279,15 +281,18 @@ export function createPool(ctx) {
         if (j.winner >= 0) {
           over = true; refresh();
           const win = j.winner === human; ui.addCpuResult('pool', win ? 'w' : 'l');
-          ui.resultModal({ title: win ? 'You win!' : 'The computer wins', sub: st.msg, win, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
+          ui.resultModal({ title: win ? 'You win!' : `${pal.name} wins`, sub: st.msg, win, vsBot: true, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
           return;
         }
         turn = j.next; refresh();
       });
     }
-    function cpuTurn() {
-      if (!alive || over || turn === human) return;
-      const shot = P.aiShot(st, turn, balls, lvl);
+    let lining = false;
+    async function cpuTurn() {
+      if (!alive || over || turn === human) { lining = false; return; }
+      const shot = await ask({ kind: 'pool', st, seat: turn, balls: balls.map((b) => ({ ...b })), level: lvl });
+      lining = false;
+      if (!alive || over || turn === human || !shot) return;
       if (shot.call >= 0 || P.needsCall(st, turn, balls)) st.call = shot.call >= 0 ? shot.call : 0;
       if (shot.place) { balls[0] = { ...balls[0], x: shot.place.x, y: shot.place.y, on: true }; }
       table.set(balls, { canShoot: false, call: st.call });
@@ -385,11 +390,15 @@ export function createPool(ctx) {
     function actions() {
       const box = $('#g-actions'); if (!box) return;
       const side = mySide();
-      if (g.status === 'waiting') box.innerHTML = `${side === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}`;
+      if (g.status === 'waiting') {
+        const offer = side === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => actions());
+        box.innerHTML = `${side === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
+      }
       else if (g.status === 'active') box.innerHTML = side >= 0 ? '<button class="btn btn-sm btn-danger" id="g-forfeit">Forfeit</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>' : '<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>';
       else box.innerHTML = `${side >= 0 && g.endReason !== 'cancelled' ? (g.rematch ? `<a class="btn btn-sm" href="#/game/${esc(g.rematch)}">Go to rematch</a>` : '<button class="btn btn-sm" id="g-rematch">Rematch</button>') : ''}<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;
       const sh = $('#g-share'); if (sh) sh.onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
       const cn = $('#g-cancel'); if (cn) cn.onclick = async () => { try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('pool', '', gid); location.hash = '#/games'; } catch (e) { toast(friendlyError(e)); } };
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = async () => { stopOffer(gid); try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('pool', '', gid); } catch { /* already gone */ } location.hash = `#/games/pool/cpu?lvl=${lastLevel()}`; };
       const ff = $('#g-forfeit'); if (ff) ff.onclick = () => { if (confirm('Forfeit this game? It counts as a loss.')) net.update(gid, { status: 'done', winnerUid: g.players[1 - mySide()], endReason: 'forfeit' }).catch((e) => toast(friendlyError(e))); };
       const rm = $('#g-rematch'); if (rm) rm.onclick = async () => {
         rm.disabled = true;
@@ -402,9 +411,11 @@ export function createPool(ctx) {
       if (stopHb) { stopHb(); stopHb = null; }
       if (g.endReason === 'cancelled') return;
       const side = mySide();
-      if (side >= 0) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      const botGame = onlyBots(g.players, ui.myUid());
+      if (side >= 0 && !botGame) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      if (side >= 0 && botGame) ui.addCpuResult('pool', g.winnerUid === ui.myUid() ? 'w' : 'l');
       const win = side >= 0 && g.winnerUid === ui.myUid();
-      ui.resultModal({ title: side < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Forfeit.' : g.endReason === 'timeout' ? 'Time ran out.' : stOf().msg, win,
+      ui.resultModal({ title: side < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Forfeit.' : g.endReason === 'timeout' ? 'Time ran out.' : stOf().msg, win, vsBot: botGame,
         buttons: side >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
     }
     function scheduleClaim() {

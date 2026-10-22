@@ -3,6 +3,7 @@
 // and the other's Pal is shown as a live ghost, interpolated. Wins go on the palStats leaderboard.
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, writeBatch, Timestamp, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { createLink } from '../games/link.js';
+import { PALS, faceSvg, normLevel, lastMode, saveMode, saveLevel, lastLevel, addBotRecord, whenOffer, offerHtml, COIN_BOT } from '../games/bots.js';
 import { drawPal, drawBubble, star } from './art.js';
 import { drawDancer } from './dance.js';
 import { getActivePal } from './core.js';
@@ -18,7 +19,60 @@ const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const snap = (p) => p ? { species: p.species, name: p.name, colors: p.colors, pattern: p.pattern, acc: p.acc, outfit: p.outfit || {}, level: p.level || 1 } : { species: 'kemy', name: 'Kemy', level: 1 };
 // CPU score curves (final scores around these at "normal")
-const CPU_RATE = { race: 2.6, bubbles: 1.05, stars: 0.95, dance: 2.6 };
+const SKILL = { easy: 0.38, medium: 0.62, hard: 0.82, expert: 0.94 };
+// A bot walks the same seeded course and misses more when the level is lower.
+export function palCurve(game, seed, level) {
+  const skill = SKILL[normLevel(level)] || SKILL.medium;
+  const R = rng((seed ^ 0x9e3779b9) >>> 0);
+  const course = rng(seed >>> 0);
+  const samples = [0];
+  if (game === 'race') {
+    const items = []; let x = 220;
+    while (x < 4000) { items.push({ x, k: course() < 0.25 ? 'star' : 'log', done: false }); x += 110 + course() * 160; }
+    let dist = 0, stars = 0, stun = 0;
+    const speed = 2.4 + skill * 2.6;
+    for (let s = 1; s <= 30; s++) {
+      if (stun > 0) stun--; else dist += speed * 48;
+      for (const it of items) {
+        if (it.done) continue;
+        const sx = it.x - dist + 80;
+        if (sx > 110 || sx < 30) continue;
+        it.done = true;
+        if (it.k === 'log') { if (R() > skill) stun = 1; }
+        else if (R() < 0.35 + skill * 0.6) stars++;
+      }
+      samples.push(Math.floor(dist / 50) + stars * 5);
+    }
+  } else if (game === 'bubbles') {
+    let score = 0; const pops = [];
+    for (let i = 0; i < 160; i++) { const at = i * 0.19 + course() * 0.1; const gold = course() < 0.12; if (R() < skill * (gold ? 1 : 0.85)) pops.push({ at: at + (1 - skill) * R() * 0.8, n: gold ? 3 : 1 }); }
+    pops.sort((a, b) => a.at - b.at);
+    let i = 0;
+    for (let s = 1; s <= 30; s++) { while (i < pops.length && pops[i].at <= s) { score += pops[i].n; i++; } samples.push(score); }
+  } else if (game === 'stars') {
+    let score = 0; const hits = [];
+    for (let i = 0; i < 120; i++) { const at = i * 0.25 + course() * 0.12; const cloud = course() < 0.15; const big = !cloud && course() < 0.15; const ok = cloud ? R() > skill : R() < skill; if (ok && !cloud) hits.push({ at, n: big ? 3 : 1 }); if (cloud && !ok) hits.push({ at, n: 0, stun: true }); }
+    let stun = 0, i = 0;
+    for (let s = 1; s <= 30; s++) {
+      if (stun > 0) stun--;
+      while (i < hits.length && hits[i].at <= s) { if (hits[i].stun) stun = 1; else if (!stun) score += hits[i].n; i++; }
+      samples.push(score);
+    }
+  } else {
+    let score = 0;
+    for (let i = 0; i < 70; i++) {
+      const at = 1.2 + i * 0.4;
+      if (R() < skill) score += R() < skill ? 3 : 1;
+      if (samples.length <= Math.ceil(at)) while (samples.length <= Math.min(30, Math.ceil(at))) samples.push(score);
+    }
+    while (samples.length <= 30) samples.push(score);
+  }
+  return (t) => {
+    const x = Math.max(0, Math.min(30, t));
+    const a = samples[Math.floor(x)] || 0, b = samples[Math.min(30, Math.ceil(x))] || a;
+    return Math.floor(a + (b - a) * (x - Math.floor(x)));
+  };
+}
 // ---------------------------------------------------------------- the four games on one canvas engine
 export function playGame(host, game, seed, { pal, oppPal, opp, onTick, sound }) {
   return new Promise((resolve) => {
@@ -118,21 +172,21 @@ export function createPalGames(ctx) {
   const { S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal } = ctx;
   let AC = null; const sound = (k) => { try { AC = AC || new AudioContext(); const o = AC.createOscillator(), g = AC.createGain(); const f = { pop: 880, big: 1320, jump: 520, bonk: 160 }[k] || 600; o.type = k === 'bonk' ? 'square' : 'triangle'; o.frequency.setValueAtTime(f, AC.currentTime); o.frequency.exponentialRampToValueAtTime(f * (k === 'bonk' ? 0.6 : 1.6), AC.currentTime + 0.1); g.gain.setValueAtTime(0.08, AC.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.14); o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + 0.15); } catch {} };
   const me = () => S.user && S.user.uid;
-  const reward = (win, cpu) => { dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: win ? 30 : 10 } })); if (win) dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: cpu ? 10 : 25, why: 'for winning' } })); };
+  const reward = (win, cpu) => { dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: win ? (cpu ? 12 : 30) : 10 } })); if (win) dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: cpu ? COIN_BOT : 25, why: cpu ? 'for beating a bot' : 'for winning' } })); };
   async function myPal() { if (!S.user) return snap(null); try { return snap(await getActivePal(db, S.user.uid)); } catch { return snap(null); } }
   async function lobby(params) {
     const sel = GAME[params.g] ? params.g : 'race';
     main.innerHTML = `<section class="card pad pal-box pg-lobby"><div class="pal-box-head"><h1>🎮 Pal Games</h1><a class="btn btn-sm" href="#/park">🌳 Pal Park</a><a class="btn btn-sm btn-ghost" href="#/games">All games</a></div>
       <p class="muted small">Your Pal competes in 30-second real-time mini-games. Play a friend, get a quick match, or practise against the computer. Wins give your Pal XP and Star Coins.</p>
       <div class="pg-cards">${PAL_GAMES.map((g) => `<button class="pg-card ${g.id === sel ? 'on' : ''}" data-g="${g.id}"><span class="pg-ic">${g.icon}</span><b>${esc(g.name)}</b><small>${esc(g.blurb)}</small></button>`).join('')}</div>
-      <div class="pg-modes"><button class="btn" data-m="cpu">🤖 vs Computer</button><button class="btn btn-ghost" data-m="quick">⚡ Quick match</button><button class="btn btn-ghost" data-m="friend">💌 Play a friend</button></div>
+      <div class="g-modes" role="tablist" aria-label="How to play"><button type="button" data-m="cpu" aria-pressed="${lastMode() === 'cpu'}">Play vs Computer</button><button type="button" data-m="quick" aria-pressed="${lastMode() === 'online'}">Play Online (real players)</button><button type="button" data-m="friend" aria-pressed="${lastMode() === 'friend'}">Play a Friend</button></div>
       <form class="pg-friend" id="pg-friend" hidden><input id="pg-handle" placeholder="@friend’s handle (or leave empty for a link)" autocomplete="off"><button class="btn btn-sm" type="submit">Create game</button></form>
       <h2 class="pal-sub">🏆 Top Pal players</h2><div id="pg-lb" class="card"><div class="spinner"></div></div></section>`;
     let g = sel; if (S.user) import('./game-emotes.js').then((m) => m.mountGameEmotes(main.firstElementChild, { db, uid: me(), toast })).catch(() => {});
     main.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { g = b.dataset.g; main.querySelectorAll('[data-g]').forEach((x) => x.classList.toggle('on', x === b)); });
-    main.querySelector('[data-m=cpu]').onclick = () => cpu(g);
-    main.querySelector('[data-m=quick]').onclick = () => quick(g);
-    main.querySelector('[data-m=friend]').onclick = () => { if (!requireAuth()) return; const f = main.querySelector('#pg-friend'); f.hidden = false; f.querySelector('input').focus(); };
+    main.querySelector('[data-m=cpu]').onclick = () => { saveMode('cpu'); difficulty(g); };
+    main.querySelector('[data-m=quick]').onclick = () => { saveMode('online'); quick(g); };
+    main.querySelector('[data-m=friend]').onclick = () => { saveMode('friend'); if (!requireAuth()) return; const f = main.querySelector('#pg-friend'); f.hidden = false; f.querySelector('input').focus(); };
     main.querySelector('#pg-friend').onsubmit = async (e) => { e.preventDefault(); const h = main.querySelector('#pg-handle').value.trim().replace(/^@/, '').toLowerCase(); let inv = '';
       if (h) { const u = await getDoc(doc(db, 'usernames', h)).catch(() => null); if (!u || !u.exists()) return toast('No one with that handle'); inv = u.data().uid; }
       try { const gid = await create(g, { invitee: inv }); if (inv) await addDoc(collection(db, 'users', inv, 'notifications'), { type: 'game', fromUid: me(), fromName: S.profile.displayName, fromUsername: S.profile.username, postId: gid, text: `${GAME[g].name} (Pal Games)`, createdAt: serverTimestamp(), read: false }).catch(() => {});
@@ -164,24 +218,36 @@ export function createPalGames(ctx) {
       const gid = await create(game, { quick: true }); await setDoc(qref, { gid, uid: me(), at: serverTimestamp() }); location.hash = '#/games/pals/' + gid;
     } catch (e) { toast(friendlyError(e)); }
   }
-  async function cpu(game) {
-    const pal = await myPal(); const level = localStorage.getItem('kemy-pg-cpu') || 'normal'; const k = { easy: 0.7, normal: 1, hard: 1.3 }[level];
-    const cpuPal = { species: ['puppy', 'kitten', 'panda', 'fox', 'dragon'][Math.floor(Math.random() * 5)], level: 5, name: 'Robo Pal' };
-    main.innerHTML = `<section class="pg-play"><div class="pg-top"><b>${esc(GAME[game].name)}</b> vs 🤖 Robo Pal <select id="pg-lvl" aria-label="Difficulty">${['easy', 'normal', 'hard'].map((l) => `<option ${l === level ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="pg-host"></div></section>`;
-    main.querySelector('#pg-lvl').onchange = (e) => { localStorage.setItem('kemy-pg-cpu', e.target.value); cpu(game); };
+  function difficulty(game) {
+    main.innerHTML = `<section class="card pad pal-box pg-lobby"><div class="pal-box-head"><h1>${esc(GAME[game].name)}</h1><button class="btn btn-sm btn-ghost" id="pg-back" type="button">Back</button></div>
+      <h2 class="pal-sub">Choose a bot</h2>
+      <div class="g-pals" id="g-diff">${PALS.map((p) => `<button type="button" class="g-pal" data-lvl="${p.id}">${faceSvg(p.name, 64)}<b>${esc(p.name)}</b><i class="bot-tag">Bot</i><span>${esc(p.title)}</span><small>${esc(p.line)}</small></button>`).join('')}</div>
+      <p class="muted small">Bot games give fewer Star Coins, and they stay off the online scoreboard.</p></section>`;
+    main.querySelector('#pg-back').onclick = () => lobby({ g: game });
+    main.querySelectorAll('[data-lvl]').forEach((b) => b.onclick = () => { saveLevel(b.dataset.lvl); cpu(game, b.dataset.lvl); });
+  }
+  async function cpu(game, level) {
+    level = normLevel(level || lastLevel());
+    const pal = await myPal();
+    const bot = PALS.find((p) => p.id === level);
+    const cpuPal = { species: { easy: 'puppy', medium: 'kitten', hard: 'fox', expert: 'dragon' }[level], level: 5, name: bot.name };
+    main.innerHTML = `<section class="pg-play"><div class="pg-top"><b>${esc(GAME[game].name)}</b> vs ${faceSvg(bot.name, 28)} ${esc(bot.name)} <i class="bot-tag">Bot</i> <span class="muted small">${esc(bot.title)}</span></div><div class="pg-host"></div></section>`;
     const host = main.querySelector('.pg-host'); if (S.user) import('./game-emotes.js').then((m) => m.mountGameEmotes(host, { db, uid: me(), toast })).catch(() => {}); await countdown(host);
-    const start = performance.now(); const jitter = 0.85 + Math.random() * 0.3; let os = 0;
-    const opp = () => { const tt = Math.min(DUR, (performance.now() - start) / 1000); os = Math.max(os, Math.floor(CPU_RATE[game] * k * jitter * tt)); return { p: Math.min(1000, tt / DUR * 1000 * (game === 'race' ? 0.95 * k * jitter : 1)), s: os, name: 'Robo Pal' }; };
-    const score = await playGame(host, game, Math.floor(Math.random() * 1e9), { pal, oppPal: cpuPal, opp, sound });
-    const o = opp().s; const win = score > o; reward(win, true);
-    result(game, score, o, 'Robo Pal', win, score === o, () => cpu(game));
+    const seed = Math.floor(Math.random() * 1e9);
+    const curve = palCurve(game, seed, level);
+    const start = performance.now();
+    const opp = () => { const tt = Math.min(DUR, (performance.now() - start) / 1000); const s = curve(tt); return { p: Math.min(1000, (s / Math.max(1, curve(DUR))) * 1000), s, name: bot.name }; };
+    const score = await playGame(host, game, seed, { pal, oppPal: cpuPal, opp, sound });
+    const o = curve(DUR); const win = score > o; reward(win, true);
+    addBotRecord('pals', score === o ? 'd' : win ? 'w' : 'l');
+    result(game, score, o, bot.name, win, score === o, () => cpu(game, level), true);
   }
   function countdown(host) { return new Promise((r) => { let n = 3; host.innerHTML = `<div class="pg-count">3</div>`; const it = setInterval(() => { n--; const el = host.querySelector('.pg-count'); if (!el) { clearInterval(it); return; } if (n <= 0) { clearInterval(it); r(); } else el.textContent = n; }, 700); }); }
-  function result(game, s, o, oname, win, draw, again) {
+  function result(game, s, o, oname, win, draw, again, vsBot) {
     openModal(`<div class="g-result ${win ? 'win' : ''}"><h2>${draw ? 'Draw!' : win ? 'Your Pal wins! 🎉' : `${esc(oname)} wins!`}</h2><p>${esc(GAME[game].name)}: you ${s} · ${esc(oname)} ${o}</p><p class="small muted">${win ? 'Your Pal got XP and Star Coins!' : 'Your Pal got a little XP for playing.'}</p>
       <div class="btns"><button class="btn" id="pg-again">Play again</button><a class="btn btn-ghost" href="#/games/pals" data-close>Pal Games</a></div></div>`);
     document.querySelector('.modal .btns')?.insertAdjacentHTML('beforeend', '<a class="btn btn-ghost lb-btn" href="#/scores/pals" data-close>🏆 Scoreboard</a>');
-    if (S.user && S.profile) import('../leaderboard.js').then((m) => m.recordAndShow('pals', { r: draw ? 'd' : win ? 'w' : 'l', pts: s })).catch(() => {});
+    if (!vsBot && S.user && S.profile) import('../leaderboard.js').then((m) => m.recordAndShow('pals', { r: draw ? 'd' : win ? 'w' : 'l', pts: s })).catch(() => {});
     document.getElementById('pg-again').onclick = () => { closeModal(); again(); };
     document.querySelector('.modal a[href="#/games/pals"]')?.addEventListener('click', () => { if (location.hash === '#/games/pals') setTimeout(() => dispatchEvent(new HashChangeEvent('hashchange')), 0); });
   }
@@ -234,9 +300,10 @@ export function createPalGames(ctx) {
       if (!g) return; const other = g.players.find((u) => u !== me()); const oi = g.players.indexOf(other);
       if (g.status === 'waiting') { const link = location.href.split('#')[0] + '#/games/pals/' + gid;
         top.innerHTML = `<b>${esc(GAME[g.game].name)}</b> · waiting for ${g.invitee ? 'your friend' : 'a player'}…`;
-        host.innerHTML = `<div class="pg-wait"><div class="spinner"></div><p>Send this link to a friend:</p><input readonly value="${esc(link)}" onclick="this.select()"><button class="btn btn-sm" id="pg-copy">Copy link</button><p class="small muted">${g.quick ? 'Looking for a quick match…' : ''}</p><button class="btn btn-sm btn-ghost" id="pg-cpu">Play the computer instead</button></div>`;
+        const ready = !g.invitee && whenOffer(gid, () => render());
+        host.innerHTML = `<div class="pg-wait"><div class="spinner"></div><p>Send this link to a friend:</p><input readonly value="${esc(link)}" onclick="this.select()"><button class="btn btn-sm" id="pg-copy">Copy link</button><p class="small muted">${g.quick ? 'Looking for a real player…' : 'Waiting for your friend…'}</p>${ready ? offerHtml() : ''}</div>`;
         host.querySelector('#pg-copy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(link).then(() => toast('Link copied'));
-        host.querySelector('#pg-cpu').onclick = () => { updateDoc(doc(db, 'palGames', gid), { status: 'done', updatedAt: serverTimestamp() }).catch(() => {}); if (g.quick) setDoc(doc(db, 'gameQueue', 'pal-' + g.game), { gid: '', uid: '', at: serverTimestamp() }).catch(() => {}); cpu(g.game); };
+        const yes = host.querySelector('[data-bot-yes]'); if (yes) yes.onclick = () => { updateDoc(doc(db, 'palGames', gid), { status: 'done', updatedAt: serverTimestamp() }).catch(() => {}); if (g.quick) setDoc(doc(db, 'gameQueue', 'pal-' + g.game), { gid: '', uid: '', at: serverTimestamp() }).catch(() => {}); difficulty(g.game); };
         return; }
       if (g.status === 'active' && !started && g.players.includes(me())) { started = true; top.innerHTML = `<b>${esc(GAME[g.game].name)}</b> · you vs ${esc(g.names[oi])}${(window.kemyModBadge ? window.kemyModBadge(other) : '')}`; go(other, oi); }
       if (!g.players.includes(me())) top.innerHTML = `${esc(g.names.join(' vs '))} · this match is full`;

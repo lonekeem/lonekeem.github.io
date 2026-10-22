@@ -184,24 +184,26 @@ export function aiAction(st, seat, level = 'hard') {
   if (!opts.length) return st.drew ? { t: 'pass' } : { t: 'draw' };
   const hand = st.hands[seat];
   let card;
-  if (level === 'easy') card = opts[Math.floor(Math.random() * opts.length)];
+  if (level === 'easy' || (level === 'medium' && Math.random() < 0.34)) card = opts[Math.floor(Math.random() * opts.length)];
   else {
     const nextCount = st.hands[nextSeat(st, seat)].length;
     const colorCount = (c) => hand.filter((h) => h[0] === c).length;
+    const expert = level === 'expert';
     const score = (c) => {
       let s = 0;
-      if (isWild(c)) s -= 30 - (nextCount <= 2 ? 40 : 0) - (hand.length <= 2 ? 30 : 0);
+      if (isWild(c)) s -= (expert ? 48 : 30) - (nextCount <= 2 ? 40 : 0) - (hand.length <= (expert ? 3 : 2) ? 30 : 0);
       else {
-        s += colorCount(c[0]) * 3 + points(c) * 0.3;
-        if (/[SDF]/.test(c[1]) && nextCount <= 3) s += 25;
+        s += colorCount(c[0]) * (expert ? 4 : 3) + points(c) * 0.3;
+        if (/[SDF]/.test(c[1]) && nextCount <= (expert ? 4 : 3)) s += expert ? 36 : 25;
+        if (expert && c[1] === 'X') s += nextCount <= 3 ? 18 : -8;
       }
-      if (c === 'X') s -= 5;
+      if (!expert && c === 'X') s -= 5;
       return s;
     };
     card = opts.slice().sort((a, b) => score(b) - score(a))[0];
   }
   const after = hand.filter((c, i) => i !== hand.indexOf(card));
-  const callLast = hand.length === 2 && (level === 'hard' || Math.random() < 0.7);
+  const callLast = hand.length === 2 && (level === 'expert' || level === 'hard' || Math.random() < (level === 'medium' ? 0.55 : 0.4));
   return { t: 'play', card, color: isWild(card) ? bestColor(after) : undefined, last: callLast };
 }
 // Public projection written to the room doc (no hands, no deck order).

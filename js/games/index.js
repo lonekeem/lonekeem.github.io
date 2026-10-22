@@ -10,9 +10,9 @@ import { createStarCards } from './starcards.js';
 import { createPool } from './pool.js';
 import { createChess } from './chess.js';
 import { createLudo } from './ludo.js';
+import { lastMode, saveMode, lastLevel, saveLevel, PALS, faceSvg, ask, whenOffer, offerHtml, stopOffer, addBotRecord, botRecords, onlyBots, normLevel, COIN_ONLINE, COIN_BOT } from './bots.js';
 
 export { CONTROLLER };
-const CPU_KEY = 'lks-games-cpu';
 
 export function createGames(ctx) {
   const { S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale } = ctx;
@@ -23,10 +23,14 @@ export function createGames(ctx) {
   const signedIn = () => !!(S.user && S.profile);
   const myUid = () => (S.user ? S.user.uid : '');
   const link = (gid) => `${location.origin}${location.pathname}#game/${gid}`;
-  const cpuRec = () => { try { return JSON.parse(localStorage.getItem(CPU_KEY) || '{}'); } catch { return {}; } };
-  function addCpuResult(type, r) { const all = cpuRec(); const x = all[type] || { w: 0, l: 0, d: 0 }; x[r]++; all[type] = x; localStorage.setItem(CPU_KEY, JSON.stringify(all)); }
+  const cpuRec = () => botRecords();
+  const addCpuResult = (type, r) => addBotRecord(type, r);
   const qs = (s) => Object.fromEntries(new URLSearchParams(s || ''));
-  const chip = (p, extra = '') => `<div class="gp ${extra}">${p.uid && !isBot(p.uid) && p.uname ? avatar({ uid: p.uid, displayName: p.name, username: p.uname, color: p.color }, 'sm', false) : `<span class="avatar sm gp-bot" style="--c:#3b2466" aria-hidden="true">${CONTROLLER}</span>`}<span class="gp-n">${esc(p.name)}${p.uid && !isBot(p.uid) ? (window.kemyModBadge ? window.kemyModBadge(p.uid) : '') : ''}</span></div>`;
+  const chip = (p, extra = '') => {
+    const bot = isBot(p.uid) || p.bot;
+    const face = bot ? `<span class="avatar sm gp-bot" style="--c:#3b2466" aria-hidden="true">${faceSvg(p.name, 28)}</span>` : (p.uid && p.uname ? avatar({ uid: p.uid, displayName: p.name, username: p.uname, color: p.color }, 'sm', false) : `<span class="avatar sm gp-bot" style="--c:#3b2466" aria-hidden="true">${CONTROLLER}</span>`);
+    return `<div class="gp ${extra}">${face}<span class="gp-n">${esc(p.name)}${bot ? '<i class="bot-tag">Bot</i>' : (p.uid ? (window.kemyModBadge ? window.kemyModBadge(p.uid) : '') : '')}</span></div>`;
+  };
   const gearBtn = () => `<a class="g-icon g-gear" href="#/settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>`;
   const muteBtn = () => `<button class="g-icon" data-g="mute" aria-pressed="${sfx.muted}" aria-label="${sfx.muted ? 'Turn sound on' : 'Mute sound'}">${sfx.muted ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.6 9a4.2 4.2 0 0 1 0 6M18.4 6.4a8 8 0 0 1 0 11.2"/></svg>'}</button>`;
   function wireMute(root) {
@@ -72,14 +76,14 @@ export function createGames(ctx) {
     if (gid) S.unsubs.push(net.watchChat(gid, (m) => { if (m.uid === myUid()) return; if (m.e >= 100) { ge && ge.recv(m.uid, m.e, names(m.uid) || 'Player'); return; } floatEmote(host, m.e, names(m.uid)); }));
   }
   let curType = '', curPlayers = null;
-  function resultModal({ title, sub, win, buttons, pts, spectator }) {
+  function resultModal({ title, sub, win, buttons, pts, spectator, vsBot }) {
     openModal(`<div class="g-result ${win ? 'win' : ''}"><div class="g-result-star">${STAR()}</div><h2>${esc(title)}</h2><p>${esc(sub || '')}</p>
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
     const m = document.querySelector('.modal');
     buttons.forEach((b, i) => { if (b.onClick) { const el = m.querySelector(`[data-i="${i}"]`); if (el) el.onclick = () => { closeModal(); b.onClick(); }; } });
     const lbBtn = document.createElement('a'); lbBtn.className = 'btn btn-ghost lb-btn'; lbBtn.href = '#/scores/' + (curType || 'all'); lbBtn.textContent = '🏆 Scoreboard'; lbBtn.dataset.close = ''; m.querySelector('.btns')?.appendChild(lbBtn);
-    if (curType && signedIn() && !spectator && (!curPlayers || curPlayers.includes(myUid())) && !/^Game cancelled/i.test(title)) recordAndShow(curType, { r: win ? 'w' : /^Draw/i.test(title) ? 'd' : 'l', pts });
-    if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 25 } })); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: 20, why: 'for winning' } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
+    if (!vsBot && curType && signedIn() && !spectator && (!curPlayers || curPlayers.includes(myUid())) && !/^Game cancelled/i.test(title)) recordAndShow(curType, { r: win ? 'w' : /^Draw/i.test(title) ? 'd' : 'l', pts });
+    if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: vsBot ? 12 : 25 } })); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: vsBot ? COIN_BOT : COIN_ONLINE, why: vsBot ? 'for beating a bot' : 'for winning' } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
   }
   const ui = { shell, chip, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
   const trivia = createTrivia({ ...ctx, ui });
@@ -150,51 +154,71 @@ export function createGames(ctx) {
     if (!g) { main.innerHTML = '<div class="empty">Game not found. <a href="#/games">Games</a></div>'; return; }
     const room = type === 'trivia' || type === 'starcards' || type === 'ludo';
     const modes = type === 'klgrid' ? [['classic', 'Classic 3x3'], ['ultimate', 'Ultimate 9x9']] : type === 'starcards' ? [['500', 'Play to 500'], ['round', 'Single round']] : type === 'chess' ? [['', '60s a move'], ['5', '5 min clock'], ['10', '10 min clock']] : type === 'ludo' ? [['4', '4 seats'], ['3', '3 seats'], ['2', '2 seats']] : null;
+    const picked = params.do === 'quick' ? 'online' : params.do === 'friend' || params.do === 'cpu' ? params.do : lastMode();
+    let how = picked === 'online' || picked === 'friend' || picked === 'cpu' ? picked : 'cpu';
     shell(esc(g.name), `
       <div class="g-detail">${COVERS[type]}<p class="muted">${esc(g.blurb)} <span class="g-tag">${esc(g.players)}</span></p></div>
-      ${modes ? `<div class="g-seg" role="radiogroup" aria-label="Mode">${modes.map(([v, l], i) => `<label><input type="radio" name="g-mode" value="${v}" ${i ? '' : 'checked'}><span>${l}</span></label>`).join('')}</div>` : ''}
-      <div class="g-opts">
-        <section class="card pad g-opt ${params.do === 'friend' ? 'hl' : ''}"><h2>${STAR()} Play a friend</h2>
-          <form id="g-inv" class="g-inline"><label for="g-handle" class="sr-only">Friend's @handle</label><input id="g-handle" placeholder="@handle" autocapitalize="none" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Invite</button></form>
-          <p class="muted small">They get a notification. Or <button class="link-btn" id="g-link">${room ? 'open a room' : 'make a game'} and share the link</button>.</p></section>
-        <section class="card pad g-opt ${params.do === 'quick' ? 'hl' : ''}"><h2>${CONTROLLER} Quick match</h2><p class="muted small">We pair you with whoever’s looking right now.</p><button class="btn btn-block" id="g-quick">Find a match</button></section>
-        <section class="card pad g-opt ${params.do === 'cpu' ? 'hl' : ''}"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01"/></svg> Play the computer</h2>
-          ${type === 'starcards' ? `<label class="small muted g-inline-l">Computer players <select id="g-bots">${[1, 2, 3, 4, 5].map((n) => `<option ${n === 3 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}
-          <div class="g-two">${['pool', 'chess', 'ludo'].includes(type) ? '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn btn-ghost" data-lvl="medium" href="#">Medium</a><a class="btn" data-lvl="hard" href="#">Hard</a>' : '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn" data-lvl="hard" href="#">Hard</a>'}</div><p class="muted small">No account needed.</p></section>
+      ${modes ? `<div class="g-seg" role="radiogroup" aria-label="Rules">${modes.map(([v, l], i) => `<label><input type="radio" name="g-mode" value="${v}" ${i ? '' : 'checked'}><span>${l}</span></label>`).join('')}</div>` : ''}
+      <div class="g-modes" role="tablist" aria-label="How to play">
+        <button type="button" data-how="cpu" aria-pressed="${how === 'cpu'}">Play vs Computer</button>
+        <button type="button" data-how="online" aria-pressed="${how === 'online'}">Play Online (real players)</button>
+        <button type="button" data-how="friend" aria-pressed="${how === 'friend'}">Play a Friend</button>
       </div>
+      <div id="g-how"></div>
       <h2 class="g-h2">Top players</h2><div class="card" id="g-lb"><div class="spinner"></div></div>`, '#/games');
     const mode = () => document.querySelector('input[name=g-mode]:checked')?.value || '';
-    main.querySelectorAll('[data-lvl]').forEach((a) => a.onclick = (e) => {
-      e.preventDefault();
-      const extra = type === 'starcards' ? `&bots=${$('#g-bots').value}` : '';
-      location.hash = `#/games/${type}/cpu?lvl=${a.dataset.lvl}&mode=${mode()}${extra}`;
-    });
-    const busy = (b, on, t) => { b.disabled = on; if (t) b.textContent = t; };
-    $('#g-quick').onclick = async () => {
-      if (!requireAuth()) return;
-      const b = $('#g-quick'); busy(b, true, 'Looking…');
-      try { const gid = await net.quickMatch(type, mode()); location.hash = '#/game/' + gid; }
-      catch (e) { toast(friendlyError(e)); busy(b, false, 'Find a match'); }
+    const paintHow = () => {
+      const box = $('#g-how'); if (!box) return;
+      saveMode(how);
+      main.querySelectorAll('[data-how]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.how === how ? 'true' : 'false'));
+      if (how === 'cpu') {
+        box.innerHTML = `<section class="card pad" id="g-diff"><h2 class="g-h2" style="margin-top:0">Choose a bot</h2>
+          ${type === 'starcards' ? `<label class="small muted g-inline-l">Computer players <select id="g-bots">${[1, 2, 3, 4, 5].map((n) => `<option ${n === 3 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}
+          <div class="g-pals">${PALS.map((p) => `<button type="button" class="g-pal" data-lvl="${p.id}">${faceSvg(p.name, 64)}<b>${esc(p.name)}</b><i class="bot-tag">Bot</i><span>${esc(p.title)}</span><small>${esc(p.line)}</small></button>`).join('')}</div>
+          <p class="muted small">Bot games give fewer Star Coins, and they stay off the online scoreboard.</p></section>`;
+        box.querySelectorAll('[data-lvl]').forEach((a) => a.onclick = () => {
+          saveLevel(a.dataset.lvl);
+          const extra = type === 'starcards' ? `&bots=${$('#g-bots').value}` : '';
+          location.hash = `#/games/${type}/cpu?lvl=${a.dataset.lvl}&mode=${mode()}${extra}`;
+        });
+        return;
+      }
+      if (how === 'online') {
+        box.innerHTML = `<section class="card pad"><h2 class="g-h2" style="margin-top:0">Real players</h2><p class="muted small">We look for someone who is waiting right now. If nobody joins in about half a minute, you can play a bot instead. Bots are labeled Bot.</p><button class="btn btn-block" id="g-quick">Find a match</button></section>`;
+        const busy = (b, on, t) => { b.disabled = on; if (t) b.textContent = t; };
+        $('#g-quick').onclick = async () => {
+          if (!requireAuth()) return;
+          const b = $('#g-quick'); busy(b, true, 'Looking…');
+          try { const gid = await net.quickMatch(type, mode()); location.hash = '#/game/' + gid; }
+          catch (e) { toast(friendlyError(e)); busy(b, false, 'Find a match'); }
+        };
+        return;
+      }
+      box.innerHTML = `<section class="card pad"><h2 class="g-h2" style="margin-top:0">A friend</h2>
+        <form id="g-inv" class="g-inline"><label for="g-handle" class="sr-only">Friend's @handle</label><input id="g-handle" placeholder="@handle" autocapitalize="none" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Invite</button></form>
+        <p class="muted small">They get a notification. Or <button class="link-btn" id="g-link">${room ? 'open a room' : 'make a game'} and share the link</button>.</p></section>`;
+      $('#g-link').onclick = async () => {
+        if (!requireAuth()) return;
+        try { const gid = await net.createGame(type, mode()); location.hash = '#/game/' + gid; } catch (e) { toast(friendlyError(e)); }
+      };
+      $('#g-inv').onsubmit = async (ev) => {
+        ev.preventDefault();
+        if (!requireAuth()) return;
+        const h = $('#g-handle').value.trim().replace(/^@/, '').toLowerCase();
+        if (!h) { toast('Type your friend’s @handle'); return; }
+        try {
+          const uid = await net.uidForHandle(h);
+          if (!uid) { toast(`No one has the handle @${h}`); return; }
+          if (uid === myUid()) { toast('That’s you! Invite someone else.'); return; }
+          const gid = await net.createGame(type, mode(), { invitee: room ? '' : uid });
+          await net.invite(uid, gid, `${g.name}${room ? ' · room ' + gid : ''}`).catch((e) => toast('Game made, but the invite didn’t send: ' + friendlyError(e)));
+          toast(`Invite sent to @${h}`);
+          location.hash = '#/game/' + gid;
+        } catch (e) { toast(friendlyError(e)); }
+      };
     };
-    $('#g-link').onclick = async () => {
-      if (!requireAuth()) return;
-      try { const gid = await net.createGame(type, mode()); location.hash = '#/game/' + gid; } catch (e) { toast(friendlyError(e)); }
-    };
-    $('#g-inv').onsubmit = async (ev) => {
-      ev.preventDefault();
-      if (!requireAuth()) return;
-      const h = $('#g-handle').value.trim().replace(/^@/, '').toLowerCase();
-      if (!h) { toast('Type your friend’s @handle'); return; }
-      try {
-        const uid = await net.uidForHandle(h);
-        if (!uid) { toast(`No one has the handle @${h}`); return; }
-        if (uid === myUid()) { toast('That’s you! Invite someone else.'); return; }
-        const gid = await net.createGame(type, mode(), { invitee: room ? '' : uid });
-        await net.invite(uid, gid, `${g.name}${room ? ' · room ' + gid : ''}`).catch((e) => toast('Game made, but the invite didn’t send: ' + friendlyError(e)));
-        toast(`Invite sent to @${h}`);
-        location.hash = '#/game/' + gid;
-      } catch (e) { toast(friendlyError(e)); }
-    };
+    main.querySelectorAll('[data-how]').forEach((b) => b.onclick = () => { how = b.dataset.how; paintHow(); });
+    paintHow();
     net.leaderboard(type).then((rows) => {
       const box = $('#g-lb'); if (!box) return;
       box.innerHTML = rows.length ? `<ol class="g-lb">${rows.map((r, i) => `<li class="${r.uid === myUid() ? 'me' : ''}"><span class="g-rank">${i < 3 ? STAR('r' + i) : ''}<b>${i + 1}</b></span>${avatar({ uid: r.uid, displayName: r.name, username: r.uname, color: r.color }, 'sm', true)}<a href="#/u/${esc(r.uname)}" class="g-lb-n">${esc(r.name)}<small class="muted">@${esc(r.uname)}</small></a><span class="g-lb-s"><b>${r[type + '_w'] || 0}</b> W · ${r[type + '_l'] || 0} L</span></li>`).join('')}</ol>` : '<div class="empty">No online wins yet.</div>';
@@ -278,13 +302,14 @@ export function createGames(ctx) {
 
   // ------------------------------------------------------------ vs computer (local)
   function localBoard(type, params) {
-    const lvl = params.lvl === 'easy' ? 'easy' : 'hard';
+    const lvl = normLevel(params.lvl);
     const mode = type === 'klgrid' && params.mode === 'ultimate' ? 'ultimate' : 'classic';
     const E = ENGINES[type];
     const humanSide = Math.random() < 0.5 ? 0 : 1;
     let st = { board: E.init(mode), turn: 0, last: '', no: 0 }, sel = -1, over = null, lastCell = -1, thinking = false;
     const me = signedIn() ? { uid: myUid(), name: 'You', uname: S.profile.username, color: S.profile.color } : { uid: '', name: 'You' };
-    const cpu = { uid: 'cpu1', name: `Computer · ${lvl === 'easy' ? 'Easy' : 'Hard'}` };
+    const pal = PALS.find((p) => p.id === lvl);
+    const cpu = { uid: 'cpu1', name: pal.name, bot: true };
     const ps = humanSide === 0 ? [me, cpu] : [cpu, me];
     boardShell(type, mode, `${gameName(type)}${mode === 'ultimate' ? ' Ultimate' : ''}`, `#/games/${type}`);
     $('#g-actions').innerHTML = `<button class="btn btn-sm btn-ghost" id="g-restart">New game</button><a class="btn btn-sm btn-ghost" href="#/games/${type}">Leave</a>`;
@@ -294,7 +319,7 @@ export function createGames(ctx) {
     function draw() {
       if (!$('#g-board')) return;
       $('#g-players').innerHTML = playersBar(type, ps, st.turn, null, !!over);
-      $('#g-status').textContent = over ? (over.winner === 'draw' ? 'Draw!' : over.winner === humanSide ? 'You win!' : 'Computer wins') : st.turn === humanSide ? `Your turn (${pieceLabel(type, humanSide)})` : 'Computer is thinking…';
+      $('#g-status').textContent = over ? (over.winner === 'draw' ? 'Draw!' : over.winner === humanSide ? 'You win!' : `${pal.name} wins`) : st.turn === humanSide ? `Your turn (${pieceLabel(type, humanSide)})` : `${pal.name} is thinking…`;
       renderBoard($('#g-board'), type, st, { mySide: humanSide, live: !over && !thinking, legal: over ? [] : E.moves(st), lastCell, line: over ? over.line : [], sel, flip: humanSide === 1, lastMove: st.last,
         onSelect: (s) => { sel = s; draw(); }, onMove: (m) => move(m) });
     }
@@ -303,7 +328,7 @@ export function createGames(ctx) {
       draw();
       const r = over.winner === 'draw' ? 'd' : over.winner === humanSide ? 'w' : 'l';
       addCpuResult(type, r);
-      setTimeout(() => alive.v && resultModal({ title: r === 'w' ? 'You win!' : r === 'l' ? 'The computer wins' : 'Draw!', sub: r === 'w' ? 'Nice play.' : 'Run it back?', win: r === 'w',
+      setTimeout(() => alive.v && resultModal({ title: r === 'w' ? 'You win!' : r === 'l' ? `${pal.name} wins` : 'Draw!', sub: r === 'w' ? 'Nice play. Bot wins pay fewer coins.' : 'Run it back?', win: r === 'w', vsBot: true,
         buttons: [{ label: 'Play again', onClick: () => localBoard(type, params) }, { label: 'Back to games', href: '#/games' }] }), 700);
       return true;
     }
@@ -315,12 +340,12 @@ export function createGames(ctx) {
       draw();
       if (st.turn !== humanSide) cpuTurn();
     }
-    function cpuTurn() {
+    async function cpuTurn() {
       thinking = true; draw();
-      setTimeout(() => {
-        if (!alive.v) return;
-        const m = E.ai(st, lvl); thinking = false; move(m);
-      }, 450 + Math.random() * 350);
+      const m = await ask({ kind: 'board', type, st: { board: st.board, turn: st.turn, last: st.last }, level: lvl });
+      if (!alive.v) return;
+      thinking = false;
+      if (m) move(m);
     }
     draw();
     if (st.turn !== humanSide) cpuTurn();
@@ -346,7 +371,8 @@ export function createGames(ctx) {
       const box = $('#g-actions'); if (!box) return;
       const side = mySide();
       if (g.status === 'waiting') {
-        box.innerHTML = `${side === 0 ? `<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>` : ''}${side < 0 && signedIn() ? '<button class="btn btn-sm" id="g-join">Join this game</button>' : ''}${!signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}`;
+        const offer = side === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => draw());
+        box.innerHTML = `${side === 0 ? `<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>` : ''}${side < 0 && signedIn() ? '<button class="btn btn-sm" id="g-join">Join this game</button>' : ''}${!signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
       } else if (g.status === 'active') {
         box.innerHTML = side >= 0 ? `<button class="btn btn-sm btn-danger" id="g-forfeit">Forfeit</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>` : `<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>`;
       } else {
@@ -354,6 +380,7 @@ export function createGames(ctx) {
       }
       const sh = $('#g-share'); if (sh) sh.onclick = async () => { try { await navigator.clipboard.writeText(link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', link(gid)); } };
       const cn = $('#g-cancel'); if (cn) cn.onclick = async () => { try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue(type, g.mode, gid); location.hash = '#/games'; } catch (e) { toast(friendlyError(e)); } };
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = async () => { stopOffer(gid); try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue(type, g.mode, gid); } catch { /* already gone */ } location.hash = `#/games/${type}/cpu?lvl=${lastLevel()}&mode=${g.mode || ''}`; };
       const jn = $('#g-join'); if (jn) jn.onclick = async () => { try { await net.join(gid); } catch (e) { toast(friendlyError(e)); } };
       const ff = $('#g-forfeit'); if (ff) ff.onclick = () => { if (confirm('Forfeit this game? It counts as a loss.')) claim('forfeit'); };
       const rm = $('#g-rematch'); if (rm) rm.onclick = async () => {
@@ -409,13 +436,15 @@ export function createGames(ctx) {
       if (stopHb) { stopHb(); stopHb = null; }
       if (g.endReason === 'cancelled') return;
       const side = mySide();
-      if (side >= 0) setTimeout(() => net.recordResult(g, iEnded || g.endReason === 'timeout' || g.endReason === 'forfeit'), iEnded ? 0 : 2500);
+      const botGame = onlyBots(g.players, myUid());
+      if (side >= 0 && !botGame) setTimeout(() => net.recordResult(g, iEnded || g.endReason === 'timeout' || g.endReason === 'forfeit'), iEnded ? 0 : 2500);
+      if (side >= 0 && botGame) addCpuResult(type, g.winnerUid === myUid() ? 'w' : g.winnerUid === 'draw' ? 'd' : 'l');
       const win = side >= 0 && g.winnerUid === myUid();
       const title = g.winnerUid === 'draw' ? 'Draw!' : side < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost';
       const sub = g.endReason === 'forfeit' ? (win ? 'Your opponent forfeited.' : 'Game forfeited.') : g.endReason === 'timeout' ? (win ? 'Your opponent ran out of time.' : 'Time ran out.') : win ? 'Stars well played.' : '';
       setTimeout(() => {
         if (stale(token)) return;
-        resultModal({ title, sub, win, buttons: side >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
+        resultModal({ title, sub, win, vsBot: botGame, buttons: side >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
       }, 800);
     }
     // Auto-claim when the other player's clock runs out or their heartbeat goes quiet.
