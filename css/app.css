@@ -1788,7 +1788,18 @@ input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible { o
 .nm-total { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
 .nm-total b { font-size: 2.75rem; line-height: 1; color: #ffd34d; font-weight: 800; }
 .nm-total span { color: #e9d5ff; font-weight: 700; }
+.nm-total .nm-delta { display: inline-block; min-width: 1.5em; margin-left: 4px; font-size: 1.4rem; font-weight: 800; color: transparent; opacity: 0; }
+.nm-total .nm-delta.show { animation: nm-pop 1.3s ease; }
+.nm-total .nm-delta.up { color: #3ddc84; }
+.nm-total .nm-delta.down { color: #ff5c6a; }
+@keyframes nm-pop {
+  0% { opacity: 0; transform: translateY(8px); }
+  15% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
 .nm-count-note { margin: 0 0 10px; }
+.nm-verified { margin: 0 0 8px; }
 .nm-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
 .nm-tabs button { min-height: 44px; padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(160,110,255,.5); background: transparent; color: #e9d5ff; font: inherit; font-weight: 700; cursor: pointer; }
 .nm-tabs button[aria-selected="true"] { background: #8a2be2; color: #fff; border-color: #ffd34d; }

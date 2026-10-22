@@ -1502,7 +1502,11 @@ async function pageAdmin(token) {
   mod.adminSection($('#adm-mods'));
   donate.mountAdmin($('#adm-donate'));
   import('./push.js').then((m) => { const h = document.getElementById('push-admin-host'); if (h) h.innerHTML = m.adminHtml(); m.wireAdmin(toast); }).catch(() => {});
-  import('./members.js').then((m) => m.paintAdminBadge(document.getElementById('nm-badge'))).catch(() => {});
+  import('./members.js').then((m) => {
+    if (stale(token)) return;
+    const unsub = m.watchAdminBadge(document.getElementById('nm-badge'));
+    if (typeof unsub === 'function') S.unsubs.push(unsub);
+  }).catch(() => {});
   if ($('#adm-founder')) { $('#adm-founder').onclick = () => founderSet(true); $('#adm-founder-off').onclick = () => founderSet(false); }
   const st = $('#shop-status'), pub = $('#shop-pub');
   const showStatus = async () => {

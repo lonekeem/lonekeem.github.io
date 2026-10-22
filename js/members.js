@@ -1,5 +1,6 @@
 // New Members: an admin-only list of who joined Kemy, plus one member's detail.
-// The totals at the top are Firestore count() queries. Online is Pal Park presence.
+// The big total, Active, and Left Kemy follow stats/members (a Cloud Functions counter).
+// Today, this week, this month, online, and Inactive stay Firestore count() queries. Online is Pal Park presence.
 // Inactive is no visit for 30 days (members.lastActive). Left Kemy is leftMembers/{uid}.
 // The directory is members/{uid}. Public profiles stay on users/{uid}. Emails are not on the
 // public profile, and this page hides them until the admin taps Show email.
@@ -8,7 +9,7 @@
 // Written by Lone Keem.
 import { auth, db, ADMIN_EMAIL, EMU, app } from './firebase-init.js';
 import {
-  collection, doc, getDoc, getDocs, getCountFromServer, query, where, orderBy, limit,
+  collection, doc, getDoc, getDocs, getCountFromServer, onSnapshot, query, where, orderBy, limit,
   startAfter, setDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
@@ -122,11 +123,6 @@ async function countWhere(field, op, value) {
   return snap.data().count || 0;
 }
 
-async function countLeft() {
-  const snap = await getCountFromServer(query(collection(db, 'leftMembers')));
-  return snap.data().count || 0;
-}
-
 async function countMembersFrom(start) {
   const q = start
     ? query(collection(db, 'members'), where('createdAt', '>=', start))
@@ -148,41 +144,78 @@ function countCell(value, label) {
   return `<div class="nm-stat"><b>${esc(shown)}</b><span>${esc(label)}</span></div>`;
 }
 
-async function paintCounts(box, stale) {
-  if (!box) return;
+let liveUnsub = null;
+function stopLive() {
+  if (liveUnsub) { try { liveUnsub(); } catch { /* already stopped */ } liveUnsub = null; }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('hashchange', () => {
+    if (!/^#\/members$/.test(location.hash || '')) stopLive();
+  });
+}
+
+function flashDelta(dir) {
+  const el = document.getElementById('nm-delta');
+  if (!el) return;
+  el.textContent = dir === 'up' ? '+1' : '-1';
+  el.className = 'nm-delta';
+  void el.offsetWidth;
+  el.className = 'nm-delta show ' + (dir === 'up' ? 'up' : 'down');
+}
+
+async function paintCounts(stale) {
+  const period = document.getElementById('nm-period');
+  if (!period) return;
+  stopLive();
   const { today, week, month } = periodStarts();
   const cutoff = inactiveCutoff();
   const settled = await Promise.all([
-    countMembersFrom(null).then((n) => n, () => null),
     countMembersFrom(today).then((n) => n, () => null),
     countMembersFrom(week).then((n) => n, () => null),
     countMembersFrom(month).then((n) => n, () => null),
     countOnline().then((n) => n, () => null),
-    countWhere('lastActive', '>=', cutoff).then((n) => n, () => null),
-    countWhere('lastActive', '<', cutoff).then((n) => n, () => null),
-    countLeft().then((n) => n, () => null)
+    countWhere('lastActive', '<', cutoff).then((n) => n, () => null)
   ]);
   if (stale && stale()) return;
-  const [total, todayN, weekN, monthN, online, activeN, inactiveN, leftN] = settled;
-  const setN = (id, n) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = n == null ? '—' : comma(n);
-  };
-  setN('nm-n-active', activeN);
-  setN('nm-n-inactive', inactiveN);
-  setN('nm-n-left', leftN);
-  if (total == null) {
-    box.innerHTML = '<p class="muted small nm-count-note">Couldn’t count members.</p>';
-    return;
-  }
-  box.innerHTML = `<p class="nm-total"><b>${esc(comma(total))}</b><span>members</span></p>
-    <div class="nm-stats">
-      ${countCell(todayN, 'Joined today')}
-      ${countCell(weekN, 'This week')}
-      ${countCell(monthN, 'This month')}
-      ${countCell(online, 'Online now')}
-    </div>
-    <p class="muted small nm-count-note">Today, this week, and this month start at midnight in New York. Online is Pal Park in the last minute. Inactive means no visit for 30 days. Left Kemy is an account that was deleted.</p>`;
+  const [todayN, weekN, monthN, online, inactiveN] = settled;
+  period.innerHTML = [
+    countCell(todayN, 'Joined today'),
+    countCell(weekN, 'This week'),
+    countCell(monthN, 'This month'),
+    countCell(online, 'Online now')
+  ].join('');
+  const inactiveEl = document.getElementById('nm-n-inactive');
+  if (inactiveEl) inactiveEl.textContent = inactiveN == null ? '—' : comma(inactiveN);
+  let prev = null;
+  liveUnsub = onSnapshot(doc(db, 'stats', 'members'), (snap) => {
+    if (stale && stale()) return;
+    const totalEl = document.getElementById('nm-live-total');
+    const verified = document.getElementById('nm-verified');
+    if (!snap.exists()) {
+      if (totalEl) totalEl.textContent = '…';
+      if (verified) verified.textContent = 'Not verified yet';
+      return;
+    }
+    const total = num(snap.get('total'));
+    if (prev != null) {
+      const delta = total - prev;
+      if (delta === 1) flashDelta('up');
+      else if (delta === -1) flashDelta('down');
+    }
+    prev = total;
+    if (totalEl) totalEl.textContent = comma(total);
+    const activeEl = document.getElementById('nm-n-active');
+    const leftEl = document.getElementById('nm-n-left');
+    if (activeEl) activeEl.textContent = comma(snap.get('active'));
+    if (leftEl) leftEl.textContent = comma(snap.get('left'));
+    if (verified) {
+      const stamp = nyStamp(snap.get('lastVerified'));
+      verified.textContent = stamp ? 'Last verified ' + stamp : 'Not verified yet';
+    }
+  }, () => {
+    const totalEl = document.getElementById('nm-live-total');
+    if (totalEl) totalEl.textContent = '…';
+  });
 }
 
 let fns = null;
@@ -202,21 +235,26 @@ export async function memberCountSince(seenAt) {
   return snap.data().count || 0;
 }
 
-export async function paintAdminBadge(el) {
-  if (!el || !isAdmin()) return;
-  const title = document.getElementById('nm-card-title');
-  try {
-    const seen = await getDoc(doc(db, 'users', auth.currentUser.uid, 'prefs', 'members'));
-    const [total, n] = await Promise.all([
-      memberCountSince(null),
-      memberCountSince(seen.exists() ? seen.get('seenAt') : null)
-    ]);
-    if (title) title.textContent = `Members ${comma(total)} · ${comma(n)} new`;
-    el.textContent = n > 99 ? '99+' : String(n);
-    el.hidden = n < 1;
-  } catch {
-    el.hidden = true;
-  }
+export function watchAdminBadge(el) {
+  if (!el || !isAdmin()) return () => {};
+  let total = null;
+  let fresh = null;
+  let stopped = false;
+  const paint = () => {
+    if (stopped || total == null || fresh == null) return;
+    const title = document.getElementById('nm-card-title');
+    if (title) title.textContent = `Members ${comma(total)} · ${comma(fresh)} new`;
+    el.textContent = fresh > 99 ? '99+' : String(fresh);
+    el.hidden = fresh < 1;
+  };
+  const unsub = onSnapshot(doc(db, 'stats', 'members'), (snap) => {
+    total = snap.exists() ? num(snap.get('total')) : 0;
+    paint();
+  }, () => { el.hidden = true; });
+  getDoc(doc(db, 'users', auth.currentUser.uid, 'prefs', 'members')).then((seen) => (
+    memberCountSince(seen.exists() ? seen.get('seenAt') : null)
+  )).then((n) => { fresh = n; paint(); }).catch(() => { el.hidden = true; });
+  return () => { stopped = true; unsub(); };
 }
 
 function onKemyStreet(plot) {
@@ -374,6 +412,7 @@ function rowHtml(m, fresh) {
 }
 
 export async function page(main, { stale, toast, mod } = {}) {
+  stopLive();
   const say = typeof toast === 'function' ? toast : () => {};
   if (!auth.currentUser) { location.hash = '#/login'; return; }
   if (!isAdmin()) {
@@ -394,7 +433,13 @@ export async function page(main, { stale, toast, mod } = {}) {
     <div id="nm-shell">
     <a class="nm-back" href="#/admin">← Admin</a>
     <h1 class="page-title">New Members</h1>
-    <div id="nm-counts" aria-live="polite"><p class="nm-total"><b>…</b><span>members</span></p></div>
+    <div id="nm-counts" aria-live="polite">
+      <p class="nm-total"><b id="nm-live-total">…</b><span>members</span><span id="nm-delta" class="nm-delta" aria-hidden="true"></span></p>
+      <div class="nm-stats" id="nm-period"></div>
+      <p class="muted small nm-count-note">Today, this week, and this month start at midnight in New York. Online is Pal Park in the last minute. Inactive means no visit for 30 days. Left Kemy is an account that was deleted.</p>
+      <p class="muted small nm-verified" id="nm-verified">Not verified yet</p>
+      <p class="small"><button type="button" class="btn btn-sm btn-ghost" id="nm-recount">Recount</button> <span class="muted small" id="nm-recount-msg"></span></p>
+    </div>
     <div class="nm-tabs" role="tablist" aria-label="Member lists">
       <button type="button" role="tab" data-tab="all" aria-selected="true">All</button>
       <button type="button" role="tab" data-tab="active" aria-selected="false">Active <b id="nm-n-active">…</b></button>
@@ -698,6 +743,22 @@ export async function page(main, { stale, toast, mod } = {}) {
 
   const markSeen = setDoc(doc(db, 'users', uid, 'prefs', 'members'), { seenAt: serverTimestamp() }).catch(() => {});
 
+  const recount = main.querySelector('#nm-recount');
+  const recountMsg = main.querySelector('#nm-recount-msg');
+  recount.onclick = async () => {
+    recount.disabled = true;
+    recountMsg.textContent = 'Counting every account…';
+    try {
+      await httpsCallable(functionsApp(), 'recountMembers')({});
+      if (!(stale && stale())) recountMsg.textContent = 'Counts match the real accounts.';
+    } catch (e) {
+      if (!(stale && stale())) recountMsg.textContent = /not-found|unavailable|internal|deadline/.test(String(e && e.code))
+        ? 'Recount needs the function deployed.'
+        : ((e && e.message) || 'Couldn’t recount.');
+    }
+    recount.disabled = false;
+  };
+
   const fill = main.querySelector('#nm-fill');
   fill.onclick = async () => {
     fill.disabled = true;
@@ -720,5 +781,5 @@ export async function page(main, { stale, toast, mod } = {}) {
     fill.disabled = false;
   };
 
-  await Promise.all([more(true), paintCounts(main.querySelector('#nm-counts'), stale), markSeen]);
+  await Promise.all([more(true), paintCounts(stale), markSeen]);
 }

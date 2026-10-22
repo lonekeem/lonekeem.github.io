@@ -268,6 +268,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Live member totals. Numbers only. Cloud Functions write this with the Admin SDK.
+    match /stats/{id} {
+      allow get: if isAdmin() && id == 'members';
+      allow list, create, update, delete: if false;
+    }
+    // One doc per Auth event so a retried create or delete cannot move the total twice.
+    match /memberCountEvents/{id} {
+      allow read, write: if false;
+    }
+
     // What's New entries (js/updates.js). Everyone can read. Only the verified admin can write.
     // updates.json in the repo is the fallback; a doc with the same id replaces that entry.
     match /updates/{id} {

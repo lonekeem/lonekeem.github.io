@@ -6,6 +6,7 @@ const { auth: authV1 } = require('firebase-functions/v1');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 const admin = require('firebase-admin');
 const policy = require('./push-policy');
+const stats = require('./member-stats');
 
 async function latestVisit(fs, uid, fallback) {
   try {
@@ -37,9 +38,16 @@ async function writeLeftMember(user) {
   return { ok: true, kept: false };
 }
 
-const recordLeftMember = authV1.user().onDelete(async (user) => {
+const recordLeftMember = authV1.user().onDelete(async (user, context) => {
   try { await writeLeftMember(user); }
   catch (e) { console.error('leftMembers', e); }
+  try { await stats.applyMemberDelta(user, context && context.eventId, 'delete'); }
+  catch (e) { console.error('memberCount', e); }
+});
+
+const countMemberCreated = authV1.user().onCreate(async (user, context) => {
+  try { await stats.applyMemberDelta(user, context && context.eventId, 'create'); }
+  catch (e) { console.error('memberCount', e); }
 });
 
 function signupOf(user) {
@@ -108,4 +116,4 @@ const backfillMembers = onCall({ timeoutSeconds: 300, memory: '512MiB' }, async 
   return { ok: true, filled, stamped, scanned };
 });
 
-module.exports = { backfillMembers, signupOf, recordLeftMember, writeLeftMember };
+module.exports = { backfillMembers, signupOf, recordLeftMember, countMemberCreated, writeLeftMember };

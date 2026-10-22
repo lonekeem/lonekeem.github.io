@@ -78,6 +78,11 @@ exports.sellHome = onCall({ enforceAppCheck: false }, async (req) => {
 // Web push: inbox invites and house visits, your-turn updates, the morning Star Coin reminder,
 // and an admin-only announcement callable. See functions/push.js. Written by Lone Keem.
 Object.assign(exports, require('./push'));
-// New Members back-fill (admin only) and the auth-delete note in leftMembers.
-// The join ping itself lives in push.js.
-Object.assign(exports, require('./members'));
+// New Members back-fill, the left-Kemy note, and the live stats/members counter.
+// Only Cloud Functions are exported. signupOf and writeLeftMember stay on ./members for tests.
+const membersApi = require('./members');
+const memberStats = require('./member-stats');
+exports.backfillMembers = membersApi.backfillMembers;
+exports.recordLeftMember = membersApi.recordLeftMember;
+exports.countMemberCreated = membersApi.countMemberCreated;
+exports.recountMembers = memberStats.recountMembers;
