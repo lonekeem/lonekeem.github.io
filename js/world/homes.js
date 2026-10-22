@@ -12,8 +12,8 @@ import { checkInput } from '../pals/talk.js';
 import { ADMIN_EMAIL, EMU } from '../firebase-init.js';
 import { attachHomeLife } from './homelife.js';
 export const plateBad = (t) => { const s = String(t || ''); return !!(checkInput(s) || checkInput(s.toLowerCase()) || checkInput(s.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').toLowerCase())); };
-import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, serItems, defaultItems, WALL_SW, WALL_ROOMS, parseWalls, EXT_SW, FLOORS } from './interior.js';
-import { itemAabb, pickIndex, nearestReach, nudgePlan, screenStep, clampPlan, xzGap } from './decorate.js';
+import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, defaultItems, placedItems, packLayout, unpackStash, WALL_SW, WALL_ROOMS, parseWalls, EXT_SW, FLOORS } from './interior.js';
+import { itemAabb, pickIndex, nearestReach, nudgePlan, screenStep, clampPlan, xzGap, stashOnRemove } from './decorate.js';
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const RADIO_RE = /^https:\/\/(?:open\.spotify\.com|embed\.music\.apple\.com|music\.apple\.com|(?:www\.|m\.)?youtube\.com|(?:www\.)?youtube-nocookie\.com|(?:www\.)?youtu\.be)\//;
 // House TV accepts the same YouTube links as the rest of Kemy. The id is checked again before an iframe is created.
@@ -144,7 +144,7 @@ export function attachHomes(api, W, K) {
   function buildRoom(h) { if (rooms.has(h.id)) return rooms.get(h.id); const { cx, cz } = roomCell(h); const o = owners.get(h.id); const dec = (o && o.decor) || {};
     const I = buildInterior(api, { put, flush, G, y: FLAT }, h, cx, cz, dec); root.add(I.g); const r0 = { g: I.g, cx, cz, I, h, dk: JSON.stringify(dec) }; rooms.set(h.id, r0); return r0; }
   function applyDecor(id) { const o = owners.get(id); const dec = (o && o.decor) || {}; if (W.paintHouse && HOUSE_BY_ID[id] && HOUSE_BY_ID[id].sale) W.paintHouse(id, dec.ext || null); const r = rooms.get(id); const k = JSON.stringify(dec);
-    if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall, dec.walls); r.I.setFloor(dec.floor || r.I.S.floor); r.I.setItems(parseItems(dec.items || defaultItems(r.I.two, r.h && r.h.num ? r.h.seed : 0))); } }
+    if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall, dec.walls); r.I.setFloor(dec.floor || r.I.S.floor); r.I.setItems(placedItems(dec, r.h, r.I.two)); } }
   const canEnter = (h) => { if (!h.sale) return true; const o = owners.get(h.id); if (!o) return false; return o.owner === uid || o.open === true || (Array.isArray(o.inv) && o.inv.includes(uid)); };
   // A doorbell or a visit on someone else's Kemy Street home. One note per owner per kind per half hour.
   const noted = new Map();
@@ -519,19 +519,23 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     const step = screenStep(sx, sy, camBasis()); nudgePlan(it, step.dx, step.dz); relItems(); placeHi();
   }
   function rotateSel() { const it = deco && deco.items[deco.sel]; if (!it) return; it.r = (it.r + 1) & 3; relItems(); placeHi(); }
+  function starterOf(r) { return parseItems(defaultItems(r.I.two, r.h && r.h.num ? r.h.seed : 0)); }
   function removeSel() {
-    if (!deco || deco.sel < 0) return; const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece';
-    deco.items.splice(deco.sel, 1); deco.sel = -1; deco.moving = false; relItems(); drawDeco(); say(name + ' put away. You can place it again.');
+    if (!deco || deco.sel < 0) return; const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece'; const code = it.c;
+    const before = deco.stash.length; deco.items.splice(deco.sel, 1); stashOnRemove(code, deco.base, deco.items.filter((q) => q.c === code).length, deco.stash);
+    deco.sel = -1; deco.moving = false; relItems(); drawDeco();
+    say(deco.stash.length > before ? name + ' is in your furniture. Place it again any time, free.' : name + ' put away. You can place it again.');
   }
-  function selectItem(i) { if (!deco || i < 0 || i >= deco.items.length) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; placeHi(); paintTools(); markMine(); }
+  function selectItem(i) { if (!deco || i < 0 || i >= deco.items.length) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; deco.resetSure = false; placeHi(); paintTools(); markMine(); }
   function startDeco() { if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
-    deco = { r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, ext: { ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), sel: -1, tab: 'f', t: 0, open: false, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false };
+    const base = {}; for (const it of starterOf(r)) base[it.c] = (base[it.c] || 0) + 1;
+    deco = { r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, ext: { ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'f', t: 0, open: false, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false };
     document.body.classList.add('kh-decorating');
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
     loadOwned().then(() => deco && drawDeco()); drawDeco(); decB.hidden = true; window.__kh && (window.__kh.deco = true); }
   function endDeco(save) { const d = deco; if (!d) return; document.body.classList.remove('kh-decorating'); const parked = d.parkedRadio; deco = null; dbar.hidden = true; ring.visible = false; hi.visible = false; hiEdge.visible = false; decB.hidden = !(inside && inside.id === myPlot); window.__kh && (window.__kh.deco = false);
     if (parked && rad && !radioBox.hidden) restoreCard();
-    if (save) { const dec = { wall: d.wall, ...(d.walls ? { walls: d.walls } : {}), floor: d.floor, ext: d.ext, items: serItems(d.items), v: 1 }; homeW({ decor: dec }).then(() => say('💾 Home saved! Visitors see your new look.')).catch((e) => { wErr(e); applyDecor(myPlot); }); const r = rooms.get(myPlot); if (r) r.dk = JSON.stringify(dec); }
+    if (save) { const dec = { wall: d.wall, ...(d.walls ? { walls: d.walls } : {}), floor: d.floor, ext: d.ext, items: packLayout(d.items, d.stash), v: 2 }; homeW({ decor: dec }).then(() => say('💾 Home saved! Visitors see your new look.')).catch((e) => { wErr(e); applyDecor(myPlot); }); const r = rooms.get(myPlot); if (r) r.dk = JSON.stringify(dec); }
     else { const r = rooms.get(myPlot); if (r) r.dk = ''; applyDecor(myPlot); } }
   const relItems = () => { if (deco) deco.r.I.setItems(deco.items); };
   function decoTick(dt) {
@@ -555,23 +559,27 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     const body = dbar.querySelector('.kh-body'); if (!body || !deco) return; const t = deco.tab;
     if (t === 'p') body.innerHTML = `<div class="kh-strip" aria-label="Wall colours">${WALL_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}</div><div class="kh-strip">${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button type="button" data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join('')}${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join('')}</div>${deco.open ? [['w', 'Walls'], ['r', 'Roof'], ['d', 'Door'], ['t', 'Trim']].map(([k, n]) => `<label>${n}</label><div class="kh-strip">${EXT_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-e="${k}:${c}" aria-label="${n} ${c}"></button>`).join('')}</div>`).join('') + '<button type="button" data-e="reset">Reset outside colours</button>' : ''}`;
     else if (t === 'm') body.innerHTML = `<div class="kh-strip" aria-label="My furniture">${deco.items.map((it, i) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing placed yet.</small>'}</div>`;
-    else body.innerHTML = `<div class="kh-strip" aria-label="Add furniture">${Object.entries(DECOR).map(([c, D]) => `<button type="button" class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D)}</em></button>`).join('')}</div>`;
+    else { const stored = (c) => deco.stash.filter((q) => q === c).length; const entries = Object.entries(DECOR).sort((a, b) => stored(b[0]) - stored(a[0]));
+      body.innerHTML = `<div class="kh-strip" aria-label="Add furniture">${entries.map(([c, D]) => { const n = stored(c); const em = n ? 'Stored' + (n > 1 ? ' ' + n : '') : have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D); return `<button type="button" class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${em}</em></button>`; }).join('')}</div>`; }
     body.querySelectorAll('[data-mine]').forEach((b) => (b.onclick = () => selectItem(+b.dataset.mine)));
     body.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; paintBody(); }));
     body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
     body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { deco.floor = b.dataset.fl; deco.r.I.setFloor(deco.floor); paintBody(); }));
     body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say('🎨 Outside colour set (see it when you go out)'); }));
     body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
-      if (!have(c)) { if (!b.dataset.sure) { b.dataset.sure = 1; b.querySelector('em').textContent = 'Tap to buy ' + priceOf(D); return; } try { b.disabled = true; const { econ: e, dia: d } = await shop(); if (D.d) await d.buy(decorItem(c)); else await e.buy(decorItem(c)); owned = owned || {}; owned[decorItem(c)] = 1; say('🛍️ Bought ' + D.n); }
+      const si = deco.stash.indexOf(c); if (si >= 0) deco.stash.splice(si, 1);
+      else if (!have(c)) { if (!b.dataset.sure) { b.dataset.sure = 1; b.querySelector('em').textContent = 'Tap to buy ' + priceOf(D); return; } try { b.disabled = true; const { econ: e, dia: d } = await shop(); if (D.d) await d.buy(decorItem(c)); else await e.buy(decorItem(c)); owned = owned || {}; owned[decorItem(c)] = 1; say('🛍️ Bought ' + D.n); }
         catch (e) { b.disabled = false; say(e.code === 'permission-denied' ? 'The shop isn’t selling decor yet (prices not published).' : /Diamond|reading 'd'/.test(e.message || '') ? 'You need more 💎 Diamonds' : e.message || 'Could not buy'); return; } }
       const r = deco.r; const fx = Math.sin(P.yaw || 0), fz = Math.cos(P.yaw || 0);
       deco.items.push({ c, x: clampPlan((P.x - r.cx + fx * 1.6) / SC), z: clampPlan((P.z - r.cz + fz * 1.6) / SC), r: (Math.round(((P.yaw || 0) + Math.PI) / (Math.PI / 2)) % 4 + 4) % 4, f: r.I.two && P.y > FLAT + 2.5 ? 1 : 0 }); deco.sel = deco.items.length - 1; relItems(); drawDeco(); }));
   }
   function drawDeco() { if (!deco) return; const t = deco.tab;
     dbar.classList.toggle('open', !!deco.open); dbar.hidden = false;
-    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} Decorate</button><button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${deco.items.length}</button><button type="button" data-tab="p" class="${t === 'p' ? 'on' : ''}">Paint</button><button type="button" class="g" data-x>Cancel</button><button type="button" class="p" data-sv>Done</button></div><div class="kh-tools"></div><div class="kh-body"></div>`;
+    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} Decorate</button><button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${deco.items.length}</button><button type="button" data-tab="p" class="${t === 'p' ? 'on' : ''}">Paint</button><button type="button" class="g" data-reset aria-label="Reset to default furniture">${deco.resetSure ? 'Sure?' : 'Reset'}</button><button type="button" class="g" data-x>Cancel</button><button type="button" class="p" data-sv>Done</button></div><div class="kh-tools"></div><div class="kh-body"></div>`;
     dbar.querySelector('[data-handle]').onclick = () => { deco.open = !deco.open; drawDeco(); };
-    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; drawDeco(); }));
+    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; deco.resetSure = false; drawDeco(); }));
+    dbar.querySelector('[data-reset]').onclick = () => { if (!deco.resetSure) { deco.resetSure = true; drawDeco(); say('Tap Sure to put back the furniture that came with the house. Paint stays.'); return; }
+      deco.items = starterOf(deco.r).map((i) => ({ ...i })); deco.stash = []; deco.sel = -1; deco.moving = false; deco.resetSure = false; relItems(); drawDeco(); say('Starter furniture is back. Pieces you bought are still yours.'); };
     dbar.querySelector('[data-x]').onclick = () => endDeco(false); dbar.querySelector('[data-sv]').onclick = () => endDeco(true);
     paintTools(); paintBody(); }
   function rayAt(clientX, clientY) {
@@ -624,7 +632,7 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     if (pressed.confirm) { deco.moving = !deco.moving; paintTools(); }
     return true;
   }
-  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, name: it ? DECOR[it.c].n : '', x: it ? it.x : null, z: it ? it.z : null, hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden }; }
+  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, name: it ? DECOR[it.c].n : '', code: it ? it.c : '', x: it ? it.x : null, z: it ? it.z : null, stash: deco.stash.slice(), hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden }; }
   function screenOf(i) {
     if (!deco || !deco.items[i] || !api.cam) return null; const b = aabbOf(deco.items[i]); api.cam.updateMatrixWorld(); const v = new THREE.Vector3((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2); v.project(api.cam);
     const rect = view.querySelector('canvas').getBoundingClientRect(); return { x: (v.x + 1) / 2 * rect.width + rect.left, y: (1 - v.y) / 2 * rect.height + rect.top, behind: v.z > 1 };

@@ -73,6 +73,15 @@ export function nearestReach(items, px, pz, aabbOf, reach = 1.25) {
 
 export function clampPlan(v) { return Math.max(-5.5, Math.min(5.5, Math.round(v * 2) / 2)); }
 
+// A removed piece goes into house storage when the room now has fewer of that
+// starter than the house came with. Bought extras stay in the shop inventory.
+export function stashOnRemove(code, base, placedAfter, stash) {
+  const stored = stash.filter((c) => c === code).length;
+  const need = (base[code] || 0) - placedAfter;
+  if (need > stored) stash.push(code);
+  return stash;
+}
+
 export function nudgePlan(it, dx, dz) {
   it.x = clampPlan(it.x + dx);
   it.z = clampPlan(it.z + dz);
