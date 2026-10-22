@@ -482,11 +482,10 @@ export function createModeration(ctx) {
       list.innerHTML = rs.length ? rs.map((x) => `<div class="card pad mod-rep st-${x.status === 'new' ? 'open' : x.status === 'progress' ? 'review' : 'resolved'}" data-id="${esc(x.id)}"><div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag mod-type">${x.kind === 'bug' ? '🐞 Bug' : x.kind === 'idea' ? '💡 Idea' : '💜 Feedback'}</span><span class="mod-st">${esc(FB[x.status] || x.status)}</span><span class="spacer"></span><span class="muted small">${esc(timeAgo(x.createdAt))}</span></div>
         <blockquote class="mod-quote">${esc(x.text)}</blockquote><p class="muted small" style="margin:0">From ${esc(x.name || 'someone')}${x.page ? ' · on ' + esc(x.page) : ''}${x.ua ? `<br>${esc(x.ua.slice(0, 120))}` : ''}</p>
         <div class="field" style="margin-top:8px"><label class="small" for="fbn-${esc(x.id)}">Notes</label><textarea id="fbn-${esc(x.id)}" maxlength="1000" rows="2">${esc(x.note || '')}</textarea></div>
-        <div class="mod-acts"><button class="btn btn-sm btn-ghost" data-s="progress">🔧 In progress</button><button class="btn btn-sm" data-s="fixed">✅ Fixed</button><button class="btn btn-sm btn-ghost" data-s="closed">Close</button><button class="btn btn-sm btn-ghost" data-s="note">💾 Save note</button><button class="btn btn-sm btn-ghost" data-s="reply">💬 Reply</button></div></div>`).join('') : '<div class="card empty">Nothing here. 🎉</div>'; };
+        <div class="mod-acts"><button class="btn btn-sm btn-ghost" data-s="progress">🔧 In progress</button><button class="btn btn-sm" data-s="fixed">✅ Fixed</button><button class="btn btn-sm btn-ghost" data-s="closed">Close</button><button class="btn btn-sm btn-ghost" data-s="note">💾 Save note</button></div></div>`).join('') : '<div class="card empty">Nothing here. 🎉</div>'; };
     draw();
     $('#fb-f').onclick = (e) => { const b = e.target.closest('[data-f]'); if (!b) return; f = b.dataset.f; $('#fb-f').querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b)); draw(); };
     list.onclick = async (e) => { const b = e.target.closest('[data-s]'); if (!b) return; const id = b.closest('[data-id]').dataset.id; const x = all.find((y) => y.id === id); const a = b.dataset.s; const note = document.getElementById('fbn-' + id).value.trim();
-      if (a === 'reply') return messageDialog(x.uid, x.name, 'thanks', { ref: 'feedback:' + id, prefill: x.kind === 'bug' ? 'Thanks for telling us about this bug! We are looking at it. 🔧' : 'Thanks for your feedback! 💜' });
       const status = a === 'note' ? x.status : a;
       try { await updateDoc(doc(db, 'feedback', id), { status, note, handledBy: S.user.uid, handledAt: serverTimestamp() }); x.status = status; x.note = note; log('feedback', x.uid, x.name, `${status}: ${x.text.slice(0, 80)}`); toast('Saved'); draw(); } catch (er) { toast(friendlyError(er)); } };
   }
@@ -612,18 +611,30 @@ export function createModeration(ctx) {
   }
   function feedbackPage(main) {
     if (!S.user) { location.hash = '#/login?next=' + encodeURIComponent('#/feedback'); return; }
-    main.innerHTML = `<section class="card pad" style="max-width:560px;margin:10px auto"><h1 class="page-title">🐞 Report a bug / Send feedback</h1><p class="muted small">Tell the Kemy team what broke or what you’d love to see. Please don’t include personal info.</p>
-      <form id="fb-form"><div class="mod-dur" role="radiogroup" aria-label="Type"><label><input type="radio" name="fbk" value="bug" checked> 🐞 Bug</label><label><input type="radio" name="fbk" value="idea"> 💡 Idea</label><label><input type="radio" name="fbk" value="feedback"> 💜 Feedback</label></div>
-        <div class="field" style="margin-top:10px"><label for="fb-t">What happened?</label><textarea id="fb-t" maxlength="1500" rows="5" required placeholder="e.g. The Post button doesn’t work on the Explore page"></textarea></div>
-        <p class="form-error" id="fb-err"></p><button class="btn" type="submit">Send</button></form>
-      <h2 class="mod-h2">Your reports</h2><div id="fb-mine"><div class="spinner"></div></div></section>`;
-    const FB = { new: '🆕 New', progress: '🔧 In progress', fixed: '✅ Fixed', closed: 'Closed' };
-    const mine = async () => { const s = await getDocs(query(collection(db, 'feedback'), where('uid', '==', S.user.uid), limit(30))).catch(() => null); const xs = s ? s.docs.map((d) => d.data()).sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)) : [];
-      $('#fb-mine').innerHTML = xs.length ? xs.map((x) => `<div class="card pad" style="margin-bottom:8px"><div class="row"><b>${esc(FB[x.status] || x.status)}</b><span class="spacer"></span><span class="muted small">${esc(timeAgo(x.createdAt))}</span></div><p class="small" style="margin:6px 0 0;white-space:pre-wrap">${esc(x.text)}</p></div>`).join('') : '<p class="muted small">Nothing sent yet.</p>'; };
-    mine();
-    $('#fb-form').onsubmit = async (e) => { e.preventDefault(); const text = $('#fb-t').value.trim(); if (!text) return;
-      try { await addDoc(collection(db, 'feedback'), { uid: S.user.uid, name: String((S.profile && S.profile.displayName) || '').slice(0, 60), kind: document.querySelector('input[name=fbk]:checked').value, text, page: String(document.referrer || location.hash).slice(0, 200), ua: navigator.userAgent.slice(0, 300), status: 'new', note: '', createdAt: serverTimestamp() });
-        $('#fb-t').value = ''; toast('Thank you! The Kemy team got it. 💜'); mine(); } catch (er) { $('#fb-err').textContent = friendlyError(er); } };
+    main.innerHTML = `<section class="card pad" style="max-width:560px;margin:10px auto" id="team-note"><h1 class="page-title">Message the Kemy team</h1><p class="muted small">Send feedback or a bug. Only Keem can read it. Please don’t include a phone number, email, or link.</p>
+      <form id="fb-form"><div class="mod-dur" role="radiogroup" aria-label="Type"><label><input type="radio" name="fbk" value="feedback" checked> Feedback</label><label><input type="radio" name="fbk" value="bug"> Bug</label></div>
+        <div class="field" style="margin-top:10px"><label for="fb-t">Your note</label><textarea id="fb-t" maxlength="1500" rows="5" required placeholder="What should the Kemy team know?"></textarea></div>
+        <p class="muted small">This page and your device are attached so we can see where it happened.</p>
+        <p class="form-error" id="fb-err"></p><button class="btn" type="submit">Send</button></form></section>`;
+    $('#fb-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const err = $('#fb-err'); err.textContent = '';
+      const text = $('#fb-t').value.trim(); if (!text) return;
+      const wait = Number(sessionStorage.getItem('kemy-team-note') || 0);
+      if (Date.now() - wait < 60000) { err.textContent = 'Please wait a minute before sending another note.'; return; }
+      const btn = e.target.querySelector('button'); btn.disabled = true;
+      try {
+        const b = writeBatch(db);
+        const t = serverTimestamp();
+        b.set(doc(collection(db, 'feedback')), { uid: S.user.uid, name: String((S.profile && S.profile.displayName) || '').slice(0, 60), kind: document.querySelector('input[name=fbk]:checked').value, text, page: String(location.hash || '').slice(0, 200), ua: (navigator.userAgent + ' · ' + innerWidth + 'x' + innerHeight).slice(0, 300), status: 'new', note: '', createdAt: t });
+        b.set(doc(db, 'feedbackQuota', S.user.uid), { at: t });
+        await b.commit();
+        sessionStorage.setItem('kemy-team-note', String(Date.now()));
+        $('#fb-t').value = '';
+        toast('Thanks, the Kemy team got it');
+      } catch (er) { err.textContent = er.code === 'permission-denied' ? 'Please wait a minute before sending another note.' : friendlyError(er); }
+      btn.disabled = false;
+    };
   }
   function watchMyThread(cb) { if (!S.user) return; S.globalUnsubs && S.globalUnsubs.push(onSnapshot(doc(db, 'modThreads', S.user.uid), (s) => cb(!!(s.exists() && s.data().unreadUser), s.exists()), () => {})); }
 

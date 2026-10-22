@@ -136,12 +136,7 @@ async function sync(uid) {
 }
 
 function whoText() {
-  const p = window.kemyParental;
-  if (!p || !p.enabled()) return 'Friends can message and invite you. A parent can change this with the parent PIN.';
-  const dm = p.get('dm');
-  if (dm === 'off') return 'Messages and invites are off. A parent turned them off.';
-  if (dm === 'everyone') return 'Anyone can message you. A parent set this.';
-  return 'Friends can message and invite you. A parent set this.';
+  return 'Private messages between players are turned off. Public chat in games and Pal Park stays on.';
 }
 const slider = (id, label, help) => `<div class="set-slider"><label for="${id}">${label} <span class="muted" id="${id}-n"></span></label><input id="${id}" type="range" min="0" max="100" step="1"><p class="muted small">${help}</p></div>`;
 
@@ -223,6 +218,7 @@ function html(ctx) {
         <div class="set-head"><span class="set-ic" aria-hidden="true">🛡️</span><h2>Privacy &amp; Safety</h2></div>
         <p><b>Who can message or invite me</b><br>${esc(whoText())}</p>
         <a class="set-link" href="#/settings/parental">Parent info<span class="go" aria-hidden="true">›</span></a>
+        <a class="set-link" href="#/feedback">Message the Kemy team<span class="go" aria-hidden="true">›</span></a>
         <p class="set-status"><i aria-hidden="true">✓</i> Chat filter: on</p>
         <p class="muted small">Kemy hides unkind words in chat. This stays on.</p>
         <h3 style="font-size:1rem;margin:10px 0 4px">Blocked players</h3>
@@ -241,7 +237,7 @@ function html(ctx) {
         <div class="set-head"><span class="set-ic" aria-hidden="true">💜</span><h2>Help</h2></div>
         <div class="set-links">
           <a class="set-link" href="#/updates">What’s New<span class="go" aria-hidden="true">›</span></a>
-          <a class="set-link" href="#/feedback">Report a bug<span class="go" aria-hidden="true">›</span></a>
+          <a class="set-link" href="#/feedback">Message the Kemy team<span class="go" aria-hidden="true">›</span></a>
           <button class="set-link" type="button" data-watch-intro>Watch intro<span class="go" aria-hidden="true">›</span></button>
           <button class="set-link" type="button" data-watch-howto>How to save Kemy<span class="go" aria-hidden="true">›</span></button>
         </div>

@@ -74,9 +74,13 @@ await ok('moderator pulls a live post back into review', assertSucceeds((async (
 await ok('user cannot fake a mod hold', assertFails(setDoc(doc(C, 'heldPosts/h9'), { post: post('cal'), reason: 'x', level: 'mod', authorId: 'cal', by: 'cal', createdAt: serverTimestamp() })));
 await ok('moderator deletes held post', assertSucceeds(deleteDoc(doc(M, 'heldPosts/h1'))));
 // feedback
-await ok('user sends bug report', assertSucceeds(setDoc(doc(U, 'feedback/f1'), { uid: 'bob', name: 'bob', kind: 'bug', text: 'Button broken', page: '#/watch', ua: 'test', status: 'new', note: '', createdAt: serverTimestamp() })));
+const sendFb = (f, id, data) => { const b = writeBatch(f); b.set(doc(f, 'feedback', id), data); b.set(doc(f, 'feedbackQuota', data.uid), { at: serverTimestamp() }); return b.commit(); };
+await ok('user sends bug report', assertSucceeds(sendFb(U, 'f1', { uid: 'bob', name: 'bob', kind: 'bug', text: 'Button broken', page: '#/watch', ua: 'test', status: 'new', note: '', createdAt: serverTimestamp() })));
 await ok('user cannot send feedback as someone else', assertFails(setDoc(doc(U, 'feedback/f2'), { uid: 'cal', name: 'x', kind: 'bug', text: 'x', page: '', ua: '', status: 'new', note: '', createdAt: serverTimestamp() })));
+await ok('author cannot read team notes', assertFails(getDoc(doc(U, 'feedback/f1'))));
 await ok('other user cannot read feedback', assertFails(getDoc(doc(C, 'feedback/f1'))));
+await ok('admin can read team notes', assertSucceeds(getDoc(doc(ADMIN, 'feedback/f1'))));
+await ok('a second note within a minute is refused', assertFails(sendFb(U, 'f3', { uid: 'bob', name: 'bob', kind: 'feedback', text: 'Another note', page: '#/settings', ua: 'test', status: 'new', note: '', createdAt: serverTimestamp() })));
 await ok('moderator marks feedback in progress', assertSucceeds(updateDoc(doc(M, 'feedback/f1'), { status: 'progress', note: 'Looking', handledBy: 'mia', handledAt: serverTimestamp() })));
 await ok('user cannot change feedback status', assertFails(updateDoc(doc(U, 'feedback/f1'), { status: 'fixed', note: '', handledBy: 'bob', handledAt: serverTimestamp() })));
 // mod threads

@@ -17,6 +17,7 @@ import { treasures, EMOTES, PHRASES, PORTALS } from './park.js';
 import { createControls } from '../controls.js';
 import { registerWorld } from '../input.js';
 import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
+import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-chat.js';
 import { emoteMs, EMOTE_BY_ID } from './emotes.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
@@ -563,16 +564,24 @@ export function createPark3D(ctx) {
     log.addEventListener('click', () => log.classList.toggle('open'));
     // chat input
     let lastSay = 0, burst = [];
+    function applyPhrase() {
+      const on = phraseOnly();
+      const form = $('#p3-chat'); if (form) form.classList.toggle('phrases', on);
+      const b = $('#p3-quick'); if (b) { b.textContent = on ? 'Say' : '💬'; b.setAttribute('aria-label', on ? 'Pick a phrase' : 'Quick phrases'); }
+    }
+    applyPhrase();
+    addEventListener('kemy:chat-mode', applyPhrase);
     function say(t) {
+      if (phraseOnly() && !isPhrase(t)) { toast(PHRASE_NOTE); return false; }
       const gate = window.kemyChatGate ? window.kemyChatGate(t, 'park', '') : { ok: true, text: t };
       if (!gate.ok) return false;
       t = gate.text;
       const now = Date.now(); burst = burst.filter((x) => now - x < 30000); if (now - lastSay < 2500 || burst.length >= 6) { toast('Slow down a bit 💜'); return false; } if (!spamOk('park', t)) return false; lastSay = now; burst.push(now); P.say = clean(t).slice(0, 60); P.sayAt = now; dirty = true; send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color); return true;
     }
-    $('#p3-chat').onsubmit = (e) => { e.preventDefault(); const inp = $('#p3-t'); const v = inp.value.trim(); if (!v) { inp.blur(); return; } if (say(v)) { inp.value = ''; inp.blur(); } };
+    $('#p3-chat').onsubmit = (e) => { e.preventDefault(); if (phraseOnly()) { $('#p3-quick').click(); return; } const inp = $('#p3-t'); const v = inp.value.trim(); if (!v) { inp.blur(); return; } if (say(v)) { inp.value = ''; inp.blur(); } };
     const panel = $('#park-panel'); const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };
     // quick chat: tabbed tap-to-say phrases (greetings, teamwork, GG, compliments, park, emoji); the text bar stays too
-    $('#p3-quick').onclick = () => { if (!toggle('c')) return; renderQuickChat(panel, (x) => { if (say(x)) panel.hidden = true; }); };
+    $('#p3-quick').onclick = () => { if (!toggle('c')) return; const tabs = phraseOnly() ? [{ id: 'say', icon: '💬', name: 'Say', list: SAFE_SAY }] : undefined; renderQuickChat(panel, (x) => { if (say(x)) panel.hidden = true; }, tabs); };
     // emote wheel: 8 favourite slots (player picks), the classic emoji reactions underneath, shop shortcut
     loadOwnedEmotes(db, S.user.uid);
     function openEmotes() { panel.hidden = true; loadOwnedEmotes(db, S.user.uid).then(() => openWheel({ onEmote: emoteDance, reactions: EMOTES, onReact: (x) => emote(x), onShop: () => dispatchEvent(new Event('kemy:dance-shop')), onLocked: (d) => { toast(`🔒 ${d.name} is in the Dance Shop`); dispatchEvent(new Event('kemy:dance-shop')); } })); }

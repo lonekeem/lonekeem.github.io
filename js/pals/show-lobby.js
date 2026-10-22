@@ -1,7 +1,6 @@
 // Kemy Challenge Show lobby: Solo vs Bots, Quick Match (fills public rooms up to 30, overflow opens a new room),
 // Create Show (code + invite via Messages), Join with Code. The room shows everyone's Pal, a ready check and an
 // automatic 10 s countdown once enough players are ready (host can also start early). Bots can fill small rooms.
-import { collection, getDocs, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { createShowNet, palSnap, cleanCode, MAX_ROOM, ZTABS, zSayIdx, zText, safeName } from './show-net.js';
 import { renderQuickChat } from './emote-wheel.js';
 import { getActivePal } from './core.js';
@@ -79,14 +78,7 @@ export function createShowLobby(ctx) {
     $('[data-x=leave]').onclick = async () => { off(); const s0 = sess; sess = null; await s0.leave(); page({}); };
     let lastQ = 0; $('[data-x=qc]').onclick = () => { const b = $('.sl-qc'); b.hidden = !b.hidden; if (!b.hidden) renderQuickChat(b, (x) => { const i = zSayIdx(x); if (i < 0 || Date.now() - lastQ < 1200) return; lastQ = Date.now(); b.hidden = true; sess.send({ em: i, emAt: Date.now() }); }, ZTABS); };
     $('[data-x=ready]').onclick = () => { const m = sess.players[uid]; sess.send({ ready: !(m && m.ready) }); };
-    $('[data-x=invite]').onclick = async () => { const box = $('.sl-inv'); box.hidden = !box.hidden; if (box.hidden) return; box.innerHTML = '<small>Loading your chats…</small>';
-      try { const qs = await getDocs(query(collection(db, 'chats'), where('participants', 'array-contains', uid), orderBy('lastAt', 'desc'), limit(8)));
-        const others = [...new Set(qs.docs.map((d) => d.data().participants.find((x) => x !== uid)).filter(Boolean))];
-        const profs = await Promise.all(others.map((o) => (ctx.getProfile ? ctx.getProfile(o).catch(() => null) : null)));
-        box.innerHTML = others.length ? others.map((o, i) => `<button data-to="${esc(o)}">${esc((profs[i] && profs[i].displayName) || 'Friend')}<span>✉️ Invite</span></button>`).join('') : '<small>No chats yet. Share the code instead!</small>';
-        box.querySelectorAll('[data-to]').forEach((b) => (b.onclick = async () => { b.disabled = true;
-          try { await ctx.sendMessage(b.dataset.to, `🎪 Join my Kemy Challenge Show! Code ${code} 👉 ${location.origin}${location.pathname}#/arcade/show?join=${code}`); b.querySelector('span').textContent = '✓ Sent'; } catch { b.disabled = false; toast('Could not send the invite'); } }));
-      } catch { box.innerHTML = '<small>Share the code with your friends!</small>'; } };
+    $('[data-x=invite]').onclick = () => { toast('Private messages are off. Share this code: ' + code); };
     window.__slobby = { code, get players() { return sess && sess.players; } };
   }
   return { page };

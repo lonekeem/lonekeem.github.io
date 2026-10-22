@@ -31,6 +31,12 @@ assert.equal(kind('i live at 12 Oak Street'), 'address');
 assert.equal(kind('add me on discord'), 'social');
 assert.equal(kind('look https://example.com/a'), 'link');
 assert.equal(p.scan('look https://example.com/a').serious, false);
+assert.equal(kind('ping me on telegram'), 'social');
+assert.equal(kind('my kik is bob'), 'social');
+assert.equal(kind('five one two three four five six'), 'phone');
+assert.equal(kind('add me on snap'), 'social');
+assert.equal(p.scan('Nice car!').action, 'ok');
+assert.equal(p.scan('hello friend').action, 'ok');
 
 const care = p.scan('i want to die');
 assert.equal(care.action, 'care');

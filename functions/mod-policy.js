@@ -25,10 +25,12 @@ const SEX = /\b(sex|sexy|nudes?|naked|porn|boobs?|penis|vagina|horny|onlyfans|ns
 const VIOLENT = /\b(kill you|murder|shoot you|stab you|i('?ll| will) (kill|hurt)|bomb|terroris\w*|torture)\b/i;
 const WORD = /\b(fuck\w*|shit\w*|bitch\w*|asshole|bastard|dick|cunt|slut|whore|wtf|stfu|piss|twat)\b/i;
 const MILD = /\b(damn|hell)\b/i;
-const PHONE = /\b(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}\b/;
+const PHONE = /\b(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}\b|(?:\d[\s.\-()]*){10,}/;
+const SPELLED = /\b(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)(?:[\s,.-]+(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)){5,}\b/i;
 const EMAIL = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
-const LINK = /\b(?:https?:\/\/|www\.)\S+|\b[a-z0-9-]{2,}\.(?:com|net|org|gg|xyz|ly|app|link)\b/i;
-const SOCIAL = /\b(snapchat|instagram|insta|whatsapp|discord|tiktok|my snap|add me on)\b|\bdiscord\.gg\b/i;
+const LINK = /\b(?:https?:\/\/|www\.)\S+|\b[a-z0-9-]{2,}\.(?:com|net|org|gg|xyz|ly|app|link|io)\b/i;
+const SOCIAL = /\b(snapchat|snap|instagram|insta|whatsapp|discord|tiktok|telegram|kik)\b|tik tok|\b(my snap|add me on|add me|text me|dm me)\b|\bdiscord\.gg\b|\bt\.me\/|\bwa\.me\b/i;
+const HANDLE = /(?:snap(?:chat)?|discord|insta(?:gram)?|tik\s?tok|whatsapp|telegram|kik)[^\n]{0,30}@[a-z0-9._]{2,}|@[a-z0-9._]{2,}[^\n]{0,30}(?:snap(?:chat)?|discord|insta(?:gram)?|tik\s?tok|whatsapp|telegram|kik)|\b[a-z0-9._]{2,32}#\d{4}\b/i;
 const ADDRESS = /\b\d{1,5}\s+[a-z0-9.' ]{2,30}\s(?:street|st|road|rd|avenue|ave|lane|ln|drive|dr|court|ct|blvd|boulevard)\b/i;
 
 function stars(w) { return '★'.repeat(Math.min(5, String(w).length)); }
@@ -46,10 +48,10 @@ function scan(text) {
   if (SLUR.test(t)) return { action: 'block', kind: 'slur', text: '', strike: true, serious: true, ban: false };
   if (SEX.test(t)) return { action: 'block', kind: 'sexual', text: '', strike: true, serious: true, ban: false };
   if (VIOLENT.test(t)) return { action: 'block', kind: 'violent', text: '', strike: true, serious: true, ban: false };
-  if (PHONE.test(raw)) return { action: 'block', kind: 'phone', text: '', strike: true, serious: true, ban: false };
+  if (PHONE.test(raw) || SPELLED.test(raw)) return { action: 'block', kind: 'phone', text: '', strike: true, serious: true, ban: false };
   if (EMAIL.test(raw) || EMAIL.test(t)) return { action: 'block', kind: 'email', text: '', strike: true, serious: true, ban: false };
   if (ADDRESS.test(raw) || ADDRESS.test(t)) return { action: 'block', kind: 'address', text: '', strike: true, serious: true, ban: false };
-  if (SOCIAL.test(t)) return { action: 'block', kind: 'social', text: '', strike: true, serious: true, ban: false };
+  if (HANDLE.test(raw) || SOCIAL.test(t) || SOCIAL.test(raw)) return { action: 'block', kind: 'social', text: '', strike: true, serious: true, ban: false };
   if (LINK.test(raw) || LINK.test(t)) return { action: 'block', kind: 'link', text: '', strike: true, serious: false, ban: false };
   if (WORD.test(t) || WORD.test(raw)) return { action: 'mask', kind: 'word', text: maskOf(raw), strike: true, serious: false, ban: false };
   if (MILD.test(t) || MILD.test(raw)) return { action: 'mask', kind: 'mild', text: maskOf(raw), strike: false, serious: false, ban: false };

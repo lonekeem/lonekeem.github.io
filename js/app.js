@@ -212,44 +212,15 @@ async function isLiked(postId) {
   return snap.exists();
 }
 const chatIdFor = (a, b) => [a, b].sort().join('_');
-// Sends a DM (used by the chat page and story replies). `me` is the sender (studio for the admin).
-async function sendMessage(otherUid, text, me = S.user.uid, snapData = null) {
-  if (me !== STUDIO_UID && !(await safety.gate())) throw Object.assign(new Error('Messages are switched off for your account.'), { code: 'kemy/safety' });
-  if (me !== STUDIO_UID && !snapData && !spamOk('dm', text, { to: otherUid })) throw Object.assign(new Error('Slow down a bit 💜'), { code: 'kemy/spam' });
-  if (me !== STUDIO_UID && !snapData) {
-    const gate = window.kemyChatGate ? window.kemyChatGate(text, 'dm', otherUid) : { ok: true, text };
-    if (!gate.ok) throw Object.assign(new Error("Kemy Helper: let's keep it kind!"), { code: 'kemy/kind' });
-    text = gate.text;
-  }
-  if (me !== STUDIO_UID) safety.scanAge(text, 'chat message', chatIdFor(me, otherUid));
-  const cid = chatIdFor(me, otherUid);
-  const chatRef = doc(db, 'chats', cid);
-  const snap = await getDoc(chatRef).catch(() => null);
-  const exists = !!(snap && snap.exists());
-  if (!exists && me !== STUDIO_UID && otherUid !== STUDIO_UID && !mod.iAmMod()) {
-    const [f1, f2] = await Promise.all([getDoc(doc(db, 'follows', `${me}_${otherUid}`)), getDoc(doc(db, 'follows', `${otherUid}_${me}`))].map((x) => x.then((d) => d.exists()).catch(() => false)));
-    if (!f1 || !f2) throw Object.assign(new Error('For safety, you can only start a chat with friends: you both need to follow each other.'), { code: 'kemy/friends-only' });
-  }
-  const b = writeBatch(db);
-  const meta = { lastMessage: text.slice(0, 1000), lastAt: serverTimestamp(), lastSender: me };
-  if (exists) b.update(chatRef, meta);
-  else b.set(chatRef, { participants: [me, otherUid].sort(), ...meta, createdAt: serverTimestamp() });
-  const newChat = !exists && me !== STUDIO_UID && otherUid !== STUDIO_UID && !mod.iAmMod();
-  b.set(doc(collection(db, 'chats', cid, 'messages')), { senderId: me, text: text.slice(0, 1000), createdAt: serverTimestamp(), ...(snapData ? { snap: snapData, viewed: false } : {}) });
-  b.update(doc(db, 'users', me), { lastMessageAt: serverTimestamp(), ...(newChat ? { lastNewChatAt: serverTimestamp() } : {}) });
-  try { await b.commit(); } catch (e) { if (newChat && e.code === 'permission-denied') throw Object.assign(new Error('Slow down a bit 💜 You can start a new chat every few seconds.'), { code: 'kemy/spam' }); throw e; }
-  if (!exists || snap.data().lastSender !== me) notify(otherUid, 'message', { text }, me);
+// Private messages between players are off. Old threads stay in Firestore; nothing new is written.
+async function sendMessage() {
+  throw Object.assign(new Error('Private messages are turned off.'), { code: 'kemy/dm-off' });
 }
 
-// View-once snaps from the camera editor (js/snapedit.js): sent one friend at a time (1 msg/s rule).
-async function sendSnap(uids, snapData) {
-  let sent = 0;
-  for (const uid of uids) {
-    if (sent) await new Promise((r) => setTimeout(r, 1150));
-    await sendMessage(uid, snapData.kind === 'video' ? '🎥 Snap' : '📸 Snap', S.user.uid, snapData);
-    sent++;
-  }
-  return sent;
+// Snaps to friends used the DM thread. That path is off.
+async function sendSnap() {
+  toast('Private messages are turned off.');
+  return 0;
 }
 // People you follow (newest first), for "Send to → Friends".
 async function snapFriends() {
@@ -613,6 +584,7 @@ async function showWelcome() {
     </form>`);
   { const ta = $('#w-bio'); if (ta) { wireCounter(ta, $('#w-bio-n'), 160); limitLines(ta);
     $('#welcome-bio').onsubmit = async (ev) => { ev.preventDefault(); const bio = cleanBio(ta.value); if (!bio) { ta.focus(); return; }
+      if (safety.contactBlocked(bio)) { toast(safety.SAFETY_NOTE); return; }
       try { await updateDoc(doc(db, 'users', S.user.uid), { bio }); S.profile.bio = bio; profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile }); $('#welcome-bio').innerHTML = '<p class="small" style="margin:0">✅ Bio saved. Change it any time in Edit profile.</p>'; }
       catch (e) { toast(friendlyError(e)); } }; } }
   { const tb = $('#welcome-theme'); const paint = () => { const on = themePlaying(); tb.textContent = on ? '⏸ Pause Kemy’s theme' : '🎵 Play Kemy’s theme'; tb.setAttribute('aria-pressed', on); };
@@ -1112,7 +1084,6 @@ async function pageProfile(username, tab, token) {
         <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine || uid === STUDIO_UID ? '<span id="p-donate"></span>' : ''}${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings/account">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
-        ${!mine && !blocked && !(uid === STUDIO_UID && isAdmin()) ? `<a class="btn btn-sm btn-ghost" href="#/chat/${esc(uid)}" id="msg">Message</a>` : ''}
         ${!mine && S.user && uid !== STUDIO_UID ? `<button class="btn btn-sm btn-ghost" id="report-user">Report</button>` : ''}${!mine && isAdmin() && uid !== STUDIO_UID ? '<span id="p-modinv"></span>' : ''}
         ${!mine && S.user && uid !== STUDIO_UID ? (blocked ? `<button class="btn btn-sm btn-danger" id="unblock">Unblock</button>` : `<button class="btn btn-sm btn-danger" id="block">Block</button>`) : ''}
       </div>
@@ -1131,7 +1102,6 @@ async function pageProfile(username, tab, token) {
   if (!blocked && uid !== STUDIO_UID) import('./inf-pass.js').then((m) => m.mountProfile(uid, $('.profile-head h1'), !mine && isAdmin() ? $('.profile-actions') : null, !mine && isAdmin(), toast)).catch(() => {});
   $('#block')?.addEventListener('click', () => blockUser(uid, u.username));
   $('#unblock')?.addEventListener('click', () => unblockUser(uid, u.username));
-  $('#msg')?.addEventListener('click', (e) => { if (!S.user) { e.preventDefault(); requireAuth(); } });
   const fb = $('#follow');
   if (fb) fb.onclick = async () => {
     if (!requireAuth()) return;
@@ -1211,7 +1181,7 @@ async function pageSettings() {
   const p = S.profile;
   main.innerHTML = `
     <div class="row" style="gap:8px;align-items:center"><a class="icon-btn" href="#/settings" aria-label="Back to settings">←</a><h1 class="page-title" style="margin:0">Edit profile</h1></div>
-    <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><a class="btn btn-sm btn-ghost" href="#/rules" id="set-rules">📜 Community Rules</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><a class="btn btn-sm btn-ghost" href="#/rules" id="set-rules">📜 Community Rules</a><a class="btn btn-sm btn-ghost" href="#/feedback" id="set-team">💬 Message the Kemy team</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
     ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Mod Hub${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
     <div id="set-donate"></div>
     <form id="settings" class="card pad">
@@ -1283,7 +1253,7 @@ async function pageSettings() {
     const displayName = $('#s-name').value.trim();
     const username = $('#s-user').value.trim().toLowerCase().replace(/^@/, '');
     const bio = cleanBio($('#s-bio').value);
-    if (bio !== (p.bio || '')) { if (!safety.piiOk(bio)) return; safety.scanAge(bio, 'user', S.user.uid); }
+    if (bio !== (p.bio || '')) { if (safety.contactBlocked(bio)) { err.textContent = safety.SAFETY_NOTE; return; } if (!safety.piiOk(bio)) return; safety.scanAge(bio, 'user', S.user.uid); }
     const pronouns = $('#s-pro').value.trim().slice(0, 20);
     const website = normWebsite($('#s-web').value);
     if (website === null) { err.textContent = 'Website must be a valid https:// link (up to 100 characters).'; return; }
@@ -1318,85 +1288,25 @@ async function pageSettings() {
 
 // ---------------------------------------------------------------- messages
 const seenMap = () => JSON.parse(localStorage.getItem('lks-seen') || '{}');
-async function pageInbox(asStudio) {
+async function pageInbox() {
   if (!requireAuth()) return;
-  const me = asStudio && isAdmin() ? STUDIO_UID : S.user.uid;
   main.innerHTML = `
-    <div class="row" style="flex-wrap:wrap"><h1 class="page-title">Messages</h1><span class="spacer"></span>
-    ${isAdmin() ? `<nav class="tabs" style="margin:0;border:0"><a href="#/messages" class="${me === STUDIO_UID ? '' : 'active'}">Mine</a><a href="#/messages/studio" class="${me === STUDIO_UID ? 'active' : ''}">Studio inbox</a></nav>` : ''}</div>
-    ${me === S.user.uid ? `<a class="list-item card mod-thread-row ${S.modThreadUnread ? 'unread' : ''}" href="#/support" style="margin-bottom:10px"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div class="row"><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${S.modThreadUnread ? '<span class="mod-count" style="margin-left:6px">new</span>' : ''}</div><p>${S.modThreadExists ? 'Messages from the Kemy safety team' : 'The safety team will write here if they need you'}</p></div></a>` : ''}
-    <div class="card" style="padding:6px" id="inbox"><div class="spinner"></div></div>
-    <p class="muted small" style="margin-top:14px">Start a chat from anyone’s profile with the <b>Message</b> button.</p>`;
-  const unsub = onSnapshot(query(collection(db, 'chats'), where('participants', 'array-contains', me), orderBy('lastAt', 'desc'), limit(50)), async (qs) => {
-    const seen = seenMap();
-    const rows = await Promise.all(qs.docs.map(async (d) => {
-      const c = d.data(); const other = c.participants.find((x) => x !== me);
-      if (S.blocked.has(other)) return '';
-      const u = (await getProfile(other)) || { displayName: 'Unknown', username: '' };
-      const unread = c.lastSender !== me && (c.lastAt?.toMillis?.() || 0) > (seen[d.id] || 0);
-      return `<a class="list-item ${unread ? 'unread' : ''}" href="#/chat/${esc(other)}${me === STUDIO_UID ? '/studio' : ''}">${avatar({ ...u, uid: other }, '', false)}
-        <div class="meta"><div class="row"><b>${esc(u.displayName)}</b>${badge(other)}<span class="spacer"></span><span class="muted small">${esc(timeAgo(c.lastAt))}</span></div>
-        <p>${c.lastSender === me ? 'You: ' : ''}${esc(c.lastMessage)}</p></div></a>`;
-    }));
-    const box = $('#inbox'); if (!box) return;
-    box.innerHTML = rows.join('') || '<div class="empty">No messages yet.</div>';
-  }, (e) => { const box = $('#inbox'); if (box) box.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; });
-  S.unsubs.push(unsub);
+    <h1 class="page-title">Messages</h1>
+    <section class="card pad" style="max-width:560px">
+      <h2 style="font-size:1.15rem;margin:0 0 8px">Private messages are turned off</h2>
+      <p>Players can’t message each other. This keeps Kemy safer for kids. Public chat in games and Pal Park is still on.</p>
+      <div class="btns" style="flex-wrap:wrap"><a class="btn" href="#/feedback">Message the Kemy team</a><a class="btn btn-ghost" href="#/support">Kemy Moderators</a></div>
+    </section>
+    <a class="list-item card mod-thread-row ${S.modThreadUnread ? 'unread' : ''}" href="#/support" style="margin-top:12px"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div class="row"><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${S.modThreadUnread ? '<span class="mod-count" style="margin-left:6px">new</span>' : ''}</div><p>${S.modThreadExists ? 'Messages from the Kemy safety team' : 'The safety team will write here if they need you'}</p></div></a>`;
 }
-async function pageChat(otherUid, asStudio, token) {
+async function pageChat() {
   if (!requireAuth()) return;
-  const me = asStudio && isAdmin() ? STUDIO_UID : S.user.uid;
-  if (otherUid === me) { location.hash = '#/messages'; return; }
-  const other = await getProfile(otherUid);
-  if (stale(token)) return;
-  if (!other) { main.innerHTML = '<div class="empty">That person isn’t available.</div>'; return; }
-  const cid = chatIdFor(me, otherUid);
-  const chatRef = doc(db, 'chats', cid);
-  const chatSnap = await getDoc(chatRef);
-  if (stale(token)) return;
-  let chatExists = chatSnap.exists();
-  let lastSender = chatExists ? chatSnap.data().lastSender : '';
   main.innerHTML = `
-    <section class="chat">
-      <div class="chat-head"><a class="icon-btn" href="#/messages${me === STUDIO_UID ? '/studio' : ''}" aria-label="Back to messages">←</a>${avatar({ ...other, uid: otherUid })}
-        <div><b>${esc(other.displayName)}</b>${badge(otherUid)}<div class="muted small">@${esc(other.username)}${me === STUDIO_UID ? ' · replying as Lone Keem Studios' : ''}</div></div></div>
-      <div class="chat-log" id="log" aria-live="polite"></div>
-      ${S.blocked.has(otherUid) ? '<p class="muted small center">You blocked this account. Unblock them from their profile to chat.</p>' :
-      `<form class="chat-form" id="chat-form"><label for="chat-text" class="sr-only">Message</label><input id="chat-text" type="text" maxlength="1000" placeholder="Message…" autocomplete="off" required><button class="btn btn-sm" type="submit">Send</button></form>`}
+    <section class="card pad" style="max-width:560px;margin:12px auto">
+      <h1 class="page-title">Private messages are turned off</h1>
+      <p>Players can’t send direct messages. If you need the Kemy team, send a note and only Keem can read it.</p>
+      <div class="btns" style="flex-wrap:wrap"><a class="btn" href="#/feedback">Message the Kemy team</a><a class="btn btn-ghost" href="#/messages">Back</a></div>
     </section>`;
-  const log = $('#log');
-  const markSeen = () => { const s = seenMap(); s[cid] = Date.now(); localStorage.setItem('lks-seen', JSON.stringify(s)); };
-  const unsub = onSnapshot(query(collection(db, 'chats', cid, 'messages'), orderBy('createdAt', 'asc'), limit(300)), (qs) => {
-    const snaps = new Map();
-    log.innerHTML = qs.docs.length ? qs.docs.map((d) => {
-      const m = d.data();
-      if ('viewed' in m) {
-        const mine = m.senderId === me, open = !m.viewed && m.snap && !mine;
-        if (open) snaps.set(d.id, m);
-        const label = mine ? (m.viewed ? 'Opened' : 'Delivered') : (m.viewed ? 'Opened' : 'Tap to view snap');
-        return `<${open ? 'button' : 'div'} class="bubble snapmsg ${mine ? 'mine' : ''} ${m.viewed ? 'opened' : 'new'}" ${open ? `data-snap="${esc(d.id)}"` : ''}><span class="snap-ic" aria-hidden="true"></span><span><b>${m.snap?.kind === 'video' || /🎥/.test(m.text) ? 'Video snap' : 'Snap'}</b><small>${label}</small></span><time>${esc(timeAgo(m.createdAt))}</time></${open ? 'button' : 'div'}>`;
-      }
-      return `<div class="bubble ${m.senderId === me ? 'mine' : ''}">${esc(m.text)}<time>${esc(timeAgo(m.createdAt))}</time>${m.senderId !== me ? `<button type="button" class="bub-rep" data-rep="${esc(d.id)}" aria-label="Report this message" title="Report">⚑</button>` : ''}</div>`;
-    }).join('') : `<p class="muted small center">Say hi to ${esc(other.displayName)} 👋</p>`;
-    log.querySelectorAll('[data-rep]').forEach((b) => (b.onclick = () => reportDialog('chat message', `${cid}/${b.dataset.rep}`, '', b.parentElement.firstChild.textContent, otherUid)));
-    log.querySelectorAll('[data-snap]').forEach((b) => (b.onclick = () => { const id = b.dataset.snap; openSnap(doc(db, 'chats', cid, 'messages', id), snaps.get(id)); b.removeAttribute('data-snap'); b.onclick = null; b.disabled = true; b.classList.replace('new', 'opened'); b.querySelector('small').textContent = 'Opened'; }));
-    log.scrollTop = log.scrollHeight; markSeen();
-  }, (e) => { log.innerHTML = `<p class="muted small center">${esc(friendlyError(e))}</p>`; });
-  S.unsubs.push(unsub);
-  const form = $('#chat-form');
-  if (form) form.onsubmit = async (ev) => {
-    ev.preventDefault();
-    const input = $('#chat-text'); const text = input.value.trim(); if (!text) return;
-    input.value = '';
-    try {
-      await sendMessage(otherUid, text, me);
-      chatExists = true; lastSender = me;
-    } catch (e) {
-      input.value = text;
-      toast(e.code === 'permission-denied' ? 'Couldn’t send. You may be sending too fast, or this person isn’t accepting messages.' : friendlyError(e));
-    }
-  };
-  setTimeout(() => $('#chat-text')?.focus(), 50);
 }
 
 // ---------------------------------------------------------------- notifications
@@ -1413,7 +1323,7 @@ async function pageNotifications(asStudio, token) {
   $('#notes').innerHTML = items.length ? items.map((n) => {
     if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings/account"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
-    const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? (String(n.text || '').includes('Pal Games') ? `#/games/pals/${esc(n.postId)}` : `#/game/${esc(n.postId)}`) : n.type === 'house' ? '#/street' : n.type === 'daily' ? '#/pals' : n.type === 'announce' ? (String(n.postId || '').startsWith('#/') ? esc(n.postId) : '#/feed') : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
+    const href = n.type === 'message' ? '#/messages' : n.type === 'game' ? (String(n.text || '').includes('Pal Games') ? `#/games/pals/${esc(n.postId)}` : `#/game/${esc(n.postId)}`) : n.type === 'house' ? '#/street' : n.type === 'daily' ? '#/pals' : n.type === 'announce' ? (String(n.postId || '').startsWith('#/') ? esc(n.postId) : '#/feed') : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b>${esc(n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
   }).join('') : '<div class="empty">No notifications yet.</div>';
@@ -1467,7 +1377,7 @@ async function pageAdmin(token) {
       <button class="btn" id="shop-pub" style="font-size:1.05rem;padding:12px 22px">Publish shop prices</button></div>
     ${big('founder', '👑', 'Kemy (Founder) Pal', 'Your admin-only Pal: the Kemy app-icon axolotl, 1.2x size, crown and sparkles. Keeps your Pal’s name, level and outfit. Only your verified admin account can use it.', '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" id="adm-founder">👑 Make my active Pal the Founder</button><button class="btn btn-sm btn-ghost" id="adm-founder-off">Switch back</button></div>')}
     ${big('reindex', '🔎', 'Build search index', 'Adds search keywords and #hashtags to every post and profile that’s missing them.', '<button class="btn btn-sm" id="reindex">Build search index</button>')}
-    ${big('studio', '🎬', 'Lone Keem Studios account', 'Read and answer the studio’s messages and notifications, or post as the studio.', '<div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn btn-sm btn-ghost" href="#/messages/studio">Studio inbox</a><a class="btn btn-sm btn-ghost" href="#/notifications/studio">Studio notifications</a><a class="btn btn-sm btn-ghost" href="#/new">Post as the studio</a></div>')}
+    ${big('studio', '🎬', 'Lone Keem Studios account', 'Private messages are off. You can still post as the studio and read studio notifications.', '<div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn btn-sm btn-ghost" href="#/notifications/studio">Studio notifications</a><a class="btn btn-sm btn-ghost" href="#/new">Post as the studio</a><a class="btn btn-sm btn-ghost" href="#/mod/bugs">Team notes</a></div>')}
     ${big('feat', '★', 'Feature posts (Studio Picks)', 'Open any movie, show or song and tap “Feature in Studio Picks” (tap again to unfeature).', '<a class="btn btn-sm btn-ghost" href="#/watch">Go to Watch</a>')}
 <div id="adm-donate"></div>
     <div id="adm-mods"></div>
@@ -1722,6 +1632,7 @@ async function loadSession() {
   const uid = S.user.uid;
   const snap = await getDoc(doc(db, 'users', uid));
   S.profile = snap.exists() ? snap.data() : null;
+  safety.syncChatMode();
   if (!S.profile) return;
   if (!S.profile.createdAt) {
     try { await updateDoc(doc(db, 'users', uid), { createdAt: serverTimestamp() }); }
@@ -1738,6 +1649,7 @@ async function loadSession() {
   S.blocked = new BlockSet(blk.docs.map((d) => d.id), S.hidden);
   S.saved = new Set(sav.docs.map((d) => d.id));
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = [];
+  await safety.underageFlag(uid).catch(() => {});
   await mod.loadMine();
   mod.watchInvite();
   mod.watchMyThread((unread, exists) => { S.modThreadUnread = unread; S.modThreadExists = exists; document.getElementById('msg-dot').hidden = !(S.unreadChats || unread); });
@@ -1753,11 +1665,8 @@ async function loadSession() {
       import('./chime.js').then((m) => m.playChime()).catch(() => {});
     }
   }, () => {}));
-  S.globalUnsubs.push(onSnapshot(query(collection(db, 'chats'), where('participants', 'array-contains', uid), orderBy('lastAt', 'desc'), limit(20)), (qs) => {
-    const seen = seenMap();
-    S.unreadChats = qs.docs.some((d) => d.data().lastSender !== uid && (d.data().lastAt?.toMillis?.() || 0) > (seen[d.id] || 0) && !location.hash.includes(d.data().participants.find((x) => x !== uid)));
-    document.getElementById('msg-dot').hidden = !(S.unreadChats || S.modThreadUnread);
-  }, () => {}));
+  S.unreadChats = false;
+  const dot = document.getElementById('msg-dot'); if (dot) dot.hidden = !S.modThreadUnread;
 }
 
 // Lazy search-index backfill: when someone signs in, add the search fields to their own

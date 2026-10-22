@@ -331,20 +331,9 @@ export function openEditor(opts) {
       <div class="ed-send-head"><b>Send to</b><button class="cam-btn" data-a="sx" aria-label="Close">${SVG.close}</button></div>
       <button class="ed-dest" data-d="story"><span class="ed-dest-ic">◎</span><span><b>My Story</b><small>Your followers · 24 hours</small></span></button>
       <button class="ed-dest" data-d="post"><span class="ed-dest-ic">▦</span><span><b>Post</b><small>Add a caption and share to your profile</small></span></button>
-      <p class="ed-send-sub">Friends <small>· a snap disappears after it’s viewed</small></p>
-      <div class="ed-friends"><p class="small muted">Loading…</p></div>
-      <button class="btn ed-sendsnap" disabled>Send snap</button></div>`;
+      <p class="ed-send-sub">Private snaps are turned off. Players can’t message each other.</p></div>`;
     panel.querySelector('[data-a=sx]').onclick = () => { panel.hidden = true; ed.dataset.tool = ''; };
     panel.querySelectorAll('[data-d]').forEach((b) => (b.onclick = () => go(b.dataset.d)));
-    const fl = panel.querySelector('.ed-friends'), sendBtn = panel.querySelector('.ed-sendsnap');
-    const chosen = new Set();
-    try {
-      const list = opts.friends ? await opts.friends() : [];
-      fl.innerHTML = list.length ? list.map((u) => `<label class="ed-friend"><input type="checkbox" value="${esc(u.uid)}"><span class="ed-av" style="background:${esc(u.color || '#8a2be2')}">${u.photoURL ? `<img src="${esc(u.photoURL)}" alt="">` : esc((u.displayName || '?')[0])}</span><span><b>${esc(u.displayName)}</b><small>@${esc(u.username)}</small></span></label>`).join('')
-        : '<p class="small muted">Follow people to send them snaps.</p>';
-      fl.querySelectorAll('input').forEach((i) => (i.onchange = () => { i.checked ? chosen.add(i.value) : chosen.delete(i.value); sendBtn.disabled = !chosen.size; sendBtn.textContent = chosen.size ? `Send snap to ${chosen.size}` : 'Send snap'; }));
-    } catch { fl.innerHTML = '<p class="small muted">Couldn’t load your friends.</p>'; }
-    sendBtn.onclick = () => go('friends', { uids: [...chosen] });
   };
   $('[data-a=discard]').onclick = () => { if ((layers.length || strokes.length) && !confirm('Discard this snap?')) return; cleanup(); opts.retake(); };
   function cleanup() { cancelAnimationFrame(fxRaf); window.removeEventListener('resize', fit); eng && eng.destroy(); eng = null; window.__lksEdit = null; }

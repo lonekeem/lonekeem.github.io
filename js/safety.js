@@ -1,6 +1,7 @@
 // Kemy safety: Community Rules agreement, birthday (13+) check, mod "under 13" flag,
 // personal-info warnings, age-clue review items, photo EXIF stripping. Written by Lone Keem
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { scan } from './helper/mod-policy.js';
 
 let C = null; // { S, db, esc, openModal, closeModal, toast, isAdmin, friendlyError }
 export function initSafety(ctx) { C = ctx; }
@@ -8,6 +9,19 @@ export function initSafety(ctx) { C = ctx; }
 export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export function ageMonths(y, m, now = new Date()) { return (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - m); }
 export const is13 = (p) => !!(p && Number.isInteger(p.birthY) && ageMonths(p.birthY, p.birthM) >= 156);
+export const SAFETY_NOTE = "For safety, links and contact info aren't allowed";
+const CONTACT_KIND = new Set(['phone', 'email', 'address', 'social', 'link']);
+export function contactBlocked(text) { return CONTACT_KIND.has(scan(String(text || '')).kind); }
+// Unknown age, under 13, or a moderator under-13 flag: public chat is phrases only.
+export function syncChatMode() {
+  const S = C && C.S;
+  const admin = !!(C && C.isAdmin && C.isAdmin());
+  const user = S && S.user;
+  const known = !!(user && S.profile && Number.isInteger(S.profile.birthY) && flagCache.uid === user.uid && flagCache.v !== null);
+  const young = !known || !is13(S.profile) || flagCache.v === true;
+  window.kemyPhraseOnly = admin ? false : young;
+  try { dispatchEvent(new Event('kemy:chat-mode')); } catch { /* no window yet */ }
+}
 
 // ---- mod-controlled "under 13" flag (underage/{uid}); cached per session
 let flagCache = { uid: '', v: null };
@@ -15,7 +29,7 @@ export async function underageFlag(uid) {
   if (!uid) return false;
   if (flagCache.uid === uid && flagCache.v !== null) return flagCache.v;
   let v = false; try { v = (await getDoc(doc(C.db, 'underage', uid))).exists(); } catch { v = false; }
-  flagCache = { uid, v }; return v;
+  flagCache = { uid, v }; syncChatMode(); return v;
 }
 export async function markUnder13(uid, reason = '') {
   await setDoc(doc(C.db, 'underage', uid), { by: C.S.user.uid, reason: String(reason || 'Marked by a moderator').slice(0, 200), at: serverTimestamp() });
@@ -55,7 +69,7 @@ export const RULES = [
   ['💜', 'Be kind', 'Treat everyone the way you want to be treated. Cheer people on!'],
   ['🚫', 'No bullying', 'No mean comments, teasing, threats or ganging up on anyone.'],
   ['🧼', 'Keep it clean', 'No swearing and no adult, scary or violent content.'],
-  ['🔒', 'Keep your info private', 'Never share your address, school, phone number, email or where you are right now. Same for other people\'s info.'],
+  ['🔒', 'Keep your info private', 'Never share your address, school, phone number, email, or a link to another app. Players can’t privately message each other.'],
   ['🎨', 'Post your own stuff', 'Only post things you made or have the right to share.'],
   ['🎵', 'No copyrighted music or videos', 'Don\'t upload songs, shows or movies made by someone else.'],
   ['🙅', 'No false reports', 'Only report real problems. Reporting people to be mean or as a joke can pause your reporting.'],
@@ -123,6 +137,7 @@ const PII = [
 export function piiFound(text) { const t = String(text || ''); for (const [re, what] of PII) if (re.test(t)) return what; return ''; }
 // Returns true to continue posting.
 export function piiOk(text) {
+  if (contactBlocked(text)) { if (C && C.toast) C.toast(SAFETY_NOTE); return false; }
   const w = piiFound(text); if (!w) return true;
   return confirm(`⚠️ Heads up! This looks like it has ${w}.\n\nSharing personal info online can be unsafe. Kemy recommends removing it.\n\nPost anyway?`);
 }

@@ -67,7 +67,9 @@ function ensureCss() {
 #kh-snap{min-height:72px;background:#fff6cc;margin:8px 0}
 #kh-report .row{display:flex;gap:8px;margin-top:8px}
 #kh-report .row button{flex:1}
-#kh-rep-x{background:#fff;color:#3b2504;border:2px solid #6d28d9}`;
+#kh-rep-x{background:#fff;color:#3b2504;border:2px solid #6d28d9}
+#kh-safe-note{position:fixed;left:50%;bottom:max(88px,calc(env(safe-area-inset-bottom) + 72px));transform:translateX(-50%);z-index:2147483000;max-width:min(440px,92vw);margin:0;background:#fff6d8;color:#3b2504;border:3px solid #6d28d9;border-radius:16px;padding:12px 16px;font:800 16px/1.35 Inter,system-ui,sans-serif;text-align:center;box-shadow:0 10px 28px rgba(0,0,0,.28)}
+#kh-safe-note[hidden]{display:none}`;
   document.head.appendChild(st);
 }
 
@@ -86,8 +88,27 @@ export async function flag(text, area, target, still) {
   try { await addDoc(collection(db, 'worldChat'), data); } catch { /* the popup already showed */ }
 }
 
+const CONTACT_NOTE = "For safety, links and contact info aren't allowed";
+const CONTACT_KIND = { phone: 1, email: 1, address: 1, social: 1, link: 1 };
+
+export function showSafetyNote() {
+  ensureCss();
+  let el = document.getElementById('kh-safe-note');
+  if (!el) {
+    el = document.createElement('p');
+    el.id = 'kh-safe-note';
+    el.setAttribute('role', 'status');
+    el.textContent = CONTACT_NOTE;
+    document.body.appendChild(el);
+  }
+  el.hidden = false;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.hidden = true; }, 6000);
+}
+
 export function gate(text, area, target) {
   const s = scan(text);
+  if (CONTACT_KIND[s.kind]) { showSafetyNote(); return { ok: false, text: '' }; }
   if (s.action === 'care') { showCare(); return { ok: false, text: '' }; }
   if (s.action === 'block') { flag(text, area, target); showWarn(); return { ok: false, text: '' }; }
   if (s.action === 'mask' && s.strike) { flag(text, area, target); showWarn(); return { ok: true, text: s.text }; }

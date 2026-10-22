@@ -53,10 +53,8 @@ const dm = (u, o, text, newChat = true) => { const f = db(u), b = writeBatch(f),
   else b.update(doc(f, 'chats', cid), { lastMessage: text, lastAt: serverTimestamp(), lastSender: u });
   b.set(doc(f, 'chats', cid, 'messages', 'm' + Math.random().toString(36).slice(2)), { senderId: u, text, createdAt: serverTimestamp() });
   b.update(doc(f, 'users', u), { lastMessageAt: serverTimestamp(), ...(newChat ? { lastNewChatAt: serverTimestamp() } : {}) }); return b.commit(); };
-await ok('new chat with stamp OK', assertSucceeds(dm('vet', 'pal', 'hey')));
-await new Promise((r) => setTimeout(r, 1100));
-await ok('second new chat within 8 s rejected', assertFails(dm('vet', 'v2', 'hey')));
-await ok('reply in existing chat OK', assertSucceeds(dm('vet', 'pal', 'how are you', false)));
-await new Promise((r) => setTimeout(r, 1100));
-await ok('DM with 3 links rejected', assertFails(dm('vet', 'pal', 'https://a.com https://b.com https://c.com', false)));
+await ok('player DMs are off', assertFails(dm('vet', 'pal', 'hey')));
+await ok('a second DM is still off', assertFails(dm('vet', 'v2', 'hey')));
+await ok('a reply DM is still off', assertFails(dm('vet', 'pal', 'how are you', false)));
+await ok('a DM with links is off', assertFails(dm('vet', 'pal', 'https://a.com https://b.com https://c.com', false)));
 console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

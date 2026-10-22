@@ -11,6 +11,7 @@ import { clean, checkInput } from './talk.js';
 import { DECOR } from './wear.js';
 import { drawDancer } from './dance.js';
 import { createPark3D } from './park3d.js';
+import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-chat.js';
 import { webglOK } from './pal3d.js';
 export const WORLD = { w: 3200, h: 2400 };
 export const ZONES = [
@@ -108,10 +109,18 @@ export function createPark(ctx) {
     const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };
     main.querySelector('#pk-emote').onclick = () => { if (!toggle('e')) return; panel.innerHTML = EMOTES.map((x) => `<button class="pk-e" data-e="${x}">${x}</button>`).join(''); };
     main.querySelector('#pk-chat').onclick = () => { if (!toggle('c')) return;
-      panel.innerHTML = PHRASES.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`;
-      panel.querySelector('#pk-f').onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
+      const kid = phraseOnly();
+      const list = kid ? SAFE_SAY : PHRASES;
+      panel.innerHTML = list.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + (kid ? `<p class="small" style="margin:8px 0 0">${esc(PHRASE_NOTE)}</p>` : `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`);
+      const f = panel.querySelector('#pk-f'); if (f) f.onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
     panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
-    let lastSay = 0; function say(t) { if (Date.now() - lastSay < 2000) return toast('Slow down a bit 💜'); if (!spamOk('park', t)) return; lastSay = Date.now(); P.say = t.slice(0, 60); P.sayAt = Date.now(); dirty = true; send(true); }
+    let lastSay = 0; function say(t) {
+      if (phraseOnly() && !isPhrase(t)) return toast(PHRASE_NOTE);
+      const gate = window.kemyChatGate ? window.kemyChatGate(t, 'park', '') : { ok: true, text: t };
+      if (!gate.ok) return;
+      t = gate.text;
+      if (Date.now() - lastSay < 2000) return toast('Slow down a bit 💜'); if (!spamOk('park', t)) return; lastSay = Date.now(); P.say = t.slice(0, 60); P.sayAt = Date.now(); dirty = true; send(true);
+    }
     function emote(x, tgt = '') { P.e = x; P.eAt = Date.now(); P.tgt = tgt; dirty = true; send(true); }
     let near = null; const actBtn = main.querySelector('#pk-act'); actBtn.onclick = () => act();
     function act() { if (near) petOther(near); }

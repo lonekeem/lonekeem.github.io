@@ -21,7 +21,7 @@ const SEEN_KEY = 'lks-story-seen';
 const ms = (t) => (t && t.toMillis ? t.toMillis() : t instanceof Date ? t.getTime() : Number(t) || 0);
 
 export function createStories(ctx) {
-  const { S, db, esc, avatar, badge, timeAgo, toast, friendlyError, requireAuth, STUDIO_UID, isAdmin, openStory, sendMessage, refreshProfile, fs } = ctx;
+  const { S, db, esc, avatar, badge, timeAgo, toast, friendlyError, requireAuth, STUDIO_UID, isAdmin, openStory, refreshProfile, fs } = ctx;
   const { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, writeBatch, Timestamp, serverTimestamp } = fs;
 
   // ------------------------------------------------------------ seen (local)
@@ -257,23 +257,7 @@ export function createStories(ctx) {
         }).catch(() => { const c = el.querySelector('#sv-vcount'); if (c) c.textContent = 'Viewers'; });
         $('sv-viewers').onclick = () => viewersSheet(st);
       } else if (me()) {
-        foot.innerHTML = `<form class="sv-reply" id="sv-reply"><label class="sr-only" for="sv-rtext">Reply to ${esc(g.user.displayName || '')}</label>
-          <input id="sv-rtext" type="text" maxlength="500" autocomplete="off" enterkeyhint="send" placeholder="Reply to ${esc(g.user.displayName || g.user.username || '')}…">
-          <button class="sv-btn" type="submit" aria-label="Send reply">${IC.send}</button></form>`;
-        const inp = $('sv-rtext');
-        inp.onfocus = () => hold('typing', true);
-        inp.onblur = () => setTimeout(() => hold('typing', false), 120);
-        $('sv-reply').onsubmit = async (ev) => {
-          ev.preventDefault();
-          const text = inp.value.trim(); if (!text) return;
-          inp.disabled = true;
-          try {
-            const quote = st.caption ? ` “${st.caption.slice(0, 60)}”` : '';
-            await sendMessage(g.uid, `↩︎ Replied to your story${quote}: ${text}`);
-            closeViewer();
-            location.hash = `#/chat/${g.uid}`;
-          } catch (e) { inp.disabled = false; toast(e.code === 'permission-denied' ? 'Couldn’t send. You may be sending too fast, or this person isn’t accepting messages.' : friendlyError(e)); }
-        };
+        foot.innerHTML = `<p class="sv-reply" style="margin:0;padding:8px 12px">Private replies are turned off. <a href="#/feedback">Message the Kemy team</a></p>`;
       } else {
         foot.innerHTML = `<a class="sv-login" href="#/login?next=${encodeURIComponent(location.hash || '#/feed')}">Log in to reply</a>`;
         foot.querySelector('a').onclick = () => closeViewer();

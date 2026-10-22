@@ -165,7 +165,7 @@ function render(main) {
     <section class="pc-card"><p>${on() ? 'Parental Controls are <b>on</b>. Changes need the parent PIN.' : 'Pick a 4-digit parent PIN to turn on Parental Controls. Kids can’t change these settings without it.'}</p></section>
     <form id="pc-form" class="pc-card">
       <h2>Chat in games &amp; Pal Park</h2>${seg('chat', v.chat, [[true, 'On'], [false, 'Off']])}
-      <h2>Direct messages</h2>${seg('dm', v.dm, [['off', 'Off'], ['friends', 'Friends only'], ['everyone', 'Everyone']])}<p class="pc-note">Kemy only lets friends (who follow each other) start DMs, so “Everyone” works like Friends only.</p>
+      <h2>Direct messages</h2><p class="pc-note">Private messages between players are turned off for everyone. This can’t be switched back on. Public chat in games and Pal Park stays on, with a safety filter.</p>${seg('dm', 'off', [['off', 'Off']])}
       <h2>Going live</h2>${seg('live', v.live, [[true, 'On'], [false, 'Off']])}
       <h2>Commenting</h2>${seg('cmt', v.cmt, [[true, 'On'], [false, 'Off']])}
       <h2>Real-money purchases</h2>${seg('buy', v.buy, [['block', 'Blocked'], ['pin', 'Need PIN'], ['open', 'Allowed']])}

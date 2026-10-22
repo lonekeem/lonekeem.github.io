@@ -12,6 +12,7 @@ import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
 import { FX_DEFAULT } from './fx/looks.js';
 import { emojiPicker, insertAtCursor } from './richcomments.js';
+import { PHRASES, phraseOnly, isPhrase } from './safe-chat.js';
 // Emoji in live chat (all live layouts share the .lv-form markup).
 if (typeof document !== 'undefined' && !window.__lvEmoji) { window.__lvEmoji = 1; document.addEventListener('click', (e) => { const b = e.target.closest('.lv-emoji'); if (!b) return; const inp = b.parentNode.querySelector('input'); emojiPicker((em) => { insertAtCursor(inp, em); }); }); }
 
@@ -226,10 +227,35 @@ export function createLive(ctx) {
   }
   function wireChatForm(root, id) {
     const form = root.querySelector('.lv-form'); if (!form) return;
+    const original = form.innerHTML;
     let last = 0;
+    const paint = () => {
+      if (!document.body.contains(form)) return;
+      const on = phraseOnly();
+      if (on && form.dataset.phrases !== '1') {
+        form.dataset.phrases = '1';
+        form.innerHTML = `<div class="safe-phrases" role="group" aria-label="Pick a phrase">${PHRASES.map((p) => `<button type="button" data-phrase="${esc(p)}">${esc(p)}</button>`).join('')}</div>`;
+      } else if (!on && form.dataset.phrases === '1') {
+        form.dataset.phrases = '';
+        form.innerHTML = original;
+      }
+    };
+    paint();
+    addEventListener('kemy:chat-mode', paint);
+    form.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-phrase]'); if (!b) return;
+      e.preventDefault();
+      if (Date.now() - last < 1100) { toast('Slow down a bit 💜'); return; }
+      last = Date.now();
+      try { await sendChat(id, b.dataset.phrase); }
+      catch (err) { toast(err.code === 'permission-denied' ? 'Slow down a little, or this live has ended.' : friendlyError(err)); }
+    });
     form.onsubmit = async (e) => {
       e.preventDefault();
-      const input = form.querySelector('input'); const text = input.value.trim(); if (!text) return;
+      if (phraseOnly()) { paint(); return; }
+      const input = form.querySelector('input'); if (!input) return;
+      const text = input.value.trim(); if (!text) return;
+      if (!isPhrase(text) && phraseOnly()) return;
       if (Date.now() - last < 1100) { toast('Slow down a bit 💜'); return; }
       if (!spamOk('live', text)) return;
       last = Date.now(); input.value = '';
