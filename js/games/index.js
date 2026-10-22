@@ -11,11 +11,13 @@ import { createPool } from './pool.js';
 import { createChess } from './chess.js';
 import { createLudo } from './ludo.js';
 import { lastMode, saveMode, lastLevel, saveLevel, PALS, faceSvg, ask, whenOffer, offerHtml, stopOffer, addBotRecord, botRecords, onlyBots, normLevel, COIN_ONLINE, COIN_BOT } from './bots.js';
+import { bindProfiles, syncPlates } from './plates.js';
 
 export { CONTROLLER };
 
 export function createGames(ctx) {
   const { S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale } = ctx;
+  bindProfiles(ctx.getProfile);
   if (!document.getElementById('games-css')) {
     const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=3'; document.head.appendChild(l);
   }
@@ -295,8 +297,16 @@ export function createGames(ctx) {
       ${emoteBar()}
       <div class="g-actions" id="g-actions"></div>`, back);
   }
-  function playersBar(type, ps, turn, timer, done) {
-    return ps.map((p, i) => `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${chip(p)}<span class="g-pc ${i === 0 ? 'gold' : 'purple'}">${type === 'klgrid' ? (i === 0 ? 'K' : 'L') : STAR()}</span>${!done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : ''}</div>`).join('<span class="g-vs">vs</span>');
+  function paintPlayers(type, ps, turn, timer, done) {
+    const parent = $('#g-players'); if (!parent) return;
+    syncPlates(parent, ps.map((p, i) => {
+      const on = !done && turn === i;
+      const bits = [type === 'klgrid'
+        ? { key: 'pc', className: 'g-pc ' + (i === 0 ? 'gold' : 'purple'), text: i === 0 ? 'K' : 'L' }
+        : { key: 'pc', className: 'g-pc ' + (i === 0 ? 'gold' : 'purple'), html: STAR(), sig: 'star' }];
+      if (on && timer != null) bits.push({ key: 'tm', className: 'g-timer' + (timer <= 10 ? ' low' : ''), text: timer + 's' });
+      return { key: 'p' + i, className: 'g-pl' + (on ? ' on' : ''), side: String(i), person: p, bits };
+    }), { sep: true });
   }
   const sndFor = (type, st, prev) => type === 'stardrop' ? 'drop' : type === 'checkers' ? ((prev && (prev.board.replace(/[^.]/g, '').length < st.board.replace(/[^.]/g, '').length)) ? 'capture' : 'place') : 'place';
 
@@ -318,7 +328,7 @@ export function createGames(ctx) {
     const alive = { v: true }; S.unsubs.push(() => (alive.v = false));
     function draw() {
       if (!$('#g-board')) return;
-      $('#g-players').innerHTML = playersBar(type, ps, st.turn, null, !!over);
+      paintPlayers(type, ps, st.turn, null, !!over);
       $('#g-status').textContent = over ? (over.winner === 'draw' ? 'Draw!' : over.winner === humanSide ? 'You win!' : `${pal.name} wins`) : st.turn === humanSide ? `Your turn (${pieceLabel(type, humanSide)})` : `${pal.name} is thinking…`;
       renderBoard($('#g-board'), type, st, { mySide: humanSide, live: !over && !thinking, legal: over ? [] : E.moves(st), lastCell, line: over ? over.line : [], sel, flip: humanSide === 1, lastMove: st.last,
         onSelect: (s) => { sel = s; draw(); }, onMove: (m) => move(m) });
@@ -401,7 +411,7 @@ export function createGames(ctx) {
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
       const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
-      $('#g-players').innerHTML = playersBar(type, ps, g.turn, left, done || g.status === 'waiting');
+      paintPlayers(type, ps, g.turn, left, done || g.status === 'waiting');
       const status = $('#g-status');
       if (g.status === 'waiting') status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend to join…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
       else if (done) status.textContent = g.endReason === 'cancelled' ? 'This game was cancelled' : g.winnerUid === 'draw' ? 'Draw!' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;

@@ -4,6 +4,7 @@
 import { shuffle } from './cards.js';
 import { isBot, tsMs } from './net.js';
 import { normLevel, botPlayer, seatName, triviaRoll, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, lastLevel, onlyBots } from './bots.js';
+import { syncPlates } from './plates.js';
 
 const ROUNDS = 10, ROUND_S = 15, REVEAL_MS = 4200;
 let BANK = null;
@@ -27,29 +28,72 @@ export function createTrivia(ctx) {
     const rows = players.map((p) => ({ ...p, s: scores[p.uid] || 0, g: gained[p.uid] || 0 })).sort((a, b) => b.s - a.s);
     return `<ol class="tv-scores">${rows.map((r, i) => `<li class="${r.uid === ui.myUid() || r.me ? 'me' : ''}"><span class="tv-rank">${i + 1}</span>${ui.chip(r)}<span class="tv-pts"><b>${r.s}</b>${r.g ? `<i>+${r.g}</i>` : ''}</span></li>`).join('')}</ol>`;
   }
-  // Renders one state of the quiz. v = { phase, round, q, ord, picked, deadline, players, scores, gained, rightIdx }
+  // Renders one state of the quiz. The question card is rebuilt when the question changes.
+  // Player chips and the score rows stay put and only change the number that moved.
+  let quiz = null, clockRaf = 0;
+  function tickClock() {
+    cancelAnimationFrame(clockRaf);
+    const run = () => {
+      const clock = $('#tv-clock'), bar = $('#tv-bar');
+      if (!clock || !clock.isConnected || !quiz) return;
+      const v = quiz, reveal = v.phase === 'reveal';
+      const left = Math.max(0, v.deadline - Date.now());
+      const label = reveal ? '' : Math.ceil(left / 1000) + 's';
+      if (clock.textContent !== label) clock.textContent = label;
+      const w = reveal ? '0%' : (left / (ROUND_S * 1000)) * 100 + '%';
+      if (bar && bar.style.width !== w) bar.style.width = w;
+      if (bar) bar.classList.toggle('low', !reveal && left < 5000);
+      if (!reveal && left > 0) clockRaf = requestAnimationFrame(run);
+    };
+    run();
+  }
   function paint(v, onPick) {
     const box = $('#tv-body'); if (!box) return;
-    if (v.phase === 'q' || v.phase === 'reveal') {
-      const reveal = v.phase === 'reveal';
-      box.innerHTML = `<div class="tv-top"><span class="g-tag">${esc(v.q.cat)}</span><span class="muted small">Question ${v.round + 1} of ${ROUNDS}</span><span class="tv-clock" id="tv-clock"></span></div>
+    if (v.phase !== 'q' && v.phase !== 'reveal') return;
+    quiz = v;
+    const reveal = v.phase === 'reveal';
+    let qwrap = box.querySelector('#tv-qwrap');
+    const qsig = v.round + '|' + v.q.q;
+    if (!qwrap || qwrap.dataset.q !== qsig) {
+      box.innerHTML = `<div id="tv-qwrap" data-q="${esc(qsig)}"><div class="tv-top"><span class="g-tag">${esc(v.q.cat)}</span><span class="muted small">Question ${v.round + 1} of ${ROUNDS}</span><span class="tv-clock" id="tv-clock"></span></div>
         <div class="tv-bar"><span id="tv-bar"></span></div>
         <h2 class="tv-q">${esc(v.q.q)}</h2>
-        <div class="tv-choices">${v.ord.map((ai, k) => `<button class="tv-c c${k} ${v.picked === ai ? 'picked' : ''} ${reveal && ai === 0 ? 'right' : ''} ${reveal && v.picked === ai && ai !== 0 ? 'wrong' : ''}" data-a="${ai}" ${v.picked != null || reveal ? 'disabled' : ''}><span class="tv-l">${letters[k]}</span>${esc(v.q.a[ai])}</button>`).join('')}</div>
-        ${reveal ? `<div class="tv-reveal">${v.picked === 0 ? `<b class="ok">Right! +${v.gained[ui.myUid() || 'me'] || 0}</b>` : v.picked == null ? '<b>Time’s up</b>' : '<b class="no">Not quite</b>'}</div>${scoreList(v.players, v.scores, v.gained)}`
-          : `<div class="tv-who">${v.players.map((p) => ui.chip(p)).join('')}</div><p class="muted small center">${v.picked != null ? 'Locked in! Waiting for the others…' : 'Faster right answers score more.'}</p>`}`;
+        <div class="tv-choices">${v.ord.map((ai, k) => `<button class="tv-c c${k}" data-a="${ai}" data-k="${k}"><span class="tv-l">${letters[k]}</span>${esc(v.q.a[ai])}</button>`).join('')}</div></div>
+        <div id="tv-reveal"></div><div id="tv-plates"></div><p class="muted small center" id="tv-foot"></p>`;
       box.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => { ui.sfx.play('tap'); onPick(+b.dataset.a); });
-      const clock = $('#tv-clock'), bar = $('#tv-bar');
-      const step = () => {
-        if (!clock.isConnected) return;
-        const left = Math.max(0, v.deadline - Date.now());
-        clock.textContent = reveal ? '' : Math.ceil(left / 1000) + 's';
-        bar.style.width = reveal ? '0%' : `${(left / (ROUND_S * 1000)) * 100}%`;
-        bar.classList.toggle('low', left < 5000);
-        if (!reveal && left > 0) requestAnimationFrame(step);
-      };
-      step();
     }
+    box.querySelectorAll('.tv-c').forEach((b) => {
+      const ai = +b.dataset.a, k = +b.dataset.k;
+      const cls = `tv-c c${k}${v.picked === ai ? ' picked' : ''}${reveal && ai === 0 ? ' right' : ''}${reveal && v.picked === ai && ai !== 0 ? ' wrong' : ''}`;
+      if (b.className !== cls) b.className = cls;
+      const dis = v.picked != null || reveal;
+      if (b.disabled !== dis) b.disabled = dis;
+    });
+    const rev = $('#tv-reveal');
+    const plates = $('#tv-plates');
+    if (reveal) {
+      const msg = v.picked === 0 ? `<b class="ok">Right! +${(v.gained && (v.gained[ui.myUid() || 'me'] || v.gained.me)) || 0}</b>` : v.picked == null ? '<b>Time’s up</b>' : '<b class="no">Not quite</b>';
+      if (rev.dataset.m !== msg) { rev.dataset.m = msg; rev.innerHTML = `<div class="tv-reveal">${msg}</div>`; }
+      plates.className = '';
+      let ol = plates.querySelector('.tv-scores');
+      if (!ol) { plates.innerHTML = '<ol class="tv-scores"></ol>'; ol = plates.querySelector('.tv-scores'); }
+      const rows = v.players.map((p) => ({ ...p, s: (v.scores && v.scores[p.uid]) || 0, g: (v.gained && v.gained[p.uid]) || 0 })).sort((a, b) => b.s - a.s);
+      syncPlates(ol, rows.map((r, i) => ({
+        key: r.uid || ('r' + i), tag: 'li', className: (r.uid === ui.myUid() || r.me) ? 'me' : '', person: r,
+        lead: [{ key: 'rank', className: 'tv-rank', text: String(i + 1) }],
+        bits: [{ key: 'pts', className: 'tv-pts', html: `<b>${r.s}</b>${r.g ? `<i>+${r.g}</i>` : ''}`, sig: r.s + ':' + (r.g || 0) }]
+      })));
+      const foot = $('#tv-foot'); if (foot && foot.textContent) foot.textContent = '';
+    } else {
+      if (rev && rev.firstChild) { rev.innerHTML = ''; rev.dataset.m = ''; }
+      plates.className = 'tv-who';
+      if (plates.querySelector('.tv-scores')) plates.innerHTML = '';
+      syncPlates(plates, v.players.map((p, i) => ({ key: p.uid || ('p' + i), kind: 'chip', className: 'gp', person: p })));
+      const foot = $('#tv-foot');
+      const ft = v.picked != null ? 'Locked in! Waiting for the others…' : 'Faster right answers score more.';
+      if (foot && foot.textContent !== ft) foot.textContent = ft;
+    }
+    tickClock();
   }
   function final(players, scores, isMe, buttons) {
     const box = $('#tv-body'); if (!box) return;
@@ -142,10 +186,19 @@ export function createTrivia(ctx) {
     function lobby() {
       const box = $('#tv-body'); if (!box) return;
       const ps = players();
+      const humans = ps.filter((p) => !isBot(p.uid)).length;
+      const offer = isHost() && !g.invitee && humans < 2 && whenOffer(gid, () => render());
+      const sig = ps.map((p) => p.uid + ':' + p.name).join('|') + '|' + offer + '|' + g.host + '|' + member() + '|' + fillBots() + '|' + humans;
+      if (box.dataset.lsig === sig) {
+        clearTimeout(autoStart);
+        if (isHost() && g.quick && ps.length >= 2) autoStart = setTimeout(() => start(), 12000);
+        return;
+      }
+      box.dataset.lsig = sig;
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
         <div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-ghost" id="tv-copy">Copy invite link</button></div>
         <h3>${ps.length} / 8 players</h3><div class="g-seats">${ps.map((p) => ui.chip(p, p.uid === g.host ? 'host' : '')).join('')}</div>
-        ${isHost() ? `${fillToggleHtml()}<button class="btn btn-block" id="tv-start">${ps.filter((p) => !isBot(p.uid)).length < 2 && !fillBots() ? 'Waiting for a real player' : 'Start the quiz'}</button>${!g.invitee && ps.filter((p) => !isBot(p.uid)).length < 2 && whenOffer(gid, () => render()) ? offerHtml() : ''}${g.quick && ps.filter((p) => !isBot(p.uid)).length >= 2 ? '<p class="muted small center">Quick rooms start on their own in a few seconds.</p>' : ''}`
+        ${isHost() ? `${fillToggleHtml()}<button class="btn btn-block" id="tv-start">${humans < 2 && !fillBots() ? 'Waiting for a real player' : 'Start the quiz'}</button>${offer ? offerHtml() : ''}${g.quick && humans >= 2 ? '<p class="muted small center">Quick rooms start on their own in a few seconds.</p>' : ''}`
           : member() ? '<p class="muted center">Waiting for the host to start…</p>'
           : ui.signedIn() ? '<button class="btn btn-block" id="tv-join">Join room</button>' : `<a class="btn btn-block" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to join</a>`}</div>`;
       $('#tv-copy').onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };

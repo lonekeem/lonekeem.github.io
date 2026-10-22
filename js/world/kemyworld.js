@@ -297,10 +297,14 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   addEventListener('resize', placeAct);
   actB.onclick = () => { const a = actB.dataset.a; if (a && /^k\d+$/.test(a)) knock(+a.slice(1)); else if (api.onAction) api.onAction(a); };
   // tags for bots
-  function tag(o, text, x, y, z) { if (!o.tagEl) { o.tagEl = document.createElement('div'); o.tagEl.className = 'ks-tag'; o.tagEl.textContent = text; tagsEl.appendChild(o.tagEl); o.bubEl = document.createElement('div'); o.bubEl.className = 'ks-bub'; o.bubEl.hidden = true; tagsEl.appendChild(o.bubEl); }
-    tv.set(x, y, z).project(api.cam); const vis = tv.z < 1 && Math.abs(tv.x) < 1.05 && Math.abs(tv.y) < 1.05; o.tagEl.style.display = vis ? '' : 'none'; if (!vis) { o.bubEl.hidden = true; return; }
-    const w = view.clientWidth, h = view.clientHeight, px = (tv.x + 1) / 2 * w, py = (1 - tv.y) / 2 * h; o.tagEl.style.transform = `translate(${px.toFixed(0)}px,${py.toFixed(0)}px) translate(-50%,-100%)`;
-    const show = o.say && Date.now() - o.sayAt < 5000; o.bubEl.hidden = !show; if (show) { if (o.bubEl.textContent !== o.say) o.bubEl.textContent = o.say; o.bubEl.style.transform = `translate(${px.toFixed(0)}px,${(py - 22).toFixed(0)}px) translate(-50%,-100%)`; } }
+  function tag(o, text, x, y, z) {
+    if (!o.tagEl) { o.tagEl = document.createElement('div'); o.tagEl.className = 'ks-tag'; o.tagEl.dataset.n = text; o.tagEl.textContent = text; tagsEl.appendChild(o.tagEl); o.bubEl = document.createElement('div'); o.bubEl.className = 'ks-bub'; o.bubEl.hidden = true; tagsEl.appendChild(o.bubEl); }
+    else if (o.tagEl.dataset.n !== text) { o.tagEl.dataset.n = text; o.tagEl.textContent = text; }
+    tv.set(x, y, z).project(api.cam); const vis = tv.z < 1 && Math.abs(tv.x) < 1.05 && Math.abs(tv.y) < 1.05;
+    const disp = vis ? '' : 'none'; if (o.tagEl.style.display !== disp) o.tagEl.style.display = disp; if (!vis) { if (!o.bubEl.hidden) o.bubEl.hidden = true; return; }
+    const w = view.clientWidth, h = view.clientHeight, px = (tv.x + 1) / 2 * w, py = (1 - tv.y) / 2 * h;
+    const tf = `translate(${px.toFixed(0)}px,${py.toFixed(0)}px) translate(-50%,-100%)`; if (o.tagEl.style.transform !== tf) o.tagEl.style.transform = tf;
+    const show = o.say && Date.now() - o.sayAt < 5000; if (o.bubEl.hidden !== !show) o.bubEl.hidden = !show; if (show) { if (o.bubEl.textContent !== o.say) o.bubEl.textContent = o.say; const bf = `translate(${px.toFixed(0)}px,${(py - 22).toFixed(0)}px) translate(-50%,-100%)`; if (o.bubEl.style.transform !== bf) o.bubEl.style.transform = bf; } }
   const hideTag = (o) => { if (o.tagEl) { o.tagEl.style.display = 'none'; o.bubEl.hidden = true; } };
   const BOTSAY = ['Trick or treat! 🎃', 'Love your costume!', 'Want to trade candy? 🍬', 'Wheee!', 'Happy Halloween!', 'Let’s go to the gazebo!', 'My bag is so full 😄', 'Boo! 👻 hehe'];
 

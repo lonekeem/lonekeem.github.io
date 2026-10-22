@@ -296,17 +296,32 @@ export function createPalGames(ctx) {
     try { const s = await getDoc(doc(db, 'palGames', gid)); if (!s.exists()) { top.textContent = 'That game doesn’t exist.'; stopWatch(); return; } g = s.data();
       if (!g.players.includes(me()) && g.status === 'waiting' && (!g.invitee || g.invitee === me())) await join(gid); } catch (e) { top.textContent = friendlyError(e); stopWatch(); return; }
     bind();
+    function putHtml(el, sig, html) {
+      if (!el || el.dataset.sig === sig) return false;
+      el.dataset.sig = sig; el.innerHTML = html; return true;
+    }
     function render() {
       if (!g) return; const other = g.players.find((u) => u !== me()); const oi = g.players.indexOf(other);
       if (g.status === 'waiting') { const link = location.href.split('#')[0] + '#/games/pals/' + gid;
-        top.innerHTML = `<b>${esc(GAME[g.game].name)}</b> · waiting for ${g.invitee ? 'your friend' : 'a player'}…`;
+        const topHtml = `<b>${esc(GAME[g.game].name)}</b> · waiting for ${g.invitee ? 'your friend' : 'a player'}…`;
+        putHtml(top, topHtml, topHtml);
         const ready = !g.invitee && whenOffer(gid, () => render());
-        host.innerHTML = `<div class="pg-wait"><div class="spinner"></div><p>Send this link to a friend:</p><input readonly value="${esc(link)}" onclick="this.select()"><button class="btn btn-sm" id="pg-copy">Copy link</button><p class="small muted">${g.quick ? 'Looking for a real player…' : 'Waiting for your friend…'}</p>${ready ? offerHtml() : ''}</div>`;
-        host.querySelector('#pg-copy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(link).then(() => toast('Link copied'));
-        const yes = host.querySelector('[data-bot-yes]'); if (yes) yes.onclick = () => { updateDoc(doc(db, 'palGames', gid), { status: 'done', updatedAt: serverTimestamp() }).catch(() => {}); if (g.quick) setDoc(doc(db, 'gameQueue', 'pal-' + g.game), { gid: '', uid: '', at: serverTimestamp() }).catch(() => {}); difficulty(g.game); };
+        const hostHtml = `<div class="pg-wait"><div class="spinner"></div><p>Send this link to a friend:</p><input readonly value="${esc(link)}" onclick="this.select()"><button class="btn btn-sm" id="pg-copy">Copy link</button><p class="small muted">${g.quick ? 'Looking for a real player…' : 'Waiting for your friend…'}</p>${ready ? offerHtml() : ''}</div>`;
+        if (putHtml(host, hostHtml, hostHtml)) {
+          host.querySelector('#pg-copy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(link).then(() => toast('Link copied'));
+          const yes = host.querySelector('[data-bot-yes]'); if (yes) yes.onclick = () => { updateDoc(doc(db, 'palGames', gid), { status: 'done', updatedAt: serverTimestamp() }).catch(() => {}); if (g.quick) setDoc(doc(db, 'gameQueue', 'pal-' + g.game), { gid: '', uid: '', at: serverTimestamp() }).catch(() => {}); difficulty(g.game); };
+        }
         return; }
-      if (g.status === 'active' && !started && g.players.includes(me())) { started = true; top.innerHTML = `<b>${esc(GAME[g.game].name)}</b> · you vs ${esc(g.names[oi])}${(window.kemyModBadge ? window.kemyModBadge(other) : '')}`; go(other, oi); }
-      if (!g.players.includes(me())) top.innerHTML = `${esc(g.names.join(' vs '))} · this match is full`;
+      if (g.status === 'active' && !started && g.players.includes(me())) {
+        started = true;
+        const topHtml = `<b>${esc(GAME[g.game].name)}</b> · you vs ${esc(g.names[oi])}${(window.kemyModBadge ? window.kemyModBadge(other) : '')}`;
+        putHtml(top, 'active:' + topHtml, topHtml);
+        go(other, oi);
+      }
+      if (!g.players.includes(me())) {
+        const full = `${esc(g.names.join(' vs '))} · this match is full`;
+        putHtml(top, full, full);
+      }
     }
     async function go(other, oi) {
       const goAt = () => (g.startAt && g.startAt.toMillis ? g.startAt.toMillis() : link.serverNow());

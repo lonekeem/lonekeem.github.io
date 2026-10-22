@@ -6,6 +6,7 @@
 import * as L from './ludo-engine.js';
 import { isBot, tsMs, TURN_SECONDS } from './net.js';
 import { ask, normLevel, botPlayer, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, stopOffer, onlyBots, lastLevel } from './bots.js';
+import { syncPlates } from './plates.js';
 
 const BOT_NAMES = ['Nova', 'Echo', 'Pixel', 'Juno'];
 const CELL = 20;
@@ -58,16 +59,50 @@ export function createLudo(ctx) {
     ui.shell(esc(title), `<div class="lu" id="lu"><div class="g-fx"></div><div id="lu-body"></div></div>${ui.emoteBar()}<div class="g-actions" id="g-actions"></div>`, back);
   }
   // v = { st, seats, mySeat, die, rolling, canRoll, movable, timer, note, flagged }
+  // Seats, the die and the message stay put. The board SVG is rebuilt only when a token moved.
+  const luCur = { v: null, on: null };
   function paint(v, on) {
     const box = $('#lu-body'); if (!box) return;
+    luCur.v = v; luCur.on = on;
     const st = v.st, me = v.mySeat;
+    if (!box.querySelector('#lu-seats')) {
+      box.innerHTML = `<div class="lu-seats" id="lu-seats"></div><div class="lu-board" id="lu-board"></div><div class="lu-ctrl"><button class="lu-die" id="lu-roll" type="button"></button><div class="lu-msg"><b id="lu-title"></b><span class="muted small" id="lu-note"></span></div></div>`;
+      $('#lu-roll').onclick = () => { if (luCur.v && luCur.v.canRoll && luCur.on) luCur.on.roll(); };
+    }
     const home = (p) => st.pos[p].filter((r) => r === L.HOME).length;
-    box.innerHTML = `<div class="lu-seats">${v.seats.map((p, i) => `<div class="lu-seat ${st.winner < 0 && st.turn === i ? 'on' : ''}" style="--lc:${L.COLORS[st.cols[i]]}">${ui.chip(p)}<span class="lu-home">${home(i)}/4</span>${v.flagged && v.flagged[i] ? '<span class="lu-flag" title="A move didn’t check out">⚠</span>' : ''}${st.winner < 0 && st.turn === i && v.timer != null ? `<span class="g-timer ${v.timer <= 10 ? 'low' : ''}">${v.timer}s</span>` : ''}</div>`).join('')}</div>
-      <div class="lu-board">${boardSvg(st, v.seats, v.movable || [], me >= 0 && st.turn === me)}</div>
-      <div class="lu-ctrl"><button class="lu-die ${v.rolling ? 'rolling' : ''} ${v.canRoll ? 'can' : ''}" id="lu-roll" ${v.canRoll ? '' : 'disabled'} aria-label="${v.canRoll ? 'Roll the die' : 'Die'}" style="--lc:${L.COLORS[st.cols[st.turn]]}">${dieSvg(v.rolling ? 0 : v.die)}</button>
-        <div class="lu-msg"><b>${st.winner >= 0 ? `${esc(v.seats[st.winner].name)} wins!` : me === st.turn ? (v.canRoll ? 'Your roll' : v.movable && v.movable.length ? 'Tap a glowing token' : 'Your turn') : `${esc(v.seats[st.turn].name)}’s turn`}</b><span class="muted small">${esc(v.note || st.msg || '')}</span></div></div>`;
-    const rb = $('#lu-roll'); if (rb && v.canRoll) rb.onclick = () => on.roll();
-    box.querySelectorAll('[data-t]').forEach((el) => { const f = () => on.pick(+el.dataset.t); el.addEventListener('click', f); el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') f(); }); });
+    syncPlates($('#lu-seats'), v.seats.map((p, i) => {
+      const onTurn = st.winner < 0 && st.turn === i;
+      const bits = [{ key: 'home', className: 'lu-home', text: home(i) + '/4' }];
+      if (v.flagged && v.flagged[i]) bits.push({ key: 'flag', className: 'lu-flag', text: '⚠', title: 'A move didn’t check out' });
+      if (onTurn && v.timer != null) bits.push({ key: 'tm', className: 'g-timer' + (v.timer <= 10 ? ' low' : ''), text: v.timer + 's' });
+      return { key: 's' + i, className: 'lu-seat' + (onTurn ? ' on' : ''), vars: { '--lc': L.COLORS[st.cols[i]] }, person: p, bits };
+    }));
+    const board = $('#lu-board');
+    const bsig = st.winner + '|' + st.turn + '|' + st.pos.map((a) => a.join(',')).join(';') + '|' + (v.movable || []).join(',') + '|' + (st.last ? st.last.p + ':' + st.last.t : '') + '|' + (me >= 0 && st.turn === me ? 1 : 0);
+    if (board.dataset.sig !== bsig) {
+      board.dataset.sig = bsig;
+      board.innerHTML = boardSvg(st, v.seats, v.movable || [], me >= 0 && st.turn === me);
+      board.querySelectorAll('[data-t]').forEach((el) => {
+        const f = () => { if (luCur.on) luCur.on.pick(+el.dataset.t); };
+        el.addEventListener('click', f);
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') f(); });
+      });
+    }
+    const die = $('#lu-roll');
+    const cls = 'lu-die' + (v.rolling ? ' rolling' : '') + (v.canRoll ? ' can' : '');
+    if (die.className !== cls) die.className = cls;
+    if (die.disabled !== !v.canRoll) die.disabled = !v.canRoll;
+    const lc = L.COLORS[st.cols[st.turn]];
+    if (die.style.getPropertyValue('--lc') !== lc) die.style.setProperty('--lc', lc);
+    const faceN = v.rolling ? 0 : (v.die || 0);
+    if (die.dataset.f !== String(faceN)) { die.dataset.f = String(faceN); die.innerHTML = dieSvg(v.rolling ? 0 : v.die); }
+    const label = v.canRoll ? 'Roll the die' : 'Die';
+    if (die.getAttribute('aria-label') !== label) die.setAttribute('aria-label', label);
+    const title = st.winner >= 0 ? `${v.seats[st.winner].name} wins!` : me === st.turn ? (v.canRoll ? 'Your roll' : v.movable && v.movable.length ? 'Tap a glowing token' : 'Your turn') : `${v.seats[st.turn].name}’s turn`;
+    const note = v.note || st.msg || '';
+    const titleEl = $('#lu-title'), noteEl = $('#lu-note');
+    if (titleEl && titleEl.textContent !== title) titleEl.textContent = title;
+    if (noteEl && noteEl.textContent !== note) noteEl.textContent = note;
   }
   const sound = (prev, st) => { if (!st.last) return; ui.sfx.play(st.last.cap ? 'capture' : st.last.to === L.HOME ? 'star' : 'place'); };
 
@@ -221,11 +256,19 @@ export function createLudo(ctx) {
     function lobby() {
       const box = $('#lu-body'); if (!box) return;
       const ps = seats(), ready = humans().every((u) => (g.rv || {})[u]);
+      const offer = isHost() && !g.invitee && humans().length < 2 && whenOffer(gid, () => draw());
+      const sig = ps.map((p) => p.uid + ':' + p.name + ':' + ((g.rv || {})[p.uid] ? 1 : 0)).join('|') + '|' + ready + '|' + offer + '|' + g.host + '|' + member() + '|' + maxSeats();
+      if (box.dataset.lsig === sig) {
+        clearTimeout(lobby.t);
+        if (isHost() && g.quick && humans().length >= 2 && ready) lobby.t = setTimeout(() => start(), humans().length >= maxSeats() ? 1500 : 12000);
+        return;
+      }
+      box.dataset.lsig = sig;
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
         <button class="btn btn-sm btn-ghost" id="lu-copy">Copy invite link</button>
         <p class="muted small">${maxSeats()} seats. Bots wear a Bot tag.</p>
         <h3>${ps.length} / ${maxSeats()} seats</h3><div class="g-seats">${ps.map((p, i) => `<div class="g-seat" style="--lc:${L.COLORS[L.seatColors(maxSeats())[i] ?? i]}">${ui.chip(p, p.uid === g.host ? 'host' : '')}${!isBot(p.uid) ? `<span class="muted small">${(g.rv || {})[p.uid] ? 'dice locked in' : 'locking dice…'}</span>` : ''}${isHost() && isBot(p.uid) ? `<button class="link-btn small" data-rm="${i}">remove</button>` : ''}</div>`).join('')}</div>
-        ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="lu-bot" ${ps.length >= maxSeats() ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="lu-start" ${ready ? '' : 'disabled'}>Start game</button></div>${!g.invitee && humans().length < 2 && whenOffer(gid, () => draw()) ? offerHtml() : ''}`
+        ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="lu-bot" ${ps.length >= maxSeats() ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="lu-start" ${ready ? '' : 'disabled'}>Start game</button></div>${offer ? offerHtml() : ''}`
           : member() ? '<p class="muted center">Waiting for the host to start…</p>'
           : ui.signedIn() ? '<button class="btn btn-block" id="lu-join">Take a seat</button>' : `<a class="btn btn-block" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to join</a>`}
         <p class="muted small center">Fair dice: everyone locks in a secret before the game; each roll mixes everyone’s next secret, so nobody can choose a number.</p></div>`;

@@ -3,6 +3,7 @@
 import * as C from './chess-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
 import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
+import { syncPlates } from './plates.js';
 
 // Original piece art: simple rounded silhouettes, gold (white) and purple (black), star on the king.
 const SHAPES = {
@@ -70,9 +71,15 @@ export function createChess(ctx) {
     el.innerHTML = h || '<span class="muted">Gold moves first.</span>';
     el.scrollLeft = el.scrollWidth;
   }
-  const sideLbl = (i) => `<span class="g-pc ${i === 0 ? 'gold' : 'purple'}">${pieceSvg(i === 0 ? 'K' : 'k')}</span>`;
-  function bar(ps, turn, done, clocks, timer) {
-    return ps.map((p, i) => `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${ui.chip(p)}${sideLbl(i)}${clocks ? `<span class="ch-clock ${!done && turn === i ? 'run' : ''} ${clocks[i] < 20000 ? 'low' : ''}">${fmt(clocks[i])}</span>` : !done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : ''}</div>`).join('<span class="g-vs">vs</span>');
+  function paintBar(ps, turn, done, clocks, timer) {
+    const parent = $('#g-players'); if (!parent) return;
+    syncPlates(parent, ps.map((p, i) => {
+      const on = !done && turn === i;
+      const bits = [{ key: 'pc', className: 'g-pc ' + (i === 0 ? 'gold' : 'purple'), html: pieceSvg(i === 0 ? 'K' : 'k'), sig: i === 0 ? 'K' : 'k' }];
+      if (clocks) bits.push({ key: 'ck', className: 'ch-clock' + (on ? ' run' : '') + (clocks[i] < 20000 ? ' low' : ''), text: fmt(clocks[i]) });
+      else if (on && timer != null) bits.push({ key: 'tm', className: 'g-timer' + (timer <= 10 ? ' low' : ''), text: timer + 's' });
+      return { key: 'p' + i, className: 'g-pl' + (on ? ' on' : ''), side: String(i), person: p, bits };
+    }), { sep: true });
   }
   const endText = (o, names) => o.winner === 'draw' ? `Draw: ${o.why.toLowerCase()}.` : `${o.why}! ${names[o.winner === 'w' ? 0 : 1]} wins.`;
 
@@ -92,7 +99,7 @@ export function createChess(ctx) {
     $('#ch-new').onclick = () => local({ ...params, side: '' });
     function refresh() {
       const turn = pos.w ? 0 : 1;
-      $('#g-players').innerHTML = bar(ps, turn, !!over);
+      paintBar(ps, turn, !!over);
       const o = C.outcome(pos, keys);
       $('#g-status').textContent = over ? endText(over, ps.map((p) => p.name)) : (o.check ? 'Check! ' : '') + (turn === human ? 'Your move' : `${pal.name} is thinking…`);
       paintBoard({ pos, mySide: human, live: !over && turn === human, sel, last, onSelect: (s) => { sel = s; refresh(); }, onMove: (m) => doMove(m) });
@@ -142,7 +149,7 @@ export function createChess(ctx) {
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
       const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
-      $('#g-players').innerHTML = bar(ps, g.turn, g.status !== 'active', clocks(), left);
+      paintBar(ps, g.turn, g.status !== 'active', clocks(), left);
       const st = $('#g-status'), me = side();
       if (g.status === 'waiting') st.textContent = me === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
       else if (g.status === 'done') st.textContent = g.endReason === 'cancelled' ? 'Cancelled' : g.winnerUid === 'draw' ? `Draw${g.why ? '' : ''}` : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (resigned)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;

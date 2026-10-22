@@ -6,6 +6,7 @@
 import * as C from './cards.js';
 import { isBot, tsMs } from './net.js';
 import { ask, normLevel, botPlayer, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, lastLevel, onlyBots } from './bots.js';
+import { syncPlate, syncPlates } from './plates.js';
 
 const TURN_S = 30;
 const CATCH = { easy: 0.35, medium: 0.55, hard: 0.8, expert: 0.95 };
@@ -45,58 +46,95 @@ export function createStarCards(ctx) {
     });
   }
   // v = { seats:[{uid,name,uname,color}], mySeat, pv, hand, drawn, timerLeft, verified, msg }
+  // Opponent plates and your plate stay in the DOM. The table and hand are rebuilt only when the cards change.
   let lastSeq = -1, lastTop = '', armed = false;
+  const scCur = { v: null, h: null };
   function paint(v, h) {
     const box = $('#sc-body'); if (!box) return;
+    scCur.v = v; scCur.h = h;
     const pv = v.pv, me = v.mySeat;
     const myTurn = me >= 0 && pv.turn === me && pv.roundWinner < 0;
     const playable = myTurn ? (pv.drew ? (v.drawn && v.hand.includes(v.drawn) && canPlayPv(pv, v.drawn) ? [v.drawn] : []) : v.hand.filter((c) => canPlayPv(pv, c))) : [];
     const order = []; for (let k = 1; k < v.seats.length; k++) order.push(((me < 0 ? 0 : me) + k) % v.seats.length);
     if (me < 0) order.unshift(0);
-    const opp = order.map((s) => {
+    if (!box.querySelector('#sc-opps')) {
+      box.innerHTML = `<div class="sc-opps" id="sc-opps"></div><div id="sc-table"></div><div class="sc-me" id="sc-me"><div class="sc-me-bar" id="sc-me-bar"></div><div id="sc-rest"></div></div>`;
+    }
+    syncPlates($('#sc-opps'), order.map((s) => {
       const p = v.seats[s], n = pv.counts[s];
-      return `<div class="sc-opp ${pv.turn === s && pv.roundWinner < 0 ? 'on' : ''} ${pv.exposed === s ? 'exposed' : ''}" data-seat="${s}">${ui.chip(p)}<div class="sc-fan">${Array.from({ length: Math.min(n, 8) }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div><span class="sc-n">${n}</span>${n === 1 && pv.called && pv.called[s] ? '<span class="sc-ls">LAST STAR!</span>' : ''}${pv.target ? `<span class="sc-score">${pv.scores[s]}</span>` : ''}${pv.turn === s && v.timerLeft != null && pv.roundWinner < 0 ? `<span class="g-timer ${v.timerLeft <= 8 ? 'low' : ''}">${v.timerLeft}s</span>` : ''}</div>`;
-    }).join('');
+      const on = pv.turn === s && pv.roundWinner < 0;
+      const bits = [
+        { key: 'fan', className: 'sc-fan', html: Array.from({ length: Math.min(n, 8) }, (_, i) => `<i style="--i:${i}"></i>`).join(''), sig: String(Math.min(n, 8)) },
+        { key: 'n', className: 'sc-n', text: String(n) }
+      ];
+      if (n === 1 && pv.called && pv.called[s]) bits.push({ key: 'ls', className: 'sc-ls', text: 'LAST STAR!' });
+      if (pv.target) bits.push({ key: 'pts', className: 'sc-score', text: String(pv.scores[s]) });
+      if (on && v.timerLeft != null) bits.push({ key: 'tm', className: 'g-timer' + (v.timerLeft <= 8 ? ' low' : ''), text: v.timerLeft + 's' });
+      return { key: 's' + s, className: 'sc-opp' + (on ? ' on' : '') + (pv.exposed === s ? ' exposed' : ''), person: p, bits };
+    }));
+    const meEl = $('#sc-me');
+    const meCls = 'sc-me' + (myTurn ? ' on' : '');
+    if (meEl.className !== meCls) meEl.className = meCls;
+    const bar = $('#sc-me-bar');
+    if (me < 0) {
+      if (bar.dataset.mode !== 'watch') { bar.dataset.mode = 'watch'; bar.innerHTML = '<span class="muted small">You’re watching</span>'; }
+    } else {
+      if (bar.dataset.mode !== 'play') { bar.dataset.mode = 'play'; bar.innerHTML = ''; }
+      const bits = [{ key: 'n', className: 'sc-n', text: v.hand.length + ' cards' }];
+      if (pv.target) bits.push({ key: 'pts', className: 'sc-score', text: pv.scores[me] + ' pts' });
+      if (myTurn && v.timerLeft != null) bits.push({ key: 'tm', className: 'g-timer' + (v.timerLeft <= 8 ? ' low' : ''), text: v.timerLeft + 's' });
+      bits.push({ key: 'sp', className: 'spacer', text: '' });
+      if (v.verified) bits.push({ key: 'ver', className: 'sc-ver ' + (v.verified.ok ? 'ok' : 'bad'), text: v.verified.ok ? '✓ deal verified' : '⚠ deal mismatch', title: v.verified.text });
+      syncPlate(bar, { className: 'sc-me-bar', person: v.seats[me], bits });
+    }
     const newTop = pv.top !== lastTop || pv.seq !== lastSeq;
     const canCatch = pv.exposed >= 0 && pv.exposed !== me && me >= 0 && pv.roundWinner < 0;
     const showLast = me >= 0 && pv.roundWinner < 0 && ((myTurn && v.hand.length === 2 && !pv.drew) || pv.exposed === me);
-    box.innerHTML = `
-      <div class="sc-opps">${opp}</div>
-      <div class="sc-table" style="--cur:${SUIT[pv.color]}">
+    const playSig = [pv.turn, pv.top, pv.seq, pv.color, pv.dir, pv.drew ? 1 : 0, pv.deckCount, pv.exposed, pv.roundWinner, me, myTurn ? 1 : 0, (v.hand || []).join(','), v.drawn || '', playable.join(','), showLast ? 1 : 0, canCatch ? 1 : 0, armed ? 1 : 0].join('|');
+    const table = $('#sc-table');
+    const rest = $('#sc-rest');
+    if (table.dataset.sig !== playSig) {
+      table.dataset.sig = playSig;
+      table.innerHTML = `<div class="sc-table" style="--cur:${SUIT[pv.color]}">
         <div class="sc-dir ${pv.dir < 0 ? 'ccw' : ''}" aria-label="Direction">${ICON.F}</div>
         <button class="sc-pile" id="sc-draw" ${myTurn && !pv.drew ? '' : 'disabled'} aria-label="Draw a card">${back()}${back('b2')}${back('b3')}<span class="sc-pile-n">${pv.deckCount}</span></button>
         <div class="sc-discard">${cardHtml(pv.top, { cls: newTop ? 'land' : '', attrs: 'tabindex="-1" disabled' })}<span class="sc-ring" title="Current colour: ${C.COLOR_NAME[pv.color]}"></span></div>
-        <div class="sc-msg" id="sc-msg">${esc(v.msg || '')}</div>
-      </div>
-      <div class="sc-me ${myTurn ? 'on' : ''}">
-        <div class="sc-me-bar">${me >= 0 ? `${ui.chip(v.seats[me])}<span class="sc-n">${v.hand.length} cards</span>${pv.target ? `<span class="sc-score">${pv.scores[me]} pts</span>` : ''}${myTurn && v.timerLeft != null ? `<span class="g-timer ${v.timerLeft <= 8 ? 'low' : ''}">${v.timerLeft}s</span>` : ''}` : '<span class="muted small">You’re watching</span>'}
-          <span class="spacer"></span>${v.verified ? `<span class="sc-ver ${v.verified.ok ? 'ok' : 'bad'}" title="${esc(v.verified.text)}">${v.verified.ok ? '✓ deal verified' : '⚠ deal mismatch'}</span>` : ''}</div>
-        <div class="sc-btns">
+        <div class="sc-msg" id="sc-msg"></div>
+      </div>`;
+      rest.innerHTML = `<div class="sc-btns">
           ${showLast ? `<button class="sc-last ${armed ? 'armed' : ''}" id="sc-last">${ui.STAR()} LAST STAR!</button>` : ''}
           ${canCatch ? `<button class="sc-catch" id="sc-catch">Catch ${esc(v.seats[pv.exposed].name)}! +2</button>` : ''}
           ${myTurn && pv.drew && playable.length ? '<button class="btn btn-sm btn-ghost" id="sc-pass">Keep it &amp; pass</button>' : ''}
         </div>
         <div class="sc-hand" style="--n:${v.hand.length}">${v.hand.map((c, i) => cardHtml(c, { cls: `${playable.includes(c) ? 'can' : myTurn ? 'dim' : ''} ${c === v.drawn && pv.drew ? 'fresh' : ''}`, attrs: `data-i="${i}" style="--i:${i}" ${playable.includes(c) ? '' : 'aria-disabled="true"'}` })).join('')}</div>
-        <p class="muted small center sc-hint">${me < 0 ? '' : pv.roundWinner >= 0 ? '' : myTurn ? (pv.drew ? 'You drew. Play it or keep it.' : playable.length ? `Play a ${C.COLOR_NAME[pv.color].toLowerCase()} card, a match, or a Star Wild${v.hand.length === 2 ? ' (tap LAST STAR! first)' : ''}.` : 'No match. Tap the pile to draw.') : `${esc(v.seats[pv.turn].name)}’s turn`}</p>
-      </div>`;
-    if (newTop) { lastSeq = pv.seq; lastTop = pv.top; }
-    box.querySelectorAll('.sc-hand [data-i]').forEach((b) => b.onclick = async () => {
-      const c = v.hand[+b.dataset.i];
-      if (!playable.includes(c)) { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); return; }
-      let color;
-      if (C.isWild(c)) { color = await pickColor(); if (!color) return; }
-      const last = armed && v.hand.length === 2; armed = false;
-      ui.sfx.play('card');
-      h.send({ t: 'play', card: c, color, last });
-    });
-    const d = $('#sc-draw'); if (d) d.onclick = () => { ui.sfx.play('deal'); h.send({ t: 'draw' }); };
-    const ps = $('#sc-pass'); if (ps) ps.onclick = () => h.send({ t: 'pass' });
-    const ls = $('#sc-last'); if (ls) ls.onclick = () => {
-      ui.sfx.play('star'); ui.burst(ls, 8);
-      if (pv.exposed === me || v.hand.length === 1) h.call({ t: 'last' });
-      else { armed = !armed; ls.classList.toggle('armed', armed); toast(armed ? 'LAST STAR! armed: now play your card' : 'LAST STAR! off'); }
-    };
-    const ct = $('#sc-catch'); if (ct) ct.onclick = () => { ui.sfx.play('pop'); h.call({ t: 'catch' }); };
+        <p class="muted small center sc-hint" id="sc-hint"></p>`;
+      if (newTop) { lastSeq = pv.seq; lastTop = pv.top; }
+      rest.querySelectorAll('.sc-hand [data-i]').forEach((b) => b.onclick = async () => {
+        const cv = scCur.v, ch = scCur.h; if (!cv || !ch) return;
+        const c = cv.hand[+b.dataset.i];
+        const pv2 = cv.pv, mine = cv.mySeat;
+        const turn = mine >= 0 && pv2.turn === mine && pv2.roundWinner < 0;
+        const legal = turn ? (pv2.drew ? (cv.drawn && cv.hand.includes(cv.drawn) && canPlayPv(pv2, cv.drawn) ? [cv.drawn] : []) : cv.hand.filter((x) => canPlayPv(pv2, x))) : [];
+        if (!legal.includes(c)) { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); return; }
+        let color;
+        if (C.isWild(c)) { color = await pickColor(); if (!color) return; }
+        const last = armed && cv.hand.length === 2; armed = false;
+        ui.sfx.play('card');
+        ch.send({ t: 'play', card: c, color, last });
+      });
+      const d = $('#sc-draw'); if (d) d.onclick = () => { if (!scCur.h) return; ui.sfx.play('deal'); scCur.h.send({ t: 'draw' }); };
+      const ps = $('#sc-pass'); if (ps) ps.onclick = () => { if (scCur.h) scCur.h.send({ t: 'pass' }); };
+      const ls = $('#sc-last'); if (ls) ls.onclick = () => {
+        const cv = scCur.v, ch = scCur.h; if (!cv || !ch) return;
+        ui.sfx.play('star'); ui.burst(ls, 8);
+        if (cv.pv.exposed === cv.mySeat || cv.hand.length === 1) ch.call({ t: 'last' });
+        else { armed = !armed; ls.classList.toggle('armed', armed); toast(armed ? 'LAST STAR! armed: now play your card' : 'LAST STAR! off'); }
+      };
+      const ct = $('#sc-catch'); if (ct) ct.onclick = () => { if (!scCur.h) return; ui.sfx.play('pop'); scCur.h.call({ t: 'catch' }); };
+    }
+    const msgEl = $('#sc-msg'); if (msgEl && msgEl.textContent !== (v.msg || '')) msgEl.textContent = v.msg || '';
+    const hint = me < 0 ? '' : pv.roundWinner >= 0 ? '' : myTurn ? (pv.drew ? 'You drew. Play it or keep it.' : playable.length ? `Play a ${C.COLOR_NAME[pv.color].toLowerCase()} card, a match, or a Star Wild${v.hand.length === 2 ? ' (tap LAST STAR! first)' : ''}.` : 'No match. Tap the pile to draw.') : `${v.seats[pv.turn].name}’s turn`;
+    const hintEl = $('#sc-hint'); if (hintEl && hintEl.textContent !== hint) hintEl.textContent = hint;
   }
   function canPlayPv(pv, card) { return C.isWild(card) || card[0] === pv.color || (!C.isWild(pv.top) && card[1] === pv.top[1]); }
   function eventMsg(ev, seats) {
@@ -314,11 +352,20 @@ export function createStarCards(ctx) {
     function lobby() {
       const box = $('#sc-body'); if (!box) return;
       const ps = seats();
+      const humans = ps.filter((p) => !isBot(p.uid)).length;
+      const offer = isHost() && !g.invitee && humans < 2 && whenOffer(gid, () => draw());
+      const sig = ps.map((p) => p.uid + ':' + p.name).join('|') + '|' + offer + '|' + g.host + '|' + member() + '|' + g.mode + '|' + fillBots();
+      if (box.dataset.lsig === sig) {
+        clearTimeout(lobby.t);
+        if (isHost() && g.quick && humans >= 2) lobby.t = setTimeout(() => startGame(), 12000);
+        return;
+      }
+      box.dataset.lsig = sig;
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
         <button class="btn btn-sm btn-ghost" id="sc-copy">Copy invite link</button>
         <p class="muted small">${g.mode === 'round' ? 'Single round' : 'First to 500 points'}</p>
         <h3>${ps.length} / 6 seats</h3><div class="g-seats">${ps.map((p, i) => `<div class="g-seat">${ui.chip(p, p.uid === g.host ? 'host' : '')}${isHost() && isBot(p.uid) ? `<button class="link-btn small" data-rm="${i}">remove</button>` : ''}</div>`).join('')}</div>
-        ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="sc-bot" ${ps.length >= 6 ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="sc-start" ${ps.length < 2 && !fillBots() ? 'disabled' : ''}>Deal cards</button></div>${!g.invitee && ps.filter((p) => !isBot(p.uid)).length < 2 && whenOffer(gid, () => draw()) ? offerHtml() : ''}${g.quick && ps.filter((p) => !isBot(p.uid)).length >= 2 ? '<p class="muted small center">Quick rooms deal on their own in a few seconds.</p>' : ''}`
+        ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="sc-bot" ${ps.length >= 6 ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="sc-start" ${ps.length < 2 && !fillBots() ? 'disabled' : ''}>Deal cards</button></div>${offer ? offerHtml() : ''}${g.quick && humans >= 2 ? '<p class="muted small center">Quick rooms deal on their own in a few seconds.</p>' : ''}`
           : member() ? '<p class="muted center">Waiting for the host to deal…</p>'
           : ui.signedIn() ? '<button class="btn btn-block" id="sc-join">Take a seat</button>' : `<a class="btn btn-block" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to join</a>`}</div>`;
       $('#sc-copy').onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };

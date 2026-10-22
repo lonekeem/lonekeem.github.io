@@ -5,6 +5,7 @@
 import * as P from './pool-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
 import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
+import { syncPlates } from './plates.js';
 
 const COLORS = { 1: '#f2b31b', 2: '#3d7bff', 3: '#e2558f', 4: '#8a2be2', 5: '#ff7a2f', 6: '#2bb5a8', 7: '#9b1d3a' };
 const ballColor = (id) => COLORS[id > 8 ? id - 8 : id];
@@ -225,8 +226,23 @@ export function createPool(ctx) {
     const ids = gname === 'solid' ? [1, 2, 3, 4, 5, 6, 7] : gname === 'stripe' ? [9, 10, 11, 12, 13, 14, 15] : [];
     return ids.map((id) => `<i class="pl-mini ${balls[id] && balls[id].on ? '' : 'gone'} ${id > 8 ? 'st' : ''}" style="--bc:${ballColor(id)}"></i>`).join('');
   }
-  function playersHtml(ps, st, turn, balls, timer, done) {
-    return ps.map((p, i) => `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${ui.chip(p)}<span class="pl-grp">${st.groups[i] ? `<b>${groupLabel(st.groups[i])}</b><span class="pl-rack">${rackRow(balls, st.groups[i])}</span>` : '<span class="muted">open</span>'}</span>${!done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : ''}</div>`).join('<span class="g-vs">vs</span>');
+  function rackSig(balls, gname) {
+    if (!gname) return 'open';
+    const ids = gname === 'solid' ? [1, 2, 3, 4, 5, 6, 7] : [9, 10, 11, 12, 13, 14, 15];
+    return gname + ':' + ids.map((id) => (balls[id] && balls[id].on ? '1' : '0')).join('');
+  }
+  function paintPlayers(ps, st, turn, balls, timer, done) {
+    const parent = $('#g-players'); if (!parent) return;
+    syncPlates(parent, ps.map((p, i) => {
+      const on = !done && turn === i;
+      const gname = st.groups[i];
+      const bits = [{
+        key: 'grp', className: 'pl-grp', sig: rackSig(balls, gname),
+        html: gname ? `<b>${groupLabel(gname)}</b><span class="pl-rack">${rackRow(balls, gname)}</span>` : '<span class="muted">open</span>'
+      }];
+      if (on && timer != null) bits.push({ key: 'tm', className: 'g-timer' + (timer <= 10 ? ' low' : ''), text: timer + 's' });
+      return { key: 'p' + i, className: 'g-pl' + (on ? ' on' : ''), side: String(i), person: p, bits };
+    }), { sep: true });
   }
   function shell(title, back) {
     ui.shell(esc(title), `<div class="g-players pl-players" id="g-players"></div><div class="g-status" id="g-status" aria-live="polite"></div>
@@ -259,7 +275,7 @@ export function createPool(ctx) {
     const table = mountTable($('#pl-table'), { onShoot: (shot, cuePos) => take(shot, cuePos), onCall: (p) => { st.call = p; } });
     function refresh() {
       const mine = turn === human && !over;
-      $('#g-players').innerHTML = playersHtml(ps, st, turn, balls, null, over);
+      paintPlayers(ps, st, turn, balls, null, over);
       $('#g-status').textContent = over ? '' : (st.msg ? st.msg + ' ' : '') + (mine ? 'Your shot' : `${pal.name} is lining up…`);
       const callMode = mine && P.needsCall(st, turn, balls);
       table.set(balls, { canShoot: mine, placing: mine && st.bih, kitchen: st.brk, callMode, call: callMode ? st.call : -1 });
@@ -321,7 +337,7 @@ export function createPool(ctx) {
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
       const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
-      $('#g-players').innerHTML = playersHtml(ps, st, g.turn, balls, left, done);
+      paintPlayers(ps, st, g.turn, balls, left, done);
       const status = $('#g-status');
       if (g.status === 'waiting') status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
       else if (g.status === 'done') status.textContent = g.endReason === 'cancelled' ? 'Cancelled' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;
