@@ -81,13 +81,10 @@ service cloud.firestore {
     // Banned right now (the admin can never be locked out).
     // ---------- Kid & teen safety (js/safety.js) ----------
     // Birthday (birthY/birthM, self-declared, set once; only the admin or a human moderator can
-    // change it), Community Rules agreement (rulesAt), and a mod-controlled under-13 flag
-    // (underage/{uid}) that the user can't touch. Posting, uploads, comments and DMs need all three.
+    // change it), Community Rules agreement (rulesAt), and an under-13 flag (underage/{uid}).
+    // A player whose birthday is under 13 can save that flag. They cannot remove it.
+    // Posting, uploads, comments and lives need a known 13+ birthday, the rules agreement, and no flag.
     function u13Path(u) { return /databases/$(database)/documents/underage/$(u); }
-    function ageOkData(d) {
-      let y = d.get('birthY', 0);
-      return y is int && (request.time.year() - y) * 12 + (request.time.month() - d.get('birthM', 12)) >= 156;
-    }
     function canCreate(u) {
       let d = get(userPath(u)).data;
       // knownTeen fails closed when the birthday is missing, under 13, or not a real month/year.

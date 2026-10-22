@@ -4,7 +4,7 @@ import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebas
 import { doc, setDoc, updateDoc, deleteDoc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 const ps = async (f, u) => { const d = (await getDoc(doc(f, 'users', u))).data() || {}; const D = Math.floor(Date.now() / 864e5); return { postDay: D, postsToday: d.postDay === D ? (d.postsToday || 0) + 1 : 1 }; };
-const env = await initializeTestEnvironment({ projectId: 'demo-safety', firestore: { host: '127.0.0.1', port: 8199, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+const env = await initializeTestEnvironment({ projectId: process.env.RULES_PROJECT || 'demo-safety', firestore: { host: '127.0.0.1', port: Number(process.env.RULES_PORT || 8199), rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
 let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, e.message.slice(0, 200)); } };
 const db = (u) => env.authenticatedContext(u, { email: u + '@example.com', email_verified: true }).firestore();
 const ADMIN = env.authenticatedContext('admin', { email: 'lillykemoy1@gmail.com', email_verified: true }).firestore();
@@ -109,6 +109,7 @@ const t0 = Date.now();
 await ok('grooming question is blocked', assertFails(parkAt('chatty', 'how old are you', t0)));
 await ok('school chat that is not a question is allowed', assertSucceeds(parkAt('chatty', 'I like school', t0 + 3000)));
 await ok('asking for a picture is blocked', assertFails(parkAt('chatty', 'send pic', t0 + 6000)));
+await new Promise((r) => setTimeout(r, 120));
 await ok('class assignment is allowed', assertSucceeds(parkAt('chatty', 'class assignment', t0 + 9000)));
 const bump = (u, id, prev) => { const f = db(u); const b = writeBatch(f); const ref = doc(f, 'chatHides', id); if (!prev) b.set(ref, { n: 1, area: 'park', at: serverTimestamp() }); else b.update(ref, { n: prev + 1 }); b.set(doc(f, 'chatHides', id, 'by', u), { at: serverTimestamp() }); return b.commit(); };
 await ok('a chat report starts at one', assertSucceeds(bump('teen', 'park_abc', 0)));
