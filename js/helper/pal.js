@@ -1,15 +1,12 @@
-// Kemy Helper in the 3D world: one local pal, purple and gold, labeled, walking a
-// patrol through Pal Park and Kemy Street. Not networked. Checks are throttled.
-// Written by Lone Keem.
+// Kemy Helper's team: local pals in matching yellow, not networked. The leader
+// walks Pal Park and Kemy Street. The crew walks, drives, or sits at the Game Hub.
+// Only nearby pals are drawn. Written by Lone Keem.
 import { poseCar } from '../world/cars.js';
 import { areaAt, BOUNDS, roadD } from '../world/layout.js';
 import { note, setHelperPlace, toastFixed } from './watch.js';
 import { placeOf, scrub } from './core.js';
-
-const PATH = [
-  [0, 6], [22, 6], [22, -24], [-20, -24], [-20, 18], [0, 34],
-  [0, 88], [-46, 100], [46, 100], [46, 142], [-46, 142], [0, 108], [0, 62]
-];
+import { ROSTER, crewCount, pathAt, aheadBlocked, groundIssue, teamShown } from './team.js';
+import { playLabel, stepPlay } from './play.js';
 
 function starGeo(THREE) {
   const sh = new THREE.Shape();
@@ -24,64 +21,125 @@ function starGeo(THREE) {
   return g;
 }
 
-function buildPal(THREE) {
+function matsOf(THREE) {
+  // Flat colors. These pals are cheap local stand-ins, and a night scene
+  // must not turn the yellow crew into dark blobs.
+  const m = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra));
+  return {
+    yellow: m('#ffe14a'),
+    vest: m('#ffb703'),
+    gold: m('#ffd34d'),
+    star: m('#6d28d9'),
+    ink: m('#3b2508'),
+    glass: m('#fff6cc', { transparent: true, opacity: 0.55 })
+  };
+}
+
+function buildPal(THREE, mats, star) {
   const g = new THREE.Group();
   g.name = 'kemy-helper';
-  const purple = new THREE.MeshStandardMaterial({ color: '#6d28d9', roughness: 0.5, metalness: 0.04 });
-  const gold = new THREE.MeshStandardMaterial({ color: '#ffd34d', roughness: 0.32, metalness: 0.42, emissive: '#c98900', emissiveIntensity: 0.18 });
-  const ink = new THREE.MeshStandardMaterial({ color: '#24133f', roughness: 0.4 });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.46, 4, 8), purple);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.46, 3, 8), mats.yellow);
   body.position.y = 0.7;
-  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.045, 6, 12), gold);
-  belt.rotation.x = Math.PI / 2;
-  belt.position.y = 0.62;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), purple);
-  head.position.y = 1.28;
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.27, 0.14, 10), gold);
-  cap.position.y = 1.5;
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.035, 12), gold);
-  brim.position.y = 1.42;
-  const badge = new THREE.Mesh(starGeo(THREE), gold);
-  badge.scale.setScalar(0.16);
-  badge.position.set(0, 0.86, 0.3);
-  const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.28, 3, 6), purple);
-  armL.position.set(-0.36, 0.78, 0);
-  armL.rotation.z = 0.3;
+  const vest = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.32, 0.22), mats.vest);
+  vest.position.set(0, 0.78, 0.12);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), mats.yellow);
+  head.position.y = 1.26;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.12, 8), mats.gold);
+  cap.position.y = 1.46;
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.03, 10), mats.gold);
+  brim.position.y = 1.4;
+  const badge = new THREE.Mesh(star, mats.star);
+  badge.name = 'badge';
+  badge.scale.setScalar(0.12);
+  badge.position.set(0, 0.82, 0.26);
+  const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.26, 2, 6), mats.yellow);
+  armL.name = 'armL';
+  armL.position.set(-0.34, 0.76, 0);
+  armL.rotation.z = 0.25;
   const armR = armL.clone();
-  armR.position.x = 0.36;
-  armR.rotation.z = -0.3;
+  armR.name = 'armR';
+  armR.position.x = 0.34;
+  armR.rotation.z = -0.25;
   for (const s of [-1, 1]) {
-    const e = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), ink);
-    e.position.set(s * 0.09, 1.3, 0.22);
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 5), mats.ink);
+    e.position.set(s * 0.08, 1.28, 0.2);
     g.add(e);
   }
-  g.add(body, belt, head, cap, brim, badge, armL, armR);
-  g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
-  g.userData.arms = [armL, armR];
+  g.add(body, vest, head, cap, brim, badge, armL, armR);
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; } });
   return g;
+}
+
+function buildCar(THREE, mats, star) {
+  const g = new THREE.Group();
+  g.name = 'kh-car';
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.4, 2.55), mats.yellow);
+  body.position.y = 0.52;
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.36, 1.15), mats.vest);
+  cabin.position.set(0, 0.86, -0.12);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.26, 1), mats.glass);
+  glass.position.set(0, 1.02, -0.12);
+  const wgeo = new THREE.CylinderGeometry(0.26, 0.26, 0.16, 8);
+  wgeo.rotateZ(Math.PI / 2);
+  const wheels = [];
+  for (const [x, z] of [[-0.68, 0.78], [0.68, 0.78], [-0.68, -0.78], [0.68, -0.78]]) {
+    const w = new THREE.Mesh(wgeo, mats.ink);
+    w.name = 'wheel';
+    w.position.set(x, 0.26, z);
+    wheels.push(w);
+    g.add(w);
+  }
+  const badge = new THREE.Mesh(star, mats.star);
+  badge.scale.setScalar(0.16);
+  badge.position.set(0, 0.76, 1.05);
+  g.add(body, cabin, glass, badge);
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; } });
+  return g;
+}
+
+function dress(root, lead) {
+  const badge = root.getObjectByName('badge');
+  if (badge) badge.scale.setScalar(lead ? 0.2 : 0.12);
+  const armL = root.getObjectByName('armL');
+  const armR = root.getObjectByName('armR');
+  root.userData.arms = [armL, armR];
 }
 
 export function attachHelper(api, W) {
   const { THREE, scene, P, view } = api;
   const ground = api.ground;
-  const root = buildPal(THREE);
-  scene.add(root);
-  const tv = new THREE.Vector3();
-  const tag = document.createElement('div');
-  tag.className = 'ks-tag kh';
-  tag.textContent = 'Kemy Helper';
-  tag.dataset.n = 'Kemy Helper';
-  const tags = view.querySelector('#ks-tags') || view;
-  tags.appendChild(tag);
+  const mats = matsOf(THREE);
+  const star = starGeo(THREE);
+  const proto = buildPal(THREE, mats, star);
+  const carProto = buildCar(THREE, mats, star);
+  const members = ROSTER.map((src) => {
+    const m = {
+      id: src.id, role: src.role, name: src.name, lead: !!src.lead, job: src.job,
+      speed: src.speed, side: src.side || 0, path: src.path || null,
+      dist: src.dist || 0, x: src.x || 0, z: src.z || 0, yaw: src.yaw || 0,
+      home: src.role === 'sit' ? { x: src.x, z: src.z, yaw: src.yaw } : null,
+      root: null, car: null, tag: null, prevG: null, spin: 0, cool: 0, step: 0
+    };
+    if (m.path) {
+      const p = pathAt(m.path, m.dist, m.side);
+      m.x = p.x; m.z = p.z; m.yaw = p.yaw;
+    }
+    return m;
+  });
+
+  const tags = view;
   if (!document.getElementById('kh-css')) {
     const st = document.createElement('style');
     st.id = 'kh-css';
-    st.textContent = `.ks-tag.kh{background:#6d28d9;border:2px solid #ffd34d;color:#fff;font-weight:800;padding:3px 8px}
-.kh-act{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 132px);pointer-events:auto;min-height:44px;padding:0 16px;border-radius:999px;border:2px solid #ffd34d;background:#6d28d9;color:#fff;font:800 15px Inter,system-ui,sans-serif;z-index:8;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+    st.textContent = `.ks-tag.kh{z-index:8;pointer-events:auto;cursor:pointer;background:#ffe14a;border:2px solid #6d28d9;color:#3b2504;font-weight:800;padding:3px 8px}
+.ks-tag.kh.lead{background:#ffd34d}
+.kh-act{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 132px);pointer-events:auto;min-height:44px;padding:0 16px;border-radius:999px;border:2px solid #6d28d9;background:#ffe14a;color:#3b2504;font:800 15px Inter,system-ui,sans-serif;z-index:8;box-shadow:0 4px 14px rgba(0,0,0,.28)}
 .kh-act[hidden]{display:none}
+.ks-panel[hidden]{display:none}
 .kh-card textarea{width:100%;min-height:88px;border-radius:12px;border:0;padding:10px;font:600 16px Inter,system-ui,sans-serif;box-sizing:border-box;color:#24133f}
 .kh-card .row{display:flex;gap:8px}
-.kh-card .row button{flex:1}`;
+.kh-card .row button{flex:1}
+.kh-job{margin:0 0 8px;font-weight:700}`;
     document.head.appendChild(st);
   }
   const btn = document.createElement('button');
@@ -92,13 +150,22 @@ export function attachHelper(api, W) {
   const panel = document.createElement('div');
   panel.className = 'ks-panel';
   panel.hidden = true;
-  panel.innerHTML = `<div class="ks-card kh-card"><h3>Kemy Helper</h3><p style="margin:0 0 8px;opacity:.9">Tell me what went wrong. Skip names, emails, and phone numbers.</p><textarea maxlength="140" placeholder="What happened?" aria-label="What happened?"></textarea><div class="row"><button type="button" data-s>Send note</button><button type="button" class="ghost" data-x>Close</button></div></div>`;
+  panel.innerHTML = `<div class="ks-card kh-card"><h3 data-title>Kemy Helper</h3><p class="kh-job" data-job></p><p style="margin:0 0 8px;opacity:.9">Tell me what went wrong. Skip names, emails, and phone numbers.</p><textarea maxlength="140" placeholder="What happened?" aria-label="What happened?"></textarea><div class="row"><button type="button" data-s>Send note</button><button type="button" class="ghost" data-x>Close</button></div></div>`;
   (W.hud || view).append(btn, panel);
   const box = panel.querySelector('textarea');
   const sendB = panel.querySelector('[data-s]');
+  const titleEl = panel.querySelector('[data-title]');
+  const jobEl = panel.querySelector('[data-job]');
+  let focus = members[0];
   panel.querySelector('[data-x]').onclick = () => { panel.hidden = true; };
   panel.onclick = (e) => { if (e.target === panel) panel.hidden = true; };
-  btn.onclick = () => { panel.hidden = false; box.focus(); };
+  btn.onclick = () => {
+    titleEl.textContent = focus && focus.lead ? 'Kemy Helper' : 'Helper';
+    const job = focus ? focus.job : '';
+    jobEl.textContent = focus && focus.role === 'sit' ? job.replace('a quick game', playLabel()) : job;
+    panel.hidden = false;
+    box.focus();
+  };
   sendB.onclick = () => {
     const text = scrub(box.value);
     if (text.length < 2) { if (W.say) W.say('Tell me a little more.'); return; }
@@ -109,22 +176,90 @@ export function attachHelper(api, W) {
     if (W.say) W.say('Thanks. Kemy Helper wrote that down.');
   };
 
-  let seg = 0;
-  let along = 0;
-  let x = PATH[0][0];
-  let z = PATH[0][1];
-  let yaw = 0;
-  let step = 0;
+  let cap = members.length;
+  let flagT = 0;
   let scanT = 0;
   let stuckFor = 0;
   let last = { x: P.x, z: P.z };
   let carBad = 0;
-  let wave = 0;
   let fixingUntil = 0;
+  let glanceI = 0;
+  const tv = new THREE.Vector3();
+  const showDist = () => (api.LOW ? 46 : 72);
+
+  function flags() {
+    let saver = false, saveData = false;
+    try { saver = localStorage.getItem('kemy-fps-saver') === '1'; } catch { /* */ }
+    try { saveData = !!(navigator.connection && navigator.connection.saveData); } catch { /* */ }
+    const tier = api.Q && api.Q.tier;
+    return { low: !!api.LOW, saver, saveData, tier, shown: teamShown() };
+  }
+  function refreshCap() { cap = crewCount(flags()); }
+  const onToggle = () => { flagT = 2; };
+  addEventListener('kemy:helper-team', onToggle);
+  refreshCap();
 
   function here() { return placeOf(areaAt(P.x, P.z), P.x, P.z); }
-  function placeGame(px, pz) { return pz > 77 && px < 100 ? 'street' : 'park'; }
+  function placeGame(px, pz) {
+    const name = areaAt(px, pz).toLowerCase();
+    if (name.includes('street')) return 'street';
+    if (name.includes('park')) return 'park';
+    return 'world';
+  }
   setHelperPlace(() => ({ game: placeGame(P.x, P.z), place: here() }));
+
+  function ensure(m) {
+    if (!m.root) {
+      m.root = proto.clone(true);
+      dress(m.root, m.lead);
+      if (m.role === 'sit') {
+        const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.28, 8), mats.vest);
+        stool.position.y = 0.14;
+        const toy = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.08, 0.18), mats.star);
+        toy.position.set(0, 0.92, 0.28);
+        stool.frustumCulled = false;
+        toy.frustumCulled = false;
+        m.root.add(stool, toy);
+      }
+      scene.add(m.root);
+      m.root.visible = false;
+    }
+    if (m.role === 'drive' && !m.car) {
+      m.car = carProto.clone(true);
+      m.car.userData.wheels = [];
+      m.car.traverse((o) => { if (o.name === 'wheel') m.car.userData.wheels.push(o); });
+      scene.add(m.car);
+      m.car.add(m.root);
+      m.root.position.set(0, 0.42, -0.15);
+      m.root.scale.setScalar(0.68);
+      m.root.rotation.set(0, 0, 0);
+      m.car.visible = false;
+    }
+    if (!m.tag) {
+      m.tag = document.createElement('div');
+      m.tag.className = 'ks-tag kh' + (m.lead ? ' lead' : '');
+      m.tag.textContent = m.name;
+      m.tag.dataset.n = m.name;
+      m.tag.onclick = (e) => { e.stopPropagation(); focus = m; btn.click(); };
+      tags.appendChild(m.tag);
+    }
+  }
+
+  function spot(m) {
+    return placeOf(areaAt(m.x, m.z), m.x, m.z);
+  }
+  function fixMember(m, type, text) {
+    const now = performance.now();
+    if (now < m.cool) return;
+    m.cool = now + 4000;
+    if (m.path) {
+      m.dist += 8;
+      const p = pathAt(m.path, m.dist, m.side);
+      m.x = p.x; m.z = p.z; m.yaw = p.yaw;
+    }
+    toastFixed();
+    note({ type, text, autoFixed: true, game: placeGame(m.x, m.z), place: spot(m) });
+  }
 
   function fixPlayer(type, text) {
     const nowMs = performance.now();
@@ -158,7 +293,6 @@ export function attachHelper(api, W) {
     if (stuckFor >= 4) { stuckFor = 0; fixPlayer('stuck', 'could not move'); }
     const mine = W.drive && W.drive.mine && W.drive.mine();
     if (mine) {
-      const fy = ground(mine.x, mine.z);
       const heave = (window.__kd && window.__kd.heave) || 0;
       const floatY = !Number.isFinite(mine.x) || !Number.isFinite(mine.z) || Math.abs(heave) > 3;
       const offRoad = mine.state === 'drive' && mine.speed < 0.4 && roadD(mine.x, mine.z) > 16;
@@ -166,8 +300,8 @@ export function attachHelper(api, W) {
       else carBad = 0;
       if (carBad >= 2 && W.drive.resetAt && W.respawn && W.respawn.nearestRoadSpot) {
         carBad = 0;
-        const spot = W.respawn.nearestRoadSpot(Number.isFinite(mine.x) ? mine.x : 0, Number.isFinite(mine.z) ? mine.z : 100);
-        if (spot) W.drive.resetAt({ x: spot.x, z: spot.z, yaw: spot.yaw || 0 });
+        const spotR = W.respawn.nearestRoadSpot(Number.isFinite(mine.x) ? mine.x : 0, Number.isFinite(mine.z) ? mine.z : 100);
+        if (spotR) W.drive.resetAt({ x: spotR.x, z: spotR.z, yaw: spotR.yaw || 0 });
         toastFixed();
         note({ type: floatY ? (Number.isFinite(mine.x) ? 'float' : 'nan') : 'wall', text: 'car', autoFixed: true, game: placeGame(P.x, P.z), place: here() });
       }
@@ -194,70 +328,179 @@ export function attachHelper(api, W) {
       if (Number.isFinite(b.x) && Number.isFinite(b.z)) continue;
       const a = b.seg && b.seg[0];
       if (!a) continue;
-      b.x = a[0];
-      b.z = a[1];
-      b.k = 0;
+      b.x = a[0]; b.z = a[1]; b.k = 0;
       toastFixed();
       note({ type: 'nan', text: 'walker', autoFixed: true, game: 'street', place: placeOf('Kemy Street', a[0], a[1]) });
       break;
     }
   }
 
-  function update(dt) {
-    const a = PATH[seg];
-    const b = PATH[(seg + 1) % PATH.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-    const nearP = Math.hypot(x - P.x, z - P.z);
-    const pause = nearP < 2.8 && !(W.driving && W.driving());
-    if (!pause) {
-      along += 1.35 * dt;
-      if (along >= L) { along = 0; seg = (seg + 1) % PATH.length; }
+  function glance(m) {
+    const gy = ground(m.x, m.z);
+    const issue = groundIssue(m.prevG, gy);
+    if (Number.isFinite(gy)) m.prevG = gy;
+    if (m.role === 'drive') {
+      const off = roadD(m.x, m.z);
+      if (!Number.isFinite(m.x) || !Number.isFinite(m.z) || off > 4) { fixMember(m, 'wall', 'helper car'); return; }
     }
-    const k = Math.max(0, Math.min(1, along / L));
-    const nx = a[0] + (b[0] - a[0]) * k;
-    const nz = a[1] + (b[1] - a[1]) * k;
-    if (!pause && (nx !== x || nz !== z)) yaw = Math.atan2(nx - x, nz - z);
-    else if (pause) yaw = Math.atan2(P.x - x, P.z - z);
-    x = nx;
-    z = nz;
-    const d = Math.hypot(x - P.x, z - P.z);
-    const show = d < (api.LOW ? 48 : 80);
-    root.visible = show;
-    if (show) {
-      root.position.set(x, ground(x, z), z);
-      root.rotation.y = yaw;
-      const bob = pause ? Math.sin(step) * 0.03 : Math.abs(Math.sin(step * 2)) * 0.06;
-      root.position.y += bob;
-      step += dt * (pause ? 2 : 6);
-      const arms = root.userData.arms;
-      const swing = pause ? Math.sin(step) * 0.35 : Math.sin(step * 2) * 0.5;
-      if (arms) { arms[0].rotation.x = swing; arms[1].rotation.x = -swing; }
-      wave = pause ? Math.min(1, wave + dt * 2) : Math.max(0, wave - dt * 2);
-      if (arms && wave > 0) arms[1].rotation.x = -0.8 * wave;
+    if (!issue) return;
+    if (m.role === 'drive' || issue === 'nan') fixMember(m, issue === 'nan' ? 'nan' : issue === 'under' ? 'under' : 'float', 'helper');
+    else note({ type: issue === 'under' ? 'under' : issue === 'nan' ? 'nan' : 'float', text: 'hole', autoFixed: false, game: 'world', place: spot(m) });
+  }
+
+  function obstacles() {
+    const out = [];
+    if (Number.isFinite(P.x)) out.push([P.x, P.z]);
+    const mine = W.drive && W.drive.mine && W.drive.mine();
+    if (mine && Number.isFinite(mine.x) && Number.isFinite(mine.z)) out.push([mine.x, mine.z]);
+    return out;
+  }
+
+  function sim(m, dt, blocks, driving) {
+    if (m.role === 'sit') {
+      m.x = m.home.x; m.z = m.home.z; m.yaw = m.home.yaw;
+      return;
     }
-    btn.hidden = !(pause && d < 2.8);
-    if (show && d < 36) {
-      tv.set(x, ground(x, z) + 1.85, z).project(api.cam);
-      const vis = tv.z < 1 && Math.abs(tv.x) < 1.05 && Math.abs(tv.y) < 1.05;
-      const disp = vis ? '' : 'none';
-      if (tag.style.display !== disp) tag.style.display = disp;
-      if (vis) {
-        const w = view.clientWidth, h = view.clientHeight;
-        const px = (tv.x + 1) / 2 * w, py = (1 - tv.y) / 2 * h;
-        const tf = `translate(${px.toFixed(0)}px,${py.toFixed(0)}px) translate(-50%,-100%)`;
-        if (tag.style.transform !== tf) tag.style.transform = tf;
+    let hold = false;
+    if (m.role === 'drive') {
+      for (let i = 0; i < blocks.length; i++) {
+        const px = blocks[i][0], pz = blocks[i][1];
+        if (Math.hypot(m.x - px, m.z - pz) < 3.6 || aheadBlocked(m.x, m.z, m.yaw, px, pz, 8)) hold = true;
       }
-    } else if (tag.style.display !== 'none') tag.style.display = 'none';
+    } else if (!driving && Math.hypot(m.x - P.x, m.z - P.z) < 2.8) hold = true;
+    if (!hold) m.dist += m.speed * dt;
+    const p = pathAt(m.path, m.dist, m.side);
+    m.x = p.x; m.z = p.z;
+    if (hold && m.role !== 'drive') m.yaw = Math.atan2(P.x - m.x, P.z - m.z);
+    else m.yaw = p.yaw;
+    m.hold = hold;
+  }
+
+  function pose(m, show) {
+    const gy = show ? ground(m.x, m.z) : 0;
+    if (m.car) {
+      m.car.visible = show;
+      m.root.visible = show;
+      if (!show) return;
+      m.car.position.set(m.x, gy, m.z);
+      m.car.rotation.y = m.yaw;
+      m.car.updateMatrixWorld(true);
+      if (!m.hold) {
+        m.spin += m.speed * 0.4;
+        const wheels = m.car.userData.wheels;
+        for (let i = 0; i < wheels.length; i++) wheels[i].rotation.x = m.spin;
+      }
+    } else {
+      m.root.visible = show;
+      if (!show) return;
+      m.root.position.set(m.x, gy, m.z);
+      m.root.rotation.y = m.yaw;
+    }
+    m.step += 0.16;
+    const arms = m.root.userData.arms;
+    if (!arms || !arms[0]) return;
+    if (m.role === 'sit') {
+      arms[0].rotation.x = -1.05;
+      arms[1].rotation.x = -1.05 + Math.sin(m.step) * 0.15;
+      return;
+    }
+    const swing = m.hold ? Math.sin(m.step) * 0.2 : Math.sin(m.step * 2) * 0.45;
+    arms[0].rotation.x = swing;
+    arms[1].rotation.x = m.hold ? -0.7 : -swing;
+    if (!m.car) m.root.position.y += m.hold ? 0 : Math.abs(Math.sin(m.step * 2)) * 0.05;
+  }
+
+  function tagAt(m, show, dist) {
+    if (!m.tag) return;
+    if (!show || dist > 34) {
+      if (m.tag.style.display !== 'none') m.tag.style.display = 'none';
+      return;
+    }
+    const head = m.car ? m.car.localToWorld(tv.set(0, 1.7, -0.15)) : tv.set(m.x, ground(m.x, m.z) + 1.8, m.z);
+    head.project(api.cam);
+    const vis = head.z < 1 && Math.abs(head.x) < 1.05 && Math.abs(head.y) < 1.05;
+    const disp = vis ? '' : 'none';
+    if (m.tag.style.display !== disp) m.tag.style.display = disp;
+    if (!vis) return;
+    const w = view.clientWidth, h = view.clientHeight;
+    const px = (head.x + 1) / 2 * w, py = (1 - head.y) / 2 * h;
+    const left = Math.round(px - m.tag.offsetWidth / 2) + 'px';
+    const top = Math.round(py - m.tag.offsetHeight) + 'px';
+    if (m.tag.style.left !== left) m.tag.style.left = left;
+    if (m.tag.style.top !== top) m.tag.style.top = top;
+    if (m.tag.style.transform !== 'none') m.tag.style.transform = 'none';
+  }
+
+  function update(dt) {
+    dt = Math.max(0, Math.min(0.1, dt || 0));
+    flagT += dt;
+    if (flagT >= 1) { flagT = 0; refreshCap(); }
+    const driving = !!(W.driving && W.driving());
+    const blocks = obstacles();
+    const reach = showDist();
+    let closest = 1e9;
+    let closestM = null;
+    for (let i = 0; i < members.length; i++) {
+      const m = members[i];
+      const on = i < cap;
+      if (!on) {
+        if (m.root) m.root.visible = false;
+        if (m.car) m.car.visible = false;
+        if (m.tag && m.tag.style.display !== 'none') m.tag.style.display = 'none';
+        continue;
+      }
+      sim(m, dt, blocks, driving);
+      const d = Math.hypot(m.x - P.x, m.z - P.z);
+      const show = d < reach;
+      if (show || d < reach + 36) ensure(m);
+      if (m.root) {
+        pose(m, show);
+        tagAt(m, show, d);
+      }
+      if (d < closest) { closest = d; closestM = m; }
+    }
+    const talk = closestM && closest < 2.8 && (closestM.role !== 'drive' || closestM.hold || closest < 2.6);
+    btn.hidden = !talk;
+    if (talk) focus = closestM;
+    if (cap > 2) {
+      const seat = members[2];
+      stepPlay(dt, (issue) => note(Object.assign({ place: placeOf(areaAt(seat.x, seat.z), seat.x, seat.z) }, issue)));
+    }
+    const tick = Math.floor(performance.now() / 1000);
+    if (tick !== glanceI && cap > 0) {
+      glanceI = tick;
+      const g = members[tick % cap];
+      if (g && g.role !== 'sit') glance(g);
+    }
     scan(dt);
+    const lead = members[0];
     const pub = window.__kh || (window.__kh = {});
-    pub.x = x;
-    pub.z = z;
-    pub.near = d;
-    pub.tag = tag;
+    pub.x = lead.x;
+    pub.z = lead.z;
+    pub.near = closest;
+    pub.tag = lead.tag;
+    pub.cap = cap;
+    pub.focus = focus ? focus.id : '';
+    pub.members = members.map((m, i) => ({ id: m.id, role: m.role, name: m.name, x: m.x, z: m.z, shown: i < cap, job: m.job }));
   }
 
   return {
     update,
-    destroy() { scene.remove(root); tag.remove(); btn.remove(); panel.remove(); }
+    destroy() {
+      removeEventListener('kemy:helper-team', onToggle);
+      for (let i = 0; i < members.length; i++) {
+        const m = members[i];
+        if (m.car) scene.remove(m.car);
+        else if (m.root) scene.remove(m.root);
+        if (m.tag) m.tag.remove();
+      }
+      btn.remove();
+      panel.remove();
+      const gone = new Set();
+      const drop = (o) => { if (o.geometry && !gone.has(o.geometry)) { gone.add(o.geometry); o.geometry.dispose(); } };
+      proto.traverse(drop);
+      carProto.traverse(drop);
+      for (const k of Object.keys(mats)) if (mats[k] && mats[k].dispose) mats[k].dispose();
+    }
   };
 }

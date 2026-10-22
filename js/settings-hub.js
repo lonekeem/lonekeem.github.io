@@ -10,6 +10,7 @@ import { masterVol, setMasterVol, sfxVol, setSfxVol } from './volume.js';
 import { walletState } from './wallet-chip.js';
 import { fxOn, setFx } from './polish.js';
 import { renderDriveSettings, linkAccount } from './world/drivecfg.js';
+import { teamShown, setTeamShown } from './helper/team.js';
 
 const SHARE_URL = 'https://lonekeem.github.io/app.html';
 export const APP_VERSION = '2026.10.22';
@@ -65,7 +66,8 @@ function snapshot() {
     master: clampInt(Math.round(masterVol() * 100), 0, 100, 100),
     music: clampInt(Math.round(themeVol() * 100), 0, 100, 20),
     effects: clampInt(Math.round(sfxVol() * 100), 0, 100, 100),
-    radio: ls.get('kemy-radio-off') !== '1'
+    radio: ls.get('kemy-radio-off') !== '1',
+    helpers: teamShown()
   };
 }
 let applying = false;
@@ -113,6 +115,8 @@ function applyCloud(d) {
     setMusicVol(music);
     setSfxVol(clampInt(d.effects, 0, 100, 100) / 100);
     setRadioEnabled(d.radio !== false);
+    if (d.helpers === false) setTeamShown(false);
+    else if (d.helpers === true) setTeamShown(true);
   } finally { applying = false; }
 }
 async function sync(uid) {
@@ -188,12 +192,13 @@ function html(ctx) {
         <div class="set-actions"><button class="btn btn-ghost" type="button" id="set-theme" data-theme-ctl>🎵 Play theme</button></div>
         <p class="muted small">${esc(PLAYLIST_CREDIT)}</p>
       </article>
-      <article class="set-sec" data-sec="graphics" data-k="graphics quality fps performance screen size zoom low medium high saver battery pal effects">
+      <article class="set-sec" data-sec="graphics" data-k="graphics quality fps performance screen size zoom low medium high saver battery pal effects helper team">
         <div class="set-head"><span class="set-ic" aria-hidden="true">✨</span><h2>Graphics &amp; Performance</h2></div>
         <p>Picture quality</p>
         <div class="set-tiers" id="set-tiers" role="radiogroup" aria-label="Picture quality" data-ultra="${ultra ? '1' : '0'}"></div>
         <p class="muted small" id="set-saver-note" hidden>FPS-saver is using Low so the game stays smooth.</p>
         <label class="set-row" for="set-saver"><span>FPS-saver<small>Uses Low graphics to help older phones.</small></span><input id="set-saver" type="checkbox" role="switch" ${saverOn() ? 'checked' : ''}></label>
+        <label class="set-row" for="set-helpers"><span>Show helper team<small>Yellow helpers walk, drive, and play nearby.</small></span><input id="set-helpers" type="checkbox" role="switch" ${teamShown() ? 'checked' : ''}></label>
         <label class="set-row" for="set-screen"><span>Keep the screen the right size<small>Stops pinch-zoom in games so the world doesn’t stretch.</small></span><input id="set-screen" type="checkbox" role="switch" ${screenOn() ? 'checked' : ''}></label>
         <label class="set-row" for="set-fx"><span>Fancy effects<small>Glass blur and the animated background.</small></span><input id="set-fx" type="checkbox" ${fxOn() ? 'checked' : ''}></label>
         <label for="set-pal-gfx">Pal graphics</label>
@@ -366,6 +371,12 @@ export async function page(main, ctx) {
       if (prev && G.TIERS.includes(prev)) G.setGfxSetting(prev);
     }
     paintGfx();
+    persist();
+  };
+  const helpers = document.getElementById('set-helpers');
+  if (helpers) helpers.onchange = () => {
+    setTeamShown(helpers.checked);
+    toast(helpers.checked ? 'Helper team on' : 'Helper team hidden');
     persist();
   };
   const screen = document.getElementById('set-screen');
