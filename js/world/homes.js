@@ -3,7 +3,7 @@
 // garage (the roll-up door opens for the owner and closes after), "Park here" saves the car in that bay, your last
 // spot + a car left on the street are remembered (localStorage + a throttled private Firestore doc).
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, serverTimestamp, writeBatch, deleteDoc, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear } from './layout.js';
 import { CAR, CARS, PAINTS, buildCar, poseCar, addPlate } from './cars.js';
 import { parseCar } from './drive.js';
@@ -142,7 +142,28 @@ export function attachHomes(api, W, K) {
     addDoc(collection(db, 'users', ownerUid, 'notifications'), {
       type: 'house', fromUid: uid, fromName: S.profile.displayName, fromUsername: S.profile.username,
       postId: String(plot || '').slice(0, 40), text, createdAt: serverTimestamp(), read: false
-    }).catch(() => {});
+    }).catch((e) => console.warn('house note', e && e.code));
+  }
+  // Someone at the door. The owner's open page hears it from their notification inbox.
+  let pendingRing = null, ringBoot = true;
+  const rungAt = new Map();
+  function ringDoor(id) {
+    const h = HOUSE_BY_ID[id]; const o = h && owners.get(id);
+    if (!h || !o || !o.owner || o.owner === uid || canEnter(h)) return;
+    const now = Date.now();
+    if (now - (rungAt.get(id) || 0) < 15000) { say('🔔 You already rang. The owner can invite you in.'); return; }
+    rungAt.set(id, now);
+    try { dispatchEvent(new CustomEvent('kemy:house-ring', { detail: { plot: id } })); } catch { /* */ }
+    say('🔔 You rang the doorbell. The owner can invite you in.');
+  }
+  function considerRing(d) {
+    if (!d || d.type !== 'house' || !d.fromUid || d.fromUid === uid) return;
+    if (!/rang your doorbell/.test(String(d.text || ''))) return;
+    const plot = String(d.postId || '');
+    if (myPlot && plot && plot !== myPlot) return;
+    pendingRing = { uid: d.fromUid, name: String(d.fromName || 'A Pal').slice(0, 24), username: String(d.fromUsername || 'pal').replace(/[^a-z0-9_.]/gi, '').slice(0, 20) || 'pal', plot, at: Date.now() };
+    say(pendingRing.name + ' rang your doorbell');
+    paintInvite();
   }
   if (window.__kemyHouseRing) removeEventListener('kemy:house-ring', window.__kemyHouseRing);
   window.__kemyHouseRing = (e) => { const plot = e.detail && e.detail.plot; const o = plot && owners.get(plot); if (o && o.owner) noteHouse(o.owner, plot, 'ring'); };
@@ -197,6 +218,27 @@ export function attachHomes(api, W, K) {
       c.querySelector('[data-a]').onclick = async () => { const n = c.querySelector('[data-n]').value.trim().replace(/^@/, '').toLowerCase(); if (!/^[a-z0-9_.]{2,20}$/.test(n)) { say('Type a username'); return; } if (inv.length >= 50) { say('Max 50 invites'); return; }
         try { const d = await getDoc(doc(db, 'usernames', n)); const u2 = d.exists() && d.data().uid; if (!u2) { say('No Pal named @' + n); return; } if (u2 === uid || inv.includes(u2)) { say('Already invited'); return; } await homeW({ inv: [...inv, u2], invN: [...invN, n] }); pan.hidden = true; say('✉️ Invited @' + n); } catch (e) { wErr(e); } };
       c.querySelectorAll('[data-r]').forEach((b) => (b.onclick = () => { const i = +b.dataset.r; homeW({ inv: inv.filter((_, j) => j !== i), invN: invN.filter((_, j) => j !== i) }).then(() => { pan.hidden = true; say('Removed'); }).catch(wErr); })); }); }
+  function ownerHere() {
+    if (!myPlot || (pendingRing && pendingRing.plot && pendingRing.plot !== myPlot)) return false;
+    if (inside && inside.id === myPlot) return true;
+    if (inside) return false;
+    const h = HOUSE_BY_ID[myPlot];
+    return !!(h && Math.hypot(h.door.x - P.x, h.door.z - P.z) < 18);
+  }
+  function paintInvite() {
+    const fresh = pendingRing && Date.now() - pendingRing.at < 3 * 60 * 1000 && ownerHere();
+    if (fresh) { const lab = '✉️ Invite ' + pendingRing.name.slice(0, 12); if (homeB.textContent !== lab) homeB.textContent = lab; homeB.dataset.ring = '1'; return lab; }
+    if (homeB.dataset.ring) { homeB.textContent = '🏠 Home'; delete homeB.dataset.ring; }
+    return '';
+  }
+  async function inviteRinger() {
+    const r = pendingRing; if (!r || !myPlot) return;
+    const o = owners.get(myPlot) || {}; const inv = Array.isArray(o.inv) ? o.inv.slice() : [], invN = Array.isArray(o.invN) ? o.invN.slice() : [];
+    if (inv.includes(r.uid)) { pendingRing = null; paintInvite(); say('✉️ ' + r.name + ' is already invited'); return; }
+    if (inv.length >= 50) { say('Max 50 invites'); return; }
+    try { await homeW({ inv: inv.concat(r.uid), invN: invN.concat(r.username || 'pal') }); pendingRing = null; paintInvite(); say('✉️ Invited ' + r.name + ' in'); }
+    catch (e) { wErr(e); }
+  }
 
   // ---------------------------------------------------------------- 🛠️ Decorate mode (owner, inside): paint, floors, furniture on a 0.5 m grid
   let owned = null; async function loadOwned() { try { const { econ: e } = await shop(); owned = await e.inventory(true); } catch { owned = {}; } return owned; }
@@ -240,7 +282,11 @@ export function attachHomes(api, W, K) {
   function metroSub(cid) { if (metroOn.has(cid) || !db) return; const hs = HOUSES.filter((h) => h.city === cid && h.num); if (!hs.length) return; metroOn.add(cid);
     listen('m:' + cid, query(collection(db, 'homes'), where(documentId(), '>=', hs[0].id), where(documentId(), '<=', hs[hs.length - 1].id))); }
   let mT = 0; function metroTick(dt) { if ((mT += dt) < 2) return; mT = 0; for (const c of METROS) if (!metroOn.has(c.id) && Math.abs(P.x - c.x) < c.hx + 260 && Math.abs(P.z - c.z) < c.hz + 260) metroSub(c.id); }
-  if (uid && db) { listen('old', query(collection(db, 'homes'), where(documentId(), '<', 'hm'))); listen('mine', query(collection(db, 'homes'), where('owner', '==', uid))); }
+  if (uid && db) { listen('old', query(collection(db, 'homes'), where(documentId(), '<', 'hm'))); listen('mine', query(collection(db, 'homes'), where('owner', '==', uid)));
+    try { subs.push(onSnapshot(query(collection(db, 'users', uid, 'notifications'), orderBy('createdAt', 'desc'), limit(5)), (qs) => {
+      if (ringBoot) { ringBoot = false; const d0 = qs.docs[0] && qs.docs[0].data(); const at = d0 && d0.createdAt && d0.createdAt.toMillis ? d0.createdAt.toMillis() : 0; if (d0 && d0.read !== true && at && Date.now() - at < 3 * 60 * 1000) considerRing(d0); return; }
+      qs.docChanges().forEach((c) => { if (c.type === 'added') considerRing(c.doc.data()); });
+    }, () => {})); } catch { /* */ } }
   function onOwners() { if (!parts.has('old')) return; const prev = new Map(owners); owners.clear(); for (const m of parts.values()) for (const [id, v] of m) owners.set(id, v); myPlot = null; myTier = 0;
       for (const [id, o] of owners) if (o.owner === uid && !HOUSE_BY_ID[id]?.admin) { myPlot = id; myTier = o.garage || 0; } if (amAdmin && owners.get(ADMIN_PLOT)?.owner === uid && !myPlot) { myPlot = ADMIN_PLOT; myTier = 0; }
       for (const id of new Set([...prev.keys(), ...owners.keys()])) { const h = HOUSE_BY_ID[id]; if (!h || !h.sale) continue; const a = prev.get(id), b = owners.get(id); if (JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); if (JSON.stringify((a || {}).decor) !== JSON.stringify((b || {}).decor)) applyDecor(id); }
@@ -272,7 +318,7 @@ export function attachHomes(api, W, K) {
     catch (e) { btn.disabled = false; btn.textContent = 'Try again'; say((e && e.message) || 'Could not sell'); } }
   function homeFront(h) { const [x, z] = Lw(h, 0, h.d / 2 + 3.2); return { x, z, yaw: h.face > 0 ? 0 : Math.PI }; }
   function teleport(p) { if (inside) goOut(); P.x = p.x; P.z = p.z; P.yaw = p.yaw || 0; P.y = ground(p.x, p.z); api.markDirty && api.markDirty(); }
-  homeB.onclick = () => { if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
+  homeB.onclick = () => { if (homeB.dataset.ring) { inviteRinger(); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
     if (myPlot) { teleport(homeFront(HOUSE_BY_ID[myPlot])); say('🏠 Home sweet home'); return; }
     findHome('all', 0); };
   const placeName = (h) => (h.estate ? h.spot : h.city ? CITY_BY_ID[h.city].name : h.town ? ({ down: '🏙️ Kemy Downtown', farm: '🌾 Clover Fields', snow: '❄️ Frostberry', desert: '🌵 Sunstone', lake: '🛶 Willow Lake', shore: '🏖️ Sunny Shore' }[h.town] || h.town) : '🎃 Kemy Street');
@@ -323,7 +369,7 @@ export function attachHomes(api, W, K) {
   api.houseLocked = (id) => { const h = HOUSE_BY_ID[id]; return !!(h && h.sale); };
   let promptNow = null; const prevPrompt = api.prompt; api.prompt = () => { const p0 = prevPrompt && prevPrompt(); if (p0) return p0; return promptNow; };
   const prevAct = api.onAction; api.onAction = (a) => { if (a && a.startsWith('kh:')) act(a.slice(3)); else if (prevAct) prevAct(a); };
-  function act(a) { const [k, v] = a.split(':'); if (k === 'sale') salePanel(HOUSE_BY_ID[v]); else if (k === 'mine') myPanel(); else if (k === 'locked') { orphanCheck(v); say('🔒 ' + (owners.get(v)?.name || 'A Pal') + '’s home. Only the owner can go inside.'); } else if (k === 'out') goOut(); else if (k === 'sit') sitDown(+v); else if (k === 'stand') standUp(); else if (k === 'life') { if (v !== 'wait') life.act(v); } else if (k === 'tv') tvAct(); else if (k === 'park') parkHome(); else if (k === 'take') takeCar(pendingTake); }
+  function act(a) { const [k, v] = a.split(':'); if (k === 'sale') salePanel(HOUSE_BY_ID[v]); else if (k === 'mine') myPanel(); else if (k === 'ring') ringDoor(v); else if (k === 'invite') inviteRinger(); else if (k === 'locked') { orphanCheck(v); say('🔒 ' + (owners.get(v)?.name || 'A Pal') + '’s home. Only the owner can go inside.'); } else if (k === 'out') goOut(); else if (k === 'sit') sitDown(+v); else if (k === 'stand') standUp(); else if (k === 'life') { if (v !== 'wait') life.act(v); } else if (k === 'tv') tvAct(); else if (k === 'park') parkHome(); else if (k === 'take') takeCar(pendingTake); }
   inB.onclick = () => { const h = HOUSE_BY_ID[inB.dataset.h]; if (h) goIn(h); };
   // my cars at home: walk up to any parked car to drive it; drive back home and tap Park to put it away (it reappears in its spot)
   const ownHomes = () => [...owners.entries()].filter(([, o]) => o.owner === uid).map(([id]) => HOUSE_BY_ID[id]).filter(Boolean);
@@ -367,13 +413,14 @@ export function attachHomes(api, W, K) {
   function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * 8); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
     if (inside) { const { cx, cz } = roomCell(inside); if (Math.hypot(P.x - cx, P.z - (cz + 5.4 * SC)) < 1.8) promptNow = { id: 'kh:out', label: '🚪 Go outside' }; else if (!deco) promptNow = roomPrompt(); }
     else if (!driving) { let best = null, bd = 2.8; for (const h of housesNear(P.x, P.z, 12)) { const d = Math.hypot(h.door.x - P.x, h.door.z - P.z); if (d < bd) { bd = d; best = h; } }
-      if (best) { const o = owners.get(best.id); if (best.sale) { if (!o) promptNow = { id: 'kh:sale:' + best.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[best.style]) }; else if (o.owner === uid) { promptNow = { id: 'kh:mine:' + best.id, label: '🏠 My home' }; showIn = best; } else if (canEnter(best)) showIn = best; else promptNow = { id: 'kh:locked:' + best.id, label: '🔒 ' + (o.name || 'A Pal') + '’s home' }; } else showIn = best; }
+      if (best) { const o = owners.get(best.id); if (best.sale) { if (!o) promptNow = { id: 'kh:sale:' + best.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[best.style]) }; else if (o.owner === uid) { promptNow = { id: 'kh:mine:' + best.id, label: '🏠 My home' }; showIn = best; } else if (canEnter(best)) showIn = best; else promptNow = { id: 'kh:ring:' + best.id, label: '🚪 Ring doorbell' }; } else showIn = best; }
       else for (const h of housesNear(P.x, P.z, 20)) if (h.sale && !owners.has(h.id)) { const [sx, sz] = Lw(h, -6.3, h.d / 2 + 4.6); if (Math.hypot(sx - P.x, sz - P.z) < 2.4) { promptNow = { id: 'kh:sale:' + h.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[h.style]) }; break; } } }
     garageTick(dt); signTick(dt); metroTick(dt);
     if (!inside && !promptNow) { if (driving) { if (Math.abs(m.speed) < 2 && ownHomes().some((q) => Math.hypot(q.x - m.x, q.z - m.z) < (q.estate ? 70 : 32))) promptNow = { id: 'kh:park', label: '🅿️ Park at home' }; }
       else { const n = nearMyCar(); if (n) { pendingTake = n; promptNow = { id: 'kh:take', label: '🚗 Drive ' + CAR[n.car.m].name }; } } }
     inB.hidden = !showIn; if (showIn) { inB.dataset.h = showIn.id; const ow = owners.get(showIn.id); inB.textContent = ow && ow.owner !== uid ? '🏠 Visit ' + String(ow.name || 'Pal').slice(0, 12) : '🏠 Go in'; }
     if (inside && roomLight) { roomLight.intensity = (LOW ? 18 : 26); const r = rooms.get(inside.id); if (r) { r.I.update(dt, P); if (roomLight2) { const up = P.y > FLAT + 2.5; roomLight2.position.set(r.cx + 3.4, FLAT + (up ? 5.9 : 2.7), r.cz + (up ? -2.5 : -1)); } if (deco) decoTick(dt); } }
+    const inviteLab = paintInvite(); if (inviteLab && !promptNow && !deco) promptNow = { id: 'kh:invite', label: inviteLab };
     persist(false);
     window.__kh = Object.assign(window.__kh || {}, { myPlot, myTier, inside: inside && inside.id, owners: owners.size, cars: [...garages.values()].reduce((a, g) => a + g.carMs.length, 0), garages: garages.size, signs: signs.size, street: !!save.street, prompt: promptNow && promptNow.label }); }
   // debug only (kemy-pals-debug=1): pretend to own a plot locally to preview garages/interiors (no writes)
