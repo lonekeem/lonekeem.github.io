@@ -24,6 +24,11 @@ service cloud.firestore {
     function isStr(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
     // Modded-keyboard tricks: zero-width / bidi / invisible fillers, or zalgo (3+ stacked combining marks). ZWJ (U+200D) stays for emoji.
     function cleanStr(v, min, max) { return isStr(v, min, max) && !v.matches('(?s).*([\\x{200B}\\x{200C}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{FEFF}\\x{3164}\\x{115F}\\x{1160}\\x{FFA0}\\x{00AD}]|[\\x{0300}-\\x{036F}]{3,}).*'); }
+    // Kid-safe chat and names. The Cloud Function does the full check (leet, repeats, strikes).
+    // This stops a raw message or name from being stored in the first place.
+    function kidSafe(t) {
+      return t is string && !t.lower().matches('(?s).*(\\bfuck|\\bshit|\\bbitch|\\basshole|\\bcunt|\\bslut|\\bwhore|\\bnigg|\\bfagg|\\bretard|\\bporn|\\bpenis|\\bvagina|\\bsex\\b|https?://|www\\.|[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}|[0-9]{3}[-. ]?[0-9]{3}[-. ]?[0-9]{4}|discord\\.gg|snapchat|instagram|whatsapp).*');
+    }
     function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     // "Sign out everywhere" (js/devices.js): sessions that signed in before users/{uid}.sessionsValidAfter are refused
@@ -101,8 +106,11 @@ service cloud.firestore {
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
         && cleanStr(d.displayName, 1, 50)
+        && kidSafe(d.displayName)
         && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+        && kidSafe(d.username)
         && cleanStr(d.bio, 0, 160)
+        && kidSafe(d.bio)
         && (!('pronouns' in d) || isStr(d.pronouns, 0, 20))
         && (!('website' in d) || d.website == ''
             || (isStr(d.website, 12, 100) && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
@@ -154,7 +162,30 @@ service cloud.firestore {
       allow create, update: if signedIn() && uid == me() && docId == 'feed'
         && request.resource.data.keys().hasOnly(['cats', 'creators', 'updatedAt'])
         && scoreMap(request.resource.data.cats, 20) && scoreMap(request.resource.data.creators, 60)
-        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      // Optional push switches (js/push.js). Owner only. Missing types stay on once they opt in.
+      allow create, update: if signedIn() && uid == me() && docId == 'push' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['enabled', 'invite', 'turn', 'house', 'daily', 'announce', 'updatedAt'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.invite is bool && request.resource.data.turn is bool
+        && request.resource.data.house is bool && request.resource.data.daily is bool
+        && request.resource.data.announce is bool
+        && request.resource.data.updatedAt == request.time;
+      // Notification sound (js/chime.js). Owner only. Saved on the device too.
+      allow create, update: if signedIn() && uid == me() && docId == 'chime' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['sound', 'updatedAt'])
+        && request.resource.data.sound is string
+        && request.resource.data.sound.matches('^[a-z0-9-]{2,32}$')
+        && request.resource.data.updatedAt == request.time;
+      // Which What's New entry this player has opened (js/updates.js). Owner only.
+      allow create, update: if signedIn() && uid == me() && docId == 'updates' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['seen', 'updatedAt'])
+        && isStr(request.resource.data.seen, 1, 40)
+        && request.resource.data.updatedAt == request.time;
+      // When the admin last opened New Members (js/members.js). Admin account only.
+      allow create, update: if signedIn() && uid == me() && isAdmin() && docId == 'members' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['seenAt'])
+        && request.resource.data.seenAt == request.time;
       // Private search history (Search > Recent), max 20 short strings. Deleted by "Clear all" and with the account.
       allow create, update: if signedIn() && uid == me() && docId == 'security'
         && request.resource.data.keys().hasOnly(['alerts', 'updatedAt']) && request.resource.data.alerts is bool
@@ -163,6 +194,134 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['recent', 'updatedAt'])
         && request.resource.data.recent is list && request.resource.data.recent.size() <= 20
         && request.resource.data.updatedAt == request.time;
+      // Device settings copy (js/settings-hub.js). Owner only. Games still read local storage.
+      allow create, update: if signedIn() && uid == me() && docId == 'hub' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['gfx', 'saver', 'fps', 'screen', 'size', 'sens', 'opacity', 'lefty', 'haptics', 'master', 'music', 'effects', 'radio', 'updatedAt'])
+        && request.resource.data.gfx in ['auto', 'low', 'medium', 'high', 'ultra']
+        && request.resource.data.saver is bool && request.resource.data.fps is bool && request.resource.data.screen is bool
+        && request.resource.data.size is int && request.resource.data.size >= 64 && request.resource.data.size <= 110
+        && request.resource.data.sens is number && request.resource.data.sens >= 0.3 && request.resource.data.sens <= 2.5
+        && request.resource.data.opacity is number && request.resource.data.opacity >= 0.3 && request.resource.data.opacity <= 1
+        && request.resource.data.lefty is bool && request.resource.data.haptics is bool
+        && request.resource.data.master is int && request.resource.data.master >= 0 && request.resource.data.master <= 100
+        && request.resource.data.music is int && request.resource.data.music >= 0 && request.resource.data.music <= 100
+        && request.resource.data.effects is int && request.resource.data.effects >= 0 && request.resource.data.effects <= 100
+        && request.resource.data.radio is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    // New Members directory (js/members.js). Public profiles stay on users/{uid}.
+    // Only the verified admin can list this directory. A player can read or update their own row
+    // (so a photo or name change can follow them) but cannot list anyone else. The email lives in
+    // secret/email, never on the public profile, and the admin page loads it only on a tap.
+    match /members/{uid} {
+      function memberSignup() {
+        let p = request.auth.token.firebase.sign_in_provider;
+        return p == 'google.com' ? 'google' : (p == 'password' ? 'email' : '');
+      }
+      function memberEmailOk(d) {
+        return d.email is string && d.email.size() <= 200
+          && (d.email == request.auth.token.email
+              || (request.auth.token.email == null && d.email == ''));
+      }
+      function memberShape(d) {
+        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive'])
+          && cleanStr(d.displayName, 1, 50)
+          && kidSafe(d.displayName)
+          && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+          && kidSafe(d.username)
+          && isStr(d.displayNameLower, 0, 100)
+          && isStr(d.color, 1, 20)
+          && (d.photoURL == '' || cloudinaryImageUrl(d.photoURL))
+          && d.createdAt is timestamp
+          && d.signup in ['email', 'google', '']
+          && (!('lastActive' in d) || d.lastActive is timestamp);
+      }
+      // A visit can set lastActive to now. It cannot be moved to some other time.
+      function lastActiveOk() {
+        let next = request.resource.data;
+        let prev = resource.data;
+        let hasNext = 'lastActive' in next;
+        let hasPrev = 'lastActive' in prev;
+        return (!hasNext && !hasPrev)
+          || (hasNext && next.lastActive == request.time)
+          || (hasNext && hasPrev && next.lastActive == prev.lastActive);
+      }
+      allow get: if isAdmin() || (signedIn() && uid == me());
+      allow list: if isAdmin();
+      allow create: if signedIn() && uid == me() && memberShape(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.lastActive == request.time
+        && request.resource.data.signup == memberSignup();
+      allow update: if signedIn() && uid == me() && memberShape(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.signup == resource.data.signup
+        && lastActiveOk();
+      allow delete: if isAdmin() || (signedIn() && uid == me());
+      // The email is not on the member row. Only the admin can read it, and only when they tap.
+      match /secret/{docId} {
+        allow read: if isAdmin();
+        allow create, update: if signedIn() && uid == me() && docId == 'email'
+          && request.resource.data.keys().hasOnly(['email'])
+          && memberEmailOk(request.resource.data);
+        allow delete: if isAdmin() || (signedIn() && uid == me());
+      }
+    }
+
+    // Someone who deleted their account. Name, @username, join date, and the day they left.
+    // No email and no other private fields. Only the admin can read the list. The person
+    // writes their own note while their member row still exists; it cannot be edited after.
+    match /leftMembers/{uid} {
+      function leftShape(d) {
+        return d.keys().hasOnly(['displayName', 'username', 'createdAt', 'deletedAt'])
+          && cleanStr(d.displayName, 1, 50)
+          && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+          && d.createdAt is timestamp
+          && d.deletedAt is timestamp;
+      }
+      function memberRow() {
+        return get(/databases/$(database)/documents/members/$(uid)).data;
+      }
+      allow get, list: if isAdmin();
+      allow create: if signedIn() && uid == me() && leftShape(request.resource.data)
+        && request.resource.data.deletedAt == request.time
+        && exists(/databases/$(database)/documents/members/$(uid))
+        && request.resource.data.displayName == memberRow().displayName
+        && request.resource.data.username == memberRow().username
+        && request.resource.data.createdAt == memberRow().createdAt;
+      allow update, delete: if false;
+    }
+
+    // Live member totals. Numbers only. Cloud Functions write this with the Admin SDK.
+    match /stats/{id} {
+      allow get: if isAdmin() && id == 'members';
+      allow list, create, update, delete: if false;
+    }
+    // One doc per Auth event so a retried create or delete cannot move the total twice.
+    match /memberCountEvents/{id} {
+      allow read, write: if false;
+    }
+
+    // What's New entries (js/updates.js). Everyone can read. Only the verified admin can write.
+    // updates.json in the repo is the fallback; a doc with the same id replaces that entry.
+    match /updates/{id} {
+      function validUpdate(d) {
+        return d.keys().hasOnly(['date', 'type', 'title', 'body', 'emoji', 'image', 'link', 'createdAt'])
+          && d.keys().hasAll(['date', 'type', 'title', 'body', 'createdAt'])
+          && d.date is string && d.date.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.type is string && d.type in ['new', 'fix', 'soon']
+          && cleanStr(d.title, 1, 80) && cleanStr(d.body, 1, 400)
+          && d.createdAt is timestamp
+          && (!('emoji' in d) || isStr(d.emoji, 1, 16))
+          && (!('image' in d) || (isStr(d.image, 1, 120) && d.image.matches('^[A-Za-z0-9_./-]+$') && !d.image.matches('.*\\.\\..*')))
+          && (!('link' in d) || (isStr(d.link, 2, 80) && (d.link.matches('^#/[A-Za-z0-9_./?=&%-]{1,78}$') || d.link.matches('^[a-z0-9][A-Za-z0-9./_-]{0,78}$'))));
+      }
+      allow read: if true;
+      allow create: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
     }
 
     // Trending searches: searchTrends/{day}_{slug} = { day, q, n }. Anyone can read; signed-in users create a
@@ -189,7 +348,8 @@ service cloud.firestore {
         && (uid != me() || !('sessionsValidAfter' in resource.data) || (request.auth.token.auth_time + 1) * 1000 > resource.data.sessionsValidAfter.toMillis())
         && (!('sessionsValidAfter' in changed()) || (uid == me() && request.resource.data.sessionsValidAfter == request.time))
         && validProfile(request.resource.data)
-        && request.resource.data.createdAt == resource.data.createdAt
+        && (request.resource.data.createdAt == resource.data.createdAt
+            || (!('createdAt' in resource.data) && uid == me() && request.resource.data.createdAt == request.time))
         && request.resource.data.get('isStudio', false) == resource.data.get('isStudio', false)
         && (request.resource.data.username == resource.data.username
             || getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid)
@@ -241,13 +401,15 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time;
       }
 
-      // New-device sign-in devices: owner only (rough UA label + timestamps, no IP / location).
+      // Sign-in devices (rough UA label + timestamps, no IP / location).
+      // The owner reads and deletes their own. The admin may read them for last active on the member page.
       match /devices/{dev} {
         function validDev(d) {
           return d.keys().hasOnly(['label', 'firstSeen', 'lastSeen', 'ack']) && isStr(d.label, 1, 60) && d.ack is bool
             && d.firstSeen is timestamp && d.lastSeen is timestamp;
         }
-        allow read, delete: if signedIn() && uid == me();
+        allow read: if signedIn() && (uid == me() || isAdmin());
+        allow delete: if signedIn() && uid == me();
         allow create: if signedIn() && uid == me() && dev.matches('^[A-Za-z0-9]{16,40}$') && exists(userPath(uid)) && sessionOk(uid)
           && validDev(request.resource.data)
           && request.resource.data.firstSeen == request.time && request.resource.data.lastSeen == request.time;
@@ -255,6 +417,24 @@ service cloud.firestore {
           && request.resource.data.firstSeen == resource.data.firstSeen
           && (!('lastSeen' in changed()) || request.resource.data.lastSeen == request.time)
           && (!('ack' in changed()) || request.resource.data.ack == true);
+      }
+
+      // FCM web push tokens. The id is this browser's device id. Only the owner can read or write it.
+      match /fcmTokens/{id} {
+        function validToken(d) {
+          return d.keys().hasOnly(['token', 'label', 'tz', 'tzOffset', 'local', 'updatedAt'])
+            && isStr(d.token, 10, 4096) && isStr(d.label, 1, 60) && isStr(d.tz, 0, 80)
+            && d.tzOffset is int && d.tzOffset >= -840 && d.tzOffset <= 840
+            && d.local is bool && d.updatedAt == request.time;
+        }
+        allow read, delete: if signedIn() && uid == me();
+        allow create, update: if signedIn() && uid == me() && exists(userPath(uid)) && sessionOk(uid)
+          && id.matches('^[A-Za-z0-9]{16,40}$') && validToken(request.resource.data);
+      }
+      // Daily send count. Cloud Functions (Admin SDK) write it. The owner may only read or delete it.
+      match /pushQuota/{qid} {
+        allow read, delete: if signedIn() && uid == me();
+        allow create, update: if false;
       }
 
       match /notifications/{nid} {
@@ -288,7 +468,7 @@ service cloud.firestore {
         allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
           && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
-          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode']
+          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode', 'house']
           && actingAs(request.resource.data.fromUid)
           && request.resource.data.fromUid != uid
           && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName
@@ -607,6 +787,7 @@ service cloud.firestore {
           && request.resource.data.authorUsername == me_().username
           && isStr(request.resource.data.authorColor, 1, 20)
           && validBody(request.resource.data)
+          && kidSafe(request.resource.data.text)
           && (isAdmin() || linksOk(request.resource.data.text, me_()))
           && request.resource.data.createdAt == request.time
           && request.resource.data.get('likeCount', 0) == 0
@@ -814,14 +995,14 @@ service cloud.firestore {
       // Live chat + stars, tied to the signed-in author, max ~1 per second (lastMessageAt).
       match /chat/{c} {
         allow read: if true;
-        allow create: if signedIn() && liveOn() && !blockedBy(live().hostId)
+        allow create: if signedIn() && liveOn() && notBanned() && !blockedBy(live().hostId)
           && live().get('chatOn', true) == true
           && request.resource.data.keys().hasOnly(['authorId', 'name', 'username', 'color', 'type', 'text', 'count', 'createdAt'])
           && request.resource.data.authorId == me()
           && request.resource.data.name == get(userPath(me())).data.displayName
           && request.resource.data.username == get(userPath(me())).data.username
           && isStr(request.resource.data.color, 1, 20)
-          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && !tooManyLinks(request.resource.data.text) && request.resource.data.count == 0)
+          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && kidSafe(request.resource.data.text) && !tooManyLinks(request.resource.data.text) && request.resource.data.count == 0)
               || (request.resource.data.type == 'star' && request.resource.data.text == ''
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
@@ -879,6 +1060,7 @@ service cloud.firestore {
             || (exists(/databases/$(database)/documents/follows/$(request.resource.data.lastSender + '_' + otherOf(request.resource.data.lastSender)))
                 && exists(/databases/$(database)/documents/follows/$(otherOf(request.resource.data.lastSender) + '_' + request.resource.data.lastSender))))
         && isStr(request.resource.data.lastMessage, 0, 1000)
+        && kidSafe(request.resource.data.lastMessage)
         // Anti-spam: starting new conversations is limited (lastNewChatAt, one per 8 s).
         && ('studio' in request.resource.data.participants || isMod()
             || getAfter(userPath(request.resource.data.lastSender)).data.get('lastNewChatAt', null) == request.time)
@@ -887,6 +1069,7 @@ service cloud.firestore {
       allow update: if inChat()
         && changed().hasOnly(['lastMessage', 'lastAt', 'lastSender'])
         && isStr(request.resource.data.lastMessage, 0, 1000)
+        && kidSafe(request.resource.data.lastMessage)
         && request.resource.data.lastSender in parts()
         && actingAs(request.resource.data.lastSender)
         && request.resource.data.lastAt == request.time
@@ -902,6 +1085,7 @@ service cloud.firestore {
           && request.resource.data.senderId in parts()
           && actingAs(request.resource.data.senderId)
           && cleanStr(request.resource.data.text, 1, 1000)
+          && kidSafe(request.resource.data.text)
           && ('studio' in parts() || linksOk(request.resource.data.text, get(userPath(request.resource.data.senderId)).data))
           && request.resource.data.createdAt == request.time
           && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
@@ -1144,17 +1328,19 @@ service cloud.firestore {
         // Star Cards: a seated player sends an intent (play/draw/pass) or a call (LAST STAR! / catch)
         || (member() && od().type == 'starcards' && od().status == 'active'
             && ((changed().hasOnly(['intent', 'updatedAt']) && nd().intent.uid == me()
-                 && nd().intent.keys().hasOnly(['uid', 't', 'card', 'color', 'last', 'n'])
+                 && nd().intent.keys().hasOnly(['uid', 't', 'card', 'color', 'last', 'n', 'seq'])
+                 && nd().intent.seq is int && nd().intent.seq >= 0 && nd().intent.seq <= 8000
                  && nd().intent.t in ['play', 'draw', 'pass'] && od().players[od().pv.turn] == me())
              || (changed().hasOnly(['call', 'updatedAt']) && nd().call.uid == me()
-                 && nd().call.keys().hasOnly(['uid', 't', 'n']) && nd().call.t in ['last', 'catch'])))
+                 && nd().call.keys().hasOnly(['uid', 't', 'n', 'seq']) && nd().call.seq is int && nd().call.seq >= 0 && nd().call.seq <= 8000
+                 && nd().call.t in ['last', 'catch'])))
       );
       allow delete: if isAdmin();
 
       // Quick-chat emotes from players and signed-in spectators (preset ids only).
       match /chat/{cid} {
         allow read: if true;
-        allow create: if signedIn() && !pcOff(get(userPath(me())).data, 'chat') && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
+        allow create: if signedIn() && notBanned() && !pcOff(get(userPath(me())).data, 'chat') && request.resource.data.keys().hasOnly(['uid', 'e', 'at'])
           && request.resource.data.uid == me() && request.resource.data.e is int
           && ((request.resource.data.e >= 0 && request.resource.data.e <= 9) || (request.resource.data.e >= 100 && request.resource.data.e <= 199)) && request.resource.data.at == request.time; // 100+: Pal emote (game-emotes.js)
         allow delete: if isAdmin();
@@ -1346,6 +1532,10 @@ service cloud.firestore {
       let q = getAfter(quotaPath(me())).data;
       return q.at == request.time && q.hN <= 10 && q.dN <= 30;
     }
+    function helperQuotaOk() {
+      let q = getAfter(/databases/$(database)/documents/helperQuota/$(me())).data;
+      return q.at == request.time && q.hN >= 1 && q.hN <= 8;
+    }
     // Report rate counter, bumped by the reporter together with each report.
     match /reportQuota/{uid} {
       function q() { return request.resource.data; }
@@ -1403,6 +1593,67 @@ service cloud.firestore {
         && request.resource.data.status in ['open', 'review', 'resolved']
         && request.resource.data.handledBy == me() && request.resource.data.handledAt == request.time
         && isStr(request.resource.data.get('action', ''), 0, 40);
+    }
+
+    // Kemy Helper notes. Players may create a scrubbed note. Only the admin can read or mark it fixed.
+    function helperWin(start, n, oldStart, oldN) {
+      return (oldStart > request.time - duration.value(600, 's') && start == oldStart && n == oldN + 1 && n <= 8)
+        || ((oldStart <= request.time - duration.value(600, 's') || !exists(/databases/$(database)/documents/helperQuota/$(me()))) && start == request.time && n == 1);
+    }
+    match /helperQuota/{uid} {
+      function q() { return request.resource.data; }
+      allow read: if signedIn() && uid == me();
+      allow create: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'at'])
+        && q().at == request.time && q().hStart == request.time && q().hN == 1;
+      allow update: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'at'])
+        && q().at == request.time
+        && helperWin(q().hStart, q().hN, resource.data.hStart, resource.data.hN);
+    }
+    match /helperReports/{id} {
+      function hr() { return request.resource.data; }
+      function plain(v) { return isStr(v, 0, 180) && !v.matches('.*[@].*'); }
+      allow read: if isAdmin();
+      allow create: if signedIn() && helperQuotaOk()
+        && hr().keys().hasOnly(['type', 'game', 'place', 'device', 'text', 'autoFixed', 'status', 'at'])
+        && hr().type in ['error', 'reject', 'load', 'fps', 'stuck', 'bounds', 'under', 'wall', 'float', 'nan', 'desync', 'turn', 'note']
+        && isStr(hr().game, 0, 24) && isStr(hr().place, 0, 48) && isStr(hr().device, 0, 24)
+        && plain(hr().text) && hr().autoFixed is bool && hr().status == 'open' && hr().at == request.time;
+      allow update: if isAdmin()
+        && changed().hasOnly(['status', 'fixedAt'])
+        && request.resource.data.status == 'fixed'
+        && request.resource.data.fixedAt == request.time;
+      allow delete: if false;
+    }
+
+    // Chat strikes written by the moderation function. The player can read their own.
+    // Keem can warn from the admin page. Nobody else writes this.
+    match /helperStrikes/{uid} {
+      allow read: if signedIn() && (uid == me() || isAdmin());
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['n', 'warn', 'warnAt', 'ban'])
+        && request.resource.data.n == 0
+        && request.resource.data.warn == true
+        && request.resource.data.warnAt == request.time
+        && request.resource.data.ban == false;
+      allow update: if isAdmin()
+        && changed().hasOnly(['warn', 'warnAt'])
+        && request.resource.data.warn == true
+        && request.resource.data.warnAt == request.time;
+      allow delete: if false;
+    }
+    // A short note the helper sends to the moderation function (park chat, a bad
+    // name attempt, or someone blocking a spawn). Not a public chat log.
+    match /worldChat/{id} {
+      allow read: if signedIn() && (isAdmin() || resource.data.uid == me());
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.keys().hasOnly(['uid', 'text', 'area', 'target', 'at', 'still'])
+        && request.resource.data.uid == me()
+        && isStr(request.resource.data.text, 0, 200)
+        && request.resource.data.area in ['park', 'street', 'plains', 'towns', 'dm', 'live', 'comment', 'game', 'name', 'grief']
+        && isStr(request.resource.data.get('target', ''), 0, 128)
+        && request.resource.data.at == request.time
+        && (!('still' in request.resource.data) || (request.resource.data.still is int && request.resource.data.still >= 0 && request.resource.data.still <= 600000));
+      allow update, delete: if false;
     }
 
     // ∞ Pass (unlimited Star Coins + Diamonds): public (profile badge), written ONLY by the admin.
@@ -1688,6 +1939,25 @@ service cloud.firestore {
     match /config/palShop {
       allow read: if true;
       allow write: if isAdmin();
+    }
+    // Who receives the once-a-day Kemy Helper digest. The day stamp is written by the Cloud Function.
+    match /config/helperDigest {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.keys().hasOnly(['uid', 'updatedAt'])
+        && request.resource.data.uid == me() && request.resource.data.updatedAt == request.time;
+      allow update: if isAdmin() && changed().hasOnly(['uid', 'updatedAt'])
+        && request.resource.data.uid == me() && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+    // Admin-only "ping me when someone joins" switch (js/members.js). The uid is the admin's own account.
+    match /config/adminAlerts {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['joinPush', 'uid', 'updatedAt'])
+        && request.resource.data.joinPush is bool
+        && request.resource.data.uid == me()
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
     }
     match /users/{uid}/pal/wallet {
       function w() { return request.resource.data; }
@@ -1987,7 +2257,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['p', 's', 'fin', 'at', 'em', 'emAt']) && (!('em' in request.resource.data) || (request.resource.data.em is int && request.resource.data.em >= -1 && request.resource.data.em <= 199 && request.resource.data.emAt is int)) && request.resource.data.p is int && request.resource.data.p >= 0 && request.resource.data.p <= 1000
           && request.resource.data.s is int && request.resource.data.s >= 0 && request.resource.data.s <= 999 && request.resource.data.fin is bool
           && request.resource.data.at == request.time
-          && (resource == null || (!resource.data.fin && resource.data.at + duration.value(300, 'ms') < request.time && request.resource.data.s >= resource.data.s));
+          && (resource == null || (!resource.data.fin && resource.data.at + duration.value(200, 'ms') < request.time && request.resource.data.s >= resource.data.s));
         allow delete: if false;
       }
       match /rec/{uid} {
@@ -2078,7 +2348,7 @@ service cloud.firestore {
         && (!('street' in wd()) || wd().street == null || carOk(wd().street))
         && wd().at == request.time && (resource == null || resource.data.at + duration.value(5, 's') < request.time);
     }
-    // ================= Pal Park presence: rooms of ~20, ~4 writes/s while moving, stale docs removable by anyone
+    // ================= Pal Park presence: rooms of ~20, ~14 writes/s while moving, stale docs removable by anyone
     match /parkRooms/{room}/p/{uid} {
       function pp() { return request.resource.data; }
       function cellNo() { return int(math.floor((float(pp().x - 1600) / 16.0 - 400.0) / 20.0)) + 6 * int(math.floor((float(pp().y - 1200) / 16.0 + 70.0) / 20.0)) + 1; } // js/world/layout.js ROOMS (20 m cells, 6 per row)
@@ -2102,13 +2372,13 @@ service cloud.firestore {
         // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
         && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= -21000 && pp().x <= 10000 && pp().y is int && pp().y >= 0 && pp().y <= 60000
-        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && isStr(pp().tgt, 0, 128)
+        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && kidSafe(pp().say) && isStr(pp().tgt, 0, 128)
         && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
         && pp().uname == get(/databases/$(database)/documents/users/$(uid)).data.username
         // Parental Controls: chat off means no new 'say' text (same profile doc as above, no extra lookup)
         && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || !pcOff(get(/databases/$(database)/documents/users/$(uid)).data, 'chat'))
         && pp().pal is map && pp().at == request.time
-        && (resource == null || resource.data.at + duration.value(200, 'ms') < request.time);
+        && (resource == null || resource.data.at + duration.value(70, 'ms') < request.time);
       allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(2, 'm'));
     }
   }

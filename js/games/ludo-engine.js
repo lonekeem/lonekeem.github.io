@@ -80,21 +80,28 @@ function danger(st, me, abs) {
   st.pos.forEach((toks, p) => { if (p === me) return; toks.forEach((r) => { const b = absOf(st.cols[p], r); if (b < 0) return; const gap = (abs - b + 52) % 52; if (gap >= 1 && gap <= 6 && r + gap <= 50) d++; }); if (toks.some((r) => r < 0) && abs === START[st.cols[p]]) d++; });
   return d;
 }
+const LUDO_W = {
+  medium: { home: 80, out: 45, cap: 60, safe: 14, lane: 24, danger: 10, noise: 6 },
+  hard: { home: 110, out: 60, cap: 85, safe: 22, lane: 32, danger: 35, noise: 1.5 },
+  expert: { home: 140, out: 78, cap: 120, safe: 30, lane: 40, danger: 58, noise: 0.25 }
+};
 export function aiPick(st, die, lvl = 'medium', rand = Math.random) {
   const L = legal(st, die); if (!L.length) return -1;
   if (lvl === 'easy') return L[Math.floor(rand() * L.length)];
+  const w = LUDO_W[lvl] || LUDO_W.medium;
   const me = st.turn, col = st.cols[me];
   let best = L[0], bs = -Infinity;
   for (const t of L) {
     const from = st.pos[me][t], to = from < 0 ? 0 : from + die, abs = absOf(col, to);
     let sc = to / 4;
-    if (to === HOME) sc += 100;
-    if (from < 0) sc += 60;
-    if (abs >= 0 && !SAFE.has(abs) && occupants(st, abs).some(([p]) => p !== me)) sc += 80;
-    if (abs >= 0 && SAFE.has(abs)) sc += 22;
-    if (to > 50 && from <= 50) sc += 30;
-    if (lvl === 'hard') { sc -= danger(st, me, abs) * 35; sc += danger(st, me, absOf(col, from)) * 30; }
-    sc += rand() * 2;
+    if (to === HOME) sc += w.home;
+    if (from < 0) sc += w.out;
+    if (abs >= 0 && !SAFE.has(abs) && occupants(st, abs).some(([p]) => p !== me)) sc += w.cap;
+    if (abs >= 0 && SAFE.has(abs)) sc += w.safe;
+    if (to > 50 && from <= 50) sc += w.lane;
+    sc -= danger(st, me, abs) * w.danger;
+    sc += danger(st, me, absOf(col, from)) * w.danger * 0.85;
+    sc += rand() * w.noise;
     if (sc > bs) { bs = sc; best = t; }
   }
   return best;

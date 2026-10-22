@@ -5,6 +5,8 @@
 // Firestore rules check every reveal against the previous link and the die against the reveals.
 import * as L from './ludo-engine.js';
 import { isBot, tsMs, TURN_SECONDS } from './net.js';
+import { ask, normLevel, botPlayer, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, stopOffer, onlyBots, lastLevel } from './bots.js';
+import { syncPlates } from './plates.js';
 
 const BOT_NAMES = ['Nova', 'Echo', 'Pixel', 'Juno'];
 const CELL = 20;
@@ -57,27 +59,61 @@ export function createLudo(ctx) {
     ui.shell(esc(title), `<div class="lu" id="lu"><div class="g-fx"></div><div id="lu-body"></div></div>${ui.emoteBar()}<div class="g-actions" id="g-actions"></div>`, back);
   }
   // v = { st, seats, mySeat, die, rolling, canRoll, movable, timer, note, flagged }
+  // Seats, the die and the message stay put. The board SVG is rebuilt only when a token moved.
+  const luCur = { v: null, on: null };
   function paint(v, on) {
     const box = $('#lu-body'); if (!box) return;
+    luCur.v = v; luCur.on = on;
     const st = v.st, me = v.mySeat;
+    if (!box.querySelector('#lu-seats')) {
+      box.innerHTML = `<div class="lu-seats" id="lu-seats"></div><div class="lu-board" id="lu-board"></div><div class="lu-ctrl"><button class="lu-die" id="lu-roll" type="button"></button><div class="lu-msg"><b id="lu-title"></b><span class="muted small" id="lu-note"></span></div></div>`;
+      $('#lu-roll').onclick = () => { if (luCur.v && luCur.v.canRoll && luCur.on) luCur.on.roll(); };
+    }
     const home = (p) => st.pos[p].filter((r) => r === L.HOME).length;
-    box.innerHTML = `<div class="lu-seats">${v.seats.map((p, i) => `<div class="lu-seat ${st.winner < 0 && st.turn === i ? 'on' : ''}" style="--lc:${L.COLORS[st.cols[i]]}">${ui.chip(p)}<span class="lu-home">${home(i)}/4</span>${v.flagged && v.flagged[i] ? '<span class="lu-flag" title="A move didn’t check out">⚠</span>' : ''}${st.winner < 0 && st.turn === i && v.timer != null ? `<span class="g-timer ${v.timer <= 10 ? 'low' : ''}">${v.timer}s</span>` : ''}</div>`).join('')}</div>
-      <div class="lu-board">${boardSvg(st, v.seats, v.movable || [], me >= 0 && st.turn === me)}</div>
-      <div class="lu-ctrl"><button class="lu-die ${v.rolling ? 'rolling' : ''} ${v.canRoll ? 'can' : ''}" id="lu-roll" ${v.canRoll ? '' : 'disabled'} aria-label="${v.canRoll ? 'Roll the die' : 'Die'}" style="--lc:${L.COLORS[st.cols[st.turn]]}">${dieSvg(v.rolling ? 0 : v.die)}</button>
-        <div class="lu-msg"><b>${st.winner >= 0 ? `${esc(v.seats[st.winner].name)} wins!` : me === st.turn ? (v.canRoll ? 'Your roll' : v.movable && v.movable.length ? 'Tap a glowing token' : 'Your turn') : `${esc(v.seats[st.turn].name)}’s turn`}</b><span class="muted small">${esc(v.note || st.msg || '')}</span></div></div>`;
-    const rb = $('#lu-roll'); if (rb && v.canRoll) rb.onclick = () => on.roll();
-    box.querySelectorAll('[data-t]').forEach((el) => { const f = () => on.pick(+el.dataset.t); el.addEventListener('click', f); el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') f(); }); });
+    syncPlates($('#lu-seats'), v.seats.map((p, i) => {
+      const onTurn = st.winner < 0 && st.turn === i;
+      const bits = [{ key: 'home', className: 'lu-home', text: home(i) + '/4' }];
+      if (v.flagged && v.flagged[i]) bits.push({ key: 'flag', className: 'lu-flag', text: '⚠', title: 'A move didn’t check out' });
+      if (onTurn && v.timer != null) bits.push({ key: 'tm', className: 'g-timer' + (v.timer <= 10 ? ' low' : ''), text: v.timer + 's' });
+      return { key: 's' + i, className: 'lu-seat' + (onTurn ? ' on' : ''), vars: { '--lc': L.COLORS[st.cols[i]] }, person: p, bits };
+    }));
+    const board = $('#lu-board');
+    const bsig = st.winner + '|' + st.turn + '|' + st.pos.map((a) => a.join(',')).join(';') + '|' + (v.movable || []).join(',') + '|' + (st.last ? st.last.p + ':' + st.last.t : '') + '|' + (me >= 0 && st.turn === me ? 1 : 0);
+    if (board.dataset.sig !== bsig) {
+      board.dataset.sig = bsig;
+      board.innerHTML = boardSvg(st, v.seats, v.movable || [], me >= 0 && st.turn === me);
+      board.querySelectorAll('[data-t]').forEach((el) => {
+        const f = () => { if (luCur.on) luCur.on.pick(+el.dataset.t); };
+        el.addEventListener('click', f);
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') f(); });
+      });
+    }
+    const die = $('#lu-roll');
+    const cls = 'lu-die' + (v.rolling ? ' rolling' : '') + (v.canRoll ? ' can' : '');
+    if (die.className !== cls) die.className = cls;
+    if (die.disabled !== !v.canRoll) die.disabled = !v.canRoll;
+    const lc = L.COLORS[st.cols[st.turn]];
+    if (die.style.getPropertyValue('--lc') !== lc) die.style.setProperty('--lc', lc);
+    const faceN = v.rolling ? 0 : (v.die || 0);
+    if (die.dataset.f !== String(faceN)) { die.dataset.f = String(faceN); die.innerHTML = dieSvg(v.rolling ? 0 : v.die); }
+    const label = v.canRoll ? 'Roll the die' : 'Die';
+    if (die.getAttribute('aria-label') !== label) die.setAttribute('aria-label', label);
+    const title = st.winner >= 0 ? `${v.seats[st.winner].name} wins!` : me === st.turn ? (v.canRoll ? 'Your roll' : v.movable && v.movable.length ? 'Tap a glowing token' : 'Your turn') : `${v.seats[st.turn].name}’s turn`;
+    const note = v.note || st.msg || '';
+    const titleEl = $('#lu-title'), noteEl = $('#lu-note');
+    if (titleEl && titleEl.textContent !== title) titleEl.textContent = title;
+    if (noteEl && noteEl.textContent !== note) noteEl.textContent = note;
   }
   const sound = (prev, st) => { if (!st.last) return; ui.sfx.play(st.last.cap ? 'capture' : st.last.to === L.HOME ? 'star' : 'place'); };
 
   // ------------------------------------------------------------ vs computer
   function local(params) {
-    const lvl = ['easy', 'medium', 'hard'].includes(params.lvl) ? params.lvl : 'medium';
+    const lvl = normLevel(params.lvl);
     const n = Math.max(2, Math.min(4, +params.mode || 4));
     shell('Ludo', '#/games/ludo');
     ui.wireEmotes(main, '', () => '');
     const me = { uid: ui.myUid(), name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' };
-    const seats = [me, ...Array.from({ length: n - 1 }, (_, i) => ({ uid: 'cpu' + (i + 1), name: `${BOT_NAMES[i]} · ${lvl[0].toUpperCase() + lvl.slice(1)}` }))];
+    const seats = [me, ...Array.from({ length: n - 1 }, (_, i) => botPlayer(i, lvl))];
     let st = L.newGame(n), die = 0, rolling = false, movable = [], phase = 'roll', alive = true;
     S.unsubs.push(() => { alive = false; });
     $('#g-actions').innerHTML = `<button class="btn btn-sm btn-ghost" id="lu-new">New game</button><a class="btn btn-sm btn-ghost" href="#/games/ludo">Leave</a>`;
@@ -92,7 +128,7 @@ export function createLudo(ctx) {
     function afterRoll() {
       movable = L.legal(st, die); phase = 'pick'; refresh();
       if (!movable.length) later(() => apply(-1), 900);
-      else if (st.turn !== 0) later(() => apply(L.aiPick(st, die, lvl)), 650);
+      else if (st.turn !== 0) ask({ kind: 'ludo', st, die, level: lvl }).then((t) => { if (alive && phase === 'pick') apply(t); });
       else if (movable.length === 1) later(() => { if (phase === 'pick') apply(movable[0]); }, 700);
     }
     function pick(t) { if (phase === 'pick' && st.turn === 0 && movable.includes(t)) apply(t); }
@@ -100,7 +136,7 @@ export function createLudo(ctx) {
       const prev = st; st = L.step(st, die, t); phase = 'roll'; movable = []; sound(prev, st);
       if (st.winner >= 0) {
         refresh(); const win = st.winner === 0; ui.addCpuResult('ludo', win ? 'w' : 'l');
-        ui.resultModal({ title: win ? 'You win!' : `${seats[st.winner].name.split(' ·')[0]} wins`, sub: 'All four tokens home.', win, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
+        ui.resultModal({ title: win ? 'You win!' : `${seats[st.winner].name} wins`, sub: 'All four tokens home.', win, vsBot: true, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
         return;
       }
       refresh();
@@ -127,7 +163,7 @@ export function createLudo(ctx) {
 
   async function online(g0) {
     const gid = g0.id;
-    let g = g0, ended = false, stopHb = null, chain = null, committing = false, sentK = -1, submittedK = -1, dieK = {}, flagged = {}, prevLv = null, botT = 0, joinTried = false, iEnded = false, turnSeen = Date.now(), turnKey = '', dropTried = '';
+    let g = g0, serverG = g0, ended = false, stopHb = null, chain = null, committing = false, sentK = -1, submittedK = -1, dieK = {}, flagged = {}, prevLv = null, botT = 0, joinTried = false, iEnded = false, pendingNo = null, dropTried = '';
     const me = () => ui.myUid();
     const isHost = () => g.host === me();
     const member = () => g.players.includes(me());
@@ -163,11 +199,18 @@ export function createLudo(ctx) {
     // the die depends on who is seated (a player who leaves is replaced by a bot), so cache it per roll AND per seating
     const dk = (k) => k + '|' + g.players.join(',');
     async function submit(st, die, token) {
-      const k = st.k; if (submittedK >= k) return; submittedK = k;
+      const k = st.k; if (submittedK >= k || pendingNo != null) return; submittedK = k;
       let ns; try { ns = L.step(st, die, token); } catch { submittedK = k - 1; return; }
-      const upd = { lv: toLv(ns), moveNo: (g.moveNo || 0) + 1, turnAt: net.fs.serverTimestamp() };
+      const expect = g.moveNo || 0;
+      const upd = { lv: toLv(ns), moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
       if (ns.winner >= 0) Object.assign(upd, { status: 'done', winnerUid: g.players[ns.winner], endReason: 'win' });
-      if (ns.winner >= 0) iEnded = true; try { await net.update(gid, upd); } catch (e) { iEnded = false; submittedK = k - 1; toast(friendlyError(e)); }
+      pendingNo = upd.moveNo;
+      const prev = g;
+      g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } };
+      draw();
+      if (ns.winner >= 0) iEnded = true;
+      try { await net.commitMove(gid, expect, upd); }
+      catch (e) { pendingNo = null; iEnded = false; submittedK = k - 1; g = serverG.moveNo >= prev.moveNo ? serverG : prev; draw(); toast(e && e.code === 'stale' ? 'That move already happened.' : friendlyError(e)); }
     }
     // drive the roll / move cycle from the latest snapshot
     async function step() {
@@ -182,7 +225,7 @@ export function createLudo(ctx) {
       const die = dieK[key];
       if (mover() !== me()) return;
       const moves = L.legal(st, die);
-      if (isBot(g.players[st.turn])) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) submit(st, die, L.aiPick(st, die, 'hard')); }, 750); }
+      if (isBot(g.players[st.turn])) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) ask({ kind: 'ludo', st, die, level: lastLevel() }).then((t) => { if (g.lv && g.lv.k === k) submit(st, die, t); }); }, 80); }
       else if (!moves.length) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) submit(st, die, -1); }, 1000); }
       else if (moves.length === 1) { clearTimeout(botT); botT = setTimeout(() => { if (g.lv && g.lv.k === k) submit(st, die, moves[0]); }, 900); }
     }
@@ -197,7 +240,7 @@ export function createLudo(ctx) {
     // a human who blocks the game for a full turn timer is replaced by a computer player
     function afk() {
       if (g.status !== 'active' || !g.lv || !member()) return;
-      if (Date.now() - turnSeen < (TURN_SECONDS + 5) * 1000) return;
+      if (net.serverNow() - (tsMs(g.turnAt) || net.serverNow()) < (TURN_SECONDS + 5) * 1000) return;
       const k = g.lv.k, rk = g.rk || {}, turnU = g.players[g.lv.turn];
       const blockers = humans().filter((u) => u !== me() && ((rk[u] ?? -1) < k || (u === turnU && allRevealed(k))));
       const okMe = humans().filter((u) => !blockers.includes(u))[0] === me();
@@ -207,24 +250,34 @@ export function createLudo(ctx) {
     async function drop(uid) {
       const i = g.players.indexOf(uid); if (i < 0 || dropTried === uid + g.lv.k) return; dropTried = uid + g.lv.k;
       const rep = (a, v) => a.map((x, j) => (j === i ? v : x));
-      try { await net.update(gid, { players: rep(g.players, 'cpu' + i), names: rep(g.names, BOT_NAMES[i] + ' (CPU)'), unames: rep(g.unames, ''), colors: rep(g.colors, ''), left: [...(g.left || []), uid], turnAt: net.fs.serverTimestamp() }); }
+      try { await net.update(gid, { players: rep(g.players, 'cpu' + i), names: rep(g.names, seatName(i)), unames: rep(g.unames, ''), colors: rep(g.colors, ''), left: [...(g.left || []), uid], turnAt: net.fs.serverTimestamp() }); }
       catch (e) { console.warn('ludo drop', e.code || e.message); }
     }
     function lobby() {
       const box = $('#lu-body'); if (!box) return;
       const ps = seats(), ready = humans().every((u) => (g.rv || {})[u]);
+      const offer = isHost() && !g.invitee && humans().length < 2 && whenOffer(gid, () => draw());
+      const sig = ps.map((p) => p.uid + ':' + p.name + ':' + ((g.rv || {})[p.uid] ? 1 : 0)).join('|') + '|' + ready + '|' + offer + '|' + g.host + '|' + member() + '|' + maxSeats();
+      if (box.dataset.lsig === sig) {
+        clearTimeout(lobby.t);
+        if (isHost() && g.quick && humans().length >= 2 && ready) lobby.t = setTimeout(() => start(), humans().length >= maxSeats() ? 1500 : 12000);
+        return;
+      }
+      box.dataset.lsig = sig;
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
         <button class="btn btn-sm btn-ghost" id="lu-copy">Copy invite link</button>
-        <p class="muted small">${maxSeats()} seats · computer players fill empty seats</p>
+        <p class="muted small">${maxSeats()} seats. Bots wear a Bot tag.</p>
         <h3>${ps.length} / ${maxSeats()} seats</h3><div class="g-seats">${ps.map((p, i) => `<div class="g-seat" style="--lc:${L.COLORS[L.seatColors(maxSeats())[i] ?? i]}">${ui.chip(p, p.uid === g.host ? 'host' : '')}${!isBot(p.uid) ? `<span class="muted small">${(g.rv || {})[p.uid] ? 'dice locked in' : 'locking dice…'}</span>` : ''}${isHost() && isBot(p.uid) ? `<button class="link-btn small" data-rm="${i}">remove</button>` : ''}</div>`).join('')}</div>
-        ${isHost() ? `<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="lu-bot" ${ps.length >= maxSeats() ? 'disabled' : ''}>+ Computer player</button><button class="btn btn-sm" id="lu-start" ${ready ? '' : 'disabled'}>Start game</button></div>`
+        ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="lu-bot" ${ps.length >= maxSeats() ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="lu-start" ${ready ? '' : 'disabled'}>Start game</button></div>${offer ? offerHtml() : ''}`
           : member() ? '<p class="muted center">Waiting for the host to start…</p>'
           : ui.signedIn() ? '<button class="btn btn-block" id="lu-join">Take a seat</button>' : `<a class="btn btn-block" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to join</a>`}
         <p class="muted small center">Fair dice: everyone locks in a secret before the game; each roll mixes everyone’s next secret, so nobody can choose a number.</p></div>`;
       $('#lu-copy').onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
+      wireFill(box);
       const bt = $('#lu-bot'); if (bt) bt.onclick = () => addBot();
       box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => removeSeat(+b.dataset.rm));
-      const sb = $('#lu-start'); if (sb) sb.onclick = () => start();
+      const sb = $('#lu-start'); if (sb) sb.onclick = () => start(false);
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = () => start(true);
       const jn = $('#lu-join'); if (jn) jn.onclick = async () => { jn.disabled = true; try { await net.join(gid); } catch (e) { toast(friendlyError(e)); jn.disabled = false; } };
       clearTimeout(lobby.t);
       if (isHost() && g.quick && humans().length >= 2 && ready) lobby.t = setTimeout(() => start(), humans().length >= maxSeats() ? 1500 : 12000);
@@ -232,18 +285,19 @@ export function createLudo(ctx) {
     async function addBot() {
       const used = new Set(g.players), i = g.players.length;
       if (i >= maxSeats() || used.has('cpu' + i)) return;
-      try { await net.update(gid, { players: [...g.players, 'cpu' + i], names: [...g.names, BOT_NAMES[i] + ' (CPU)'], unames: [...g.unames, ''], colors: [...g.colors, ''] }); } catch (e) { toast(friendlyError(e)); }
+      try { await net.update(gid, { players: [...g.players, 'cpu' + i], names: [...g.names, seatName(i)], unames: [...g.unames, ''], colors: [...g.colors, ''] }); } catch (e) { toast(friendlyError(e)); }
     }
     async function removeSeat(i) {
       const f = (a) => a.filter((_, j) => j !== i);
       const ps = f(g.players).map((u, j) => (isBot(u) ? 'cpu' + j : u));
       try { await net.update(gid, { players: ps, names: f(g.names), unames: f(g.unames), colors: f(g.colors) }); } catch (e) { toast(friendlyError(e)); }
     }
-    async function start() {
+    async function start(force) {
       if (!isHost() || g.status !== 'waiting') return;
       clearTimeout(lobby.t);
       const players = [...g.players], names = [...g.names], unames = [...g.unames], colors = [...g.colors];
-      while (players.length < maxSeats()) { const i = players.length; players.push('cpu' + i); names.push(BOT_NAMES[i] + ' (CPU)'); unames.push(''); colors.push(''); }
+      if (force || fillBots()) while (players.length < maxSeats()) { const i = players.length; players.push('cpu' + i); names.push(seatName(i)); unames.push(''); colors.push(''); }
+      if (players.length < 2) { toast('Waiting for a real player. You can fill empty seats with bots.'); return; }
       const st = L.newGame(players.length);
       try { await net.update(gid, { players, names, unames, colors, status: 'active', lv: toLv(st), moveNo: 0, turnAt: net.fs.serverTimestamp() }); net.leaveQueue('ludo', g.mode, gid); }
       catch (e) { toast(friendlyError(e)); }
@@ -257,7 +311,7 @@ export function createLudo(ctx) {
       const canRoll = myTurn && (rk[me()] ?? -1) < k && sentK < k;
       const rolling = g.status === 'active' && !revealedAll && (rk[roller()] === k);
       const movable = myTurn && revealedAll && die != null && submittedK < k ? L.legal(st, die) : [];
-      const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - turnSeen) / 1000)) : null;
+      const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
       const note = revealedAll && die != null ? `Rolled ${die}${st.msg ? ' · ' + st.msg : ''}` : st.msg ? `${g.lv.die ? 'Last roll ' + g.lv.die + ' · ' : ''}${st.msg}` : '';
       paint({ st, seats: seats(), mySeat: seat, die: revealedAll && die != null ? die : g.lv.die, rolling, canRoll, movable, timer: left, note, flagged }, {
         roll: () => { reveal(k); draw(); },
@@ -274,9 +328,13 @@ export function createLudo(ctx) {
     }
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This room is gone. <a href="#/games">Games</a></div>'; return; }
-      g = ng;
+      serverG = ng;
+      const rec = net.reconcile(ng.moveNo, pendingNo);
+      pendingNo = rec.pending;
+      if (!rec.take) {
+        g = { ...ng, lv: g.lv, moveNo: g.moveNo, status: g.status, winnerUid: g.winnerUid || '', endReason: g.endReason || '', turnAt: g.turnAt };
+      } else g = ng;
       if (g.lv) {
-        const k = `${g.lv.k}|${g.status}`; if (k !== turnKey) { turnKey = k; turnSeen = Date.now(); }
         if (prevLv && g.lv.k === prevLv.k + 1) { verify(prevLv, g.lv); sound(fromLv(prevLv), fromLv(g.lv)); }
         prevLv = g.lv;
       }
@@ -290,10 +348,12 @@ export function createLudo(ctx) {
       if (g.status === 'done' && !ended) {
         ended = true; if (stopHb) { stopHb(); stopHb = null; }
         const mine = member() || (g.left || []).includes(me());
-        if (mine) setTimeout(() => net.recordResult(g, iEnded || (member() && (g.left || []).length > 0)), iEnded ? 0 : 2500);
+        if (mine && !onlyBots(g.players, me())) setTimeout(() => net.recordResult(g, iEnded || (member() && (g.left || []).length > 0)), iEnded ? 0 : 2500);
         const win = g.winnerUid === me();
         const wi = g.players.indexOf(g.winnerUid);
-        ui.resultModal({ title: win ? 'You win!' : `${wi >= 0 ? g.names[wi] : 'Someone'} wins`, sub: 'All four tokens home.', win, buttons: [{ label: 'New room', onClick: () => $('#lu-again')?.click() }, { label: 'Back to games', href: '#/games' }] });
+        const botGame = onlyBots(g.players, me());
+        if (botGame && mySeat() >= 0) ui.addCpuResult('ludo', win ? 'w' : 'l');
+        ui.resultModal({ title: win ? 'You win!' : `${wi >= 0 ? g.names[wi] : 'Someone'} wins`, sub: 'All four tokens home.', win, vsBot: botGame, buttons: [{ label: 'New room', onClick: () => $('#lu-again')?.click() }, { label: 'Back to games', href: '#/games' }] });
       }
     }, (e) => toast(friendlyError(e)));
     S.unsubs.push(unsub);

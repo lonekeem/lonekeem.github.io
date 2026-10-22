@@ -3,7 +3,7 @@
 // garage (the roll-up door opens for the owner and closes after), "Park here" saves the car in that bay, your last
 // spot + a car left on the street are remembered (localStorage + a throttled private Firestore doc).
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, serverTimestamp, writeBatch, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, serverTimestamp, writeBatch, deleteDoc, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear } from './layout.js';
 import { CAR, CARS, PAINTS, buildCar, poseCar, addPlate } from './cars.js';
 import { parseCar } from './drive.js';
@@ -131,9 +131,25 @@ export function attachHomes(api, W, K) {
   function applyDecor(id) { const o = owners.get(id); const dec = (o && o.decor) || {}; if (W.paintHouse && HOUSE_BY_ID[id] && HOUSE_BY_ID[id].sale) W.paintHouse(id, dec.ext || null); const r = rooms.get(id); const k = JSON.stringify(dec);
     if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall, dec.walls); r.I.setFloor(dec.floor || r.I.S.floor); r.I.setItems(parseItems(dec.items || defaultItems(r.I.two, r.h && r.h.num ? r.h.seed : 0))); } }
   const canEnter = (h) => { if (!h.sale) return true; const o = owners.get(h.id); if (!o) return false; return o.owner === uid || o.open === true || (Array.isArray(o.inv) && o.inv.includes(uid)); };
+  // A doorbell or a visit on someone else's Kemy Street home. One note per owner per kind per half hour.
+  const noted = new Map();
+  function noteHouse(ownerUid, plot, kind) {
+    if (!uid || !db || !S.profile || !ownerUid || ownerUid === uid) return;
+    const key = ownerUid + ':' + kind; const now = Date.now();
+    if (now - (noted.get(key) || 0) < 30 * 60 * 1000) return;
+    noted.set(key, now);
+    const text = kind === 'ring' ? 'rang your doorbell on Kemy Street' : 'visited your home on Kemy Street';
+    addDoc(collection(db, 'users', ownerUid, 'notifications'), {
+      type: 'house', fromUid: uid, fromName: S.profile.displayName, fromUsername: S.profile.username,
+      postId: String(plot || '').slice(0, 40), text, createdAt: serverTimestamp(), read: false
+    }).catch(() => {});
+  }
+  if (window.__kemyHouseRing) removeEventListener('kemy:house-ring', window.__kemyHouseRing);
+  window.__kemyHouseRing = (e) => { const plot = e.detail && e.detail.plot; const o = plot && owners.get(plot); if (o && o.owner) noteHouse(o.owner, plot, 'ring'); };
+  addEventListener('kemy:house-ring', window.__kemyHouseRing);
   function goIn(h) { SC = scOf(h); if (!canEnter(h)) { say('🔒 Only the owner and invited friends can go inside'); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') return; const r = buildRoom(h); inside = h; roomState.box = { x0: r.cx - 5.6 * SC, x1: r.cx + 5.6 * SC, z0: r.cz - 5.6 * SC, z1: r.cz + 5.5 * SC };
     standUp(true); P.x = r.cx; P.z = r.cz + 4.6 * SC; P.yaw = Math.PI; P.y = FLAT; if (!roomLight) { roomLight = new THREE.PointLight('#fff1d6', LOW ? 22 : 32, 22, 1.6); scene.add(roomLight); } roomLight.position.set(r.cx - 3 * SC, FLAT + 2.7, r.cz + 1.5); roomLight.visible = true; if (!LOW) { if (!roomLight2) { roomLight2 = new THREE.PointLight('#fff1d6', 24, 20, 1.6); scene.add(roomLight2); } roomLight2.position.set(r.cx + 3.5 * SC, FLAT + 2.7, r.cz - 2); roomLight2.visible = true; }
-    roomState.inId = h.id; const ow = owners.get(h.id); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); api.markDirty && api.markDirty(); }
+    roomState.inId = h.id; const ow = owners.get(h.id); if (ow && ow.owner && ow.owner !== uid) noteHouse(ow.owner, h.id, 'visit'); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); api.markDirty && api.markDirty(); }
   function goOut() { const h = inside; if (!h) return; standUp(true); tvHide(); if (deco) endDeco(false); inside = null; roomState.box = null; roomState.inId = null; stopRadio(); decB.hidden = true; if (roomLight2) roomLight2.visible = false; const [x, z] = Lw(h, 0, h.d / 2 + 3.2); P.x = x; P.z = z; P.yaw = h.face > 0 ? 0 : Math.PI; P.y = ground(x, z); if (roomLight) roomLight.visible = false; api.markDirty && api.markDirty(); }
 
   // ---------------------------------------------------------------- house radio (homes/{plot}.radio: Spotify/Apple embed or Kemy Radio synced by startedAt)

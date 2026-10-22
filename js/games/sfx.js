@@ -1,11 +1,12 @@
 // Tiny synthesized sound kit (WebAudio, no files). Muted state is remembered per device.
+import { masterVol, sfxVol } from '../volume.js';
 let ctx = null;
 const KEY = 'lks-games-muted';
 export const sfx = {
   get muted() { return localStorage.getItem(KEY) === '1'; },
   set muted(v) { localStorage.setItem(KEY, v ? '1' : '0'); },
   play(name) {
-    if (this.muted) return;
+    if (this.muted || masterVol() <= 0 || sfxVol() <= 0) return;
     try {
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
       if (ctx.state === 'suspended') ctx.resume();
@@ -14,6 +15,7 @@ export const sfx = {
   }
 };
 function tone(c, { f = 440, f2 = null, t = 0.12, type = 'sine', v = 0.18, at = 0 }) {
+  v = Math.max(0.0001, v * sfxVol() * masterVol());
   const o = c.createOscillator(), g = c.createGain(), s = c.currentTime + at;
   o.type = type; o.frequency.setValueAtTime(f, s);
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, s + t);

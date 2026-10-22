@@ -25,6 +25,7 @@ const CSS = `.kc{position:absolute;inset:0;z-index:5;touch-action:none;user-sele
 .kc-gear{position:absolute;top:max(8px,env(safe-area-inset-top));right:58px;z-index:7;width:48px;height:48px;border-radius:50%;border:0;background:rgba(0,0,0,.4);color:#fff;font-size:22px}
 .kc-set,.kc-tut{position:absolute;inset:0;z-index:9;background:rgba(10,5,30,.78);color:#fff;display:flex;align-items:center;justify-content:center;padding:16px}
 .kc-card{background:#2b1d55;border-radius:18px;padding:18px;max-width:380px;width:100%;font:15px system-ui}.kc-card h3{margin:0 0 10px}.kc-card label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0}
+.kc-all{display:flex;align-items:center;justify-content:center;min-height:48px;margin:0 0 12px;border-radius:12px;background:#ffd23f;color:#2b1d55;font-weight:800;text-decoration:none;text-align:center}
 .kc-card button{min-height:48px;border-radius:12px;border:0;padding:0 18px;font-weight:700;background:#ffd23f;color:#2b1d55;font-size:16px}.kc-tut ul{padding-left:20px;line-height:1.7}`;
 export function createControls(host, o = {}) {
   if (!document.getElementById('kc-css')) { const s = document.createElement('style'); s.id = 'kc-css'; s.textContent = CSS; document.head.appendChild(s); }
@@ -78,7 +79,7 @@ export function createControls(host, o = {}) {
   const kbMove = () => { const K = st.keys; const x = (K.has('d') || K.has('ArrowRight') ? 1 : 0) - (K.has('a') || K.has('ArrowLeft') ? 1 : 0), y = (K.has('s') || K.has('ArrowDown') ? 1 : 0) - (K.has('w') || K.has('ArrowUp') ? 1 : 0); const m = Math.hypot(x, y); return m ? { x: x / m, y: y / m, mag: 1, run: K.has('Shift') } : null; };
   // settings
   function settings() { const d = document.createElement('div'); d.className = 'kc-set';
-    d.innerHTML = `<div class="kc-card"><h3>🎮 Controls</h3><label>Button size <input type="range" min="64" max="110" value="${S.size}" data-k="size"></label><label>Look sensitivity <input type="range" min="0.3" max="2.5" step="0.1" value="${S.sens}" data-k="sens"></label>
+    d.innerHTML = `<div class="kc-card"><a class="kc-all" href="#/settings">All Kemy settings</a><h3>🎮 Controls</h3><label>Button size <input type="range" min="64" max="110" value="${S.size}" data-k="size"></label><label>Look sensitivity <input type="range" min="0.3" max="2.5" step="0.1" value="${S.sens}" data-k="sens"></label>
       <label>Control opacity <input type="range" min="0.3" max="1" step="0.05" value="${S.opacity}" data-k="opacity"></label><label>Left-handed (swap sides) <input type="checkbox" ${S.left ? 'checked' : ''} data-k="left"></label><label>Vibration <input type="checkbox" ${S.haptics ? 'checked' : ''} data-k="haptics"></label>
       <div style="display:flex;gap:8px;justify-content:space-between"><button type="button" data-reset>Reset</button><button type="button" data-done>Done</button></div></div>`;
     d.addEventListener('input', (e) => { const k = e.target.dataset.k; if (!k) return; S[k] = e.target.type === 'checkbox' ? e.target.checked : Number(e.target.value); saveSettings(S); apply(); });
