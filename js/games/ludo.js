@@ -174,7 +174,7 @@ export function createLudo(ctx) {
     shell('Ludo', '#/games');
     ui.wireEmotes(main, gid, (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; });
     const tick = setInterval(() => { if (g.status === 'active') { draw(); afk(); } }, 1000);
-    S.unsubs.push(() => { clearInterval(tick); clearTimeout(botT); if (stopHb) stopHb(); clearTimeout(lobby.t); });
+    S.unsubs.push(() => { clearInterval(tick); clearTimeout(botT); stopOffer(gid); if (stopHb) stopHb(); clearTimeout(lobby.t); });
     const roller = () => { const u = g.players[g.lv.turn]; return isBot(u) ? g.host : u; };
     const mover = roller;
 
