@@ -1,4 +1,8 @@
-const CACHE = 'lks-v179';
+// Push handling lives in firebase-messaging-sw.js and is imported here so one worker
+// still does caching, the share target, and notifications. Written by Lone Keem.
+self.__kemyShell = true;
+try { importScripts('./firebase-messaging-sw.js'); } catch (e) { /* push is optional; cache and share-target still work */ }
+const CACHE = 'lks-v180';
 // Small app shell only (other files are cached as they are used); a big precache on every version bump
 // slowed phones down on first open after each update.
 const CORE = [

@@ -698,5 +698,5 @@ export function createModeration(ctx) {
     draw();
   }
 
-  return { aiTag, rolesReady, iAmMod, badge, loadMine, watchReports, watchCounts, totalCount, page, adminSection, isSuspended, suspendedHtml, banDialog, messageDialog, holdOrSet, heldNotice, profileButton, invitePage, watchInvite, holdLivePost, supportPage, feedbackPage, watchMyThread };
+  return { aiTag, rolesReady, iAmMod, badge, loadMine, watchReports, watchCounts, totalCount, page, adminSection, isSuspended, suspendedHtml, banDialog, unban, messageDialog, holdOrSet, heldNotice, profileButton, invitePage, watchInvite, holdLivePost, supportPage, feedbackPage, watchMyThread };
 }

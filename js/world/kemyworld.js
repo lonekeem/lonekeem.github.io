@@ -3,7 +3,7 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
-import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear } from './layout.js';
+import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear } from './layout.js';
 import { attachCities } from './cities.js';
 import { attachMap } from './map.js';
 const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
@@ -12,6 +12,7 @@ import { currentSeason, SEASONS } from '../seasons.js';
 const SEASONS_T = Object.fromEntries(Object.values(SEASONS).filter((x) => x.treat).map((x) => [x.treat.id, x.treat]));
 import { attachHomes } from './homes.js';
 import { attachRespawn } from './respawn.js';
+import { attachHelper } from '../helper/pal.js';
 import { buildCar, poseCar, CAR_IDX, CARS } from './cars.js';
 import { attachDrive } from './drive.js';
 export { worldGround, worldClamp } from './layout.js';
@@ -160,7 +161,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
 
   // ---------------------------------------------------------------- autumn trees (instanced), leaf piles, park corner
   const trees = []; { const r = rng(99); for (const h of OLDH) { if (r() < 0.75) { const s = r() < 0.5 ? -1 : 1; const f = h.face; trees.push({ x: h.x + s * (h.w / 2 + 2), z: h.z + f * (h.d / 2 + 4.4), s: 0.8 + r() * 0.5, c: ['#f97316', '#dc2626', '#facc15', '#84cc16', '#ea580c'][Math.floor(r() * 5)] }); } }
-    for (let i = 0; i < 26 * det; i++) { const x = PARK_CORNER.x0 + 3 + r() * (PARK_CORNER.x1 - PARK_CORNER.x0 - 6), z = PARK_CORNER.z0 + 3 + r() * (PARK_CORNER.z1 - PARK_CORNER.z0 - 6); if (Math.hypot(x - 32, z - 122) < 9 || trees.some((t) => Math.hypot(t.x - x, t.z - z) < 5)) continue; trees.push({ x, z, s: 0.9 + r() * 0.6, c: ['#f97316', '#dc2626', '#facc15', '#b45309'][Math.floor(r() * 4)] }); } }
+    for (let i = 0; i < 26 * det; i++) { const x = PARK_CORNER.x0 + 3 + r() * (PARK_CORNER.x1 - PARK_CORNER.x0 - 6), z = PARK_CORNER.z0 + 3 + r() * (PARK_CORNER.z1 - PARK_CORNER.z0 - 6); if ((x > STATION.x0 - 6 && x < STATION.x1 + 2 && z > STATION.z0 - 4 && z < STATION.z1 + 4) || Math.hypot(x - 32, z - 122) < 9 || trees.some((t) => Math.hypot(t.x - x, t.z - z) < 5)) continue; trees.push({ x, z, s: 0.9 + r() * 0.6, c: ['#f97316', '#dc2626', '#facc15', '#b45309'][Math.floor(r() * 4)] }); } }
   const trunkIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.3, 3, 8), std('#6b4a2f', { r: 0.9 }), trees.length), leafG = new THREE.IcosahedronGeometry(1.7, Q.phone || LOW ? 0 : 1); { const p = leafG.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + Math.sin(p.getX(i) * 3.1 + p.getZ(i) * 2.3) * 0.12; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.85, p.getZ(i) * k); } leafG.computeVertexNormals(); }
   const leafIM = new THREE.InstancedMesh(leafG, std('#fff', { r: 0.8, x: { flatShading: false } }), trees.length * 2), pileIM = new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 10, 6), std('#fff', { r: 1 }), trees.length);
   trees.forEach((t, i) => { tmpM.compose(tv.set(t.x, FLAT + 1.5 * t.s, t.z), tq.identity(), ts.set(t.s, t.s, t.s)); trunkIM.setMatrixAt(i, tmpM); for (let j = 0; j < 2; j++) { tq.setFromAxisAngle(UP, i + j); tmpM.compose(tv.set(t.x + (j ? 0.7 : -0.3) * t.s, FLAT + (3.4 + j * 1.1) * t.s, t.z + (j ? -0.4 : 0.3) * t.s), tq, ts.setScalar(t.s * (j ? 0.75 : 1))); leafIM.setMatrixAt(i * 2 + j, tmpM); leafIM.setColorAt(i * 2 + j, col.set(t.c).offsetHSL(0, 0, j ? 0.05 : 0)); }
@@ -173,7 +174,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     const fl = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.2, 0.4, 8), wood); fl.position.y = 0.2; g.add(fl); box.push({ x0: cx - 3.4, x1: cx + 3.4, z0: cz - 3.4, z1: cz + 3.4, top: y + 0.4, bot: -99 });
     for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3, 8), wood); p.position.set(Math.cos(a) * 3.7, 1.9, Math.sin(a) * 3.7); g.add(p); cyl.push({ x: cx + Math.cos(a) * 3.7, z: cz + Math.sin(a) * 3.7, r: 0.15, top: 99 }); }
     const rf = new THREE.Mesh(new THREE.ConeGeometry(4.8, 2.2, 8), purple); rf.position.y = 4.5; g.add(rf); g.traverse((o) => { if (o.isMesh) { o.castShadow = !LOW; o.receiveShadow = true; } });
-    const rr = rng(5); for (let i = 0; i < 22 * det; i++) { const a = rr() * TAU, d = 6 + rr() * 6; addPumpkin({ x: cx + Math.cos(a) * d, z: cz + Math.sin(a) * d, s: 0.45 + rr() * 0.9, ry: rr() * TAU }); } }
+    const rr = rng(5); for (let i = 0; i < 22 * det; i++) { const a = rr() * TAU, d = 6 + rr() * 6; const px = cx + Math.cos(a) * d, pz = cz + Math.sin(a) * d; if (px > STATION.x0 - 6 && px < STATION.x1 + 2 && pz > STATION.z0 - 4 && pz < STATION.z1 + 4) continue; addPumpkin({ x: px, z: pz, s: 0.45 + rr() * 0.9, ry: rr() * TAU }); } }
   // ---------------------------------------------------------------- the Kemy Street gate (Pal Park side) + a sign back to the park
   function signTex(text, bg = '#2b1d55', fg = '#ffd23f') { const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 192; const x = cv.getContext('2d'); x.fillStyle = bg; x.beginPath(); x.roundRect(8, 8, 1008, 176, 60); x.fill(); x.strokeStyle = '#ff8a1f'; x.lineWidth = 10; x.stroke(); x.fillStyle = fg; x.font = '900 104px Inter, Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 512, 104); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t; }
   const gate = new THREE.Group(); gate.position.set(GATE.x, FLAT, GATE.z); root.add(gate);
@@ -185,6 +186,34 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     gate.traverse((o) => { if (o.isMesh) o.castShadow = !LOW; }); }
   // street name signs
   for (const [x, z, t] of [[-61, 103, 'Pumpkin Lane'], [61, 103, 'Lantern Way'], [3, 148, 'Candy Court'], [-61, 142, 'Moonbeam Ave']]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.6), new THREE.MeshBasicMaterial({ map: signTex(t, '#14532d', '#ffffff'), side: THREE.DoubleSide })); s.position.set(x, FLAT + 3.2, z); root.add(s); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), std('#4b5563')); p.position.set(x, FLAT + 1.6, z); root.add(p); cyl.push({ x, z, r: 0.08, top: 99 }); }
+
+  // Kemy Patrol station: an open lobby on Kemy Street. Cars park in the lot. The desk opens a report.
+  { const y = FLAT; const g = new THREE.Group(); g.name = 'kemy-station'; townG._street.add(g);
+    const basic = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra));
+    const navy = basic('#1e3a5f'), deep = basic('#0f2744'), white = basic('#f8fafc'), gold = basic('#f5c542');
+    const glass = basic('#dbeafe', { transparent: true, opacity: 0.55 });
+    const boxM = (w, h, d, mat, x, yy, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, yy, z); m.castShadow = !LOW; m.receiveShadow = true; g.add(m); return m; };
+    boxM(STATION.x1 - STATION.x0 - 0.5, 0.08, STATION.z1 - STATION.z0 - 0.5, white, (STATION.x0 + STATION.x1) / 2, y + 0.05, (STATION.z0 + STATION.z1) / 2);
+    boxM(5.2, 0.04, 14, std('#cbd5e1', { r: 0.85 }), 6.4, y + 0.03, 122);
+    for (const zz of [117.2, 126.2]) { boxM(0.08, 0.02, 3.1, white, 5.2, y + 0.06, zz); boxM(0.08, 0.02, 3.1, white, 7.6, y + 0.06, zz); }
+    const wall = (x0, x1, z0, z1, h) => { box.push({ x0, x1, z0, z1, top: y + h, bot: -99 }); boxM(x1 - x0, h, z1 - z0, navy, (x0 + x1) / 2, y + h / 2, (z0 + z1) / 2); };
+    wall(9, 9.42, 116, 120.35, 3.35); wall(9, 9.42, 123.65, 128, 3.35);
+    wall(9, 23, 116, 116.42, 3.35); wall(9, 23, 127.58, 128, 3.35); wall(22.58, 23, 116, 128, 3.35);
+    boxM(14.4, 0.28, 12.4, deep, 16, y + 3.5, 122);
+    boxM(0.5, 3.5, 0.5, white, 9.1, y + 1.75, 120.2); boxM(0.5, 3.5, 0.5, white, 9.1, y + 1.75, 123.8);
+    boxM(3.4, 0.18, 0.5, gold, 9.15, y + 3.15, 122);
+    for (const wz of [118.2, 125.8]) boxM(0.08, 1.15, 1.6, glass, 8.82, y + 1.85, wz);
+    boxM(1.7, 1.1, 0.08, glass, 16, y + 1.9, 115.85); boxM(1.7, 1.1, 0.08, glass, 16, y + 1.9, 128.15);
+    const starSh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r0 = i % 2 ? 0.42 : 1; const sx = Math.cos(a) * r0, sy = Math.sin(a) * r0; if (i) starSh.lineTo(sx, sy); else starSh.moveTo(sx, sy); }
+    const star = new THREE.Mesh(new THREE.ExtrudeGeometry(starSh, { depth: 0.18, bevelEnabled: false }), gold); star.scale.setScalar(0.42); star.position.set(8.7, y + 2.15, 118.2); star.rotation.y = -Math.PI / 2; g.add(star);
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.62), new THREE.MeshBasicMaterial({ map: signTex('KEMY PATROL', '#0f2744', '#f5c542'), transparent: true })); board.position.set(8.82, y + 2.55, 122); board.rotation.y = -Math.PI / 2; g.add(board);
+    boxM(2.4, 1.05, 0.7, white, 20.9, y + 0.55, 122);
+    box.push({ x0: 19.7, x1: 22.1, z0: 121.2, z1: 122.8, top: y + 1.1, bot: -99 });
+    const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 256; const gx = cv.getContext('2d'); gx.fillStyle = '#f8fafc'; gx.fillRect(0, 0, 1024, 256); gx.fillStyle = '#1e3a5f'; gx.font = '800 92px Inter, Arial, sans-serif'; gx.textAlign = 'center'; gx.textBaseline = 'middle'; gx.fillText('Report a Problem', 512, 128);
+    const deskMap = new THREE.CanvasTexture(cv); deskMap.colorSpace = THREE.SRGBColorSpace;
+    const deskSign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.46), new THREE.MeshBasicMaterial({ map: deskMap })); deskSign.position.set(20.5, y + 1.2, 122); deskSign.rotation.y = -Math.PI / 2; g.add(deskSign);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: '#fde68a' })); lamp.position.set(16, y + 3.2, 122); g.add(lamp);
+  }
 
   // ---------------------------------------------------------------- seasons (js/seasons.js): Halloween decor only in October, other holidays reuse
   // the same spots (pumpkin places, string-light bulbs, the arch banner) with one instanced prop set + light colours
@@ -292,15 +321,19 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   function giveCandy(i) { const d = doors[i]; const c = HW ? CANDY[Math.floor(Math.random() * CANDY.length)] : SEA.treat; const n = 1 + Math.floor(Math.random() * 3); bag[c.id] = (bag[c.id] | 0) + n; lss(BK, JSON.stringify(bag)); paintBag();
     kn.at[d.h.id] = Date.now(); let coins = 0; if (kn.n < KNOCK_DAY_CAP) { kn.n++; coins = KNOCK_COINS; dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: KNOCK_COINS, why: HW ? 'for trick-or-treating' : 'for visiting neighbors' } })); }
     for (const k of Object.keys(kn.at)) if (Date.now() - kn.at[k] > KNOCK_CD_MS) delete kn.at[k]; kn.at[d.h.id] = Date.now(); lss(KK, JSON.stringify(kn));
-    const GR2 = HW ? GREET : SEA.greet; say(`${GR2[Math.floor(Math.random() * GR2.length)]}\n+${n} ${c.e} ${c.name}${coins ? ` · +${coins} ⭐ Star Coins` : ' · (daily coin limit reached, candy only)'}`); window.__kw && (window.__kw.knocks = (window.__kw.knocks || 0) + 1); }
+    const GR2 = HW ? GREET : SEA.greet; say(`${GR2[Math.floor(Math.random() * GR2.length)]}\n+${n} ${c.e} ${c.name}${coins ? ` · +${coins} ⭐ Star Coins` : ' · (daily coin limit reached, candy only)'}`); window.__kw && (window.__kw.knocks = (window.__kw.knocks || 0) + 1); try { dispatchEvent(new CustomEvent('kemy:house-ring', { detail: { plot: d.h.id } })); } catch { /* */ } }
   const placeAct = () => { const c = document.querySelector('.kc-btns'); if (!c) return; const r = c.getBoundingClientRect(); if (!r.height) return; const H = hud.getBoundingClientRect(); const lh = !!document.querySelector('.kc.lh'); const bs = [...c.querySelectorAll('.kc-b')]; const low = bs.length > 3 ? bs[bs.length - 1].getBoundingClientRect() : null; if (low && H.height > H.width && r.top - H.top < H.height * 0.7) { /* narrow phone: cluster reaches the Pal, so sit beside the lone bottom-row button instead */ actB.style.bottom = Math.round(H.bottom - (low.top + low.bottom) / 2 - 22) + 'px'; if (lh) { actB.style.right = 'auto'; actB.style.left = Math.round(low.right - H.left + 10) + 'px'; } else { actB.style.left = 'auto'; actB.style.right = Math.round(H.right - low.left + 10) + 'px'; } return; } actB.style.bottom = Math.round(H.bottom - r.top + 10) + 'px'; if (lh) { actB.style.right = 'auto'; actB.style.left = Math.round(r.left - H.left) + 'px'; } else { actB.style.left = 'auto'; actB.style.right = Math.round(H.right - r.right) + 'px'; } };
   addEventListener('resize', placeAct);
-  actB.onclick = () => { const a = actB.dataset.a; if (a && /^k\d+$/.test(a)) knock(+a.slice(1)); else if (api.onAction) api.onAction(a); };
+  actB.onclick = () => { const a = actB.dataset.a; if (a === 'kst') { if (window.kemyModReport) window.kemyModReport({ targetType: 'world', targetId: 'kemy-station', name: 'a problem' }); else say('Tell a Kemy Patrol helper and they will pass it on.'); } else if (a && /^k\d+$/.test(a)) knock(+a.slice(1)); else if (api.onAction) api.onAction(a); };
   // tags for bots
-  function tag(o, text, x, y, z) { if (!o.tagEl) { o.tagEl = document.createElement('div'); o.tagEl.className = 'ks-tag'; o.tagEl.textContent = text; tagsEl.appendChild(o.tagEl); o.bubEl = document.createElement('div'); o.bubEl.className = 'ks-bub'; o.bubEl.hidden = true; tagsEl.appendChild(o.bubEl); }
-    tv.set(x, y, z).project(api.cam); const vis = tv.z < 1 && Math.abs(tv.x) < 1.05 && Math.abs(tv.y) < 1.05; o.tagEl.style.display = vis ? '' : 'none'; if (!vis) { o.bubEl.hidden = true; return; }
-    const w = view.clientWidth, h = view.clientHeight, px = (tv.x + 1) / 2 * w, py = (1 - tv.y) / 2 * h; o.tagEl.style.transform = `translate(${px.toFixed(0)}px,${py.toFixed(0)}px) translate(-50%,-100%)`;
-    const show = o.say && Date.now() - o.sayAt < 5000; o.bubEl.hidden = !show; if (show) { if (o.bubEl.textContent !== o.say) o.bubEl.textContent = o.say; o.bubEl.style.transform = `translate(${px.toFixed(0)}px,${(py - 22).toFixed(0)}px) translate(-50%,-100%)`; } }
+  function tag(o, text, x, y, z) {
+    if (!o.tagEl) { o.tagEl = document.createElement('div'); o.tagEl.className = 'ks-tag'; o.tagEl.dataset.n = text; o.tagEl.textContent = text; tagsEl.appendChild(o.tagEl); o.bubEl = document.createElement('div'); o.bubEl.className = 'ks-bub'; o.bubEl.hidden = true; tagsEl.appendChild(o.bubEl); }
+    else if (o.tagEl.dataset.n !== text) { o.tagEl.dataset.n = text; o.tagEl.textContent = text; }
+    tv.set(x, y, z).project(api.cam); const vis = tv.z < 1 && Math.abs(tv.x) < 1.05 && Math.abs(tv.y) < 1.05;
+    const disp = vis ? '' : 'none'; if (o.tagEl.style.display !== disp) o.tagEl.style.display = disp; if (!vis) { if (!o.bubEl.hidden) o.bubEl.hidden = true; return; }
+    const w = view.clientWidth, h = view.clientHeight, px = (tv.x + 1) / 2 * w, py = (1 - tv.y) / 2 * h;
+    const tf = `translate(${px.toFixed(0)}px,${py.toFixed(0)}px) translate(-50%,-100%)`; if (o.tagEl.style.transform !== tf) o.tagEl.style.transform = tf;
+    const show = o.say && Date.now() - o.sayAt < 5000; if (o.bubEl.hidden !== !show) o.bubEl.hidden = !show; if (show) { if (o.bubEl.textContent !== o.say) o.bubEl.textContent = o.say; const bf = `translate(${px.toFixed(0)}px,${(py - 22).toFixed(0)}px) translate(-50%,-100%)`; if (o.bubEl.style.transform !== bf) o.bubEl.style.transform = bf; } }
   const hideTag = (o) => { if (o.tagEl) { o.tagEl.style.display = 'none'; o.bubEl.hidden = true; } };
   const BOTSAY = ['Trick or treat! 🎃', 'Love your costume!', 'Want to trade candy? 🍬', 'Wheee!', 'Happy Halloween!', 'Let’s go to the gazebo!', 'My bag is so full 😄', 'Boo! 👻 hehe'];
 
@@ -353,7 +386,8 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     // doors + knocking
     let best = -1, bd = 2.6; if (!api.driving || !api.driving()) for (let i = 0; i < doors.length; i++) { const d = doors[i]; const dd = Math.hypot(d.x - P.x, d.z - P.z); if (dd < bd) { bd = dd; best = i; } }
     const lockedHouse = (i) => api.houseLocked && api.houseLocked(doors[i].h.id);
-    if (!knockAt) { if (actB.hidden) placeAct(); const extra = api.prompt && api.prompt(); if (extra) { actB.hidden = false; actB.textContent = extra.label; actB.dataset.a = extra.id; } else if (best >= 0 && !lockedHouse(best)) { actB.hidden = false; actB.textContent = '🚪 Knock'; actB.dataset.a = 'k' + best; } else actB.hidden = true; }
+    const atDesk = P.x > 16.2 && P.x < 20.2 && Math.abs(P.z - STATION.desk[1]) < 1.3 && Math.abs((P.y || 0) - FLAT) < 2;
+    if (!knockAt) { if (actB.hidden) placeAct(); const extra = api.prompt && api.prompt(); if (atDesk) { actB.hidden = false; actB.textContent = 'Report a Problem'; actB.dataset.a = 'kst'; } else if (extra) { actB.hidden = false; actB.textContent = extra.label; actB.dataset.a = extra.id; } else if (best >= 0 && !lockedHouse(best)) { actB.hidden = false; actB.textContent = '🚪 Knock'; actB.dataset.a = 'k' + best; } else actB.hidden = true; }
     for (let i = 0; i < doors.length; i++) { const d = doors[i]; if (Math.abs(d.a - d.want) > 0.001) { d.a += clamp(d.want - d.a, -dt * 1.6, dt * 1.6); poseDoor(i); doorM.instanceMatrix.needsUpdate = true; } }
     if (knockAt) { knockAt.t += dt; const d = doors[knockAt.i]; const fx = Math.sin(d.ry), fz = Math.cos(d.ry);
       if (host) { host.visible = knockAt.t > 0.6; host.position.set(d.x - fx * 0.6 + fx * Math.min(0.9, (knockAt.t - 0.6) * 1.2), FLAT + 0.42, d.z - fz * 0.6 + fz * Math.min(0.9, (knockAt.t - 0.6) * 1.2)); host.rotation.y = d.ry; host.userData.t = (host.userData.t || 0) + dt * 60; api.posePal3D(host.userData.m, { mode: 'idle', t: host.userData.t, dt60: dt * 60, dance3d: knockAt.t > 1.2 ? 'wave' : '', beat: tt * 2, amt: 1 }); }
@@ -365,14 +399,15 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   function spawnStreet() { P.x = GATE.x + (Math.random() - 0.5) * 3; P.z = GATE.z + 6 + Math.random() * 3; P.yaw = 0; P.y = ground(P.x, P.z); }
   function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
-  const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
+  const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, loopAt, move: (m) => m, driving: () => false };
   const D = attachDrive(api, W); W.drive = D;
   const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
   const Rs = attachRespawn(api, W);
+  const Kh = attachHelper(api, W);
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat }); const Mp = attachMap(api, W);
-  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Mp.update(dt, now); Rs.update(dt); update(dt, now); };
-  W.destroy = () => { for (const x of [D, E, Ci, Hm, Mp, Rs]) try { x.destroy(); } catch { /* */ } destroy(); };
+  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
+  W.destroy = () => { for (const x of [D, E, Ci, Hm, Mp, Rs, Kh]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];

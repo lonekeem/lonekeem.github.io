@@ -221,15 +221,11 @@ export function search(p, { depth = 3, ms = 800, noise = 0, rand = Math.random }
   }
   return { move: bestMove, score: bestScore, nodes };
 }
-const LEVELS = { easy: { depth: 1, ms: 200, noise: 260 }, medium: { depth: 2, ms: 500, noise: 40 }, hard: { depth: 5, ms: 1200, noise: 0 } };
+const LEVELS = { easy: { depth: 1, ms: 200, noise: 260 }, medium: { depth: 2, ms: 500, noise: 40 }, hard: { depth: 4, ms: 900, noise: 0 }, expert: { depth: 6, ms: 1400, noise: 0 } };
 export function aiMove(board, cx, lvl = 'medium', rand = Math.random) {
   const p = parse(board, cx); const L = LEVELS[lvl] || LEVELS.medium;
   const ms = legal(p); if (!ms.length) return null;
   if (lvl === 'easy' && rand() < 0.25) return moveStr(ms[Math.floor(rand() * ms.length)]);
   const r = search(p, { ...L, rand });
   return r && moveStr(r.move);
-}
-// module worker entry
-if (typeof self !== 'undefined' && typeof window === 'undefined' && typeof self.postMessage === 'function') {
-  self.onmessage = (e) => { const { board, cx, lvl, id } = e.data; self.postMessage({ id, move: aiMove(board, cx, lvl) }); };
 }

@@ -10,23 +10,30 @@ import { createStarCards } from './starcards.js';
 import { createPool } from './pool.js';
 import { createChess } from './chess.js';
 import { createLudo } from './ludo.js';
+import { lastMode, saveMode, lastLevel, saveLevel, PALS, faceSvg, ask, whenOffer, offerHtml, stopOffer, addBotRecord, botRecords, onlyBots, normLevel, COIN_ONLINE, COIN_BOT } from './bots.js';
+import { bindProfiles, syncPlates } from './plates.js';
 
 export { CONTROLLER };
-const CPU_KEY = 'lks-games-cpu';
 
 export function createGames(ctx) {
   const { S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale } = ctx;
+  bindProfiles(ctx.getProfile);
   if (!document.getElementById('games-css')) {
-    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=1'; document.head.appendChild(l);
+    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=3'; document.head.appendChild(l);
   }
   const net = createNet({ db, S });
   const signedIn = () => !!(S.user && S.profile);
   const myUid = () => (S.user ? S.user.uid : '');
   const link = (gid) => `${location.origin}${location.pathname}#game/${gid}`;
-  const cpuRec = () => { try { return JSON.parse(localStorage.getItem(CPU_KEY) || '{}'); } catch { return {}; } };
-  function addCpuResult(type, r) { const all = cpuRec(); const x = all[type] || { w: 0, l: 0, d: 0 }; x[r]++; all[type] = x; localStorage.setItem(CPU_KEY, JSON.stringify(all)); }
+  const cpuRec = () => botRecords();
+  const addCpuResult = (type, r) => addBotRecord(type, r);
   const qs = (s) => Object.fromEntries(new URLSearchParams(s || ''));
-  const chip = (p, extra = '') => `<div class="gp ${extra}">${p.uid && !isBot(p.uid) && p.uname ? avatar({ uid: p.uid, displayName: p.name, username: p.uname, color: p.color }, 'sm', false) : `<span class="avatar sm gp-bot" style="--c:#3b2466" aria-hidden="true">${CONTROLLER}</span>`}<span class="gp-n">${esc(p.name)}${p.uid && !isBot(p.uid) ? (window.kemyModBadge ? window.kemyModBadge(p.uid) : '') : ''}</span></div>`;
+  const chip = (p, extra = '') => {
+    const bot = isBot(p.uid) || p.bot;
+    const face = bot ? `<span class="avatar sm gp-bot" style="--c:#3b2466" aria-hidden="true">${faceSvg(p.name, 28)}</span>` : (p.uid && p.uname ? avatar({ uid: p.uid, displayName: p.name, username: p.uname, color: p.color }, 'sm', false) : `<span class="avatar sm gp-bot" style="--c:#3b2466" aria-hidden="true">${CONTROLLER}</span>`);
+    return `<div class="gp ${extra}">${face}<span class="gp-n">${esc(p.name)}${bot ? '<i class="bot-tag">Bot</i>' : (p.uid ? (window.kemyModBadge ? window.kemyModBadge(p.uid) : '') : '')}</span></div>`;
+  };
+  const gearBtn = () => `<a class="g-icon g-gear" href="#/settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>`;
   const muteBtn = () => `<button class="g-icon" data-g="mute" aria-pressed="${sfx.muted}" aria-label="${sfx.muted ? 'Turn sound on' : 'Mute sound'}">${sfx.muted ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.6 9a4.2 4.2 0 0 1 0 6M18.4 6.4a8 8 0 0 1 0 11.2"/></svg>'}</button>`;
   function wireMute(root) {
     root.querySelectorAll('[data-g=mute]').forEach((b) => b.onclick = () => {
@@ -35,8 +42,9 @@ export function createGames(ctx) {
   }
   function shell(title, body, back = '#/games') {
     main.innerHTML = `<section class="gm-wrap">
-      <div class="gm-bar"><a class="g-icon" href="${back}" aria-label="Back">←</a><h1>${title}</h1><span class="spacer"></span>${muteBtn()}</div>${body}</section>`;
+      <div class="gm-bar"><a class="g-icon" href="${back}" aria-label="Back">←</a><h1>${title}</h1><div class="g-tools"><span class="k-link-slot"></span>${muteBtn()}${gearBtn()}</div></div>${body}</section>`;
     wireMute(main);
+    net.link.mount(main.querySelector('.k-link-slot'));
   }
   function burst(host, n = 14) {
     if (!host) return;
@@ -70,14 +78,14 @@ export function createGames(ctx) {
     if (gid) S.unsubs.push(net.watchChat(gid, (m) => { if (m.uid === myUid()) return; if (m.e >= 100) { ge && ge.recv(m.uid, m.e, names(m.uid) || 'Player'); return; } floatEmote(host, m.e, names(m.uid)); }));
   }
   let curType = '', curPlayers = null;
-  function resultModal({ title, sub, win, buttons, pts, spectator }) {
+  function resultModal({ title, sub, win, buttons, pts, spectator, vsBot }) {
     openModal(`<div class="g-result ${win ? 'win' : ''}"><div class="g-result-star">${STAR()}</div><h2>${esc(title)}</h2><p>${esc(sub || '')}</p>
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
     const m = document.querySelector('.modal');
     buttons.forEach((b, i) => { if (b.onClick) { const el = m.querySelector(`[data-i="${i}"]`); if (el) el.onclick = () => { closeModal(); b.onClick(); }; } });
     const lbBtn = document.createElement('a'); lbBtn.className = 'btn btn-ghost lb-btn'; lbBtn.href = '#/scores/' + (curType || 'all'); lbBtn.textContent = '🏆 Scoreboard'; lbBtn.dataset.close = ''; m.querySelector('.btns')?.appendChild(lbBtn);
-    if (curType && signedIn() && !spectator && (!curPlayers || curPlayers.includes(myUid())) && !/^Game cancelled/i.test(title)) recordAndShow(curType, { r: win ? 'w' : /^Draw/i.test(title) ? 'd' : 'l', pts });
-    if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 25 } })); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: 20, why: 'for winning' } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
+    if (!vsBot && curType && signedIn() && !spectator && (!curPlayers || curPlayers.includes(myUid())) && !/^Game cancelled/i.test(title)) recordAndShow(curType, { r: win ? 'w' : /^Draw/i.test(title) ? 'd' : 'l', pts });
+    if (win) { burst(m, 18); sfx.play('win'); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: vsBot ? 12 : 25 } })); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: vsBot ? COIN_BOT : COIN_ONLINE, why: vsBot ? 'for beating a bot' : 'for winning' } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
   }
   const ui = { shell, chip, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
   const trivia = createTrivia({ ...ctx, ui });
@@ -90,6 +98,7 @@ export function createGames(ctx) {
   async function hub(token) {
     const rec = cpuRec();
     main.innerHTML = `<section class="gm-wrap">
+      <a class="wn-hub" href="#/updates"><span aria-hidden="true">✨</span><span><b>What's New</b><small>See everything new in Kemy</small></span><span class="wn-dot" data-wn-dot hidden></span></a>
       <a class="zf-hero ks-hero" href="#/street" aria-label="Visit Kemy Street: a Halloween trick-or-treat neighborhood in Pal Park" style="background:radial-gradient(120% 90% at 85% 15%,#7a4fb0 0,#3b2470 45%,#140c2e 100%);border-color:rgba(255,138,31,.6)"><span class="zf-badge">🎃 New World · Kemy Street</span><svg class="zf-zom" viewBox="0 0 120 130" aria-hidden="true"><circle cx="92" cy="22" r="12" fill="#fff8e1"/><path d="M14 72 L42 50 L70 72 V118 H14Z" fill="#f3d1dc"/><path d="M8 74 L42 44 L76 74" fill="none" stroke="#5b3a7a" stroke-width="8" stroke-linejoin="round"/><rect x="34" y="92" width="14" height="26" rx="2" fill="#8a3ffc"/><rect x="20" y="80" width="10" height="9" fill="#ffd27a"/><rect x="54" y="80" width="10" height="9" fill="#ffd27a"/><g><ellipse cx="92" cy="108" rx="20" ry="16" fill="#ff8a1f"/><path d="M84 102 l4 -6 l4 6z M96 102 l4 -6 l4 6z" fill="#ffe08a"/><path d="M82 110 q10 9 20 0" stroke="#ffe08a" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="90" y="88" width="4" height="7" fill="#4d7c0f"/></g></svg>
         <span class="zf-txt"><b>Kemy Street</b><small>Trick-or-treat a big friendly neighborhood: knock on doors for candy + Star Coins, ride past the cartoon cars, hang out with up to 30 friends. Walk there from Pal Park too!</small><span class="zf-play" style="background:#ff8a1f;color:#2b1d55">▶ Visit</span></span></a>
       <nav class="ks-worlds" aria-label="Pick a world" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px"><a class="g-qbtn" href="#/park" style="flex:1">🌳 Pal Park</a><a class="g-qbtn" href="#/street" style="flex:1">🎃 Kemy Street</a><span class="g-qbtn" style="flex:1;opacity:.6" aria-disabled="true">✨ More worlds soon</span></nav>
@@ -97,7 +106,7 @@ export function createGames(ctx) {
       <a class="cs-hero" href="#/arcade/show" aria-label="Play the Kemy Challenge Show"><span class="zf-badge">🆕 New · up to 30 players</span><svg class="cs-sun" viewBox="0 0 120 150" aria-hidden="true"><rect x="55" y="70" width="10" height="80" rx="5" fill="#4caf50"/><ellipse cx="38" cy="112" rx="18" ry="7" fill="#5cc85c" transform="rotate(-25 38 112)"/><g fill="#ffd23f" stroke="#e7a92b" stroke-width="2">${Array.from({ length: 14 }, (_, i) => `<ellipse cx="60" cy="22" rx="9" ry="20" transform="rotate(${i * 360 / 14} 60 60)"/>`).join('')}</g><circle cx="60" cy="60" r="27" fill="#b07a3e"/><circle cx="50" cy="55" r="6" fill="#7dffb0"/><circle cx="70" cy="55" r="6" fill="#7dffb0"/><path d="M48 70 Q60 80 72 70" stroke="#3a2010" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
         <span class="zf-txt"><b>Kemy Challenge Show</b><small>Freeze Dash 🌻 · Cookie Carve 🍪 · Tug Splash 🪢 · Bubble Bridge 🫧 · Bumper Summit 👑. Last Pal standing wins!</small><span class="zf-play cs-play">▶ Play</span></span></a>
       <a class="zf-hero" href="#/arcade/zombie" aria-label="Play Pal Zombie Survival"><span class="zf-badge">⭐ Featured Game</span><svg class="zf-zom" viewBox="0 0 120 130" aria-hidden="true"><g stroke="#1d3b14" stroke-width="3" stroke-linejoin="round"><path d="M10 70 L48 64 L48 76 L12 82Z" fill="#8fd16a"/><ellipse cx="62" cy="96" rx="30" ry="30" fill="#7cc35a"/><rect x="40" y="88" width="44" height="34" rx="10" fill="#6a4fc4"/><path d="M50 92 l10 0 M70 104 l10 0" stroke="#a99be8"/><circle cx="62" cy="48" r="32" fill="#8fd16a"/><path d="M18 58 L50 54 L50 66 L20 72Z" fill="#8fd16a"/></g><circle cx="50" cy="44" r="10" fill="#fff" stroke="#1d3b14" stroke-width="3"/><circle cx="76" cy="40" r="7" fill="#fff" stroke="#1d3b14" stroke-width="3"/><circle cx="52" cy="46" r="4" fill="#222"/><circle cx="75" cy="42" r="3" fill="#222"/><path d="M48 62 q14 10 28 0" fill="#3a1a1a" stroke="#1d3b14" stroke-width="3"/><path d="M60 66 q4 10 9 2" fill="#ff8fb1" stroke="#1d3b14" stroke-width="2"/><path d="M70 22 l6 -8 M74 24 l10 -4" stroke="#1d3b14" stroke-width="3" stroke-linecap="round"/><path d="M36 30 l8 6 M40 26 l2 8" stroke="#5a3a2a" stroke-width="2.4"/></svg><img class="zf-pal" src="assets/featured/pal-bear.webp" alt="" width="215" height="187"><div class="zf-txt"><b>Pal Zombie Survival</b><small>Team up with your Pal and splat goofy zombies with bubble blasters!</small><span class="zf-play">▶ Play</span></div></a><a class="zf-arcade" href="#/arcade">🕹️ Open the Arcade <span aria-hidden="true">›</span></a>
-      <div class="g-hero"><span class="g-hero-ic">${CONTROLLER}</span><div><h1>Games</h1><p class="muted">Free, turn-based and made by the studio. Play friends, get matched, or take on the computer.</p></div>${muteBtn()}</div>
+      <div class="g-hero"><span class="g-hero-ic">${CONTROLLER}</span><div><h1>Games</h1><p class="muted">Free, turn-based and made by the studio. Play friends, get matched, or take on the computer.</p></div><div class="g-tools">${muteBtn()}${gearBtn()}</div></div>
       <div class="g-quick">
         <a class="g-qbtn" href="#/games/pick/friend"><span>${STAR()}</span>Play a friend</a>
         <a class="g-qbtn" href="#/games/pick/quick"><span>${CONTROLLER}</span>Quick match</a>
@@ -114,6 +123,7 @@ export function createGames(ctx) {
       <div class="card" id="g-lb"><div class="spinner"></div></div>
     </section>`;
     window.kemyDonate?.mountSlim(document.getElementById('g-donate'), 'Love Kemy games? Help Lone Keem Studios make Kemy even better.');
+    import('../updates.js').then((m) => m.paintDots()).catch(() => {});
     wireMute(main);
     $('#g-code').onsubmit = (e) => { e.preventDefault(); const c = $('#g-code-in').value.trim().toUpperCase(); if (/^[A-Z0-9]{6}$/.test(c)) location.hash = '#/game/' + c; else toast('Room codes are 6 letters and numbers'); };
     const recRow = (id, on, off) => `<div class="g-rec-row"><b>${esc(gameName(id))}</b><span>${on ? `<i class="w">${on.w}W</i> <i class="l">${on.l}L</i>${on.d ? ` <i>${on.d}D</i>` : ''}` : '<span class="muted">-</span>'}</span><span class="muted small">${off ? `vs computer ${off.w}-${off.l}${off.d ? '-' + off.d : ''}` : ''}</span></div>`;
@@ -146,51 +156,71 @@ export function createGames(ctx) {
     if (!g) { main.innerHTML = '<div class="empty">Game not found. <a href="#/games">Games</a></div>'; return; }
     const room = type === 'trivia' || type === 'starcards' || type === 'ludo';
     const modes = type === 'klgrid' ? [['classic', 'Classic 3x3'], ['ultimate', 'Ultimate 9x9']] : type === 'starcards' ? [['500', 'Play to 500'], ['round', 'Single round']] : type === 'chess' ? [['', '60s a move'], ['5', '5 min clock'], ['10', '10 min clock']] : type === 'ludo' ? [['4', '4 seats'], ['3', '3 seats'], ['2', '2 seats']] : null;
+    const picked = params.do === 'quick' ? 'online' : params.do === 'friend' || params.do === 'cpu' ? params.do : lastMode();
+    let how = picked === 'online' || picked === 'friend' || picked === 'cpu' ? picked : 'cpu';
     shell(esc(g.name), `
       <div class="g-detail">${COVERS[type]}<p class="muted">${esc(g.blurb)} <span class="g-tag">${esc(g.players)}</span></p></div>
-      ${modes ? `<div class="g-seg" role="radiogroup" aria-label="Mode">${modes.map(([v, l], i) => `<label><input type="radio" name="g-mode" value="${v}" ${i ? '' : 'checked'}><span>${l}</span></label>`).join('')}</div>` : ''}
-      <div class="g-opts">
-        <section class="card pad g-opt ${params.do === 'friend' ? 'hl' : ''}"><h2>${STAR()} Play a friend</h2>
-          <form id="g-inv" class="g-inline"><label for="g-handle" class="sr-only">Friend's @handle</label><input id="g-handle" placeholder="@handle" autocapitalize="none" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Invite</button></form>
-          <p class="muted small">They get a notification. Or <button class="link-btn" id="g-link">${room ? 'open a room' : 'make a game'} and share the link</button>.</p></section>
-        <section class="card pad g-opt ${params.do === 'quick' ? 'hl' : ''}"><h2>${CONTROLLER} Quick match</h2><p class="muted small">We pair you with whoever’s looking right now.</p><button class="btn btn-block" id="g-quick">Find a match</button></section>
-        <section class="card pad g-opt ${params.do === 'cpu' ? 'hl' : ''}"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01"/></svg> Play the computer</h2>
-          ${type === 'starcards' ? `<label class="small muted g-inline-l">Computer players <select id="g-bots">${[1, 2, 3, 4, 5].map((n) => `<option ${n === 3 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}
-          <div class="g-two">${['pool', 'chess', 'ludo'].includes(type) ? '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn btn-ghost" data-lvl="medium" href="#">Medium</a><a class="btn" data-lvl="hard" href="#">Hard</a>' : '<a class="btn btn-ghost" data-lvl="easy" href="#">Easy</a><a class="btn" data-lvl="hard" href="#">Hard</a>'}</div><p class="muted small">No account needed.</p></section>
+      ${modes ? `<div class="g-seg" role="radiogroup" aria-label="Rules">${modes.map(([v, l], i) => `<label><input type="radio" name="g-mode" value="${v}" ${i ? '' : 'checked'}><span>${l}</span></label>`).join('')}</div>` : ''}
+      <div class="g-modes" role="tablist" aria-label="How to play">
+        <button type="button" data-how="cpu" aria-pressed="${how === 'cpu'}">Play vs Computer</button>
+        <button type="button" data-how="online" aria-pressed="${how === 'online'}">Play Online (real players)</button>
+        <button type="button" data-how="friend" aria-pressed="${how === 'friend'}">Play a Friend</button>
       </div>
+      <div id="g-how"></div>
       <h2 class="g-h2">Top players</h2><div class="card" id="g-lb"><div class="spinner"></div></div>`, '#/games');
     const mode = () => document.querySelector('input[name=g-mode]:checked')?.value || '';
-    main.querySelectorAll('[data-lvl]').forEach((a) => a.onclick = (e) => {
-      e.preventDefault();
-      const extra = type === 'starcards' ? `&bots=${$('#g-bots').value}` : '';
-      location.hash = `#/games/${type}/cpu?lvl=${a.dataset.lvl}&mode=${mode()}${extra}`;
-    });
-    const busy = (b, on, t) => { b.disabled = on; if (t) b.textContent = t; };
-    $('#g-quick').onclick = async () => {
-      if (!requireAuth()) return;
-      const b = $('#g-quick'); busy(b, true, 'Looking…');
-      try { const gid = await net.quickMatch(type, mode()); location.hash = '#/game/' + gid; }
-      catch (e) { toast(friendlyError(e)); busy(b, false, 'Find a match'); }
+    const paintHow = () => {
+      const box = $('#g-how'); if (!box) return;
+      saveMode(how);
+      main.querySelectorAll('[data-how]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.how === how ? 'true' : 'false'));
+      if (how === 'cpu') {
+        box.innerHTML = `<section class="card pad" id="g-diff"><h2 class="g-h2" style="margin-top:0">Choose a bot</h2>
+          ${type === 'starcards' ? `<label class="small muted g-inline-l">Computer players <select id="g-bots">${[1, 2, 3, 4, 5].map((n) => `<option ${n === 3 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}
+          <div class="g-pals">${PALS.map((p) => `<button type="button" class="g-pal" data-lvl="${p.id}">${faceSvg(p.name, 64)}<b>${esc(p.name)}</b><i class="bot-tag">Bot</i><span>${esc(p.title)}</span><small>${esc(p.line)}</small></button>`).join('')}</div>
+          <p class="muted small">Bot games give fewer Star Coins, and they stay off the online scoreboard.</p></section>`;
+        box.querySelectorAll('[data-lvl]').forEach((a) => a.onclick = () => {
+          saveLevel(a.dataset.lvl);
+          const extra = type === 'starcards' ? `&bots=${$('#g-bots').value}` : '';
+          location.hash = `#/games/${type}/cpu?lvl=${a.dataset.lvl}&mode=${mode()}${extra}`;
+        });
+        return;
+      }
+      if (how === 'online') {
+        box.innerHTML = `<section class="card pad"><h2 class="g-h2" style="margin-top:0">Real players</h2><p class="muted small">We look for someone who is waiting right now. If nobody joins in about half a minute, you can play a bot instead. Bots are labeled Bot.</p><button class="btn btn-block" id="g-quick">Find a match</button></section>`;
+        const busy = (b, on, t) => { b.disabled = on; if (t) b.textContent = t; };
+        $('#g-quick').onclick = async () => {
+          if (!requireAuth()) return;
+          const b = $('#g-quick'); busy(b, true, 'Looking…');
+          try { const gid = await net.quickMatch(type, mode()); location.hash = '#/game/' + gid; }
+          catch (e) { toast(friendlyError(e)); busy(b, false, 'Find a match'); }
+        };
+        return;
+      }
+      box.innerHTML = `<section class="card pad"><h2 class="g-h2" style="margin-top:0">A friend</h2>
+        <form id="g-inv" class="g-inline"><label for="g-handle" class="sr-only">Friend's @handle</label><input id="g-handle" placeholder="@handle" autocapitalize="none" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Invite</button></form>
+        <p class="muted small">They get a notification. Or <button class="link-btn" id="g-link">${room ? 'open a room' : 'make a game'} and share the link</button>.</p></section>`;
+      $('#g-link').onclick = async () => {
+        if (!requireAuth()) return;
+        try { const gid = await net.createGame(type, mode()); location.hash = '#/game/' + gid; } catch (e) { toast(friendlyError(e)); }
+      };
+      $('#g-inv').onsubmit = async (ev) => {
+        ev.preventDefault();
+        if (!requireAuth()) return;
+        const h = $('#g-handle').value.trim().replace(/^@/, '').toLowerCase();
+        if (!h) { toast('Type your friend’s @handle'); return; }
+        try {
+          const uid = await net.uidForHandle(h);
+          if (!uid) { toast(`No one has the handle @${h}`); return; }
+          if (uid === myUid()) { toast('That’s you! Invite someone else.'); return; }
+          const gid = await net.createGame(type, mode(), { invitee: room ? '' : uid });
+          await net.invite(uid, gid, `${g.name}${room ? ' · room ' + gid : ''}`).catch((e) => toast('Game made, but the invite didn’t send: ' + friendlyError(e)));
+          toast(`Invite sent to @${h}`);
+          location.hash = '#/game/' + gid;
+        } catch (e) { toast(friendlyError(e)); }
+      };
     };
-    $('#g-link').onclick = async () => {
-      if (!requireAuth()) return;
-      try { const gid = await net.createGame(type, mode()); location.hash = '#/game/' + gid; } catch (e) { toast(friendlyError(e)); }
-    };
-    $('#g-inv').onsubmit = async (ev) => {
-      ev.preventDefault();
-      if (!requireAuth()) return;
-      const h = $('#g-handle').value.trim().replace(/^@/, '').toLowerCase();
-      if (!h) { toast('Type your friend’s @handle'); return; }
-      try {
-        const uid = await net.uidForHandle(h);
-        if (!uid) { toast(`No one has the handle @${h}`); return; }
-        if (uid === myUid()) { toast('That’s you! Invite someone else.'); return; }
-        const gid = await net.createGame(type, mode(), { invitee: room ? '' : uid });
-        await net.invite(uid, gid, `${g.name}${room ? ' · room ' + gid : ''}`).catch((e) => toast('Game made, but the invite didn’t send: ' + friendlyError(e)));
-        toast(`Invite sent to @${h}`);
-        location.hash = '#/game/' + gid;
-      } catch (e) { toast(friendlyError(e)); }
-    };
+    main.querySelectorAll('[data-how]').forEach((b) => b.onclick = () => { how = b.dataset.how; paintHow(); });
+    paintHow();
     net.leaderboard(type).then((rows) => {
       const box = $('#g-lb'); if (!box) return;
       box.innerHTML = rows.length ? `<ol class="g-lb">${rows.map((r, i) => `<li class="${r.uid === myUid() ? 'me' : ''}"><span class="g-rank">${i < 3 ? STAR('r' + i) : ''}<b>${i + 1}</b></span>${avatar({ uid: r.uid, displayName: r.name, username: r.uname, color: r.color }, 'sm', true)}<a href="#/u/${esc(r.uname)}" class="g-lb-n">${esc(r.name)}<small class="muted">@${esc(r.uname)}</small></a><span class="g-lb-s"><b>${r[type + '_w'] || 0}</b> W · ${r[type + '_l'] || 0} L</span></li>`).join('')}</ol>` : '<div class="empty">No online wins yet.</div>';
@@ -267,20 +297,29 @@ export function createGames(ctx) {
       ${emoteBar()}
       <div class="g-actions" id="g-actions"></div>`, back);
   }
-  function playersBar(type, ps, turn, timer, done) {
-    return ps.map((p, i) => `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${chip(p)}<span class="g-pc ${i === 0 ? 'gold' : 'purple'}">${type === 'klgrid' ? (i === 0 ? 'K' : 'L') : STAR()}</span>${!done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : ''}</div>`).join('<span class="g-vs">vs</span>');
+  function paintPlayers(type, ps, turn, timer, done) {
+    const parent = $('#g-players'); if (!parent) return;
+    syncPlates(parent, ps.map((p, i) => {
+      const on = !done && turn === i;
+      const bits = [type === 'klgrid'
+        ? { key: 'pc', className: 'g-pc ' + (i === 0 ? 'gold' : 'purple'), text: i === 0 ? 'K' : 'L' }
+        : { key: 'pc', className: 'g-pc ' + (i === 0 ? 'gold' : 'purple'), html: STAR(), sig: 'star' }];
+      if (on && timer != null) bits.push({ key: 'tm', className: 'g-timer' + (timer <= 10 ? ' low' : ''), text: timer + 's' });
+      return { key: 'p' + i, className: 'g-pl' + (on ? ' on' : ''), side: String(i), person: p, bits };
+    }), { sep: true });
   }
   const sndFor = (type, st, prev) => type === 'stardrop' ? 'drop' : type === 'checkers' ? ((prev && (prev.board.replace(/[^.]/g, '').length < st.board.replace(/[^.]/g, '').length)) ? 'capture' : 'place') : 'place';
 
   // ------------------------------------------------------------ vs computer (local)
   function localBoard(type, params) {
-    const lvl = params.lvl === 'easy' ? 'easy' : 'hard';
+    const lvl = normLevel(params.lvl);
     const mode = type === 'klgrid' && params.mode === 'ultimate' ? 'ultimate' : 'classic';
     const E = ENGINES[type];
     const humanSide = Math.random() < 0.5 ? 0 : 1;
     let st = { board: E.init(mode), turn: 0, last: '', no: 0 }, sel = -1, over = null, lastCell = -1, thinking = false;
     const me = signedIn() ? { uid: myUid(), name: 'You', uname: S.profile.username, color: S.profile.color } : { uid: '', name: 'You' };
-    const cpu = { uid: 'cpu1', name: `Computer · ${lvl === 'easy' ? 'Easy' : 'Hard'}` };
+    const pal = PALS.find((p) => p.id === lvl);
+    const cpu = { uid: 'cpu1', name: pal.name, bot: true };
     const ps = humanSide === 0 ? [me, cpu] : [cpu, me];
     boardShell(type, mode, `${gameName(type)}${mode === 'ultimate' ? ' Ultimate' : ''}`, `#/games/${type}`);
     $('#g-actions').innerHTML = `<button class="btn btn-sm btn-ghost" id="g-restart">New game</button><a class="btn btn-sm btn-ghost" href="#/games/${type}">Leave</a>`;
@@ -289,8 +328,8 @@ export function createGames(ctx) {
     const alive = { v: true }; S.unsubs.push(() => (alive.v = false));
     function draw() {
       if (!$('#g-board')) return;
-      $('#g-players').innerHTML = playersBar(type, ps, st.turn, null, !!over);
-      $('#g-status').textContent = over ? (over.winner === 'draw' ? 'Draw!' : over.winner === humanSide ? 'You win!' : 'Computer wins') : st.turn === humanSide ? `Your turn (${pieceLabel(type, humanSide)})` : 'Computer is thinking…';
+      paintPlayers(type, ps, st.turn, null, !!over);
+      $('#g-status').textContent = over ? (over.winner === 'draw' ? 'Draw!' : over.winner === humanSide ? 'You win!' : `${pal.name} wins`) : st.turn === humanSide ? `Your turn (${pieceLabel(type, humanSide)})` : `${pal.name} is thinking…`;
       renderBoard($('#g-board'), type, st, { mySide: humanSide, live: !over && !thinking, legal: over ? [] : E.moves(st), lastCell, line: over ? over.line : [], sel, flip: humanSide === 1, lastMove: st.last,
         onSelect: (s) => { sel = s; draw(); }, onMove: (m) => move(m) });
     }
@@ -299,7 +338,7 @@ export function createGames(ctx) {
       draw();
       const r = over.winner === 'draw' ? 'd' : over.winner === humanSide ? 'w' : 'l';
       addCpuResult(type, r);
-      setTimeout(() => alive.v && resultModal({ title: r === 'w' ? 'You win!' : r === 'l' ? 'The computer wins' : 'Draw!', sub: r === 'w' ? 'Nice play.' : 'Run it back?', win: r === 'w',
+      setTimeout(() => alive.v && resultModal({ title: r === 'w' ? 'You win!' : r === 'l' ? `${pal.name} wins` : 'Draw!', sub: r === 'w' ? 'Nice play. Bot wins pay fewer coins.' : 'Run it back?', win: r === 'w', vsBot: true,
         buttons: [{ label: 'Play again', onClick: () => localBoard(type, params) }, { label: 'Back to games', href: '#/games' }] }), 700);
       return true;
     }
@@ -311,12 +350,12 @@ export function createGames(ctx) {
       draw();
       if (st.turn !== humanSide) cpuTurn();
     }
-    function cpuTurn() {
+    async function cpuTurn() {
       thinking = true; draw();
-      setTimeout(() => {
-        if (!alive.v) return;
-        const m = E.ai(st, lvl); thinking = false; move(m);
-      }, 450 + Math.random() * 350);
+      const m = await ask({ kind: 'board', type, st: { board: st.board, turn: st.turn, last: st.last }, level: lvl });
+      if (!alive.v) return;
+      thinking = false;
+      if (m) move(m);
     }
     draw();
     if (st.turn !== humanSide) cpuTurn();
@@ -325,7 +364,7 @@ export function createGames(ctx) {
   // ------------------------------------------------------------ online board game
   async function onlineBoard(g0, token) {
     const gid = g0.id, type = g0.type, E = ENGINES[type];
-    let g = g0, sel = -1, lastSeenMove = -1, ended = false, claimTimer = 0, joinedAsk = false;
+    let g = g0, serverG = g0, sel = -1, lastSeenMove = -1, ended = false, claimTimer = 0, joinedAsk = false, pendingNo = null;
     const title = `${gameName(type)}${g.mode === 'ultimate' ? ' Ultimate' : ''}`;
     boardShell(type, g.mode, title, '#/games');
     const names = (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; };
@@ -342,7 +381,8 @@ export function createGames(ctx) {
       const box = $('#g-actions'); if (!box) return;
       const side = mySide();
       if (g.status === 'waiting') {
-        box.innerHTML = `${side === 0 ? `<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>` : ''}${side < 0 && signedIn() ? '<button class="btn btn-sm" id="g-join">Join this game</button>' : ''}${!signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}`;
+        const offer = side === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => draw());
+        box.innerHTML = `${side === 0 ? `<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>` : ''}${side < 0 && signedIn() ? '<button class="btn btn-sm" id="g-join">Join this game</button>' : ''}${!signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
       } else if (g.status === 'active') {
         box.innerHTML = side >= 0 ? `<button class="btn btn-sm btn-danger" id="g-forfeit">Forfeit</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>` : `<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>`;
       } else {
@@ -350,6 +390,7 @@ export function createGames(ctx) {
       }
       const sh = $('#g-share'); if (sh) sh.onclick = async () => { try { await navigator.clipboard.writeText(link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', link(gid)); } };
       const cn = $('#g-cancel'); if (cn) cn.onclick = async () => { try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue(type, g.mode, gid); location.hash = '#/games'; } catch (e) { toast(friendlyError(e)); } };
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = async () => { stopOffer(gid); try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue(type, g.mode, gid); } catch { /* already gone */ } location.hash = `#/games/${type}/cpu?lvl=${lastLevel()}&mode=${g.mode || ''}`; };
       const jn = $('#g-join'); if (jn) jn.onclick = async () => { try { await net.join(gid); } catch (e) { toast(friendlyError(e)); } };
       const ff = $('#g-forfeit'); if (ff) ff.onclick = () => { if (confirm('Forfeit this game? It counts as a loss.')) claim('forfeit'); };
       const rm = $('#g-rematch'); if (rm) rm.onclick = async () => {
@@ -369,8 +410,8 @@ export function createGames(ctx) {
       const side = mySide(), done = g.status === 'done';
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
-      const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - (tsMs(g.turnAt) || Date.now())) / 1000)) : null;
-      $('#g-players').innerHTML = playersBar(type, ps, g.turn, left, done || g.status === 'waiting');
+      const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
+      paintPlayers(type, ps, g.turn, left, done || g.status === 'waiting');
       const status = $('#g-status');
       if (g.status === 'waiting') status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend to join…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
       else if (done) status.textContent = g.endReason === 'cancelled' ? 'This game was cancelled' : g.winnerUid === 'draw' ? 'Draw!' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;
@@ -384,15 +425,20 @@ export function createGames(ctx) {
     }
     const cellOf = (st) => (type === 'stardrop' && st.last !== '' ? (() => { for (let r = 0; r < 6; r++) if (st.board[r * 7 + +st.last] !== '.') return r * 7 + +st.last; return -1; })() : type === 'checkers' ? +String(st.last).split('-').pop() : st.last === '' ? -1 : +st.last);
     async function move(m) {
+      if (pendingNo != null || g.status !== 'active' || mySide() !== g.turn) return;
       const st = { board: g.board, turn: g.turn, last: g.last, no: g.moveNo };
       let nx; try { nx = E.apply(st, m); } catch (e) { toast(e.message); return; }
       const out = E.outcome({ ...nx, no: st.no + 1 });
-      const upd = { board: nx.board, turn: nx.turn, last: m, moveNo: g.moveNo + 1, turnAt: net.fs.serverTimestamp() };
+      const expect = g.moveNo || 0;
+      const upd = { board: nx.board, turn: nx.turn, last: m, moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
       if (out) Object.assign(upd, { status: 'done', winnerUid: out.winner === 'draw' ? 'draw' : myUid(), endReason: out.winner === 'draw' ? 'draw' : 'win' });
-      // optimistic
+      pendingNo = upd.moveNo;
       g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } }; sel = -1; sfx.play(sndFor(type, nx, st)); draw();
-      try { await net.update(gid, upd); if (out) iEnded = true; }
-      catch (e) { toast(friendlyError(e)); }
+      try { await net.commitMove(gid, expect, upd); if (out) iEnded = true; }
+      catch (e) {
+        pendingNo = null; iEnded = false; g = serverG; sel = -1; draw();
+        toast(e && e.code === 'stale' ? 'That move already happened.' : friendlyError(e));
+      }
     }
     let iEnded = false;
     function onEnd() {
@@ -400,13 +446,15 @@ export function createGames(ctx) {
       if (stopHb) { stopHb(); stopHb = null; }
       if (g.endReason === 'cancelled') return;
       const side = mySide();
-      if (side >= 0) setTimeout(() => net.recordResult(g, iEnded || g.endReason === 'timeout' || g.endReason === 'forfeit'), iEnded ? 0 : 2500);
+      const botGame = onlyBots(g.players, myUid());
+      if (side >= 0 && !botGame) setTimeout(() => net.recordResult(g, iEnded || g.endReason === 'timeout' || g.endReason === 'forfeit'), iEnded ? 0 : 2500);
+      if (side >= 0 && botGame) addCpuResult(type, g.winnerUid === myUid() ? 'w' : g.winnerUid === 'draw' ? 'd' : 'l');
       const win = side >= 0 && g.winnerUid === myUid();
       const title = g.winnerUid === 'draw' ? 'Draw!' : side < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost';
       const sub = g.endReason === 'forfeit' ? (win ? 'Your opponent forfeited.' : 'Game forfeited.') : g.endReason === 'timeout' ? (win ? 'Your opponent ran out of time.' : 'Time ran out.') : win ? 'Stars well played.' : '';
       setTimeout(() => {
         if (stale(token)) return;
-        resultModal({ title, sub, win, buttons: side >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
+        resultModal({ title, sub, win, vsBot: botGame, buttons: side >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
       }, 800);
     }
     // Auto-claim when the other player's clock runs out or their heartbeat goes quiet.
@@ -415,14 +463,18 @@ export function createGames(ctx) {
       const side = mySide();
       if (g.status !== 'active' || side < 0 || g.turn === side) return;
       const other = g.players[1 - side];
-      const tTurn = (tsMs(g.turnAt) || Date.now()) + (TURN_SECONDS + 6) * 1000 - Date.now();
+      const tTurn = (tsMs(g.turnAt) || net.serverNow()) + (TURN_SECONDS + 6) * 1000 - net.serverNow();
       const hb = g.hb && g.hb[other] ? tsMs(g.hb[other]) : 0;
       const tHb = hb ? hb + 48000 - Date.now() : Infinity;
       claimTimer = setTimeout(async () => { await claim('timeout'); }, Math.max(1500, Math.min(tTurn, tHb)));
     }
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
+      serverG = ng;
       const prevMove = g.moveNo; const prevStatus = g.status;
+      const rec = net.reconcile(ng.moveNo, pendingNo);
+      pendingNo = rec.pending;
+      if (!rec.take) { scheduleClaim(); return; }
       g = ng;
       if (g.moveNo !== prevMove && g.moveNo > 0 && lastSeenMove >= 0 && g.players[g.turn] === myUid()) sfx.play(type === 'stardrop' ? 'drop' : 'place');
       lastSeenMove = g.moveNo;

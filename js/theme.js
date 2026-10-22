@@ -1,3 +1,4 @@
+import { heard } from './volume.js';
 // Kemy's theme song. To swap the song, change THEME_FILE + THEME_TITLE (one place; kemy/index.html reads these too).
 // Rules: only ever starts after a user tap, plays LOW (default 20%) through Web Audio so the volume also works on
 // iPhone (iOS ignores audio.volume), fades in/out over ~1.5 s, never plays over videos, lives, songs, Movie Maker
@@ -42,7 +43,7 @@ export function setMode(m, { start = true } = {}) {
   if (m === 'play') { if (start) play(); } else stop();
   emit(); paintFab();
 }
-export function setVolume(v) { ls.set(VOLK, String(v)); if (gain && actx && el && !el.paused) { const g = gain.gain; g.cancelScheduledValues(actx.currentTime); g.setTargetAtTime(v, actx.currentTime, 0.05); } else if (el && !actx) el.volume = v; }
+export function setVolume(v) { ls.set(VOLK, String(v)); const out = heard(v); if (gain && actx && el && !el.paused) { const g = gain.gain; g.cancelScheduledValues(actx.currentTime); g.setTargetAtTime(out, actx.currentTime, 0.05); } else if (el && !actx) el.volume = out; }
 // legacy API (old Settings checkbox)
 export const bgmOn = () => getMode() === 'play';
 export const setBgm = (on) => setMode(on ? 'play' : 'mute');
@@ -81,7 +82,7 @@ export async function play({ fromStart = false, force = false } = {}) {
   try { if (actx && actx.state !== 'running') await actx.resume(); } catch { /* */ }
   if (!actx) a.volume = 0; else gain.gain.value = Math.min(gain.gain.value, 0.0001);
   try { await a.play(); } catch { return false; }
-  ramp(getVolume(), FADE); emit(); paintFab(); return true;
+  ramp(heard(getVolume()), FADE); emit(); paintFab(); return true;
 }
 // Fade out and pause (keeps the position so Mute -> Play resumes).
 export function stop(sec = FADE) {
@@ -133,3 +134,9 @@ export function initThemeMusic() {
   document.addEventListener('pointerdown', kick, true); document.addEventListener('keydown', kick, true);
   route();
 }
+addEventListener('kemy:vol', () => {
+  if (!el || el.paused) return;
+  const out = heard(getVolume());
+  if (gain && actx) { const g = gain.gain; g.cancelScheduledValues(actx.currentTime); g.setTargetAtTime(out, actx.currentTime, 0.05); }
+  else el.volume = out;
+});

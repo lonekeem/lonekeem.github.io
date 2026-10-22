@@ -3,6 +3,7 @@
 // and pasted Apple Music / Spotify links (official embeds). Default volume ~35% so game sounds stay audible.
 // Events: kemy:media-play / kemy:media-stop / kemy:music {source:'game-music', state, title, station}.
 import { musicEmbed, mountMusicEmbed } from './embeds.js';
+import { masterVol } from './volume.js';
 
 const K = { vol: 'kemy-gm-vol', st: 'kemy-gm-station', open: 'kemy-gm-open' };
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } } };
@@ -31,7 +32,8 @@ const radioOff = () => ls.get(RK.off) === '1';
 
 let cfg = null, root = null, audio = null, stations = [], st = null, idx = 0, wantPlay = false, embed = null, kemySongs = null, opts = {};
 let volOverride = null; // session-only volume (Pal Park plays the theme playlist softly without changing your saved level)
-const vol = () => { if (volOverride != null) return volOverride; const v = parseFloat(ls.get(K.vol)); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : (cfg?.defaultVolume ?? 0.35); };
+const baseVol = () => { if (volOverride != null) return volOverride; const v = parseFloat(ls.get(K.vol)); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : (cfg?.defaultVolume ?? 0.35); };
+const playVol = () => Math.max(0, Math.min(1, baseVol() * masterVol()));
 const fire = (state) => {
   const t = st && st.tracks[idx]; const detail = { source: SRC, state, title: t?.title || '', artist: t?.artist || '', station: st?.id || '' };
   dispatchEvent(new CustomEvent(state === 'play' ? 'kemy:media-play' : 'kemy:media-stop', { detail }));
@@ -72,7 +74,7 @@ async function pick(id) {
 }
 function startTrack() {
   const t = st && st.tracks[idx]; if (!t) { paint(); return; }
-  const a = ensureAudio(); a.volume = vol(); a.loop = st.tracks.length === 1 || (isRadio() && repeatMode() === 'one');
+  const a = ensureAudio(); a.volume = playVol(); a.loop = st.tracks.length === 1 || (isRadio() && repeatMode() === 'one');
   if (isRadio()) { ls.set(RK.trk, String(idx)); ls.set(RK.off, '0'); if (lastToast !== t.url) { lastToast = t.url; toast(t); } }
   if (a.dataset.url !== t.url) { a.src = t.url; a.dataset.url = t.url; }
   wantPlay = true; a.play().catch(() => { wantPlay = false; paint(); });
@@ -88,18 +90,20 @@ export function radioToggle() { if (isPlaying()) pause(); else radioPlay(); }
 export function setShuffle(v) { ls.set(RK.shuf, v ? '1' : '0'); paint(); }
 export function setRepeat(v) { ls.set(RK.rep, v); if (audio && isRadio()) audio.loop = v === 'one'; paint(); }
 export function turnRadioOff() { ls.set(RK.off, '1'); if (isRadio()) pause(); paint(); }
+export function setRadioEnabled(on) { ls.set(RK.off, on ? '0' : '1'); if (!on && isRadio()) pause(); paint(); }
 export const radioState = () => ({ on: !radioOff(), shuffle: shuffleOn(), repeat: repeatMode(), track: isRadio() ? idx : parseInt(ls.get(RK.trk), 10) || 0, title: isRadio() ? st.tracks[idx]?.title || '' : '', playing: isRadio() && isPlaying(), tracks: themeTracks.map((t) => t.title) });
 function toast(t) {
   const el = root?.querySelector('.gmr-toast'); if (!el || root.hidden) return;
   el.textContent = `Now playing: ${t.title} – ${t.artist}`; el.hidden = false; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   clearTimeout(toastT); toastT = setTimeout(() => { el.classList.remove('show'); el.hidden = true; }, 2600);
 }
-export function setVolume(v) { volOverride = null; ls.set(K.vol, String(v)); if (audio) audio.volume = v; paint(); }
+export function setVolume(v) { volOverride = null; ls.set(K.vol, String(v)); if (audio) audio.volume = playVol(); paint(); }
+addEventListener('kemy:vol', () => { if (audio) audio.volume = playVol(); });
 // Play a station from its first track (playlist order, loops). volume: session-only level. remember=false keeps your saved station.
 export async function playStation(id, { volume = null, remember = false } = {}) { await load(); const keep = ls.get(K.st); volOverride = volume; await pick(id); if (id === 'theme' && radioOff()) { if (!remember && keep) ls.set(K.st, keep); paint(); return; } if (!remember && keep) ls.set(K.st, keep); closeEmbed(); startTrack(); }
 export const audioEl = () => audio;
 export const isPlaying = () => !!audio && !audio.paused;
-export const state = () => ({ playing: isPlaying(), station: st?.id || '', title: st?.tracks[idx]?.title || '', volume: audio ? audio.volume : vol(), embed: embed?.service || '' });
+export const state = () => ({ playing: isPlaying(), station: st?.id || '', title: st?.tracks[idx]?.title || '', volume: baseVol(), embed: embed?.service || '' });
 
 function closeEmbed() { if (embed) { embed.destroy(); embed = null; } pl = null; if (card) { card.hidden = true; card.querySelector('.gmp-box').innerHTML = ''; } const b = root?.querySelector('.gm-embed'); if (b) b.innerHTML = ''; }
 function openLink(url) {
@@ -157,7 +161,7 @@ function paint() {
   root.querySelector('.gmr-off').textContent = radioOff() ? '📻 Radio on' : '⏻ Radio off';
   root.querySelectorAll('[data-pid]').forEach((li) => li.classList.toggle('on', li.dataset.pid === pl?.id));
   root.querySelectorAll('[data-st]').forEach((b) => { const a = b.dataset.st === st?.id; b.classList.toggle('on', a); b.setAttribute('aria-pressed', a); });
-  const r = root.querySelector('.gm-vol'); if (document.activeElement !== r) r.value = String(Math.round((audio ? audio.volume : vol()) * 100));
+  const r = root.querySelector('.gm-vol'); if (document.activeElement !== r) r.value = String(Math.round(baseVol() * 100));
 }
 
 // Show on game screens; hidden (and stopped) elsewhere.

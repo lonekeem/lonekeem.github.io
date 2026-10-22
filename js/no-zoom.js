@@ -57,7 +57,9 @@ html.kz-game :is(.zg-panel,.zg-card,[class*=-scroll],[class*=-list],[class*=-log
     meta.setAttribute('content', v ? gameVp : baseVp);
     if (v) { window.scrollTo(0, 0); setTimeout(recover, 50); }
   };
-  const check = () => set(inGame());
+  const screenFix = () => { try { return localStorage.getItem('kemy-screen-fix') !== '0'; } catch { return true; } };
+  const check = () => set(screenFix() && inGame());
+  window.addEventListener('kemy:screen-fix', check);
 
   // Pinch (Safari gesture events + any 2-finger touchmove not on a control layer)
   const stop = (e) => { if (on) e.preventDefault(); };

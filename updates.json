@@ -1,0 +1,161 @@
+[
+  {
+    "id": "street-doorbell",
+    "date": "2026-10-22",
+    "type": "soon",
+    "emoji": "🚪",
+    "title": "A doorbell on Kemy Street",
+    "body": "Soon, a friend can ring your doorbell. You will see who it is and can invite them in."
+  },
+  {
+    "id": "game-shops",
+    "date": "2026-10-22",
+    "type": "soon",
+    "emoji": "🛍️",
+    "title": "A shop in each game",
+    "body": "Soon, Star Pool, Chess, Ludo and the other games will have a little shop of their own. Pal Zombie Survival already has the Armory."
+  },
+  {
+    "id": "push-notifications",
+    "date": "2026-10-22",
+    "type": "new",
+    "emoji": "🔔",
+    "title": "You can turn on notifications",
+    "body": "Want a gentle ping when it is your turn, a friend asks you to play, or someone visits your house? You choose in Settings. Each kind has its own switch, and Kemy stays quiet from 9pm to 8am.",
+    "link": "#/settings"
+  },
+  {
+    "id": "kemy-street-homes",
+    "date": "2026-10-20",
+    "type": "new",
+    "emoji": "🏠",
+    "title": "Houses, garages and house radio",
+    "body": "Buy a house on Kemy Street. Add a garage, park cars on the driveway, decorate your rooms, and play music on the house radio.",
+    "link": "#/street"
+  },
+  {
+    "id": "duplicate-pal-park",
+    "date": "2026-10-20",
+    "type": "fix",
+    "emoji": "🌳",
+    "title": "Pal Park shows up once",
+    "body": "The games list on a profile used to list Pal Park twice. The extra link is gone."
+  },
+  {
+    "id": "pal-hats-fit",
+    "date": "2026-10-20",
+    "type": "fix",
+    "emoji": "🎩",
+    "title": "Hats and balloons fit",
+    "body": "A Pal's head, hat or balloon could get cut off on the feed, on live, and on the little floating Pal. They fit in the picture now."
+  },
+  {
+    "id": "cars-drive",
+    "date": "2026-10-20",
+    "type": "fix",
+    "emoji": "🚗",
+    "title": "Stuck cars can drive",
+    "body": "A car could get stuck and refuse to move, because its parking spot stayed in the way. Cars drive now, and Reset flips one upright.",
+    "link": "#/street"
+  },
+  {
+    "id": "zombie-joystick",
+    "date": "2026-10-20",
+    "type": "fix",
+    "emoji": "🕹️",
+    "title": "Zombie joystick on iPhone",
+    "body": "The joystick in Pal Zombie Survival could freeze on an iPhone. It wakes back up if a touch gets lost.",
+    "link": "#/arcade/zombie"
+  },
+  {
+    "id": "zombie-survival",
+    "date": "2026-10-20",
+    "type": "new",
+    "emoji": "🧟",
+    "image": "assets/featured/pal-bear.webp",
+    "title": "Pal Zombie Survival",
+    "body": "Bring your Pal and splat goofy zombies with bubbles, foam and a pillow hammer. No scary stuff. Just goo and giggles.",
+    "link": "#/arcade/zombie"
+  },
+  {
+    "id": "challenge-show",
+    "date": "2026-10-20",
+    "type": "new",
+    "emoji": "🎪",
+    "title": "Kemy Challenge Show",
+    "body": "Freeze Dash, Cookie Carve, Tug Splash, Bubble Bridge and Bumper Summit. The last Pal standing wins. Play with friends or the computer.",
+    "link": "#/arcade/show"
+  },
+  {
+    "id": "ludo-keeps-going",
+    "date": "2026-10-19",
+    "type": "fix",
+    "emoji": "🎲",
+    "title": "Ludo keeps going",
+    "body": "If a player left while the die was rolling, Ludo could stall. The die is rolled again so the game continues.",
+    "link": "#/games/ludo"
+  },
+  {
+    "id": "star-pool",
+    "date": "2026-10-19",
+    "type": "new",
+    "emoji": "🎱",
+    "title": "Star Pool",
+    "body": "Gold rails and purple felt. Sink your group, then call the 8. Play a friend or the computer.",
+    "link": "#/games/pool"
+  },
+  {
+    "id": "chess",
+    "date": "2026-10-19",
+    "type": "new",
+    "emoji": "♟️",
+    "title": "Chess",
+    "body": "Gold versus purple, with the real rules and an optional clock. Easy, medium or hard computer, or a friend.",
+    "link": "#/games/chess"
+  },
+  {
+    "id": "ludo",
+    "date": "2026-10-19",
+    "type": "new",
+    "emoji": "🎲",
+    "title": "Ludo",
+    "body": "Roll the dice and race four tokens home. Two, three or four can play, including the computer.",
+    "link": "#/games/ludo"
+  },
+  {
+    "id": "more-board-games",
+    "date": "2026-10-19",
+    "type": "new",
+    "emoji": "⭐",
+    "title": "Star Drop, Star Cards and more",
+    "body": "Also ready to play: Star Drop, Star Cards, Checkers, KL Grid and Studio Trivia. Take turns with a friend or the computer.",
+    "link": "#/games"
+  },
+  {
+    "id": "pal-games",
+    "date": "2026-10-19",
+    "type": "new",
+    "emoji": "🐾",
+    "title": "Pal Games",
+    "body": "Your Pal versus a friend in Pal Race, Bubble Pop Battle, Star Catch and Dance-Off.",
+    "link": "#/games/pals"
+  },
+  {
+    "id": "bubble-quest",
+    "date": "2026-10-19",
+    "type": "new",
+    "emoji": "🫧",
+    "title": "Kemy's Bubble Quest",
+    "body": "Hop, swim and blow bubbles with Kemy the axolotl.",
+    "link": "kemy-quest.html"
+  },
+  {
+    "id": "pal-park",
+    "date": "2026-10-19",
+    "type": "new",
+    "emoji": "🌳",
+    "title": "Pal Park",
+    "body": "Walk your Pal around a sunny 3D park with friends. Chat, dance, find treasures and jump into mini-games.",
+    "link": "#/park"
+  }
+]

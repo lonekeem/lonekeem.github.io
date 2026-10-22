@@ -24,7 +24,8 @@
         "node_modules",
         ".git",
         "*.local"
-      ]
+      ],
+      "postdeploy": "node ./recount-on-deploy.js"
     },
     {
       "source": "functions-stripe",
