@@ -140,7 +140,7 @@ export function createChess(ctx) {
   // ------------------------------------------------------------ online
   async function online(g0) {
     const gid = g0.id;
-    let g = g0, ended = false, stopHb = null, claimT = 0, sel = -1, joinTried = false, iEnded = false, turnSeen = Date.now(), turnKey = '';
+    let g = g0, serverG = g0, ended = false, stopHb = null, claimT = 0, sel = -1, joinTried = false, iEnded = false, pendingNo = null;
     shell('Chess', '#/games');
     const names = (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; };
     ui.wireEmotes(main, gid, names);
@@ -148,12 +148,13 @@ export function createChess(ctx) {
     const timed = () => Array.isArray(g.clk) && g.clk.length === 2;
     const tick = setInterval(() => header(), 500);
     S.unsubs.push(() => { clearInterval(tick); clearTimeout(claimT); if (stopHb) stopHb(); });
-    const clocks = () => { if (!timed()) return null; const c = [...g.clk]; if (g.status === 'active') c[g.turn] -= Date.now() - turnSeen; return c; };
+    const elapsed = () => Math.max(0, net.serverNow() - (tsMs(g.turnAt) || net.serverNow()));
+    const clocks = () => { if (!timed()) return null; const c = [...g.clk]; if (g.status === 'active') c[g.turn] = Math.max(0, c[g.turn] - elapsed()); return c; };
     function header() {
       if (!$('#g-players')) return;
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
-      const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - turnSeen) / 1000)) : null;
+      const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
       $('#g-players').innerHTML = bar(ps, g.turn, g.status !== 'active', clocks(), left);
       const st = $('#g-status'), me = side();
       if (g.status === 'waiting') st.textContent = me === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
@@ -168,15 +169,21 @@ export function createChess(ctx) {
       header(); actions();
     }
     async function move(m) {
+      if (pendingNo != null || g.status !== 'active' || side() !== g.turn) return;
+      const base = g;
       const p = C.parse(g.board, g.cx), me = side();
       const r = C.replay(g.ml);
       const np = C.play(p, m), mstr = C.moveStr(m), keys = [...r.keys, C.key(np)];
       const o = C.outcome(np, keys);
-      const upd = { board: C.boardOf(np), cx: C.cxOf(np), ml: (g.ml ? g.ml + ' ' : '') + mstr, last: mstr, turn: 1 - g.turn, moveNo: g.moveNo + 1, turnAt: net.fs.serverTimestamp() };
-      if (timed()) { const c = [...g.clk]; c[me] = Math.max(0, Math.round(c[me] - (Date.now() - turnSeen) - 500)); upd.clk = c; }
+      const expect = g.moveNo || 0;
+      const upd = { board: C.boardOf(np), cx: C.cxOf(np), ml: (g.ml ? g.ml + ' ' : '') + mstr, last: mstr, turn: 1 - g.turn, moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
+      if (timed()) { const c = [...g.clk]; c[me] = Math.max(0, Math.round(c[me] - elapsed())); upd.clk = c; }
       if (o.over) Object.assign(upd, o.winner === 'draw' ? { status: 'done', winnerUid: 'draw', endReason: 'draw' } : { status: 'done', winnerUid: ui.myUid(), endReason: 'win' });
-      sel = -1; ui.sfx.play(m.c ? 'capture' : 'place');
-      if (o.over) iEnded = true; try { await net.update(gid, upd); } catch (e) { iEnded = false; toast(friendlyError(e)); }
+      pendingNo = upd.moveNo;
+      g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } };
+      sel = -1; ui.sfx.play(m.c ? 'capture' : 'place'); draw();
+      try { await net.commitMove(gid, expect, upd); if (o.over) iEnded = true; }
+      catch (e) { pendingNo = null; iEnded = false; g = serverG.moveNo >= base.moveNo ? serverG : base; draw(); toast(e && e.code === 'stale' ? 'That move already happened.' : friendlyError(e)); }
     }
     function actions() {
       const box = $('#g-actions'); if (!box) return;
@@ -209,15 +216,19 @@ export function createChess(ctx) {
       const me = side();
       if (g.status !== 'active' || me < 0 || g.turn === me) return;
       const other = g.players[1 - me];
-      const tTurn = timed() ? g.clk[g.turn] + 4000 - (Date.now() - turnSeen) : (TURN_SECONDS + 6) * 1000 - (Date.now() - turnSeen);
+      const tTurn = timed() ? g.clk[g.turn] + 4000 - elapsed() : (TURN_SECONDS + 6) * 1000 - elapsed();
       const hb = g.hb && g.hb[other] ? tsMs(g.hb[other]) : 0;
       const tHb = hb ? hb + 48000 - Date.now() : Infinity;
       claimT = setTimeout(() => net.update(gid, { status: 'done', winnerUid: ui.myUid(), endReason: 'timeout' }).catch(() => { claimT = setTimeout(scheduleClaim, 4000); }), Math.max(1500, Math.min(tTurn, tHb)));
     }
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
-      const prevMove = g.moveNo; g = ng;
-      const k = `${g.moveNo}|${g.status}`; if (k !== turnKey) { turnKey = k; turnSeen = Date.now(); }
+      serverG = ng;
+      const prevMove = g.moveNo;
+      const rec = net.reconcile(ng.moveNo, pendingNo);
+      pendingNo = rec.pending;
+      if (!rec.take) { scheduleClaim(); return; }
+      g = ng;
       if (g.moveNo !== prevMove && g.turn === side()) ui.sfx.play('place');
       if (g.status === 'active' && side() >= 0 && !stopHb) stopHb = net.heartbeat(gid);
       if (g.status === 'active' && g.moveNo === 0 && g.quick) net.leaveQueue('chess', g.mode, gid);

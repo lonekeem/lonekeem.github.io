@@ -1,8 +1,8 @@
 // Pal Games: real-time Pal vs Pal mini-games (Pal Race, Bubble Pop Battle, Star Catch, Dance-Off).
 // Both players play the same seeded course; each writes its own progress ~2x a second (palGames/{id}/live/{uid})
 // and the other's Pal is shown as a live ghost, interpolated. Wins go on the palStats leaderboard.
-import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, writeBatch, Timestamp, addDoc }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, writeBatch, Timestamp, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { createLink } from '../games/link.js';
 import { drawPal, drawBubble, star } from './art.js';
 import { drawDancer } from './dance.js';
 import { getActivePal } from './core.js';
@@ -188,12 +188,48 @@ export function createPalGames(ctx) {
   // online match page
   async function match(gid) {
     if (!requireAuth()) return; let unsub = null, unsubL = null, started = false, g = null; const live = {}; const shown = {};
-    main.innerHTML = `<section class="pg-play"><div class="pg-top" id="pg-top">Loading…</div><div class="pg-host"></div></section>`;
+    const link = createLink(); const seen = {}; let ge = null;
+    main.innerHTML = `<section class="pg-play"><div class="pg-top" id="pg-top">Loading…</div><span class="k-link-slot"></span><div class="pg-host"></div></section>`;
+    link.mount(main.querySelector('.k-link-slot'));
     const host = main.querySelector('.pg-host'), top = main.querySelector('#pg-top');
-    try { const s = await getDoc(doc(db, 'palGames', gid)); if (!s.exists()) { top.textContent = 'That game doesn’t exist.'; return; } g = s.data();
-      if (!g.players.includes(me()) && g.status === 'waiting' && (!g.invitee || g.invitee === me())) await join(gid); } catch (e) { top.textContent = friendlyError(e); return; }
-    unsub = onSnapshot(doc(db, 'palGames', gid), (s) => { if (!document.body.contains(host)) { unsub(); unsubL && unsubL(); return; } g = s.data(); render(); });
-    unsubL = onSnapshot(collection(db, 'palGames', gid, 'live'), (qs) => qs.forEach((d) => { live[d.id] = d.data(); }));
+    let stopped = false;
+    const bind = () => {
+      if (stopped) return;
+      if (unsub) { unsub(); unsub = null; }
+      if (unsubL) { unsubL(); unsubL = null; }
+      unsub = onSnapshot(doc(db, 'palGames', gid), (s) => {
+        if (!document.body.contains(host)) { stopWatch(); return; }
+        const pending = !!(s.metadata && s.metadata.hasPendingWrites);
+        if (s.exists() && !pending && s.data().updatedAt && s.data().updatedAt.toMillis) link.noteServer(s.data().updatedAt.toMillis());
+        link.noteSnap(pending);
+        g = s.data(); render();
+      }, () => { link.fail(); if (!stopped) setTimeout(bind, 1200); });
+      unsubL = onSnapshot(collection(db, 'palGames', gid, 'live'), (qs) => qs.docChanges().forEach((ch) => {
+        const d = ch.doc.data(); live[ch.doc.id] = d;
+        if (ch.doc.id !== me() && d.emAt && ge && d.emAt !== seen[ch.doc.id]) {
+          const first = seen[ch.doc.id] === undefined; seen[ch.doc.id] = d.emAt;
+          if (!first || Date.now() - d.emAt < 6000) ge.recv(ch.doc.id, d.em, g && g.names ? g.names[g.players.indexOf(ch.doc.id)] : '');
+        }
+      }), () => link.fail());
+    };
+    const wake = () => { if (stopped || document.visibilityState === 'hidden') return; link.setDown(false); bind(); };
+    const stopWatch = () => {
+      stopped = true;
+      removeEventListener('hashchange', stopWatch);
+      document.removeEventListener('visibilitychange', wake);
+      document.removeEventListener('resume', wake);
+      removeEventListener('online', wake);
+      if (unsub) { unsub(); unsub = null; }
+      if (unsubL) { unsubL(); unsubL = null; }
+      link.stop();
+    };
+    addEventListener('hashchange', stopWatch);
+    document.addEventListener('visibilitychange', wake);
+    document.addEventListener('resume', wake);
+    addEventListener('online', wake);
+    try { const s = await getDoc(doc(db, 'palGames', gid)); if (!s.exists()) { top.textContent = 'That game doesn’t exist.'; stopWatch(); return; } g = s.data();
+      if (!g.players.includes(me()) && g.status === 'waiting' && (!g.invitee || g.invitee === me())) await join(gid); } catch (e) { top.textContent = friendlyError(e); stopWatch(); return; }
+    bind();
     function render() {
       if (!g) return; const other = g.players.find((u) => u !== me()); const oi = g.players.indexOf(other);
       if (g.status === 'waiting') { const link = location.href.split('#')[0] + '#/games/pals/' + gid;
@@ -206,15 +242,22 @@ export function createPalGames(ctx) {
       if (!g.players.includes(me())) top.innerHTML = `${esc(g.names.join(' vs '))} · this match is full`;
     }
     async function go(other, oi) {
-      const wait = Math.max(0, (g.startAt && g.startAt.toMillis ? g.startAt.toMillis() : Date.now()) - Date.now()); host.innerHTML = `<div class="pg-count">${Math.ceil(wait / 1000) || 'Go!'}</div>`;
-      const cdi = setInterval(() => { const el = host.querySelector('.pg-count'); const left = Math.ceil(((g.startAt && g.startAt.toMillis ? g.startAt.toMillis() : 0) - Date.now()) / 1000); if (el) el.textContent = left > 0 ? left : 'Go!'; }, 250);
+      const goAt = () => (g.startAt && g.startAt.toMillis ? g.startAt.toMillis() : link.serverNow());
+      const wait = Math.max(0, goAt() - link.serverNow()); host.innerHTML = `<div class="pg-count">${Math.ceil(wait / 1000) || 'Go!'}</div>`;
+      const cdi = setInterval(() => { const el = host.querySelector('.pg-count'); const left = Math.ceil((goAt() - link.serverNow()) / 1000); if (el) el.textContent = left > 0 ? left : 'Go!'; }, 250);
       await new Promise((r) => setTimeout(r, wait)); clearInterval(cdi);
       const lref = doc(db, 'palGames', gid, 'live', me()); let lastW = 0, pending = null, best = 0;
       // Pal emotes ride along in the live doc (em/emAt), sent with the next progress write (rules keep the ~2/s limit)
-      let emF = {}; const seen = {}; let ge = null;
+      let emF = {};
       import('./game-emotes.js').then((m) => { ge = m.mountGameEmotes(host, { db, uid: me(), toast, send: async (code) => { emF = { em: code, emAt: Date.now() }; } }); }).catch(() => {});
-      const emPoll = setInterval(() => { if (!host.isConnected) { clearInterval(emPoll); return; } const L = live[other]; if (L && L.emAt && L.emAt !== seen[other]) { const first = seen[other] === undefined; seen[other] = L.emAt; if (!first || Date.now() - L.emAt < 6000) ge && ge.recv(other, L.em, g.names[oi]); } }, 300);
-      const send = (p, s, fin) => { best = Math.max(best, s); const now = Date.now(); const data = { p, s: Math.min(999, best), fin: !!fin, at: serverTimestamp(), ...emF }; if (!fin && now - lastW < 450) return; lastW = now; setDoc(lref, data).catch(() => {}); };
+      const send = (p, s, fin) => {
+        best = Math.max(best, s); const now = Date.now();
+        const data = { p: Math.max(0, Math.min(1000, p | 0)), s: Math.min(999, best), fin: !!fin, at: serverTimestamp(), ...emF };
+        if (!fin && now - lastW < 220) return;
+        lastW = now; link.markWrite();
+        const t0 = performance.now();
+        setDoc(lref, data).then(() => link.noteRtt(performance.now() - t0), () => link.fail());
+      };
       const opp = () => { const L = live[other] || { p: 0, s: 0 }; const cur = shown[other] || { p: 0, s: 0 }; cur.p += (L.p - cur.p) * 0.15; cur.s = L.s; shown[other] = cur; return { p: cur.p, s: cur.s, name: g.names[oi] }; };
       const score = await playGame(host, g.game, g.seed, { pal: g.pals[g.players.indexOf(me())], oppPal: g.pals[oi], opp, onTick: (p, s) => send(p, s, false), sound });
       await new Promise((r) => setTimeout(r, 500)); await setDoc(lref, { p: 1000, s: Math.min(999, score), fin: true, at: serverTimestamp(), ...emF }).catch(() => {});

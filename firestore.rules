@@ -1314,10 +1314,12 @@ service cloud.firestore {
         // Star Cards: a seated player sends an intent (play/draw/pass) or a call (LAST STAR! / catch)
         || (member() && od().type == 'starcards' && od().status == 'active'
             && ((changed().hasOnly(['intent', 'updatedAt']) && nd().intent.uid == me()
-                 && nd().intent.keys().hasOnly(['uid', 't', 'card', 'color', 'last', 'n'])
+                 && nd().intent.keys().hasOnly(['uid', 't', 'card', 'color', 'last', 'n', 'seq'])
+                 && nd().intent.seq is int && nd().intent.seq >= 0 && nd().intent.seq <= 8000
                  && nd().intent.t in ['play', 'draw', 'pass'] && od().players[od().pv.turn] == me())
              || (changed().hasOnly(['call', 'updatedAt']) && nd().call.uid == me()
-                 && nd().call.keys().hasOnly(['uid', 't', 'n']) && nd().call.t in ['last', 'catch'])))
+                 && nd().call.keys().hasOnly(['uid', 't', 'n', 'seq']) && nd().call.seq is int && nd().call.seq >= 0 && nd().call.seq <= 8000
+                 && nd().call.t in ['last', 'catch'])))
       );
       allow delete: if isAdmin();
 
@@ -2167,7 +2169,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['p', 's', 'fin', 'at', 'em', 'emAt']) && (!('em' in request.resource.data) || (request.resource.data.em is int && request.resource.data.em >= -1 && request.resource.data.em <= 199 && request.resource.data.emAt is int)) && request.resource.data.p is int && request.resource.data.p >= 0 && request.resource.data.p <= 1000
           && request.resource.data.s is int && request.resource.data.s >= 0 && request.resource.data.s <= 999 && request.resource.data.fin is bool
           && request.resource.data.at == request.time
-          && (resource == null || (!resource.data.fin && resource.data.at + duration.value(300, 'ms') < request.time && request.resource.data.s >= resource.data.s));
+          && (resource == null || (!resource.data.fin && resource.data.at + duration.value(200, 'ms') < request.time && request.resource.data.s >= resource.data.s));
         allow delete: if false;
       }
       match /rec/{uid} {
@@ -2258,7 +2260,7 @@ service cloud.firestore {
         && (!('street' in wd()) || wd().street == null || carOk(wd().street))
         && wd().at == request.time && (resource == null || resource.data.at + duration.value(5, 's') < request.time);
     }
-    // ================= Pal Park presence: rooms of ~20, ~4 writes/s while moving, stale docs removable by anyone
+    // ================= Pal Park presence: rooms of ~20, ~14 writes/s while moving, stale docs removable by anyone
     match /parkRooms/{room}/p/{uid} {
       function pp() { return request.resource.data; }
       function cellNo() { return int(math.floor((float(pp().x - 1600) / 16.0 - 400.0) / 20.0)) + 6 * int(math.floor((float(pp().y - 1200) / 16.0 + 70.0) / 20.0)) + 1; } // js/world/layout.js ROOMS (20 m cells, 6 per row)
@@ -2288,7 +2290,7 @@ service cloud.firestore {
         // Parental Controls: chat off means no new 'say' text (same profile doc as above, no extra lookup)
         && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || !pcOff(get(/databases/$(database)/documents/users/$(uid)).data, 'chat'))
         && pp().pal is map && pp().at == request.time
-        && (resource == null || resource.data.at + duration.value(200, 'ms') < request.time);
+        && (resource == null || resource.data.at + duration.value(70, 'ms') < request.time);
       allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(2, 'm'));
     }
   }

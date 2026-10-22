@@ -113,7 +113,24 @@ export function createTrivia(ctx) {
   async function online(g0, token) {
     const qsAll = await bank();
     const gid = g0.id;
-    let g = g0, stopHb = null, answers = {}, unsubAns = null, hostTimer = 0, roundSeenAt = 0, lastKey = '', ended = false, autoStart = 0;
+    let g = g0, stopHb = null, answers = {}, unsubAns = null, hostTimer = 0, lastKey = '', ended = false, autoStart = 0;
+    const phaseLeft = () => {
+      const start = tsMs(g.phase === 'q' ? g.roundAt : g.updatedAt) || net.serverNow();
+      const total = g.phase === 'q' ? (ROUND_S + 1) * 1000 : REVEAL_MS;
+      return start + total - net.serverNow();
+    };
+    async function hostWrite(expect, patch) {
+      const ref = net.fs.doc(db, 'games', gid);
+      await net.fs.runTransaction(db, async (tx) => {
+        const s = await tx.get(ref);
+        if (!s.exists()) { const e = new Error('over'); e.code = 'over'; throw e; }
+        const cur = s.data();
+        if (expect.status && cur.status !== expect.status) { const e = new Error('stale'); e.code = 'stale'; throw e; }
+        if (expect.phase && cur.phase !== expect.phase) { const e = new Error('stale'); e.code = 'stale'; throw e; }
+        if (expect.round != null && cur.round !== expect.round) { const e = new Error('stale'); e.code = 'stale'; throw e; }
+        tx.update(ref, { ...patch, updatedAt: net.fs.serverTimestamp() });
+      });
+    }
     const me = () => ui.myUid();
     const isHost = () => g.host === me();
     const member = () => g.players.includes(me());
@@ -142,7 +159,7 @@ export function createTrivia(ctx) {
       if (!isHost() || g.status !== 'waiting') return;
       clearTimeout(autoStart);
       try {
-        await net.update(gid, { status: 'active', round: 0, phase: 'q', qs: pickQs(ROUNDS), roundAt: net.fs.serverTimestamp(), scores: Object.fromEntries(g.players.map((u) => [u, 0])), reveal: {} });
+        await hostWrite({ status: 'waiting' }, { status: 'active', round: 0, phase: 'q', qs: pickQs(ROUNDS), roundAt: net.fs.serverTimestamp(), scores: Object.fromEntries(g.players.map((u) => [u, 0])), reveal: {} });
         net.leaveQueue('trivia', '', gid);
       } catch (e) { toast(friendlyError(e)); }
     }
@@ -159,11 +176,11 @@ export function createTrivia(ctx) {
       if (!isHost() || g.status !== 'active') return;
       if (g.phase === 'q') {
         const got = g.players.filter((u) => answers[u] && answers[u].round === g.round).length;
-        const left = roundSeenAt + (ROUND_S + 1) * 1000 - Date.now();
+        const left = phaseLeft();
         if (got >= g.players.length || left <= 0) closeRound();
         else hostTimer = setTimeout(hostCheck, Math.min(left, 1000));
       } else if (g.phase === 'reveal') {
-        const left = roundSeenAt + REVEAL_MS - Date.now();
+        const left = phaseLeft();
         hostTimer = setTimeout(nextRound, Math.max(0, left));
       }
     }
@@ -174,16 +191,16 @@ export function createTrivia(ctx) {
         const a = answers[u];
         if (a && a.round === g.round && a.choice === 0) { gained[u] = pointsFor(Math.max(0, tsMs(a.at) - r0)); scores[u] = (scores[u] || 0) + gained[u]; }
       }
-      try { await net.update(gid, { phase: 'reveal', scores, reveal: { round: g.round, gained } }); } catch (e) { console.warn(e); }
+      try { await hostWrite({ phase: 'q', round: g.round }, { phase: 'reveal', scores, reveal: { round: g.round, gained } }); } catch (e) { if (!(e && e.code === 'stale')) console.warn(e); }
     }
     async function nextRound() {
       if (g.phase !== 'reveal') return;
       if (g.round + 1 < ROUNDS) {
-        try { await net.update(gid, { round: g.round + 1, phase: 'q', roundAt: net.fs.serverTimestamp(), reveal: {} }); } catch (e) { console.warn(e); }
+        try { await hostWrite({ phase: 'reveal', round: g.round }, { round: g.round + 1, phase: 'q', roundAt: net.fs.serverTimestamp(), reveal: {} }); } catch (e) { if (!(e && e.code === 'stale')) console.warn(e); }
       } else {
         const rows = Object.entries(g.scores || {}).sort((a, b) => b[1] - a[1]);
         const tie = rows.length > 1 && rows[0][1] === rows[1][1];
-        try { await net.update(gid, { status: 'done', winnerUid: tie ? 'draw' : rows[0][0], endReason: tie ? 'draw' : 'win' }); iEnded = true; } catch (e) { console.warn(e); }
+        try { await hostWrite({ phase: 'reveal', round: g.round }, { status: 'done', winnerUid: tie ? 'draw' : rows[0][0], endReason: tie ? 'draw' : 'win' }); iEnded = true; } catch (e) { if (!(e && e.code === 'stale')) console.warn(e); }
       }
     }
     let iEnded = false;
@@ -206,10 +223,11 @@ export function createTrivia(ctx) {
       }
       const key = g.round + ':' + g.phase;
       if (key !== lastKey) {
-        roundSeenAt = Date.now(); lastKey = key;
+        lastKey = key;
         const qi = g.qs[g.round], q = qsAll[qi];
         const prevPick = v.round === g.round ? v.picked : null;
-        v = { phase: g.phase, round: g.round, q, ord: order(gid + ':' + qi), picked: prevPick, deadline: roundSeenAt + ROUND_S * 1000, players: players(), scores: g.scores || {}, gained: (g.reveal && g.reveal.gained) || {} };
+        const start = tsMs(g.roundAt) || net.serverNow();
+        v = { phase: g.phase, round: g.round, q, ord: order(gid + ':' + qi), picked: prevPick, deadline: Date.now() + (start + ROUND_S * 1000 - net.serverNow()), players: players(), scores: g.scores || {}, gained: (g.reveal && g.reveal.gained) || {} };
         if (g.phase === 'q') { v.picked = null; ui.sfx.play('pop'); }
         if (g.phase === 'reveal') ui.sfx.play(v.picked === 0 ? 'right' : 'wrong');
         paint(v, member() ? pick : () => {});

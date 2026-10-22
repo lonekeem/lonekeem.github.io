@@ -196,11 +196,8 @@ export function createStarCards(ctx) {
       const save = (events, extra = {}) => {
         const snap = JSON.parse(JSON.stringify(st));
         chain = chain.then(async () => {
-          const b = net.fs.writeBatch(db);
-          const pv = { ...C.publicView(snap), ev: events.slice(-3) };
-          const { dealt, ...gextra } = extra;
-          b.update(net.fs.doc(db, 'games', gid), { pv, turnAt: net.fs.serverTimestamp(), updatedAt: net.fs.serverTimestamp(), ...gextra });
-          b.set(net.fs.doc(db, 'games', gid, 'hands', '_dealer'), { s: JSON.stringify({ st: snap, seenI, seenC }) });
+          const gameRef = net.fs.doc(db, 'games', gid);
+          const hands = [];
           g.players.forEach((uid, seat) => {
             if (isBot(uid)) return;
             const data = { hand: snap.hands[seat], seat, drawn: snap.drew && snap.turn === seat ? snap.drawn : null, round: snap.round };
@@ -208,10 +205,22 @@ export function createStarCards(ctx) {
             if (written[uid] === key && !extra.status) return;
             written[uid] = key;
             if (extra.dealt) data.dealt = snap.hands[seat];
-            b.set(net.fs.doc(db, 'games', gid, 'hands', uid), data, { merge: true });
+            hands.push([uid, data]);
           });
-          await b.commit();
-        }).catch((e) => { console.warn('deal write', e.code || e.message); written = {}; });
+          await net.fs.runTransaction(db, async (tx) => {
+            const cur = await tx.get(gameRef);
+            const pv0 = cur.exists() ? cur.data().pv : null;
+            if (pv0 && typeof pv0.seq === 'number' && snap.seq < pv0.seq) { const e = new Error('stale'); e.code = 'stale'; throw e; }
+            const pv = { ...C.publicView(snap), ev: events.slice(-3) };
+            const { dealt, ...gextra } = extra;
+            tx.update(gameRef, { pv, turnAt: net.fs.serverTimestamp(), updatedAt: net.fs.serverTimestamp(), ...gextra });
+            tx.set(net.fs.doc(db, 'games', gid, 'hands', '_dealer'), { s: JSON.stringify({ st: snap, seenI, seenC }) });
+            hands.forEach(([uid, data]) => tx.set(net.fs.doc(db, 'games', gid, 'hands', uid), data, { merge: true }));
+          });
+        }).catch(async (e) => {
+          console.warn('deal write', e.code || e.message); written = {};
+          if (e && e.code === 'stale') { st = null; await ensure(); }
+        });
         return chain;
       };
       async function ensure() {
@@ -268,9 +277,15 @@ export function createStarCards(ctx) {
         if (!isHost() || g.status !== 'active') return;
         if (!(await ensure())) return;
         const it = g.intent || {};
-        if (it.n && it.n !== seenI) { seenI = it.n; const seat = g.players.indexOf(it.uid); if (seat >= 0) apply(seat, { t: it.t, card: it.card, color: it.color, last: !!it.last }); }
+        if (it.n && it.n !== seenI) {
+          seenI = it.n; const seat = g.players.indexOf(it.uid);
+          if (seat >= 0 && st && (it.seq == null || it.seq === st.seq)) apply(seat, { t: it.t, card: it.card, color: it.color, last: !!it.last });
+        }
         const cl = g.call || {};
-        if (cl.n && cl.n !== seenC) { seenC = cl.n; const seat = g.players.indexOf(cl.uid); if (seat >= 0) apply(seat, { t: cl.t }); }
+        if (cl.n && cl.n !== seenC) {
+          seenC = cl.n; const seat = g.players.indexOf(cl.uid);
+          if (seat >= 0 && st && (cl.seq == null || cl.seq === st.seq)) apply(seat, { t: cl.t });
+        }
         plan();
       }
       return {
@@ -280,13 +295,20 @@ export function createStarCards(ctx) {
     })();
     let iEnded = false;
 
+    let lockSeq = -1, lockCall = -1;
     function send(a) {
+      const seq = g.pv ? g.pv.seq : 0;
       if (isHost()) { if (!dealer.act(mySeat(), a)) toast('That move isn’t allowed right now'); return; }
-      net.update(gid, { intent: { uid: me(), t: a.t, card: a.card || '', color: a.color || '', last: !!a.last, n: Date.now() + Math.random() } }).catch((e) => toast(friendlyError(e)));
+      if (lockSeq === seq) return;
+      lockSeq = seq;
+      net.update(gid, { intent: { uid: me(), t: a.t, card: a.card || '', color: a.color || '', last: !!a.last, n: Date.now() + Math.random(), seq } }).catch((e) => { lockSeq = -1; toast(friendlyError(e)); });
     }
     function call(a) {
+      const seq = g.pv ? g.pv.seq : 0;
       if (isHost()) { dealer.act(mySeat(), a); return; }
-      net.update(gid, { call: { uid: me(), t: a.t, n: Date.now() + Math.random() } }).catch((e) => toast(friendlyError(e)));
+      if (lockCall === seq) return;
+      lockCall = seq;
+      net.update(gid, { call: { uid: me(), t: a.t, n: Date.now() + Math.random(), seq } }).catch((e) => { lockCall = -1; toast(friendlyError(e)); });
     }
     function lobby() {
       const box = $('#sc-body'); if (!box) return;
@@ -326,8 +348,8 @@ export function createStarCards(ctx) {
       if (!g.pv) { const b = $('#sc-body'); if (b) b.innerHTML = '<div class="spinner"></div>'; return; }
       const pv = g.pv, seat = mySeat();
       const key = pv.turn + ':' + pv.seq;
-      if (key !== lastTurnKey) { lastTurnKey = key; turnSeenAt = Date.now(); }
-      const left = Math.max(0, TURN_S - Math.floor((Date.now() - turnSeenAt) / 1000));
+      if (key !== lastTurnKey) lastTurnKey = key;
+      const left = Math.max(0, TURN_S - Math.floor((net.serverNow() - (tsMs(g.turnAt) || net.serverNow())) / 1000));
       paint({ seats: seats(), mySeat: seat, pv, hand: seat >= 0 ? hand.hand || [] : [], drawn: hand.drawn, timerLeft: pv.roundWinner < 0 ? left : null, verified, msg: eventMsg(pv.ev, seats()) }, { send, call });
       $('#g-actions').innerHTML = g.status === 'done' ? `<a class="btn btn-sm btn-ghost" href="#/games">Games</a>` : `<button class="btn btn-sm btn-ghost" id="sc-copy2">Share link</button><a class="btn btn-sm btn-ghost" href="#/games">Leave</a>`;
       const c2 = $('#sc-copy2'); if (c2) c2.onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
@@ -359,7 +381,7 @@ export function createStarCards(ctx) {
         if (hand.dealt && hand.round && !myDealt[hand.round]) myDealt[hand.round] = hand.dealt;
         draw();
       }, () => {});
-      if (member() && !isHost() && g.status === 'active' && g.hb && g.hb[g.host] && Date.now() - tsMs(g.hb[g.host]) > 40000
+      if (member() && !isHost() && g.status === 'active' && g.hb && g.hb[g.host] && net.serverNow() - tsMs(g.hb[g.host]) > 40000
           && g.players.filter((u) => !isBot(u) && u !== g.host)[0] === me()) {
         net.fs.updateDoc(net.fs.doc(db, 'games', gid), { host: me(), [`hb.${me()}`]: net.fs.serverTimestamp() }).catch(() => {});
       }

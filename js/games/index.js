@@ -17,7 +17,7 @@ const CPU_KEY = 'lks-games-cpu';
 export function createGames(ctx) {
   const { S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale } = ctx;
   if (!document.getElementById('games-css')) {
-    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=2'; document.head.appendChild(l);
+    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=3'; document.head.appendChild(l);
   }
   const net = createNet({ db, S });
   const signedIn = () => !!(S.user && S.profile);
@@ -36,8 +36,9 @@ export function createGames(ctx) {
   }
   function shell(title, body, back = '#/games') {
     main.innerHTML = `<section class="gm-wrap">
-      <div class="gm-bar"><a class="g-icon" href="${back}" aria-label="Back">←</a><h1>${title}</h1><div class="g-tools">${muteBtn()}${gearBtn()}</div></div>${body}</section>`;
+      <div class="gm-bar"><a class="g-icon" href="${back}" aria-label="Back">←</a><h1>${title}</h1><div class="g-tools"><span class="k-link-slot"></span>${muteBtn()}${gearBtn()}</div></div>${body}</section>`;
     wireMute(main);
+    net.link.mount(main.querySelector('.k-link-slot'));
   }
   function burst(host, n = 14) {
     if (!host) return;
@@ -328,7 +329,7 @@ export function createGames(ctx) {
   // ------------------------------------------------------------ online board game
   async function onlineBoard(g0, token) {
     const gid = g0.id, type = g0.type, E = ENGINES[type];
-    let g = g0, sel = -1, lastSeenMove = -1, ended = false, claimTimer = 0, joinedAsk = false;
+    let g = g0, serverG = g0, sel = -1, lastSeenMove = -1, ended = false, claimTimer = 0, joinedAsk = false, pendingNo = null;
     const title = `${gameName(type)}${g.mode === 'ultimate' ? ' Ultimate' : ''}`;
     boardShell(type, g.mode, title, '#/games');
     const names = (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; };
@@ -372,7 +373,7 @@ export function createGames(ctx) {
       const side = mySide(), done = g.status === 'done';
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
-      const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - (tsMs(g.turnAt) || Date.now())) / 1000)) : null;
+      const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
       $('#g-players').innerHTML = playersBar(type, ps, g.turn, left, done || g.status === 'waiting');
       const status = $('#g-status');
       if (g.status === 'waiting') status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend to join…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
@@ -387,15 +388,20 @@ export function createGames(ctx) {
     }
     const cellOf = (st) => (type === 'stardrop' && st.last !== '' ? (() => { for (let r = 0; r < 6; r++) if (st.board[r * 7 + +st.last] !== '.') return r * 7 + +st.last; return -1; })() : type === 'checkers' ? +String(st.last).split('-').pop() : st.last === '' ? -1 : +st.last);
     async function move(m) {
+      if (pendingNo != null || g.status !== 'active' || mySide() !== g.turn) return;
       const st = { board: g.board, turn: g.turn, last: g.last, no: g.moveNo };
       let nx; try { nx = E.apply(st, m); } catch (e) { toast(e.message); return; }
       const out = E.outcome({ ...nx, no: st.no + 1 });
-      const upd = { board: nx.board, turn: nx.turn, last: m, moveNo: g.moveNo + 1, turnAt: net.fs.serverTimestamp() };
+      const expect = g.moveNo || 0;
+      const upd = { board: nx.board, turn: nx.turn, last: m, moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
       if (out) Object.assign(upd, { status: 'done', winnerUid: out.winner === 'draw' ? 'draw' : myUid(), endReason: out.winner === 'draw' ? 'draw' : 'win' });
-      // optimistic
+      pendingNo = upd.moveNo;
       g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } }; sel = -1; sfx.play(sndFor(type, nx, st)); draw();
-      try { await net.update(gid, upd); if (out) iEnded = true; }
-      catch (e) { toast(friendlyError(e)); }
+      try { await net.commitMove(gid, expect, upd); if (out) iEnded = true; }
+      catch (e) {
+        pendingNo = null; iEnded = false; g = serverG; sel = -1; draw();
+        toast(e && e.code === 'stale' ? 'That move already happened.' : friendlyError(e));
+      }
     }
     let iEnded = false;
     function onEnd() {
@@ -418,14 +424,18 @@ export function createGames(ctx) {
       const side = mySide();
       if (g.status !== 'active' || side < 0 || g.turn === side) return;
       const other = g.players[1 - side];
-      const tTurn = (tsMs(g.turnAt) || Date.now()) + (TURN_SECONDS + 6) * 1000 - Date.now();
+      const tTurn = (tsMs(g.turnAt) || net.serverNow()) + (TURN_SECONDS + 6) * 1000 - net.serverNow();
       const hb = g.hb && g.hb[other] ? tsMs(g.hb[other]) : 0;
       const tHb = hb ? hb + 48000 - Date.now() : Infinity;
       claimTimer = setTimeout(async () => { await claim('timeout'); }, Math.max(1500, Math.min(tTurn, tHb)));
     }
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
+      serverG = ng;
       const prevMove = g.moveNo; const prevStatus = g.status;
+      const rec = net.reconcile(ng.moveNo, pendingNo);
+      pendingNo = rec.pending;
+      if (!rec.take) { scheduleClaim(); return; }
       g = ng;
       if (g.moveNo !== prevMove && g.moveNo > 0 && lastSeenMove >= 0 && g.players[g.turn] === myUid()) sfx.play(type === 'stardrop' ? 'drop' : 'place');
       lastSeenMove = g.moveNo;

@@ -127,7 +127,7 @@ export function createLudo(ctx) {
 
   async function online(g0) {
     const gid = g0.id;
-    let g = g0, ended = false, stopHb = null, chain = null, committing = false, sentK = -1, submittedK = -1, dieK = {}, flagged = {}, prevLv = null, botT = 0, joinTried = false, iEnded = false, turnSeen = Date.now(), turnKey = '', dropTried = '';
+    let g = g0, serverG = g0, ended = false, stopHb = null, chain = null, committing = false, sentK = -1, submittedK = -1, dieK = {}, flagged = {}, prevLv = null, botT = 0, joinTried = false, iEnded = false, pendingNo = null, dropTried = '';
     const me = () => ui.myUid();
     const isHost = () => g.host === me();
     const member = () => g.players.includes(me());
@@ -163,11 +163,18 @@ export function createLudo(ctx) {
     // the die depends on who is seated (a player who leaves is replaced by a bot), so cache it per roll AND per seating
     const dk = (k) => k + '|' + g.players.join(',');
     async function submit(st, die, token) {
-      const k = st.k; if (submittedK >= k) return; submittedK = k;
+      const k = st.k; if (submittedK >= k || pendingNo != null) return; submittedK = k;
       let ns; try { ns = L.step(st, die, token); } catch { submittedK = k - 1; return; }
-      const upd = { lv: toLv(ns), moveNo: (g.moveNo || 0) + 1, turnAt: net.fs.serverTimestamp() };
+      const expect = g.moveNo || 0;
+      const upd = { lv: toLv(ns), moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
       if (ns.winner >= 0) Object.assign(upd, { status: 'done', winnerUid: g.players[ns.winner], endReason: 'win' });
-      if (ns.winner >= 0) iEnded = true; try { await net.update(gid, upd); } catch (e) { iEnded = false; submittedK = k - 1; toast(friendlyError(e)); }
+      pendingNo = upd.moveNo;
+      const prev = g;
+      g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } };
+      draw();
+      if (ns.winner >= 0) iEnded = true;
+      try { await net.commitMove(gid, expect, upd); }
+      catch (e) { pendingNo = null; iEnded = false; submittedK = k - 1; g = serverG.moveNo >= prev.moveNo ? serverG : prev; draw(); toast(e && e.code === 'stale' ? 'That move already happened.' : friendlyError(e)); }
     }
     // drive the roll / move cycle from the latest snapshot
     async function step() {
@@ -197,7 +204,7 @@ export function createLudo(ctx) {
     // a human who blocks the game for a full turn timer is replaced by a computer player
     function afk() {
       if (g.status !== 'active' || !g.lv || !member()) return;
-      if (Date.now() - turnSeen < (TURN_SECONDS + 5) * 1000) return;
+      if (net.serverNow() - (tsMs(g.turnAt) || net.serverNow()) < (TURN_SECONDS + 5) * 1000) return;
       const k = g.lv.k, rk = g.rk || {}, turnU = g.players[g.lv.turn];
       const blockers = humans().filter((u) => u !== me() && ((rk[u] ?? -1) < k || (u === turnU && allRevealed(k))));
       const okMe = humans().filter((u) => !blockers.includes(u))[0] === me();
@@ -257,7 +264,7 @@ export function createLudo(ctx) {
       const canRoll = myTurn && (rk[me()] ?? -1) < k && sentK < k;
       const rolling = g.status === 'active' && !revealedAll && (rk[roller()] === k);
       const movable = myTurn && revealedAll && die != null && submittedK < k ? L.legal(st, die) : [];
-      const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - turnSeen) / 1000)) : null;
+      const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
       const note = revealedAll && die != null ? `Rolled ${die}${st.msg ? ' · ' + st.msg : ''}` : st.msg ? `${g.lv.die ? 'Last roll ' + g.lv.die + ' · ' : ''}${st.msg}` : '';
       paint({ st, seats: seats(), mySeat: seat, die: revealedAll && die != null ? die : g.lv.die, rolling, canRoll, movable, timer: left, note, flagged }, {
         roll: () => { reveal(k); draw(); },
@@ -274,9 +281,13 @@ export function createLudo(ctx) {
     }
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This room is gone. <a href="#/games">Games</a></div>'; return; }
-      g = ng;
+      serverG = ng;
+      const rec = net.reconcile(ng.moveNo, pendingNo);
+      pendingNo = rec.pending;
+      if (!rec.take) {
+        g = { ...ng, lv: g.lv, moveNo: g.moveNo, status: g.status, winnerUid: g.winnerUid || '', endReason: g.endReason || '', turnAt: g.turnAt };
+      } else g = ng;
       if (g.lv) {
-        const k = `${g.lv.k}|${g.status}`; if (k !== turnKey) { turnKey = k; turnSeen = Date.now(); }
         if (prevLv && g.lv.k === prevLv.k + 1) { verify(prevLv, g.lv); sound(fromLv(prevLv), fromLv(g.lv)); }
         prevLv = g.lv;
       }

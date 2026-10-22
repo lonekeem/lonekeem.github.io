@@ -3,9 +3,10 @@
 // phones, WASD/Space/Shift on desktop. Physics-lite: gravity, jumping, collisions with trees/rocks/buildings, slopes, stairs.
 // World: gentle-hill terrain, instanced trees (oak, pine, birch) with near/far LOD, swaying grass, flowers, a pond with
 // water shading, paths, benches, lamps, a playground, a fountain and the purple Kemy Studio. All original, built in code.
-// Multiplayer: Firestore presence in rooms of 25 (parkRooms/rN/p/{uid}), <= 4 writes/s while moving, 15 s heartbeat,
-// interpolation, stale cleanup. Chat via the safety filter, bubbles + chat log, report / mute / block.
+// Multiplayer: Firestore presence in rooms of 25 (parkRooms/rN/p/{uid}), about 12 writes/s while moving
+// (delta-skipped when still), 15 s heartbeat, ~100 ms interpolation, stale cleanup. Chat via the safety filter.
 import { spamOk } from '../spam.js';
+import { createLink } from '../games/link.js';
 import { getCountFromServer, doc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp, addDoc }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { THREE, makePal3D, posePal3D, gfxLevel } from './pal3d.js';
@@ -25,7 +26,7 @@ import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, at
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
 const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX), Math.round(z * PX + CY)];
 const W = 100, H = 75;                                // world half-size (200 m x 150 m)
-const MAX_ROOM = 100, ROOMS = 20, CELL = 160, MAX_DRAWN = 30, SEND_MS = 1000, HB_MS = 15000, STALE_MS = 30000;
+const MAX_ROOM = 100, ROOMS = 20, CELL = 160, MAX_DRAWN = 30, SEND_MS = 80, HB_MS = 15000, STALE_MS = 10000;
 const PORTAL_NAME = { race: 'Pal Race', bubbles: 'Bubble Pop', stars: 'Star Catch', dance: 'Dance-Off' };
 const EMO_DANCE = { '👋': 'wave', '💜': 'happyshimmy', '😂': 'bounce', '😮': 'woah', '🎉': 'groove', '😴': 'slowmo', '⭐': 'twirl', '🐾': 'hopclap' };
 const BPM = 112;
@@ -61,7 +62,7 @@ export function createPark3D(ctx) {
     const Q = gfxPreset(); const ULTRA = Q.tier === 'ultra', LOW = Q.tier === 'low'; void gfxLevel; // shared Graphics setting (js/gfx.js)
     main.innerHTML = `<section class="p3"><div class="p3-view" id="p3-view">
       <canvas id="park-cv" class="p3-cv" tabindex="0" aria-label="Pal Park 3D. Joystick or WASD to walk, Space to jump, Shift to run. Drag to look around."></canvas>
-      <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div><button class="p3-b" id="p3-set" aria-label="Control settings">⚙️</button>
+      <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span class="k-link-slot"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div><button class="p3-b" id="p3-set" aria-label="Control settings">⚙️</button>
       <div class="p3-log" id="p3-log" aria-live="polite"></div>
       <div class="p3-tags" id="p3-tags"></div>
       <form class="p3-chat" id="p3-chat"><input id="p3-t" maxlength="60" placeholder="Say something nice…" autocomplete="off" enterkeyhint="send" aria-label="Chat message"><button class="p3-send" aria-label="Send">➤</button><button type="button" class="p3-b" id="p3-quick" aria-label="Quick phrases">💬</button></form>
@@ -423,14 +424,22 @@ export function createPark3D(ctx) {
 
     // ---------------------------------------------------------------- multiplayer presence (Firestore)
     let room = 'r1', roomN = 0;
-    for (let i = 1; i <= ROOMS; i++) { try { const s = await getCountFromServer(query(collection(db, 'parkRooms', 'r' + i, 'p'), where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS)))); const n = s.data().count; if (n < MAX_ROOM) { room = 'r' + i; roomN = n; break; } } catch { break; } }
+    const countRoom = async (i) => {
+      const qy = query(collection(db, 'parkRooms', 'r' + i, 'p'), where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS)));
+      const s = await Promise.race([
+        getCountFromServer(qy),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('room-count')), 4000))
+      ]);
+      return s.data().count;
+    };
+    for (let i = 1; i <= ROOMS; i++) { try { const n = await countRoom(i); if (n < MAX_ROOM) { room = 'r' + i; roomN = n; break; } } catch { break; } }
     if (!document.body.contains(cv)) { unhookSize(); R.dispose(); return; }
     $('#park-room').textContent = `Room ${room.slice(1)}`;
     const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid); let extras = true;
     const base = () => { const [x, y] = toP(P.x, P.z); const o = { x: Math.max(-21000, Math.min(10000, x)), y: Math.max(0, Math.min(60000, y)), /* big world: x -1300..385 m, z up to 3460 m (rules mirror this) */ d: P.d, e: P.e, eAt: P.eAt, say: P.say, sayAt: P.sayAt, tgt: P.tgt, c: cellOf(P.x, P.z), name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2', pal: palSnap, at: serverTimestamp() };
       if (extras) { o.vx = Math.max(-600, Math.min(600, Math.round(SV.vx * 10))); o.vz = Math.max(-600, Math.min(600, Math.round(SV.vz * 10))); o.ct = Date.now(); o.an = SV.an; o.h = Math.max(0, Math.min(2000, Math.round(P.y * 10))); o.r = ((Math.round(P.yaw * 180 / Math.PI) % 360) + 360) % 360; o.dn = P.dance && Date.now() < P.danceUntil ? P.dance : ''; o.v = 3; } if (inOk && roomState.inId) o.in = roomState.inId; return o; }; let inOk = true;
     // interest management: presence carries its 160 m cell; I only listen to the 3x3 cells around me (re-centred with
-    // 30 m hysteresis), so reads scale with NEARBY movers, not the whole room. With nobody near, I write every 4 s instead of 1 s.
+    // 30 m hysteresis). Writes are about 12/s while moving and skipped when the quantized pose has not changed.
     function cellOf(x, z) { return Math.floor(x / CELL) + '_' + Math.floor(z / CELL); }
     let ctr = { i: Math.floor(P.x / CELL), j: Math.floor(P.z / CELL) }; const cells9 = () => { const a = []; for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) a.push((ctr.i + di) + '_' + (ctr.j + dj)); return a; };
     // my smoothed velocity (m/s) + anim state, sent with each update so others can interpolate / dead-reckon
@@ -441,36 +450,75 @@ export function createPark3D(ctx) {
       const sent = Math.hypot(SV.sx, SV.sz), now = Math.hypot(SV.vx, SV.vz); const turn = sent > 1 && now > 1 && (SV.sx * SV.vx + SV.sz * SV.vz) / (sent * now) < 0.8; const stop = sent > 1 && now < 0.3;
       const big = Math.hypot(ix, iz) * dt > 8 || (P.dance || '') !== SV.dn; if (big) { SV.dn = P.dance || ''; SV.big = true; }
       if ((turn || stop || SV.big) && Date.now() - lastSend > 500) { SV.big = false; dirty = true; send(true); } }
-    let lastSend = 0, dirty = true, sending = false, nearN = 1; const net = { ok: 0, err: '', snaps: 0, snapErr: '' };
-    const send = async (force) => { const now = Date.now(); if (sending || (!force && (!dirty || now - lastSend < (nearN ? SEND_MS : 4000)) && now - lastSend < HB_MS)) return; sending = true; lastSend = now; dirty = false;
-      try { SV.sx = SV.vx; SV.sz = SV.vz; await setDoc(meRef, base()); net.ok++; } catch (e) { net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; try { const q = base(); delete q.at; net.last = JSON.stringify(q).slice(0, 600); } catch { /* */ } if (e.code === 'permission-denied') { if (roomState.inId) { dirty = true; lastSend = now + 400; net.inDen = (net.inDen || 0) + 1; if (net.inDen >= 3) inOk = false; } else if (extras) { extras = false; dirty = true; lastSend = 0; } else lastSend = now + 300; } } sending = false; };
+    let lastSend = 0, dirty = true, sending = false, nearN = 1, lastSig = ''; const net = { ok: 0, err: '', snaps: 0, snapErr: '' };
+    const link = createLink(); link.mount(document.querySelector('#park-cv') && view.querySelector('.k-link-slot'));
+    const sigOf = (o) => [o.x, o.y, o.h, o.r, o.vx, o.vz, o.an, o.dn, o.d, o.e, o.say, o.in || '', o.c].join('|');
+    const send = async (force) => {
+      const now = Date.now();
+      if (sending) { if (force || dirty) dirty = true; return; }
+      if (!force && now - lastSend < SEND_MS) return;
+      if (!force && !dirty && now - lastSend < HB_MS) return;
+      const body = base(); const sig = sigOf(body);
+      if (!force && sig === lastSig && now - lastSend < HB_MS) { dirty = false; return; }
+      sending = true; lastSend = now; dirty = false; SV.sx = SV.vx; SV.sz = SV.vz;
+      const t0 = performance.now(); link.markWrite();
+      try { await setDoc(meRef, body); lastSig = sig; net.ok++; link.noteRtt(performance.now() - t0); }
+      catch (e) {
+        net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; link.fail();
+        try { const q = base(); delete q.at; net.last = JSON.stringify(q).slice(0, 600); } catch { /* */ }
+        if (e.code === 'permission-denied') { if (roomState.inId) { dirty = true; lastSend = now + 400; net.inDen = (net.inDen || 0) + 1; if (net.inDen >= 3) inOk = false; } else if (extras) { extras = false; dirty = true; lastSend = 0; } else lastSend = now + 300; }
+        else lastSend = now + 200;
+      }
+      sending = false;
+      if (dirty && document.body.contains(cv)) send(false);
+    };
     await send(true);
     const others = new Map(); const blocked = S.blocked || new Set(); const MK = 'kemy-park-muted-' + S.user.uid; const muted = new Set(JSON.parse(lsg(MK) || '[]'));
-    // Presence costs 1 read per other player's write, so: ~1 write/s max (was ~4/s), only fresh docs,
-    // and the listener detaches while the tab is hidden.
+    // Presence: ~12 writes/s while the pose changes, only fresh docs, listener detaches while the tab is hidden.
+    // Your own pal is predicted locally and never corrected from this doc (that is what used to rubber-band).
     // WIDE mode (whole room, client-side nearest-30) unless the room is crowded: players on older cached builds don't send 'c',
     // so a cell-only query would hide them. A failing cell query falls back to WIDE and is logged visibly.
     let wide = roomN <= 40; net.mode = () => (wide ? 'wide' : 'cells');
-    const listen = () => { let first = true; const fresh = where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS * 2)); const qy = wide ? query(collection(db, 'parkRooms', room, 'p'), fresh) : query(collection(db, 'parkRooms', room, 'p'), where('c', 'in', cells9()), fresh); return onSnapshot(qy, (qs) => {
+    const listen = () => { let first = true; const fresh = where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS * 3)); const qy = wide ? query(collection(db, 'parkRooms', room, 'p'), fresh) : query(collection(db, 'parkRooms', room, 'p'), where('c', 'in', cells9()), fresh); return onSnapshot(qy, (qs) => {
+      link.noteSnap(!!(qs.metadata && qs.metadata.hasPendingWrites));
       if (first) { first = false; const ids = new Set(qs.docs.map((d) => d.id)); for (const id of [...others.keys()]) if (!ids.has(id)) drop(id); }
       const now = Date.now(); net.snaps++; net.reads = (net.reads || 0) + Math.max(1, qs.docChanges().length);
       qs.docChanges().forEach((ch) => { const id = ch.doc.id; if (id === S.user.uid) return; if (ch.type === 'removed') { drop(id); return; }
         const d = ch.doc.data(); const at = d.at && d.at.toMillis ? d.at.toMillis() : now;
         if (now - at > 120000) { deleteDoc(ch.doc.ref).catch(() => {}); return; }
         const [x, z] = toW(d.x, d.y); let o = others.get(id);
-        if (!o) { o = { uid: id, x, z, ix: x, iz: z, ivx: 0, ivz: 0, iyaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, dl: 250, fade: 0, y: typeof d.h === 'number' ? d.h / 10 : ground(x, z), yaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, seenS: d.sayAt || 0, seenE: d.eAt || 0, t: Math.random() * 100 }; others.set(id, o); }
+        if (!o) { o = { uid: id, x, z, ix: x, iz: z, ivx: 0, ivz: 0, iyaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, dl: 100, fade: 0, y: typeof d.h === 'number' ? d.h / 10 : ground(x, z), yaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, seenS: d.sayAt || 0, seenE: d.eAt || 0, t: Math.random() * 100 }; others.set(id, o); }
         { const ct = typeof d.ct === 'number' ? d.ct : at; const off = Date.now() - ct; o.off = o.off == null ? off : Math.min(off, o.off + (off - o.off) * 0.1); const B = o.buf || (o.buf = []);
           if (!B.length || ct > B[B.length - 1].t) { const st = B.length >= 4 ? B.shift() : {}; st.t = ct; st.x = x; st.z = z; st.yaw = typeof d.r === 'number' ? d.r * Math.PI / 180 : null; st.vx = (d.vx || 0) / 10; st.vz = (d.vz || 0) / 10; B.push(st); } o.an = d.an || ''; }
         Object.assign(o, { tx: x, tz: z, th: typeof d.h === 'number' ? d.h / 10 : null, tr: typeof d.r === 'number' ? d.r * Math.PI / 180 : null, dn: d.dn || '', name: d.name, uname: d.uname, color: d.color, pal: d.pal, at, e: d.e, eAt: d.eAt, say: d.say, sayAt: d.sayAt, tgt: d.tgt });
         if (d.sayAt && d.sayAt > o.seenS && d.say) { o.seenS = d.sayAt; if (!muted.has(id) && !blocked.has(id)) logMsg(d.name, clean(d.say), d.color); }
         if (d.eAt && d.eAt > o.seenE) { o.seenE = d.eAt; if (d.e && EMO_DANCE[d.e]) { o.dance = EMO_DANCE[d.e]; o.danceUntil = performance.now() + 6000; } if (d.tgt === S.user.uid && d.e === '🐾') toast(`@${d.uname} petted your Pal! 💜`); } });
-    }, (e) => { net.snapErr = e.code || String(e); console.error('[Kemy presence] listener failed (' + (wide ? 'wide' : 'cells') + '):', e); if (!wide) { wide = true; toast('⚠️ Nearby-player sync hiccup, switching to full-room sync'); } setTimeout(() => { if (unsubL && document.body.contains(cv)) { try { unsubL(); } catch { /* */ } unsubL = listen(); } }, 3000); }); };
+    }, (e) => { net.snapErr = e.code || String(e); link.fail(); console.error('[Kemy presence] listener failed (' + (wide ? 'wide' : 'cells') + '):', e); if (!wide) { wide = true; toast('⚠️ Nearby-player sync hiccup, switching to full-room sync'); } setTimeout(() => { if (document.body.contains(cv)) { try { unsubL && unsubL(); } catch { /* */ } unsubL = listen(); } }, 1500); }); };
     let unsubL = listen();
     const recenter = () => { const cx = (ctr.i + 0.5) * CELL, cz = (ctr.j + 0.5) * CELL; if (Math.abs(P.x - cx) < CELL / 2 + 30 && Math.abs(P.z - cz) < CELL / 2 + 30) return; ctr = { i: Math.floor(P.x / CELL), j: Math.floor(P.z / CELL) }; net.recenters = (net.recenters || 0) + 1; if (wide) return; if (unsubL) { unsubL(); unsubL = listen(); } };
     setInterval(() => { if (document.body.contains(cv)) { recenter(); let n = 0; for (const o of others.values()) if (Math.hypot(o.x - P.x, o.z - P.z) < 150) n++; nearN = n; const rl = $('#park-room'); if (rl) { const t = `Room ${room.slice(1)} · 👥 ${others.size + 1}`; if (rl.textContent !== t) { rl.textContent = t; rl.title = `Up to ${MAX_ROOM} players per room; new rooms open automatically`; } } } }, 1000);
-    const onVis = () => { if (document.hidden) { if (unsubL) { unsubL(); unsubL = null; } } else if (!unsubL && document.body.contains(cv)) { unsubL = listen(); send(true); } };
+    let hideT = 0;
+    const onVisHide = () => {
+      if (unsubL) { unsubL(); unsubL = null; }
+      clearTimeout(hideT);
+      hideT = setTimeout(() => { if (document.hidden || document.visibilityState === 'hidden') deleteDoc(meRef).catch(() => {}); }, 12000);
+      link.setDown(true);
+    };
+    const onVisShow = () => {
+      if (!document.body.contains(cv)) return;
+      clearTimeout(hideT); link.setDown(false);
+      if (!unsubL) unsubL = listen();
+      dirty = true; send(true);
+    };
+    const onVis = () => { if (document.hidden) onVisHide(); else onVisShow(); };
+    const onOff = () => link.setDown(true), onOn = () => { link.setDown(false); dirty = true; send(true); };
+    const onFreeze = () => onVisHide();
+    const onResume = () => onVisShow();
+    addEventListener('offline', onOff); addEventListener('online', onOn);
     document.addEventListener('visibilitychange', onVis);
-    const unsub = () => { document.removeEventListener('visibilitychange', onVis); if (unsubL) unsubL(); unsubL = null; };
+    document.addEventListener('freeze', onFreeze);
+    document.addEventListener('resume', onResume);
+    const unsub = () => { document.removeEventListener('visibilitychange', onVis); document.removeEventListener('freeze', onFreeze); document.removeEventListener('resume', onResume); removeEventListener('offline', onOff); removeEventListener('online', onOn); clearTimeout(hideT); link.stop(); if (unsubL) unsubL(); unsubL = null; };
     function drop(id) { const o = others.get(id); if (!o) return; if (o.obj) { scene.remove(o.obj); } o.tag?.remove(); others.delete(id); }
 
     // ---------------------------------------------------------------- name tags + speech bubbles (HTML overlay, crisp on phones)
@@ -541,14 +589,18 @@ export function createPark3D(ctx) {
     let alive = true, last = performance.now(), frames = 0, fpsT = last, fps = 0, slow = 0, lodT = 0, portalCd = 0; lodTrees(P.x, P.z);
     const fpsEl = $('#p3-fps'); const dbgFps = lsg('kemy-pals-debug') === '1' || /fps/.test(location.hash + location.search); if (!(dbgFps || gfxShowFps())) fpsEl.hidden = true;
     $('#p3-load').remove(); hint('Drag to look around · 👁 switches camera');
-    const others3D = () => others.values(); let drawSet = null, fr = 0; const DELAY = 1100;
-    // snapshot interpolation ~1.1 s behind the sender's clock; dead-reckon from velocity when the buffer runs dry (max 1.5 s)
-    function interp(o, dt) { const B = o.buf; if (!B || !B.length) { o.ix = o.tx; o.iz = o.tz; o.ivx = 0; o.ivz = 0; return; } o.dl = Math.min(DELAY, (o.dl ?? DELAY) + dt * 350); const rt = Date.now() - o.off - o.dl; let a = B[0], b = null;
+    const others3D = () => others.values(); let drawSet = null, fr = 0; const DELAY = 100, EXTRAP = 0.22;
+    // snapshot interpolation ~100 ms behind the sender's clock; a short gap is extrapolated, then held
+    function interp(o, dt) { const B = o.buf; if (!B || !B.length) { o.ix = o.tx; o.iz = o.tz; o.ivx = 0; o.ivz = 0; return; }
+      const span = B.length >= 2 ? B[B.length - 1].t - B[B.length - 2].t : 80;
+      const want = Math.min(280, Math.max(DELAY, span * 1.25));
+      o.dl = (o.dl ?? DELAY) + (want - (o.dl ?? DELAY)) * Math.min(1, dt * 3);
+      const rt = Date.now() - (o.off || 0) - o.dl; let a = B[0], b = null;
       for (let i = 0; i < B.length - 1; i++) if (B[i].t <= rt && B[i + 1].t >= rt) { a = B[i]; b = B[i + 1]; break; }
       let x, z, vx, vz; if (b) { const u = (rt - a.t) / Math.max(1, b.t - a.t), s1 = (b.t - a.t) / 1000; /* Hermite: positions + velocities, so curves stay round */ const u2 = u * u, u3 = u2 * u, h1 = 2 * u3 - 3 * u2 + 1, h2 = -2 * u3 + 3 * u2, h3 = u3 - 2 * u2 + u, h4 = u3 - u2;
         x = h1 * a.x + h2 * b.x + (h3 * a.vx + h4 * b.vx) * s1; z = h1 * a.z + h2 * b.z + (h3 * a.vz + h4 * b.vz) * s1; vx = (b.x - a.x) / s1; vz = (b.z - a.z) / s1; }
-      else { const L = rt < B[0].t ? B[0] : B[B.length - 1]; const ah = Math.max(0, Math.min(1.5, (rt - L.t) / 1000)); x = L.x + L.vx * ah; z = L.z + L.vz * ah; vx = ah < 1.5 ? L.vx : 0; vz = ah < 1.5 ? L.vz : 0; }
-      if (o.ix == null || Math.hypot(x - o.ix, z - o.iz) > 25) { o.ix = x; o.iz = z; } else { const k = Math.min(1, dt * 14); o.ix += (x - o.ix) * k; o.iz += (z - o.iz) * k; } o.ivx = vx; o.ivz = vz;
+      else { const L = rt < B[0].t ? B[0] : B[B.length - 1]; const ah = Math.max(0, Math.min(EXTRAP, (rt - L.t) / 1000)); x = L.x + L.vx * ah; z = L.z + L.vz * ah; vx = ah < EXTRAP ? L.vx : 0; vz = ah < EXTRAP ? L.vz : 0; }
+      if (o.ix == null || Math.hypot(x - o.ix, z - o.iz) > 18) { o.ix = x; o.iz = z; } else { const k = Math.min(1, dt * 28); o.ix += (x - o.ix) * k; o.iz += (z - o.iz) * k; } o.ivx = vx; o.ivz = vz;
       let yw = null; if (b && a.yaw != null && b.yaw != null) { let dy = b.yaw - a.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); yw = a.yaw + dy * Math.max(0, Math.min(1, (rt - a.t) / Math.max(1, b.t - a.t))); } else { const L = B[B.length - 1]; if (L.yaw != null) yw = L.yaw; }
       const sp = Math.hypot(vx, vz); o.iyaw = yw != null ? yw : sp > 0.4 ? Math.atan2(vx, vz) : o.iyaw || 0; }
     function frame(now) {
@@ -594,7 +646,7 @@ export function createPark3D(ctx) {
       // others: interpolate, LOD (full rig near, simple pose far, hidden very far)
       svTick(dt); const nowMs = Date.now(); if (!(fr % 15) || !drawSet) { const L = [...others.values()].map((o) => [Math.hypot(o.x - P.x, o.z - P.z), o.uid]).sort((a, b) => a[0] - b[0]); drawSet = new Set(L.slice(0, MAX_DRAWN).map((q) => q[1])); } fr++;
       for (const o of others3D()) {
-        if (blocked.has(o.uid) || nowMs - o.at > STALE_MS * 2) { drop(o.uid); continue; }
+        if (blocked.has(o.uid) || nowMs - o.at > STALE_MS) { drop(o.uid); continue; }
         if (o.obj && o.pal) { const lk = JSON.stringify([o.pal.species, o.pal.variant || '', o.pal.outfit || {}]); if (o.objKey && o.objKey !== lk) { scene.remove(o.obj); o.obj = null; } } // re-dress when they change outfit/accessories
         interp(o, dt); if (!drawSet.has(o.uid)) { o.x = o.ix; o.z = o.iz; if (o.obj) { scene.remove(o.obj); o.obj = null; o.objKey = null; } if (o.tag) o.tag.style.display = 'none'; continue; }
         if (!o.obj && o.pal) { try { o.obj = palObj(o.pal, !LOW); o.objKey = JSON.stringify([o.pal.species, o.pal.variant || '', o.pal.outfit || {}]); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
