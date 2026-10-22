@@ -1789,12 +1789,34 @@ input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible { o
 .nm-search { display: block; font-weight: 700; margin-top: 4px; }
 #nm-q { width: 100%; margin: 4px 0 8px; background: #07050c; border: 1px solid #8a2be2; border-radius: 12px; padding: 12px 14px; font-size: 16px; color: var(--text); }
 .nm-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid rgba(160,110,255,.22); }
-.nm-meta { min-width: 0; flex: 1; }
+.nm-meta { min-width: 0; flex: 1; display: grid; }
+.nm-when, .nm-how { display: block; }
 .nm-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .nm-name b { font-size: 1.02rem; }
 .nm-new { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #ffd34d; color: #241400; font-size: .72rem; font-weight: 800; }
 .nm-handle { color: #e9d5ff; font-weight: 700; text-decoration: none; }
 .nm-when, .nm-how, .nm-email { margin: 2px 0; color: #d9d0ea; font-size: .92rem; }
 .nm-email { color: #ffd34d; font-weight: 700; word-break: break-all; }
-.nm-mail { margin-top: 6px; min-height: 44px; }
+.nm-mail { margin: 4px 0 0 56px; min-height: 44px; align-self: flex-start; }
+.nm-row { flex-direction: column; align-items: stretch; gap: 2px; }
+.nm-open { display: flex; gap: 12px; align-items: flex-start; width: 100%; margin: 0; padding: 2px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; min-height: 44px; border-radius: 12px; }
+.nm-open:focus-visible { outline: 2px solid #ffd34d; outline-offset: 2px; }
+.nm-go { margin-left: auto; color: #ffd34d; font-size: 1.5rem; line-height: 1; align-self: center; }
+button.nm-back { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.nm-card-detail { border: 2px solid #8a2be2; border-radius: 18px; padding: 14px; background: linear-gradient(160deg, rgba(138,43,226,.22), rgba(255,211,77,.08)); }
+.nm-detail-head { display: flex; gap: 12px; align-items: center; }
+.nm-detail-head h1 { margin: 0; font-size: 1.35rem; }
+.nm-detail-head .avatar { width: 64px; height: 64px; font-size: 1.35rem; }
+.nm-pal { margin: 4px 0 0; color: #ffd34d; font-weight: 700; }
+.nm-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.nm-stat { background: rgba(36, 16, 64, .55); border: 1px solid rgba(255, 211, 77, .4); border-radius: 14px; padding: 10px 12px; min-height: 44px; }
+.nm-stat b { display: block; color: #ffd34d; font-size: 1.15rem; }
+.nm-stat span { color: #e9d5ff; font-size: .8rem; }
+.nm-h2 { margin: 14px 0 4px; font-size: 1rem; color: #fff; }
+.nm-block { margin: 0; color: #f3e9ff; }
+.nm-note { color: #d9d0ea; font-size: .88rem; }
+.nm-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.nm-acts .btn { min-height: 44px; }
+.nm-card-detail .nm-mail { margin-left: 0; }
+.nm-ban { margin: 8px 0 0; color: #ffd34d; font-weight: 700; }
 #nm-end { height: 1px; }

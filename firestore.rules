@@ -330,13 +330,15 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time;
       }
 
-      // New-device sign-in devices: owner only (rough UA label + timestamps, no IP / location).
+      // Sign-in devices (rough UA label + timestamps, no IP / location).
+      // The owner reads and deletes their own. The admin may read them for last active on the member page.
       match /devices/{dev} {
         function validDev(d) {
           return d.keys().hasOnly(['label', 'firstSeen', 'lastSeen', 'ack']) && isStr(d.label, 1, 60) && d.ack is bool
             && d.firstSeen is timestamp && d.lastSeen is timestamp;
         }
-        allow read, delete: if signedIn() && uid == me();
+        allow read: if signedIn() && (uid == me() || isAdmin());
+        allow delete: if signedIn() && uid == me();
         allow create: if signedIn() && uid == me() && dev.matches('^[A-Za-z0-9]{16,40}$') && exists(userPath(uid)) && sessionOk(uid)
           && validDev(request.resource.data)
           && request.resource.data.firstSeen == request.time && request.resource.data.lastSeen == request.time;

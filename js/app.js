@@ -674,7 +674,7 @@ const routes = [
   [/^#\/music$/, (t) => music.page(t), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
-  [/^#\/members$/, (t) => import('./members.js').then((m) => m.page(main, { stale: () => stale(t), toast })), ''],
+  [/^#\/members$/, (t) => import('./members.js').then((m) => m.page(main, { stale: () => stale(t), toast, mod })), ''],
   [/^#\/mod(?:\/(\w+))?(?:\?.*)?$/, (tab, t) => mod.page(tab, t, stale), ''],
   [/^#\/support$/, () => mod.supportPage(main), 'messages'],
   [/^#\/mod-invite$/, () => mod.invitePage(main), 'me'],
