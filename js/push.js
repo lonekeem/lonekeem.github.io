@@ -164,8 +164,8 @@ function paint() {
   box.appendChild(hint);
   box.appendChild(row(
     'push-chime',
-    'Soft chime',
-    'A short chime while Kemy is open, and when the What’s New dot shows up. If Kemy is in the background, your phone plays its own sound.',
+    'Soft Breeze',
+    'A calm chime while Kemy is open, and when the What’s New dot shows up. If Kemy is in the background, your phone plays its own sound.',
     chimeOn(),
     (ev) => {
       setChimeOn(ev.target.checked);

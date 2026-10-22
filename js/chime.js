@@ -1,9 +1,10 @@
 // Chime player: mute, inbox, foreground push, and the What's New dot.
-// The sound itself is js/chime-sound.js. Swap that file without changing this one.
+// Soft Breeze itself is js/chime-sound.js, already peaked at about 0.5.
 // Written by Lone Keem.
 import { playChimeSound } from './chime-sound.js';
 const MUTE_KEY = 'kemy-chime-mute';
 const BADGE_KEY = 'kemy-chime-badge';
+const GAP_MS = 2600;
 
 let ctx = null;
 let master = null;
@@ -25,7 +26,7 @@ function audio() {
   try {
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.2;
+    master.gain.value = 1;
     master.connect(ctx.destination);
   } catch { ctx = null; }
   return ctx;
@@ -35,7 +36,7 @@ function audio() {
 export async function playChime() {
   if (!chimeOn()) return false;
   const now = Date.now();
-  if (now - lastAt < 900) return false;
+  if (now - lastAt < GAP_MS) return false;
   lastAt = now;
   const a = audio();
   if (!a) { lastAt = 0; return false; }
