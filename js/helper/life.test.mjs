@@ -1,5 +1,6 @@
 import assert from 'assert';
-import { ROSTER, lifeInit, stepLife } from './team.js';
+import { ROSTER, lifeInit, stepLife, pathLen } from './team.js';
+import { roadD, STATION } from '../world/layout.js';
 
 const byId = (id) => ROSTER.find((m) => m.id === id);
 
@@ -16,7 +17,8 @@ function run(src, seconds, hold) {
 }
 
 const names = ROSTER.map((m) => m.name);
-assert.deepEqual(names, ['Kemy Helper', 'Helper', 'Helper', 'Helper', 'Helper', 'Helper']);
+assert.deepEqual(names, ['Kemy Helper', 'Kemy Patrol', 'Helper', 'Kemy Patrol', 'Helper', 'Kemy Patrol']);
+assert.equal(byId('lead').lead, true);
 assert.ok(byId('play').job.includes('a quick game'));
 
 const lead = run(byId('lead'), 12);
@@ -72,6 +74,36 @@ for (const src of ROSTER) {
     if (src.role === 'walk') assert.ok(Math.hypot(p.x - p.carX, p.z - p.carZ) < 1.6, src.id + ' stays on the walk');
     if (src.role === 'drive') assert.ok(Math.hypot(p.x - p.carX, p.z - p.carZ) < 3.2, src.id + ' stays by the car');
   }
+}
+
+function alongTo(path, pred) {
+  let acc = 0;
+  for (let i = 0; i < path.length; i++) {
+    if (pred(path[i])) return acc;
+    const b = path[(i + 1) % path.length];
+    acc += Math.hypot(b[0] - path[i][0], b[1] - path[i][1]);
+  }
+  return -1;
+}
+
+const doorD = alongTo(byId('lead').path, (p) => p[0] === STATION.door[0] && p[1] === STATION.door[1]);
+assert.ok(doorD > 0, 'chief route visits the station');
+const visit = run(Object.assign({}, byId('lead'), { dist: doorD - 0.4 }), 5);
+assert.ok(visit.seen.some((p) => p.mode === 'look' && Math.hypot(p.x - STATION.door[0], p.z - STATION.door[1]) < 0.3), 'chief stands in the station doorway');
+
+for (const id of ['street', 'country']) {
+  const src = byId(id);
+  const spot = id === 'street' ? STATION.lotStreet : STATION.lotCountry;
+  const d = alongTo(src.path, (p) => p[2] === 'park' && p[0] === spot[0] && p[1] === spot[1]);
+  assert.ok(d > 0, id + ' parks at the station');
+  const lot = run(Object.assign({}, src, { dist: d - 0.5 }), 6);
+  const foot = lot.seen.find((p) => p.onFoot);
+  assert.ok(foot, id + ' hops out at the station');
+  assert.ok(foot.carX > 5 && foot.carX < 8, id + ' car sits in the lot');
+  assert.ok(Math.abs(foot.carZ - spot[1]) < 3, id + ' uses its stall');
+  const secs = pathLen(src.path) / src.speed + 40;
+  const loop = run(Object.assign({}, src, { dist: 0 }), secs);
+  for (const p of loop.seen) assert.ok(roadD(p.carX, p.carZ) < 4, id + ' stays by a road at ' + p.carX.toFixed(1) + ',' + p.carZ.toFixed(1));
 }
 
 console.log('life ok');

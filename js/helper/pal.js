@@ -1,6 +1,7 @@
-// Kemy Helper's team: local pals in matching yellow, not networked. They wander
-// like players: look around, wave, sit, browse, and some park the car and hop out.
-// The yellow outfit and Helper tag stay on. Only nearby pals are drawn.
+// Kemy Patrol: local pals in an original navy uniform, not networked. They wander
+// like players: look around, wave, sit, browse, and some park a patrol car and hop out.
+// The navy outfit, gold Kemy star, and name tag stay on. Only nearby pals are drawn.
+// The lightbar blinks for a moment when a report opens. There is no siren.
 // Written by Lone Keem.
 import { poseCar } from '../world/cars.js';
 import { areaAt, BOUNDS, roadD } from '../world/layout.js';
@@ -24,49 +25,77 @@ function starGeo(THREE) {
 
 function matsOf(THREE) {
   // Flat colors. These pals are cheap local stand-ins, and a night scene
-  // must not turn the yellow crew into dark blobs.
+  // must keep the navy uniform, gold star, and lightbar easy to see.
   const m = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra));
   return {
-    yellow: m('#ffe14a'),
-    vest: m('#ffb703'),
-    gold: m('#ffd34d'),
-    star: m('#6d28d9'),
-    ink: m('#3b2508'),
-    glass: m('#fff6cc', { transparent: true, opacity: 0.55 })
+    navy: m('#1e3a5f'),
+    navy2: m('#0f2744'),
+    shirt: m('#2f5d92'),
+    vest: m('#2f5d92'),
+    gold: m('#f5c542'),
+    star: m('#f6c445'),
+    skin: m('#ffd3a8'),
+    ink: m('#1c140c'),
+    white: m('#f8fafc'),
+    glass: m('#dbeafe', { transparent: true, opacity: 0.55 }),
+    lampR: m('#ef4444'),
+    lampB: m('#3b82f6'),
+    shade: m('#0b1220')
   };
 }
 
 function buildPal(THREE, mats, star) {
   const g = new THREE.Group();
   g.name = 'kemy-helper';
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.46, 3, 8), mats.yellow);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.46, 3, 8), mats.navy);
   body.position.y = 0.7;
-  const vest = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.32, 0.22), mats.vest);
-  vest.position.set(0, 0.78, 0.12);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), mats.yellow);
+  const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.28, 0.08), mats.shirt);
+  shirt.position.set(0, 0.82, 0.24);
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.3), mats.gold);
+  belt.position.set(0, 0.58, 0.02);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), mats.skin);
   head.position.y = 1.26;
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.12, 8), mats.gold);
-  cap.position.y = 1.46;
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.03, 10), mats.gold);
-  brim.position.y = 1.4;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.23, 0.22, 8), mats.navy2);
+  cap.position.y = 1.52;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.04, 8), mats.gold);
+  band.position.y = 1.4;
+  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.03, 0.24), mats.navy2);
+  brim.position.set(0, 1.38, 0.18);
+  const capStar = new THREE.Mesh(star, mats.star);
+  capStar.scale.setScalar(0.045);
+  capStar.position.set(0, 1.46, 0.2);
   const badge = new THREE.Mesh(star, mats.star);
   badge.name = 'badge';
   badge.scale.setScalar(0.12);
-  badge.position.set(0, 0.82, 0.26);
-  const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.26, 2, 6), mats.yellow);
+  badge.position.set(0, 0.86, 0.3);
+  const rank = new THREE.Group();
+  rank.name = 'rank';
+  rank.visible = false;
+  for (const s of [-1, 1]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.035, 0.04), mats.gold);
+    bar.position.set(s * 0.22, 1.02, 0.22);
+    rank.add(bar);
+  }
+  const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.26, 2, 6), mats.navy);
   armL.name = 'armL';
   armL.position.set(-0.34, 0.76, 0);
   armL.rotation.z = 0.25;
+  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 5), mats.skin);
+  handL.position.y = -0.2;
+  armL.add(handL);
   const armR = armL.clone();
   armR.name = 'armR';
   armR.position.x = 0.34;
   armR.rotation.z = -0.25;
   for (const s of [-1, 1]) {
     const e = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 5), mats.ink);
-    e.position.set(s * 0.08, 1.28, 0.2);
+    e.position.set(s * 0.08, 1.3, 0.2);
     g.add(e);
   }
-  g.add(body, vest, head, cap, brim, badge, armL, armR);
+  const smile = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), mats.ink);
+  smile.scale.set(1.3, 0.55, 0.6);
+  smile.position.set(0, 1.2, 0.21);
+  g.add(body, shirt, belt, head, cap, band, brim, capStar, badge, rank, armL, armR, smile);
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; } });
   return g;
 }
@@ -74,26 +103,41 @@ function buildPal(THREE, mats, star) {
 function buildCar(THREE, mats, star) {
   const g = new THREE.Group();
   g.name = 'kh-car';
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.4, 2.55), mats.yellow);
-  body.position.y = 0.52;
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.36, 1.15), mats.vest);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.32, 2.55), mats.white);
+  body.position.y = 0.58;
+  const skirt = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.18, 2.58), mats.navy);
+  skirt.position.y = 0.36;
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.08, 2.2), mats.navy2);
+  stripe.position.y = 0.7;
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.32, 1.15), mats.navy);
   cabin.position.set(0, 0.86, -0.12);
-  const glass = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.26, 1), mats.glass);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.22, 1), mats.glass);
   glass.position.set(0, 1.02, -0.12);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.08, 0.32), mats.shade);
+  bar.position.set(0, 1.16, -0.12);
+  const lampR = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.24), mats.lampR);
+  lampR.name = 'lampR';
+  lampR.position.set(-0.18, 1.22, -0.12);
+  const lampB = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.24), mats.lampB);
+  lampB.name = 'lampB';
+  lampB.position.set(0.18, 1.22, -0.12);
   const wgeo = new THREE.CylinderGeometry(0.26, 0.26, 0.16, 8);
   wgeo.rotateZ(Math.PI / 2);
-  const wheels = [];
   for (const [x, z] of [[-0.68, 0.78], [0.68, 0.78], [-0.68, -0.78], [0.68, -0.78]]) {
     const w = new THREE.Mesh(wgeo, mats.ink);
     w.name = 'wheel';
     w.position.set(x, 0.26, z);
-    wheels.push(w);
     g.add(w);
   }
   const badge = new THREE.Mesh(star, mats.star);
-  badge.scale.setScalar(0.16);
-  badge.position.set(0, 0.76, 1.05);
-  g.add(body, cabin, glass, badge);
+  badge.scale.setScalar(0.22);
+  badge.rotation.x = -Math.PI / 2;
+  badge.position.set(0, 0.76, 0.72);
+  const doorStar = new THREE.Mesh(star, mats.star);
+  doorStar.scale.setScalar(0.14);
+  doorStar.rotation.y = Math.PI / 2;
+  doorStar.position.set(0.74, 0.64, 0.15);
+  g.add(body, skirt, stripe, cabin, glass, bar, lampR, lampB, badge, doorStar);
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; } });
   return g;
 }
@@ -101,6 +145,8 @@ function buildCar(THREE, mats, star) {
 function dress(root, lead) {
   const badge = root.getObjectByName('badge');
   if (badge) badge.scale.setScalar(lead ? 0.2 : 0.12);
+  const rank = root.getObjectByName('rank');
+  if (rank) rank.visible = !!lead;
   const armL = root.getObjectByName('armL');
   const armR = root.getObjectByName('armR');
   root.userData.arms = [armL, armR];
@@ -134,16 +180,16 @@ export function attachHelper(api, W) {
   if (!document.getElementById('kh-css')) {
     const st = document.createElement('style');
     st.id = 'kh-css';
-    st.textContent = `.ks-tag.kh{z-index:8;pointer-events:auto;cursor:pointer;background:#ffe14a;border:2px solid #6d28d9;color:#3b2504;font-weight:800;padding:3px 8px}
-.ks-tag.kh.lead{background:#ffd34d}
-.kh-act{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 132px);pointer-events:auto;min-height:44px;padding:0 16px;border-radius:999px;border:2px solid #6d28d9;background:#ffe14a;color:#3b2504;font:800 15px Inter,system-ui,sans-serif;z-index:8;box-shadow:0 4px 14px rgba(0,0,0,.28)}
+    st.textContent = `.ks-tag.kh{z-index:8;pointer-events:auto;cursor:pointer;background:#1e3a5f;border:2px solid #f5c542;color:#fff8dc;font-weight:800;padding:3px 8px}
+.ks-tag.kh.lead{background:#0f2744;color:#f5c542}
+.kh-act{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(18px,env(safe-area-inset-bottom)) + 132px);pointer-events:auto;min-height:44px;padding:0 16px;border-radius:999px;border:2px solid #f5c542;background:#1e3a5f;color:#fff8dc;font:800 15px Inter,system-ui,sans-serif;z-index:8;box-shadow:0 4px 14px rgba(0,0,0,.28)}
 .kh-act[hidden]{display:none}
 .ks-panel[hidden]{display:none}
 .kh-card textarea{width:100%;min-height:88px;border-radius:12px;border:0;padding:10px;font:600 16px Inter,system-ui,sans-serif;box-sizing:border-box;color:#24133f}
 .kh-card .row{display:flex;gap:8px}
 .kh-card .row button{flex:1}
 .kh-job{margin:0 0 8px;font-weight:700}
-.kh-say{position:absolute;z-index:8;max-width:140px;background:#fff;color:#3b2504;border:2px solid #6d28d9;border-radius:12px;padding:3px 8px;font:700 12px Inter,system-ui,sans-serif;pointer-events:none;white-space:nowrap}
+.kh-say{position:absolute;z-index:8;max-width:160px;background:#fff;color:#1e3a5f;border:2px solid #f5c542;border-radius:12px;padding:3px 8px;font:700 12px Inter,system-ui,sans-serif;pointer-events:none;white-space:nowrap}
 .kh-say[hidden]{display:none}`;
     document.head.appendChild(st);
   }
@@ -169,7 +215,7 @@ export function attachHelper(api, W) {
     if (window.kemyModReport) window.kemyModReport({ targetType: 'chat message', targetId: 'helper', name: focus && focus.lead ? 'Kemy Helper' : 'Helper' });
   };
   btn.onclick = () => {
-    titleEl.textContent = focus && focus.lead ? 'Kemy Helper' : 'Helper';
+    titleEl.textContent = focus && focus.lead ? 'Chief Kemy Helper' : (focus ? focus.name : 'Helper');
     const job = focus ? focus.job : '';
     jobEl.textContent = focus && focus.mode === 'play' ? job.replace('a quick game', playLabel()) : job;
     panel.hidden = false;
@@ -213,6 +259,16 @@ export function attachHelper(api, W) {
   let glanceI = 0;
   const tv = new THREE.Vector3();
   const showDist = () => (api.LOW ? 46 : 72);
+  let flashUntil = 0;
+  const onPatrol = () => { flashUntil = performance.now() + 2400; };
+  addEventListener('kemy:patrol', onPatrol);
+  function paintLamps() {
+    const now = performance.now();
+    const blink = now < flashUntil;
+    const phase = Math.floor(now / 140) % 2 === 0;
+    mats.lampR.color.set(blink ? (phase ? '#ff4d4d' : '#4a1520') : '#ef4444');
+    mats.lampB.color.set(blink ? (phase ? '#1e3a8a' : '#60a5fa') : '#3b82f6');
+  }
 
   function flags() {
     let saver = false, saveData = false;
@@ -570,7 +626,12 @@ export function attachHelper(api, W) {
     }
     const talk = closestM && closest < 2.8 && (closestM.role !== 'drive' || closestM.onFoot || closestM.hold || closest < 2.6);
     btn.hidden = !talk;
-    if (talk) focus = closestM;
+    if (talk) {
+      focus = closestM;
+      const label = closestM.lead ? 'Kemy Helper' : closestM.name;
+      if (btn.textContent !== label) btn.textContent = label;
+    }
+    paintLamps();
     if (cap > 2) {
       const seat = members[2];
       stepPlay(dt, (issue) => note(Object.assign({ place: placeOf(areaAt(seat.x, seat.z), seat.x, seat.z) }, issue)));
@@ -592,6 +653,7 @@ export function attachHelper(api, W) {
     pub.cap = cap;
     pub.focus = focus ? focus.id : '';
     pub.members = members.map((m, i) => ({ id: m.id, role: m.role, name: m.name, x: m.fx, z: m.fz, carX: m.x, carZ: m.z, shown: i < cap, job: m.job, mode: m.mode, onFoot: m.onFoot, say: m.say || '' }));
+    pub.flash = performance.now() < flashUntil;
     pub.step = (n) => { const k = Math.max(1, Math.min(400, n | 0)); for (let i = 0; i < k; i++) update(0.05); };
   }
 
@@ -599,6 +661,7 @@ export function attachHelper(api, W) {
     update,
     destroy() {
       removeEventListener('kemy:helper-team', onToggle);
+      removeEventListener('kemy:patrol', onPatrol);
       for (let i = 0; i < members.length; i++) {
         const m = members[i];
         if (m.car) scene.remove(m.car);

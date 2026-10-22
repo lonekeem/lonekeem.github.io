@@ -198,7 +198,7 @@ function html(ctx) {
         <div class="set-tiers" id="set-tiers" role="radiogroup" aria-label="Picture quality" data-ultra="${ultra ? '1' : '0'}"></div>
         <p class="muted small" id="set-saver-note" hidden>FPS-saver is using Low so the game stays smooth.</p>
         <label class="set-row" for="set-saver"><span>FPS-saver<small>Uses Low graphics to help older phones.</small></span><input id="set-saver" type="checkbox" role="switch" ${saverOn() ? 'checked' : ''}></label>
-        <label class="set-row" for="set-helpers"><span>Show helper team<small>Yellow helpers walk, drive, and play nearby.</small></span><input id="set-helpers" type="checkbox" role="switch" ${teamShown() ? 'checked' : ''}></label>
+        <label class="set-row" for="set-helpers"><span>Show helper team<small>Kemy Patrol walks, drives, and plays nearby.</small></span><input id="set-helpers" type="checkbox" role="switch" ${teamShown() ? 'checked' : ''}></label>
         <label class="set-row" for="set-screen"><span>Keep the screen the right size<small>Stops pinch-zoom in games so the world doesn’t stretch.</small></span><input id="set-screen" type="checkbox" role="switch" ${screenOn() ? 'checked' : ''}></label>
         <label class="set-row" for="set-fx"><span>Fancy effects<small>Glass blur and the animated background.</small></span><input id="set-fx" type="checkbox" ${fxOn() ? 'checked' : ''}></label>
         <label for="set-pal-gfx">Pal graphics</label>

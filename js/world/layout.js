@@ -48,6 +48,14 @@ export const SIDEWALK = 2.6;
 // the friendly entrance from Pal Park's south path
 export const GATE = { x: 0, z: 79 };
 export const PARK_CORNER = { x0: 6, x1: 58, z0: 106, z1: 139 };
+// Kemy Patrol station: east of the center road, west of the gazebo. Original building, not a real department.
+// door is just inside the west entrance. lotStreet / lotCountry are route points; a +1.5 lane heading
+// north, or a -1.5 lane heading south, lands the car in the lot beside the door.
+export const STATION = {
+  x: 16, z: 122, x0: 9, x1: 23, z0: 116, z1: 128,
+  door: [10.2, 122], desk: [18.4, 122],
+  lotStreet: [4.8, 118], lotCountry: [4.8, 126]
+};
 // houses: rows facing their street. face: +1 = front door looks toward +z, -1 toward -z
 const ROWS = [{ z: 84, face: 1 }, { z: 116, face: -1 }, { z: 129, face: 1 }, { z: 161, face: -1 }];
 export const HOUSES = (() => { const out = []; let n = 0;

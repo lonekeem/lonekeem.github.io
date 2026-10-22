@@ -107,6 +107,7 @@ export function openReport({ targetType = 'user', targetId = '', targetUid = '',
   ensureCss();
   const user = auth.currentUser;
   if (!user) return;
+  try { dispatchEvent(new Event('kemy:patrol')); } catch { /* no window */ }
   let el = document.getElementById('kh-report');
   if (el) el.remove();
   el = document.createElement('div');
