@@ -486,14 +486,15 @@ export function tick() {
   }
   prevDown = new Set(Object.keys(down).filter((a) => down[a]));
   let mx = left.x, my = left.y;
-  if (inPlay()) {
+  const play = inPlay();
+  const decorating = !!(play && world.decorating && world.decorating());
+  if (inPlay() && !decorating) {
     if (down.left) mx -= 1;
     if (down.right) mx += 1;
     if (down.up) my -= 1;
     if (down.down) my += 1;
   }
   const mag = Math.min(1, Math.hypot(mx, my));
-  const play = inPlay();
   frame = {
     dt: 0.016,
     device: pad ? kind : deviceName,
@@ -521,6 +522,8 @@ export function tick() {
     sampleFns.forEach((f) => { try { f(frame); } catch { /* */ } });
     return frame;
   }
+  if (decorating && world.decorate) world.decorate(pressed);
+  else {
   if (pressed.confirm) {
     const ae = document.activeElement;
     if (ae && ae.closest && ae.closest('.kh-note-btn, .kh-radio')) ae.click();
@@ -547,6 +550,7 @@ export function tick() {
       if (play) world.menu && world.menu();
       else if (location.hash !== '#/settings') location.hash = '#/settings';
     }
+  }
   }
   if (pressed.map && play) world.map && world.map();
   if (pressed.tabPrev && !(play && world.driving && world.driving())) {

@@ -66,6 +66,13 @@ export const SCREENS = { tv: [0, 1.25, .02, 2, .95], tg: [0, 1.5, .02, 3, 1.5] }
 export const decorItem = (code) => { const d = DECOR[code]; return d ? (d.d ? 'z_hd_' + code : 'hd_' + code) : null; };
 export function parseItems(s) { const out = []; for (const t of String(s || '').split(';')) { const [c, x, z, r, f] = t.split(','); if (!DECOR[c]) continue; const X = +x / 2, Z = +z / 2; if (!isFinite(X) || !isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) continue; out.push({ c, x: X, z: Z, r: (+r || 0) & 3, f: f === '1' ? 1 : 0 }); if (out.length >= 80) break; } return out; }
 export const serItems = (L) => L.map((i) => [i.c, Math.round(i.x * 2), Math.round(i.z * 2), i.r & 3].join(',') + (i.f ? ',1' : '')).join(';');
+// A saved items string is the whole layout, even when it is empty. No items key means the house still has its starter set.
+export function placedItems(decor, h, two) { if (decor && Object.prototype.hasOwnProperty.call(decor, 'items')) return parseItems(decor.items); return parseItems(defaultItems(two, h && h.num ? h.seed : 0)); }
+export function parseStash(s) { const out = []; for (const c of String(s || '').split(';')) { if (!DECOR[c]) continue; out.push(c); if (out.length >= 80) break; } return out; }
+export const serStash = (list) => (list || []).filter((c) => DECOR[c]).slice(0, 80).join(';');
+// Stored starter pieces ride in the same items string (~cs) so a save stays valid on the current rules. Placed layout ignores those tokens.
+export function packLayout(items, stash) { const placed = serItems(items); const held = serStash(stash).split(';').filter(Boolean).map((c) => '~' + c).join(';'); return [placed, held].filter(Boolean).join(';'); }
+export const unpackStash = (items) => parseStash(String(items || '').split(';').filter((t) => t.startsWith('~')).map((t) => t.slice(1)).join(';'));
 export const defaultItems = (two, seed = 0) => serItems([{ c: ['cs', 'cs', 'cl'][seed % 3], x: -2.2, z: 4.9, r: 2 }, { c: 'tv', x: -2.2, z: 1.0, r: 0 }, { c: 'rg', x: -2.6, z: 3, r: 0 }, { c: 'lp', x: -5.5, z: 5.5, r: 0 }, { c: 'bs', x: -5.7, z: 3, r: 1 }, { c: 'pl', x: -5.5, z: 1.1, r: 0 },
   { c: 'ta', x: -3.2, z: -2.4, r: 0 }, { c: 'cr', x: -4.3, z: -2.4, r: 1 }, { c: 'cr', x: -2.1, z: -2.4, r: 3 }, { c: ['bd', 'bd', 'bc', 'br'][Math.floor(seed / 3) % 4], x: 4.2, z: -4.2, r: 0 }, { c: 'dr', x: 2.1, z: -5.7, r: 0 }, { c: 'ar', x: 6, z: -2, r: 3 }, { c: 'pl', x: 5.6, z: -.5, r: 0 },
   ...(two ? [{ c: 'bk', x: 4.6, z: -4.4, r: 0, f: 1 }, { c: 'ta', x: 3.2, z: -1, r: 0, f: 1 }, { c: 'cr', x: 3.2, z: -.1, r: 2, f: 1 }, { c: 'rr', x: 3.4, z: -3.2, r: 0, f: 1 }, { c: 'lp', x: 1.6, z: -5.6, r: 0, f: 1 }, { c: 'ak', x: 3, z: -6, r: 0, f: 1 }] : [{ c: 'pl', x: 2, z: 5.5, r: 0 }])]);
@@ -130,7 +137,7 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   const wallMs = {}; for (const [rm] of WALL_ROOMS) { wallMs[rm] = rm === 'L' ? wallMat : wallMat.clone(); flush(k + 'w' + rm, wallMs[rm], !LOW, g); } const setWalls = (base, per) => { const P0 = parseWalls(per); for (const [rm] of WALL_ROOMS) wallMs[rm].color.set(P0[rm] || base || S.wall); }; setWalls(decor.wall, decor.walls); flush(k + 's', structM, !LOW, g); flush(k + 'g', glowM, false, g); flush(vk, viewM, false, g);
   // (interior doors removed: open doorways everywhere)
   // floor (rebuildable) + furniture (rebuildable)
-  let floorM = null, decG = null; let decCols = [], seats = [], screens = []; let items = parseItems(decor.items || defaultItems(two, h.num ? h.seed : 0));
+  let floorM = null, decG = null; let decCols = [], seats = [], screens = []; let items = placedItems(decor, h, two);
   function setFloor(t) { const F = FLOORS[t] || FLOORS[S.floor]; if (floorM) { g.remove(floorM); floorM.geometry.dispose(); } const fk = k + 'f'; put(fk, G.box, F.c, cx, y - 0.05, cz, 0, 12.4 * SC, 0.1, 12.4 * SC);
     if (t === 'tile') { for (let i = -6; i < 6; i++) for (let j = -6; j < 6; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC, SC, 1, -Math.PI / 2); }
     else if (F.l) for (let i = -5; i <= 5; i++) put(fk, G.box, F.l, cx + i * 1.1 * SC, y + 0.002, cz, 0, 0.03, 0.004, 12.2 * SC);

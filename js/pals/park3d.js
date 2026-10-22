@@ -671,6 +671,8 @@ export function createPark3D(ctx) {
       active: () => document.body.contains(cv),
       driving: () => !!(W3.driving && W3.driving()),
       interact: () => { const b = document.getElementById('ks-act'); if (b && !b.hidden) { b.click(); return true; } return false; },
+      decorating: () => !!(window.__kh && window.__kh.deco),
+      decorate: (pressed) => !!(window.__khApi && window.__khApi.decoratePad && window.__khApi.decoratePad(pressed)),
       patrol: () => { const h = document.querySelector('.kh-act'); if (h && !h.hidden) { h.click(); return; } if (window.kemyModReport) window.kemyModReport({ targetType: 'world', targetId: 'park', name: 'a problem' }); },
       menu: () => tc.settings(),
       map: () => { const m = document.getElementById('ks-map'); if (m) m.click(); },
