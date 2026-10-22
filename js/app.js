@@ -667,6 +667,7 @@ const routes = [
   [/^#\/games(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\?(.*))?$/, (a, b, q, t) => games.page(a, b, q, t), 'games'],
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/rules$/, () => safety.rulesPage(main), 'me'],
+  [/^#\/updates$/, (t) => import('./updates.js').then((m) => m.page(main, { token: t, stale, toast })), 'games'],
   [/^#\/settings$/, pageSettings, 'me'],
   [/^#\/settings\/parental$/, () => parental.page(main), 'me'],
   [/^#\/settings\/interests$/, (t) => interestsPage({ main, esc, toast, getDoc, doc, db, loadDiscover, stale, token: t }), 'me'],
@@ -869,11 +870,13 @@ async function pageExplore(tab, token) {
     <h1 class="page-title">Explore</h1>${tabs}
     <a class="g-promo pk-promo" href="#/park"><i class="zf-mini" aria-hidden="true">🌳</i><span><b>Pal Park 3D</b><small>Walk your Pal with friends, chat, dance and find treasures.</small></span><span aria-hidden="true">›</span></a>
     <a class="g-promo" href="#/games">${GAMES_ICON}<span><b>Games</b><small>Star Pool, Star Drop, checkers, Trivia &amp; more. Play friends or the computer.</small></span><span aria-hidden="true">›</span></a>
+    <a class="wn-hub" href="#/updates"><span aria-hidden="true">✨</span><span><b>What's New</b><small>See everything Keem has added</small></span><span class="wn-dot" data-wn-dot hidden></span></a>
     <a class="g-promo zf-promo" href="#/arcade/zombie"><i class="zf-mini" aria-hidden="true">🧟</i><span><b>New: Pal Zombie Survival</b><small>Bring your Pal, splat silly zombies with bubbles. Tap to play!</small></span><span aria-hidden="true">›</span></a>
     <div id="ex-top"></div>
     <h2 style="margin:22px 0 14px;font-size:1.15rem">Recent posts</h2>
     <div id="posts"><div class="spinner"></div></div>`;
   search.renderExploreTop($('#ex-top'), token);
+  import('./updates.js').then((m) => m.paintDots()).catch(() => {});
   const snap = await cachedQuery('explore', query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)), 300e3);
   if (stale(token)) return;
   renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet. Be the first!');
@@ -1483,6 +1486,7 @@ async function pageAdmin(token) {
     ${big('mod', '🗑️', 'Delete posts, comments and lives', 'Any post or comment has “Delete” in its menu for you. On a live you can tap “End live (guidelines)”. Reports are listed below.')}
     ${big('media', '🧹', 'Media cleanup', 'After you delete a post, Kemy shows a command to erase its files from Cloudinary on your computer (the key never goes in the app). For a full sweep run <code>node scripts/cloudinary-cleanup.mjs</code> (dry run first).')}
     <div id="push-admin-host"></div>
+    <a class="card pad adm-tool" href="#/updates" style="display:block;margin-bottom:12px;text-decoration:none;color:inherit"><b style="font-size:1.05rem">✨ What's New</b><p class="muted small" style="margin:3px 0 0">Add an entry players see on the What's New page. You can also send the update notification from there.</p></a>
     <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports <a class="btn btn-sm" href="#/mod" style="margin-left:8px">Open Moderator Tools</a></h2>
     <div id="reports"></div>`;
   const founderSet = async (on) => { if (!isAdmin()) return toast('Admins only'); try { const m = await pals.myPals(true); const p = m && (m.list.find((x) => x.id === S.profile.activePet) || m.list[0]); if (!p) return toast('Hatch a Pal first');

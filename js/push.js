@@ -358,6 +358,12 @@ function functionsApp() {
   return fns;
 }
 
+export async function sendAnnounce(data) {
+  const fn = httpsCallable(functionsApp(), 'sendAnnouncement');
+  const res = await fn(data || {});
+  return res.data || {};
+}
+
 export function wireAdmin(toast) {
   toastFn = typeof toast === 'function' ? toast : toastFn;
   const b = document.getElementById('push-an-send');
@@ -368,13 +374,11 @@ export function wireAdmin(toast) {
     b.disabled = true;
     if (msg) msg.textContent = 'Sending…';
     try {
-      const fn = httpsCallable(functionsApp(), 'sendAnnouncement');
-      const res = await fn({
+      const d = await sendAnnounce({
         title: document.getElementById('push-an-title').value,
         body: document.getElementById('push-an-body').value,
         url: document.getElementById('push-an-url').value
       });
-      const d = res.data || {};
       if (msg) msg.textContent = `Sent to ${d.sent || 0} ${d.sent === 1 ? 'person' : 'people'}. ${d.skipped || 0} skipped (off, quiet hours, or the daily limit).`;
       say('Announcement sent');
     } catch (e) {

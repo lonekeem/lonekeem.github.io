@@ -163,6 +163,11 @@ service cloud.firestore {
         && request.resource.data.house is bool && request.resource.data.daily is bool
         && request.resource.data.announce is bool
         && request.resource.data.updatedAt == request.time;
+      // Which What's New entry this player has opened (js/updates.js). Owner only.
+      allow create, update: if signedIn() && uid == me() && docId == 'updates' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['seen', 'updatedAt'])
+        && isStr(request.resource.data.seen, 1, 40)
+        && request.resource.data.updatedAt == request.time;
       // Private search history (Search > Recent), max 20 short strings. Deleted by "Clear all" and with the account.
       allow create, update: if signedIn() && uid == me() && docId == 'security'
         && request.resource.data.keys().hasOnly(['alerts', 'updatedAt']) && request.resource.data.alerts is bool
@@ -171,6 +176,27 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['recent', 'updatedAt'])
         && request.resource.data.recent is list && request.resource.data.recent.size() <= 20
         && request.resource.data.updatedAt == request.time;
+    }
+
+    // What's New entries (js/updates.js). Everyone can read. Only the verified admin can write.
+    // updates.json in the repo is the fallback; a doc with the same id replaces that entry.
+    match /updates/{id} {
+      function validUpdate(d) {
+        return d.keys().hasOnly(['date', 'title', 'body', 'emoji', 'image', 'link', 'createdAt'])
+          && d.keys().hasAll(['date', 'title', 'body', 'createdAt'])
+          && d.date is string && d.date.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && cleanStr(d.title, 1, 80) && cleanStr(d.body, 1, 400)
+          && d.createdAt is timestamp
+          && (!('emoji' in d) || isStr(d.emoji, 1, 16))
+          && (!('image' in d) || (isStr(d.image, 1, 120) && d.image.matches('^[A-Za-z0-9_./-]+$') && !d.image.matches('.*\\.\\..*')))
+          && (!('link' in d) || (isStr(d.link, 2, 80) && (d.link.matches('^#/[A-Za-z0-9_./?=&%-]{1,78}$') || d.link.matches('^[a-z0-9][A-Za-z0-9./_-]{0,78}$'))));
+      }
+      allow read: if true;
+      allow create: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
     }
 
     // Trending searches: searchTrends/{day}_{slug} = { day, q, n }. Anyone can read; signed-in users create a

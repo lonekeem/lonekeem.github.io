@@ -1707,6 +1707,37 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 #push-admin input, #push-admin textarea { width: 100%; margin: 4px 0 8px; }
 #push-admin label { display: block; margin-top: 6px; font-weight: 600; }
 
+/* What's New */
+.wn-hub {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 12px 14px;
+  text-decoration: none; color: #f4f1fa; background: linear-gradient(90deg, #2a1848, #5b21b6);
+  border: 2px solid #ffd34d; border-radius: 16px;
+}
+.wn-hub > span:first-child { font-size: 1.6rem; line-height: 1; }
+.wn-hub > span:nth-child(2) { flex: 1; min-width: 0; }
+.wn-hub b { display: block; color: #ffd34d; font-size: 1.05rem; }
+.wn-hub small { display: block; color: #f4f1fa; font-size: .85rem; }
+.wn-dot { width: 12px; height: 12px; border-radius: 50%; background: #ffd34d; box-shadow: 0 0 0 2px #2a1848; flex: none; }
+.wn-page { max-width: 640px; margin: 0 auto; }
+.wn-lead { margin: 6px 0 0; color: #f4f1fa; }
+.wn-credit { margin: 4px 0 14px; }
+.wn-list { display: grid; gap: 12px; }
+.wn-card {
+  display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: start;
+  background: #1a1030; color: #f4f1fa; border: 2px solid #c4b5fd; border-radius: 18px; padding: 14px;
+}
+.wn-emoji { font-size: 1.8rem; line-height: 1.2; text-align: center; }
+.wn-date { margin: 0; color: #ffd34d; font-weight: 700; font-size: .85rem; }
+.wn-card h2 { font-size: 1.12rem; margin: 2px 0 0; color: #fff; }
+.wn-card p { margin: 6px 0 0; color: #f4f1fa; }
+.wn-img { width: 100%; max-height: 140px; object-fit: cover; border-radius: 12px; margin-top: 10px; border: 2px solid #ffd34d; }
+.wn-card .wn-play { margin-top: 12px; background: #ffd34d; color: #241400; box-shadow: none; }
+.wn-card .wn-play:hover { background: #ffe58a; color: #241400; }
+.wn-form { margin-top: 16px; }
+.wn-form input, .wn-form textarea { width: 100%; margin: 4px 0 10px; background: #07050c; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 16px; }
+.wn-form .wn-ping { margin: 4px 0 12px; color: var(--text); }
+.wn-form h2 { font-size: 1.05rem; margin-bottom: 6px; }
+
 /* ===== 📱 No "blue screen" on taps (iPhone + Android): no tap flash, no accidental selection / long-press callout /
    image drag, no blue outline after a tap. Typing + selecting still work in inputs, textareas and contenteditable;
    keyboard users still get a visible (purple) focus ring. ===== */
