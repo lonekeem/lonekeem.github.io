@@ -1,7 +1,7 @@
 // House TV: full-length YouTube, saved list, and the chat/TV split.
 // YouTube links are allowed in homes/{plot}.radio only. kidSafe still blocks https:// in chat.
 import { readFileSync } from 'node:fs';
-import { ytId, ytWatchUrl, ytEmbedSrc, radioLinkOk, canonicalLink, PREVIEW_NOTE, YT_MAX, parseYtList, serYtList, ytListOk, radioKeep, playKeyOf, safeTitle } from '../../js/world/house-tv.js';
+import { ytId, ytWatchUrl, ytEmbedSrc, radioLinkOk, canonicalLink, PREVIEW_NOTE, YT_BLOCKED, YT_MAX, parseYtList, serYtList, ytListOk, radioKeep, playKeyOf, safeTitle } from '../../js/world/house-tv.js';
 
 let pass = 0, fail = 0;
 const ok = (n, cond) => { if (cond) { pass++; console.log('PASS', n); } else { fail++; console.log('FAIL', n); } };
@@ -17,6 +17,8 @@ ok('spotify and apple still count as radio links', radioLinkOk('https://open.spo
 const on = ytEmbedSrc(ID, { autoplay: true, origin: 'https://lonekeem.github.io' });
 const off = ytEmbedSrc(ID, { origin: 'https://lonekeem.github.io' });
 ok('embed is playsinline and has no end or start', on.includes('playsinline=1') && off.includes('playsinline=1') && !on.includes('end=') && !on.includes('start=') && !off.includes('end='));
+ok('embed keeps youtube branding and ads', !on.includes('modestbranding') && !on.includes('controls=0') && !off.includes('modestbranding'));
+ok('embedding disabled uses the exact sentence', YT_BLOCKED === "This video can't play in Kemy, open on YouTube");
 ok('autoplay only after a tap', on.includes('autoplay=1') && !off.includes('autoplay=') && on.startsWith('https://www.youtube-nocookie.com/embed/' + ID + '?'));
 
 const items = [{ id: ID, title: 'Me at the zoo' }, { id: 'M7lc1UVf-VE', title: '  Demo\nvideo  ' }, { id: 'dQw4w9WgXcQ', title: 'https://discord.gg/no' }];
@@ -42,11 +44,11 @@ ok('tv rules allow a youtube list and not a new home field', rules.includes("r.k
 ok('a youtube url would be blocked by the chat filter', /https?:\/\/|www\./i.test('https://www.youtube.com/watch?v=' + ID) && radioLinkOk('https://www.youtube.com/watch?v=' + ID));
 
 const homes = readFileSync(new URL('../../js/world/homes.js', import.meta.url), 'utf8');
-const keepAt = homes.indexOf('.kh-radio.dock.yt-keep');
-const keep = homes.slice(keepAt, homes.indexOf('.kh-note-btn{', keepAt));
-ok('youtube minimize stays a 2px in-viewport sliver', keep.includes('width:2px!important') && keep.includes('height:2px!important') && keep.includes('opacity:.01!important') && keep.includes('position:fixed!important') && keep.includes('visibility:visible!important') && keep.includes('display:block!important') && !keep.includes('display:none') && !keep.includes('-9999'));
+const dockFn = homes.slice(homes.indexOf('function dockRadio'), homes.indexOf('function restoreCard'));
+const miniFn = homes.slice(homes.indexOf('function minimizeRadio'), homes.indexOf('function expandRadio'));
+ok('youtube minimize is a visible 200px player', homes.includes('min-width:200px!important') && homes.includes('min-height:200px!important') && homes.includes('yt-float') && !homes.includes('yt-keep') && !homes.includes('nudgeYt') && !homes.includes('modestbranding'));
 ok('spotify minimize still parks far off-screen', homes.includes('left:-9999px!important') && homes.includes("'-9999px'"));
-ok('a hidden youtube frame is told to keep playing', homes.includes('onStateChange') && homes.includes('playVideo') && homes.includes('nudgeYt'));
+ok('collapsing youtube to the note pauses it', dockFn.includes('pauseYtForDock') && dockFn.indexOf('pauseYtForDock') < dockFn.indexOf("'-9999px'") && miniFn.includes('floatYouTube') && homes.includes('YT_BLOCKED'));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

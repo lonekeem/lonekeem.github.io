@@ -4,6 +4,7 @@
 // kidSafe, which blocks https:// — do not run a TV link through that filter.
 
 export const PREVIEW_NOTE = 'Spotify & Apple Music play 30-sec previews unless signed in to your own paid account';
+export const YT_BLOCKED = "This video can't play in Kemy, open on YouTube";
 export const YT_MAX = 20;
 export const TITLE_MAX = 80;
 export const LIST_MAX = 2400;
@@ -32,8 +33,9 @@ export function ytWatchUrl(id) { return 'https://www.youtube.com/watch?v=' + id;
 
 // playsinline is always on (iPhone Safari and Android TWA). autoplay is only set for a real tap.
 // There is no start= and no end=, so nothing here is a 30-second preview.
+// Branding and ads stay: no modestbranding, no controls=0, no ad blocker.
 export function ytEmbedSrc(id, { autoplay = false, origin = '' } = {}) {
-  const q = new URLSearchParams({ enablejsapi: '1', playsinline: '1', rel: '0', modestbranding: '1' });
+  const q = new URLSearchParams({ enablejsapi: '1', playsinline: '1', rel: '0' });
   if (autoplay) q.set('autoplay', '1');
   if (origin) q.set('origin', origin);
   return 'https://www.youtube-nocookie.com/embed/' + id + '?' + q.toString();

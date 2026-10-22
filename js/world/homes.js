@@ -11,7 +11,7 @@ import { GALLERY } from './cities.js';
 import { checkInput } from '../pals/talk.js';
 import { ADMIN_EMAIL, EMU } from '../firebase-init.js';
 import { attachHomeLife } from './homelife.js';
-import { RADIO_RE, ytId, ytWatchUrl, ytEmbedSrc, radioLinkOk, PREVIEW_NOTE, YT_MAX, cleanTitle, titleOk, parseYtList, serYtList, radioKeep, playKeyOf } from './house-tv.js';
+import { RADIO_RE, ytId, ytWatchUrl, ytEmbedSrc, radioLinkOk, PREVIEW_NOTE, YT_BLOCKED, YT_MAX, cleanTitle, titleOk, parseYtList, serYtList, radioKeep, playKeyOf } from './house-tv.js';
 export { RADIO_RE, radioLinkOk };
 export const ytRadioId = ytId;
 export const plateBad = (t) => { const s = String(t || ''); return !!(checkInput(s) || checkInput(s.toLowerCase()) || checkInput(s.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').toLowerCase())); };
@@ -185,11 +185,14 @@ export function attachHomes(api, W, K) {
 .kh-radio.min{width:200px;padding:6px 8px;z-index:20;touch-action:none;cursor:grab;user-select:none;box-shadow:0 8px 22px rgba(0,0,0,.35)}
 .kh-radio.min .kh-rh{flex-wrap:wrap}.kh-radio.min .kh-title{flex:1 1 100%}.kh-radio.min .kh-ract{width:100%}.kh-radio.min .kh-ract button{flex:1;min-height:32px;padding:4px 6px}
 .kh-radio.min .kh-rb iframe,.kh-radio.min .mx-embed{height:96px!important;max-height:96px;overflow:hidden}.kh-radio.min .kh-rb iframe{pointer-events:none}
-.kh-radio.min .kh-rb > :not(iframe):not(.mx-embed),.kh-radio.min .mx-credit,.kh-radio.min .kh-note{display:none}
+.kh-radio.min .kh-rb > :not(iframe):not(.mx-embed):not(.kh-yt-block),.kh-radio.min .mx-credit,.kh-radio.min .kh-note{display:none}
+.kh-radio.min.yt-float{width:220px;min-width:220px;touch-action:auto}
+.kh-radio.min.yt-float .kh-rh{touch-action:none;cursor:grab}
+.kh-radio.min.yt-float .kh-yt{width:200px!important;height:200px!important;min-width:200px!important;min-height:200px!important;max-height:none!important;pointer-events:auto;touch-action:auto}
+.kh-radio:not(.min) .kh-yt{height:200px;min-width:200px;min-height:200px}
+.kh-yt-block{display:block;margin:6px 0 0;font-size:12px;line-height:1.35}.kh-yt-block a{color:#ffe08a}
 .kh-radio.dock{left:-9999px!important;top:0!important;right:auto!important;bottom:auto!important;width:min(92vw,340px)!important;transform:none!important;opacity:.02;pointer-events:none;z-index:0}
 .kh-radio.dock .kh-rb iframe,.kh-radio.dock .mx-embed{height:152px!important;max-height:none;visibility:visible}
-.kh-radio.dock.yt-keep{left:0!important;top:0!important;right:auto!important;bottom:auto!important;width:2px!important;height:2px!important;padding:0!important;opacity:.01!important;overflow:hidden!important;visibility:visible!important;display:block!important;transform:none!important;pointer-events:none;z-index:0}
-.kh-radio.dock.yt-keep .kh-rb iframe,.kh-radio.dock.yt-keep .kh-yt{position:fixed!important;left:0!important;top:0!important;width:2px!important;height:2px!important;min-height:0!important;max-height:2px!important;opacity:1!important;visibility:visible!important;display:block!important;pointer-events:none!important}
 .kh-note-btn{position:absolute;width:40px;height:40px;padding:0;border-radius:50%;border:1px solid rgba(255,214,90,.9);background:rgba(20,12,45,.92);color:#ffe08a;font:800 20px/1 Inter,sans-serif;display:grid;place-items:center;z-index:21;pointer-events:auto;box-shadow:0 4px 14px rgba(0,0,0,.35);touch-action:manipulation}
 .kh-note-btn[hidden]{display:none}.kh-note-btn .kh-eq{position:absolute;left:9px;right:9px;bottom:6px;height:8px;display:flex;align-items:flex-end;gap:2px;opacity:0}
 .kh-note-btn.on{animation:kh-note-pulse 1.6s ease-in-out infinite}.kh-note-btn.on .kh-eq{opacity:.95}
@@ -227,7 +230,7 @@ export function attachHomes(api, W, K) {
     }
   }
   function paintChrome(title) {
-    radioBox.classList.remove('min', 'dock'); clearKeep(); radioBox.removeAttribute('aria-hidden');
+    radioBox.classList.remove('min', 'dock', 'yt-float'); clearKeep(); radioBox.removeAttribute('aria-hidden');
     noteBtn.hidden = true; noteBtn.classList.remove('on');
     radioBox.style.left = radioBox.style.top = radioBox.style.right = radioBox.style.bottom = radioBox.style.transform = '';
     radioBox.innerHTML = `<div class="kh-rh"><b class="kh-title"></b><span class="kh-ract"><button type="button" data-pp hidden aria-label="Pause">⏸</button><button type="button" data-min aria-label="Minimize">Minimize</button><button type="button" data-ex hidden aria-label="Expand">Expand</button><button type="button" data-s aria-label="Close">✕</button></span></div><div class="kh-rb"></div>`;
@@ -235,11 +238,11 @@ export function attachHomes(api, W, K) {
   }
   function markPaused(p, byUser) { if (!rad) return; rad.paused = !!p; if (!p) rad.userPause = false; else if (byUser) rad.userPause = true; syncChrome(); }
   function clearKeep() {
-    radioBox.classList.remove('yt-keep');
     radioBox.style.width = radioBox.style.height = radioBox.style.padding = radioBox.style.opacity = radioBox.style.overflow = radioBox.style.visibility = radioBox.style.display = radioBox.style.pointerEvents = '';
     const frame = radioBox.querySelector('iframe.kh-yt');
     if (frame) frame.style.position = frame.style.left = frame.style.top = frame.style.width = frame.style.height = frame.style.maxHeight = frame.style.opacity = frame.style.visibility = frame.style.display = frame.style.pointerEvents = '';
   }
+  function ytOn() { return !!(rad && (rad.yid || (rad.emb && rad.emb.service === 'youtube'))); }
   function controlPads() {
     const w = innerWidth, h = innerHeight;
     // The walking joystick sits in the lower-left corner and the action buttons sit lower-right, even before a thumb shows the knob.
@@ -270,19 +273,22 @@ export function attachHomes(api, W, K) {
   }
   function settleMini() {
     if (!radioBox.classList.contains('min')) return;
-    const w = radioBox.offsetWidth || 200;
+    const w = radioBox.offsetWidth || 200, h = radioBox.offsetHeight || 200;
     const right = Math.max(8, innerWidth - w - 8);
     const below = headerBottom();
+    const bottom = Math.max(below, innerHeight - h - 8);
+    const onLeft = miniAt && miniAt.l < innerWidth / 2;
+    const sides = onLeft ? [8, right] : [right, 8];
     const tries = [];
-    for (let t = below; t >= 8; t -= 22) tries.push({ l: right, t });
-    tries.push({ l: 8, t: below }, { l: 8, t: 8 }, { l: right, t: 8 });
-    if (miniAt) tries.unshift(miniAt);
+    if (miniAt) tries.push(miniAt);
+    for (const l of sides) for (let t = below; t <= bottom; t += 28) tries.push({ l, t });
+    tries.push({ l: 8, t: below }, { l: right, t: below }, { l: 8, t: bottom }, { l: right, t: bottom });
     for (const c of tries) {
       placeMini(c.l, c.t);
       const r = radioBox.getBoundingClientRect();
       if (!hitsPad({ l: r.left, t: r.top, r: r.right, b: r.bottom })) return;
     }
-    placeMini(right, below);
+    placeMini(sides[0], below);
   }
   function defaultMiniCorner() {
     const w = radioBox.offsetWidth || 200;
@@ -312,43 +318,34 @@ export function attachHomes(api, W, K) {
     }
     noteBtn.style.left = right + 'px'; noteBtn.style.top = below + 'px';
   }
-  // Minimize hides the card behind the gold ♪ button.
-  // Spotify and Apple can sit far off-screen. YouTube pauses a frame that is display:none, visibility:hidden, or far off-screen,
-  // so that iframe stays mounted as a 2px in-viewport dot (opacity ~0.01) and keeps playing.
-  let ytNudgeAt = 0;
-  function ytLive() { return !!(rad && rad.emb && rad.emb.service === 'youtube' && rad.emb.started && (rad.yid || rad.emb.frame)); }
-  function resumeYt() {
-    if (!ytLive() || rad.userPause || rad.ytState === 0 || document.visibilityState === 'hidden') return;
+  // Spotify, Apple, and Kemy Radio can hide behind the ♪ button and keep playing.
+  // YouTube cannot: while it plays it stays a visible player of at least 200×200 CSS pixels.
+  // Collapsing YouTube to ♪ pauses it, and restoring that card plays it again.
+  function pauseYtForDock() {
+    if (!ytOn() || !rad.emb || rad.blocked) return;
+    if (!rad.userPause) rad.dockPause = true;
+    try { rad.emb.pause(); } catch { /* */ }
+    markPaused(true);
+  }
+  function resumeYtFromDock() {
+    if (!ytOn() || !rad.dockPause || rad.userPause || rad.blocked || rad.ytState === 0) return;
+    rad.dockPause = false;
     try { rad.emb.play(); } catch { /* */ }
+    markPaused(false);
   }
-  function nudgeYt() {
-    if (!ytLive() || rad.userPause || rad.ytState === 0) return;
-    if (!radioBox.classList.contains('dock') || !radioBox.classList.contains('yt-keep') || document.visibilityState === 'hidden') return;
-    const now = Date.now(); if (now - ytNudgeAt < 700) return; ytNudgeAt = now; resumeYt();
-  }
-  function keepYtPlaying() {
-    if (!ytLive() || rad.userPause) return;
-    const me = rad;
-    clearTimeout(me.nudgeA); clearTimeout(me.nudgeB);
-    me.nudgeA = setTimeout(() => { if (rad === me) nudgeYt(); }, 300);
-    me.nudgeB = setTimeout(() => { if (rad === me) { ytNudgeAt = 0; nudgeYt(); } }, 1000);
+  function floatYouTube() {
+    if (!rad || radioBox.hidden) return;
+    radioBox.classList.remove('dock'); clearKeep(); radioBox.classList.add('min', 'yt-float'); radioBox.removeAttribute('aria-hidden');
+    noteBtn.hidden = true;
+    const spot = miniAt || defaultMiniCorner();
+    placeMini(spot.l, spot.t); settleMini(); syncChrome();
+    resumeYtFromDock();
   }
   function dockRadio() {
     if (!rad || radioBox.hidden) return;
-    const yt = !!(rad.yid || (rad.emb && rad.emb.service === 'youtube'));
-    radioBox.classList.remove('min'); radioBox.classList.add('dock'); radioBox.setAttribute('aria-hidden', 'true');
-    if (yt) {
-      radioBox.classList.add('yt-keep');
-      radioBox.style.left = '0px'; radioBox.style.top = '0px'; radioBox.style.right = 'auto'; radioBox.style.bottom = 'auto'; radioBox.style.transform = 'none';
-      radioBox.style.width = '2px'; radioBox.style.height = '2px'; radioBox.style.padding = '0px'; radioBox.style.opacity = '0.01';
-      radioBox.style.overflow = 'hidden'; radioBox.style.visibility = 'visible'; radioBox.style.display = 'block'; radioBox.style.pointerEvents = 'none';
-      const frame = radioBox.querySelector('iframe.kh-yt');
-      if (frame) { frame.style.position = 'fixed'; frame.style.left = '0px'; frame.style.top = '0px'; frame.style.width = '2px'; frame.style.height = '2px'; frame.style.visibility = 'visible'; frame.style.display = 'block'; frame.style.opacity = '1'; frame.style.pointerEvents = 'none'; }
-      keepYtPlaying();
-    } else {
-      clearKeep();
-      radioBox.style.left = '-9999px'; radioBox.style.top = '0px'; radioBox.style.right = 'auto'; radioBox.style.bottom = 'auto'; radioBox.style.transform = 'none';
-    }
+    if (ytOn()) pauseYtForDock();
+    radioBox.classList.remove('min', 'yt-float'); clearKeep(); radioBox.classList.add('dock'); radioBox.setAttribute('aria-hidden', 'true');
+    radioBox.style.left = '-9999px'; radioBox.style.top = '0px'; radioBox.style.right = 'auto'; radioBox.style.bottom = 'auto'; radioBox.style.transform = 'none';
     const ae = document.activeElement;
     if (ae && ae !== noteBtn && (radioBox.contains(ae) || ae.tagName === 'IFRAME')) { try { ae.blur(); } catch { /* */ } }
     noteBtn.hidden = false; syncChrome(); placeNote(); noteBtn.focus();
@@ -356,21 +353,24 @@ export function attachHomes(api, W, K) {
   }
   function restoreCard() {
     if (!rad || radioBox.hidden) return;
-    radioBox.classList.remove('dock'); clearKeep(); radioBox.classList.add('min'); radioBox.removeAttribute('aria-hidden');
+    const wasDock = radioBox.classList.contains('dock');
+    radioBox.classList.remove('dock'); clearKeep(); radioBox.classList.add('min'); if (ytOn()) radioBox.classList.add('yt-float');
+    radioBox.removeAttribute('aria-hidden');
     noteBtn.hidden = true; syncChrome();
     const spot = miniAt || defaultMiniCorner();
     placeMini(spot.l, spot.t); settleMini();
-    resumeYt();
+    if (wasDock) resumeYtFromDock();
     requestAnimationFrame(() => { if (radioBox.classList.contains('min') && !radioBox.classList.contains('dock')) settleMini(); });
     const focus = radioBox.querySelector('[data-pp]') || radioBox.querySelector('[data-ex]');
     if (focus) focus.focus();
   }
-  function minimizeRadio() { dockRadio(); }
+  function minimizeRadio() { if (ytOn()) floatYouTube(); else dockRadio(); }
   function expandRadio() {
     if (!rad) return;
-    radioBox.classList.remove('min', 'dock'); clearKeep(); radioBox.removeAttribute('aria-hidden'); noteBtn.hidden = true;
+    const wasDock = radioBox.classList.contains('dock');
+    radioBox.classList.remove('min', 'dock', 'yt-float'); clearKeep(); radioBox.removeAttribute('aria-hidden'); noteBtn.hidden = true;
     radioBox.style.left = radioBox.style.top = radioBox.style.right = radioBox.style.bottom = radioBox.style.transform = '';
-    syncChrome(); resumeYt();
+    syncChrome(); if (wasDock) resumeYtFromDock();
   }
   function togglePlay() {
     if (!rad) return;
@@ -381,27 +381,39 @@ export function attachHomes(api, W, K) {
   }
   function closeRadio() { radioOff = (inside && inside.id) || (rad && rad.plot) || null; stopRadio(); }
   // The YouTube iframe is created inside the tap (autoplay + playsinline) and then left alone.
-  // Minimize, the ♪ button, walking, driving, and leaving the house only move that same frame.
+  // Minimize shrinks that same frame to a visible 200×200 player. Hiding it behind ♪ pauses it.
   function mountHouseYouTube(body, id, { autoplay, title } = {}) {
     const frame = document.createElement('iframe');
-    frame.className = 'kh-yt'; frame.title = title || 'YouTube'; frame.width = '100%'; frame.height = '180';
+    frame.className = 'kh-yt'; frame.title = title || 'YouTube'; frame.width = '100%'; frame.height = '200';
     frame.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen'); frame.allowFullscreen = true;
     frame.setAttribute('playsinline', '1'); frame.dataset.yt = id; frame.dataset.full = '1';
     frame.src = ytEmbedSrc(id, { autoplay: !!autoplay, origin: location.origin });
     body.appendChild(frame);
-    const note = document.createElement('small'); note.className = 'kh-note'; note.textContent = 'Full video. It keeps playing in the mini player and the ♪ button while you walk, drive, or leave.'; body.appendChild(note);
+    const note = document.createElement('small'); note.className = 'kh-note'; note.textContent = 'Full video. The small player stays on screen while you walk, drive, or leave.'; body.appendChild(note);
     if (!autoplay) {
       const tap = document.createElement('button'); tap.type = 'button'; tap.className = 'kh-tap'; tap.dataset.tap = '1'; tap.textContent = 'Tap to play';
       tap.addEventListener('click', (e) => { e.stopPropagation(); beginYt(id, { autoplay: true, title: (rad && rad.tvTitle) || title || 'YouTube' }); });
       body.appendChild(tap);
     }
     const cmd = (func, args = []) => { try { frame.contentWindow && frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*'); } catch { /* */ } };
-    const listen = () => { try { const win = frame.contentWindow; if (!win) return; win.postMessage(JSON.stringify({ event: 'listening', id, channel: 'widget' }), '*'); cmd('addEventListener', ['onStateChange']); } catch { /* */ } };
+    const listen = () => { try { const win = frame.contentWindow; if (!win) return; win.postMessage(JSON.stringify({ event: 'listening', id, channel: 'widget' }), '*'); cmd('addEventListener', ['onStateChange']); cmd('addEventListener', ['onError']); } catch { /* */ } };
     frame.addEventListener('load', listen);
     const box = { service: 'youtube', frame, started: !!autoplay, play() { cmd('playVideo'); }, toggle() { cmd(rad && rad.paused ? 'playVideo' : 'pauseVideo'); return true; }, pause() { cmd('pauseVideo'); },
       destroy() { try { cmd('stopVideo'); } catch { /* */ } frame.remove(); if (box.started) dispatchEvent(new CustomEvent('kemy:media-stop', { detail: { source: 'house-radio', service: 'youtube' } })); } };
     if (autoplay) dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'house-radio', service: 'youtube' } }));
     return box;
+  }
+  function showYtBlocked(id) {
+    if (!rad || rad.blocked) return;
+    rad.blocked = true;
+    try { rad.emb && rad.emb.pause(); } catch { /* */ }
+    markPaused(true, true);
+    const body = radioBox.querySelector('.kh-rb');
+    if (!body || body.querySelector('.kh-yt-block')) return;
+    const p = document.createElement('p'); p.className = 'kh-yt-block';
+    const a = document.createElement('a'); a.href = ytWatchUrl(id || rad.yid); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'open on YouTube';
+    p.append(YT_BLOCKED.slice(0, YT_BLOCKED.indexOf('open on YouTube')), a);
+    body.appendChild(p);
   }
   function oembedTitle(id) {
     return fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(ytWatchUrl(id))).then((r) => (r.ok ? r.json() : null)).then((d) => {
@@ -449,26 +461,27 @@ export function attachHomes(api, W, K) {
     const b = e.target.closest('button'); if (!b || !radioBox.contains(b) || b.dataset.p != null) return;
     if (b.dataset.s != null) closeRadio(); else if (b.dataset.min != null) minimizeRadio(); else if (b.dataset.ex != null) expandRadio(); else if (b.dataset.pp != null) togglePlay();
   });
-  radioBox.addEventListener('pointerdown', (e) => {
-    if (!radioBox.classList.contains('min') || e.target.closest('button')) return;
-    const r = radioBox.getBoundingClientRect();
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, l: r.left, t: r.top, moved: false };
-    try { radioBox.setPointerCapture(e.pointerId); } catch { /* */ }
-    e.preventDefault();
-  });
-  radioBox.addEventListener('pointermove', (e) => {
+  const onDragMove = (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (dx * dx + dy * dy > 36) drag.moved = true;
     placeMini(drag.l + dx, drag.t + dy);
-  });
+  };
   const endDrag = (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const moved = drag.moved; drag = null;
-    if (moved) settleMini(); else dockRadio();
+    removeEventListener('pointermove', onDragMove); removeEventListener('pointerup', endDrag); removeEventListener('pointercancel', endDrag);
+    if (moved) settleMini(); else if (!radioBox.classList.contains('yt-float')) dockRadio();
   };
-  radioBox.addEventListener('pointerup', endDrag);
-  radioBox.addEventListener('pointercancel', (e) => { if (!drag || e.pointerId !== drag.id) return; drag = null; settleMini(); });
+  radioBox.addEventListener('pointerdown', (e) => {
+    if (!radioBox.classList.contains('min') || e.target.closest('button') || e.target.closest('a')) return;
+    if (radioBox.classList.contains('yt-float') && !e.target.closest('.kh-rh')) return;
+    const r = radioBox.getBoundingClientRect();
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, l: r.left, t: r.top, moved: false };
+    addEventListener('pointermove', onDragMove); addEventListener('pointerup', endDrag); addEventListener('pointercancel', endDrag);
+    try { radioBox.setPointerCapture(e.pointerId); } catch { /* */ }
+    e.preventDefault();
+  });
   function onMiniResize() { if (radioBox.classList.contains('dock')) placeNote(); else if (radioBox.classList.contains('min')) settleMini(); }
   noteBtn.addEventListener('click', (e) => { e.stopPropagation(); restoreCard(); });
   function onHouseMusic(ev) { const d = ev.detail || {}; if (!rad || d.source !== 'house-radio' || d.service !== 'spotify') return; markPaused(d.state !== 'play'); }
@@ -480,10 +493,13 @@ export function attachHomes(api, W, K) {
     let state = null;
     if (data.event === 'onStateChange' && data.info != null && typeof data.info !== 'object') state = Number(data.info);
     else if (data.event === 'infoDelivery' && data.info && data.info.playerState != null) state = Number(data.info.playerState);
+    let code = null;
+    if (data.event === 'onError' && data.info != null && typeof data.info !== 'object') code = Number(data.info);
+    if (code === 100 || code === 101 || code === 150) { showYtBlocked(rad.yid); return; }
     if (!Number.isFinite(state)) return;
     rad.ytState = state;
-    if (state === 1) { if (!rad.userPause) markPaused(false); return; }
-    if (state === 2) nudgeYt();
+    if (state === 1 && radioBox.classList.contains('dock')) { pauseYtForDock(); return; }
+    if (state === 1 && !rad.userPause) markPaused(false);
   }
   addEventListener('resize', onMiniResize); addEventListener('kemy:music', onHouseMusic); addEventListener('message', onYtMessage);
   async function startRadio() {
@@ -527,7 +543,7 @@ export function attachHomes(api, W, K) {
   function stopRadio() {
     tvHide();
     if (rad) { try { if (rad.emb) rad.emb.destroy(); } catch { /* */ } if (rad.au) { try { rad.au.pause(); rad.au.removeAttribute('src'); rad.au.load(); } catch { /* */ } dispatchEvent(new CustomEvent('kemy:media-stop', { detail: { source: 'house-radio' } })); } }
-    rad = null; miniAt = null; drag = null; radioBox.classList.remove('min', 'dock'); clearKeep(); radioBox.removeAttribute('aria-hidden');
+    rad = null; miniAt = null; drag = null; radioBox.classList.remove('min', 'dock', 'yt-float'); clearKeep(); radioBox.removeAttribute('aria-hidden');
     noteBtn.hidden = true; noteBtn.classList.remove('on');
     radioBox.style.left = radioBox.style.top = radioBox.style.right = radioBox.style.bottom = radioBox.style.transform = '';
     radioBox.hidden = true; radioBox.innerHTML = ''; if (window.__kh) window.__kh.radio = null;
@@ -572,7 +588,7 @@ export function attachHomes(api, W, K) {
     if (!myPlot || o.owner !== uid) { if (inside) watchPanel(); else say('Only the owner can edit this TV'); return; }
     const Rd = o.radio || {}; const items = parseYtList(Rd.list); const curId = Rd.k === 'link' ? ytId(Rd.url || '') : '';
     const spUrl = Rd.k === 'link' && !curId ? (Rd.url || '') : '';
-    import('../theme.js').then(({ TRACKS }) => panel(`<h3>📺 TV &amp; house music</h3><p><small>YouTube plays the full video on this TV, in the mini player, and on the ♪ button while you walk, drive, or leave the house.</small></p>
+    import('../theme.js').then(({ TRACKS }) => panel(`<h3>📺 TV &amp; house music</h3><p><small>YouTube plays the full video on this TV and in a small player that stays on screen while you walk, drive, or leave the house.</small></p>
       <label class="kh-lab" for="kh-yt">YouTube</label><input id="kh-yt" data-yt placeholder="https://www.youtube.com/watch?v=… or youtu.be/…" value="${esc(curId ? ytWatchUrl(curId) : '')}"><button type="button" data-add>Add to TV</button><button type="button" data-go>Play</button>
       ${tvRows(items, true, curId)}
       <label class="kh-lab" for="kh-sp">Spotify or Apple Music</label><input id="kh-sp" data-sp placeholder="https://open.spotify.com/… or music.apple.com/…" value="${esc(spUrl)}"><button type="button" data-spgo>Use Spotify or Apple</button><small class="kh-note">${esc(PREVIEW_NOTE)}</small>
@@ -796,7 +812,11 @@ export function attachHomes(api, W, K) {
 
   // ---------------------------------------------------------------- per-frame: prompts, garage doors, light
   function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * 8); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
-    if (driving && rad && !radioBox.hidden) { if (radioBox.classList.contains('dock')) placeNote(); else if (!radioBox.classList.contains('min')) dockRadio(); else { const rr = radioBox.getBoundingClientRect(); if (hitsPad({ l: rr.left, t: rr.top, r: rr.right, b: rr.bottom })) dockRadio(); } }
+    if (driving && rad && !radioBox.hidden) {
+      if (drag) { /* the finger is still moving the player */ }
+      else if (ytOn()) { if (!radioBox.classList.contains('yt-float') || radioBox.classList.contains('dock')) floatYouTube(); else { const rr = radioBox.getBoundingClientRect(); if (hitsPad({ l: rr.left, t: rr.top, r: rr.right, b: rr.bottom })) settleMini(); } }
+      else if (radioBox.classList.contains('dock')) placeNote(); else if (!radioBox.classList.contains('min')) dockRadio(); else { const rr = radioBox.getBoundingClientRect(); if (hitsPad({ l: rr.left, t: rr.top, r: rr.right, b: rr.bottom })) dockRadio(); }
+    }
     if (inside) { const { cx, cz } = roomCell(inside); if (Math.hypot(P.x - cx, P.z - (cz + 5.4 * SC)) < 1.8) promptNow = { id: 'kh:out', label: '🚪 Go outside' }; else if (!deco) promptNow = roomPrompt(); }
     else if (!driving) { let best = null, bd = 2.8; for (const h of housesNear(P.x, P.z, 12)) { const d = Math.hypot(h.door.x - P.x, h.door.z - P.z); if (d < bd) { bd = d; best = h; } }
       if (best) { const o = owners.get(best.id); if (best.sale) { if (!o) promptNow = { id: 'kh:sale:' + best.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[best.style]) }; else if (o.owner === uid) { promptNow = { id: 'kh:mine:' + best.id, label: '🏠 My home' }; showIn = best; } else if (canEnter(best)) showIn = best; else promptNow = { id: 'kh:ring:' + best.id, label: '🚪 Ring doorbell' }; } else showIn = best; }
