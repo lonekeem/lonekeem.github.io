@@ -398,7 +398,7 @@ export function createPark3D(ctx) {
 
     // ---------------------------------------------------------------- input: joystick, buttons, keys, drag-orbit, pinch, wheel
     const keys = {}; const typing = () => /input|textarea/i.test(document.activeElement && document.activeElement.tagName);
-    const kd = (e) => { if (typing()) return; const k = e.key.toLowerCase(); keys[k] = true; if (k === 'enter') { $('#p3-t').focus(); e.preventDefault(); } };
+    const kd = (e) => { if (typing()) return; if (e.target && e.target.closest && e.target.closest('.kh-note-btn, .kh-radio')) return; const k = e.key.toLowerCase(); keys[k] = true; if (k === 'enter') { $('#p3-t').focus(); e.preventDefault(); } };
     const ku = (e) => { keys[e.key.toLowerCase()] = false; }; addEventListener('keydown', kd); addEventListener('keyup', ku);
     let jumpQ = false;
     let runT = false;
