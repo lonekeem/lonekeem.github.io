@@ -1775,3 +1775,26 @@ canvas, button, a, [role="button"], .btn, .card, label, summary, .ps-tile, .pal-
 :focus-visible { outline: 2px solid #9a6aff; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(154,106,255,.25); }
 input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible { outline: 2px solid #9a6aff; outline-offset: 0; }
 ::selection { background: rgba(154,106,255,.35); }
+
+/* New Members (admin) */
+.nm-card { display: block; margin: 0 0 14px; text-decoration: none; color: inherit; border: 2px solid #8a2be2; background: linear-gradient(135deg, rgba(138,43,226,.28), rgba(255,211,77,.12)); }
+.nm-card-row { display: flex; align-items: center; gap: 12px; }
+.nm-card-row > span:first-child { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.nm-card b { font-size: 1.15rem; }
+.nm-badge { min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; display: inline-grid; place-items: center; background: #ffd34d; color: #241400; font-weight: 800; font-size: .85rem; }
+.nm { max-width: 640px; margin: 0 auto; }
+.nm-back { display: inline-block; margin-bottom: 8px; color: #e9d5ff; font-weight: 700; text-decoration: none; min-height: 44px; line-height: 44px; }
+.nm-lead { margin-top: 0; }
+.nm-push { margin: 8px 0 12px; color: var(--text); }
+.nm-search { display: block; font-weight: 700; margin-top: 4px; }
+#nm-q { width: 100%; margin: 4px 0 8px; background: #07050c; border: 1px solid #8a2be2; border-radius: 12px; padding: 12px 14px; font-size: 16px; color: var(--text); }
+.nm-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid rgba(160,110,255,.22); }
+.nm-meta { min-width: 0; flex: 1; }
+.nm-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nm-name b { font-size: 1.02rem; }
+.nm-new { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #ffd34d; color: #241400; font-size: .72rem; font-weight: 800; }
+.nm-handle { color: #e9d5ff; font-weight: 700; text-decoration: none; }
+.nm-when, .nm-how, .nm-email { margin: 2px 0; color: #d9d0ea; font-size: .92rem; }
+.nm-email { color: #ffd34d; font-weight: 700; word-break: break-all; }
+.nm-mail { margin-top: 6px; min-height: 44px; }
+#nm-end { height: 1px; }

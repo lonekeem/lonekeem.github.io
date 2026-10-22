@@ -4,6 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const p = require('./push-policy');
 
+test('a live join is recent and a back-fill is not', () => {
+  const now = Date.UTC(2026, 9, 22, 16, 0, 0);
+  assert.equal(p.joinIsLive(now - 60 * 1000, now), true);
+  assert.equal(p.joinIsLive(now - 14 * 60 * 1000, now), true);
+  assert.equal(p.joinIsLive(now - 16 * 60 * 1000, now), false);
+  assert.equal(p.joinIsLive(now + 3 * 60 * 1000, now), false);
+  assert.equal(p.joinIsLive(now + 30 * 1000, now), true);
+  assert.equal(p.joinIsLive(0, now), false);
+  assert.equal(p.joinIsLive(null, now), false);
+});
+
 test('quiet hours block every type, including turns', () => {
   for (const hour of [21, 23, 0, 7]) {
     const d = p.decideSend({ type: 'turn', hour, day: '2026-10-22', quota: {} });

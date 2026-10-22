@@ -174,6 +174,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['seen', 'updatedAt'])
         && isStr(request.resource.data.seen, 1, 40)
         && request.resource.data.updatedAt == request.time;
+      // When the admin last opened New Members (js/members.js). Admin account only.
+      allow create, update: if signedIn() && uid == me() && isAdmin() && docId == 'members' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['seenAt'])
+        && request.resource.data.seenAt == request.time;
       // Private search history (Search > Recent), max 20 short strings. Deleted by "Clear all" and with the account.
       allow create, update: if signedIn() && uid == me() && docId == 'security'
         && request.resource.data.keys().hasOnly(['alerts', 'updatedAt']) && request.resource.data.alerts is bool
@@ -182,6 +186,49 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['recent', 'updatedAt'])
         && request.resource.data.recent is list && request.resource.data.recent.size() <= 20
         && request.resource.data.updatedAt == request.time;
+    }
+
+    // New Members directory (js/members.js). Public profiles stay on users/{uid}.
+    // Only the verified admin can list this directory. A player can read or update their own row
+    // (so a photo or name change can follow them) but cannot list anyone else. The email lives in
+    // secret/email, never on the public profile, and the admin page loads it only on a tap.
+    match /members/{uid} {
+      function memberSignup() {
+        let p = request.auth.token.firebase.sign_in_provider;
+        return p == 'google.com' ? 'google' : (p == 'password' ? 'email' : '');
+      }
+      function memberEmailOk(d) {
+        return d.email is string && d.email.size() <= 200
+          && (d.email == request.auth.token.email
+              || (request.auth.token.email == null && d.email == ''));
+      }
+      function memberShape(d) {
+        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup'])
+          && cleanStr(d.displayName, 1, 50)
+          && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+          && isStr(d.displayNameLower, 0, 100)
+          && isStr(d.color, 1, 20)
+          && (d.photoURL == '' || cloudinaryImageUrl(d.photoURL))
+          && d.createdAt is timestamp
+          && d.signup in ['email', 'google', ''];
+      }
+      allow get: if isAdmin() || (signedIn() && uid == me());
+      allow list: if isAdmin();
+      allow create: if signedIn() && uid == me() && memberShape(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.signup == memberSignup();
+      allow update: if signedIn() && uid == me() && memberShape(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.signup == resource.data.signup;
+      allow delete: if isAdmin() || (signedIn() && uid == me());
+      // The email is not on the member row. Only the admin can read it, and only when they tap.
+      match /secret/{docId} {
+        allow read: if isAdmin();
+        allow create, update: if signedIn() && uid == me() && docId == 'email'
+          && request.resource.data.keys().hasOnly(['email'])
+          && memberEmailOk(request.resource.data);
+        allow delete: if isAdmin() || (signedIn() && uid == me());
+      }
     }
 
     // What's New entries (js/updates.js). Everyone can read. Only the verified admin can write.
@@ -230,7 +277,8 @@ service cloud.firestore {
         && (uid != me() || !('sessionsValidAfter' in resource.data) || (request.auth.token.auth_time + 1) * 1000 > resource.data.sessionsValidAfter.toMillis())
         && (!('sessionsValidAfter' in changed()) || (uid == me() && request.resource.data.sessionsValidAfter == request.time))
         && validProfile(request.resource.data)
-        && request.resource.data.createdAt == resource.data.createdAt
+        && (request.resource.data.createdAt == resource.data.createdAt
+            || (!('createdAt' in resource.data) && uid == me() && request.resource.data.createdAt == request.time))
         && request.resource.data.get('isStudio', false) == resource.data.get('isStudio', false)
         && (request.resource.data.username == resource.data.username
             || getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid)
@@ -1747,6 +1795,16 @@ service cloud.firestore {
     match /config/palShop {
       allow read: if true;
       allow write: if isAdmin();
+    }
+    // Admin-only "ping me when someone joins" switch (js/members.js). The uid is the admin's own account.
+    match /config/adminAlerts {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['joinPush', 'uid', 'updatedAt'])
+        && request.resource.data.joinPush is bool
+        && request.resource.data.uid == me()
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
     }
     match /users/{uid}/pal/wallet {
       function w() { return request.resource.data; }

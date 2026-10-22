@@ -178,4 +178,25 @@ const sendAnnouncement = onCall({ timeoutSeconds: 120 }, async (req) => {
   return { ok: true, sent, skipped };
 });
 
-module.exports = { pushInbox, pushTurn, pushDailyReady, sendAnnouncement };
+// Optional admin ping when a member row is created. Back-filled rows have an old createdAt, so they stay quiet.
+const pushNewMember = onDocumentCreated('members/{uid}', async (event) => {
+  const data = event.data && event.data.data();
+  if (!data) return;
+  const ms = data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : 0;
+  if (!policy.joinIsLive(ms, Date.now())) return;
+  const cfg = await db().doc('config/adminAlerts').get();
+  if (!cfg.exists || cfg.get('joinPush') !== true) return;
+  const adminUid = cfg.get('uid');
+  if (!adminUid || adminUid === event.params.uid) return;
+  const tokens = await tokensOf(adminUid);
+  if (!tokens.length) return;
+  const clock = clockOf(tokens);
+  if (clock.hour >= 21 || clock.hour < 8) return;
+  const name = policy.clip(data.displayName || data.username || 'Someone new', 40);
+  await deliver(adminUid, tokens, {
+    type: 'join', title: 'New member', body: name + ' joined Kemy',
+    url: 'app.html#/members', tag: 'join-' + event.params.uid
+  });
+});
+
+module.exports = { pushInbox, pushTurn, pushDailyReady, sendAnnouncement, pushNewMember };

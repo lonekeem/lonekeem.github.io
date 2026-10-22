@@ -127,6 +127,15 @@ function buildAnnouncement(data) {
   return { title, body, path };
 }
 
+// A live signup, not a back-fill of an older account. createdAt within 15 minutes, plus a little clock skew.
+const JOIN_WINDOW_MS = 15 * 60 * 1000;
+function joinIsLive(createdAtMs, nowMs) {
+  const t = Number(createdAtMs);
+  const now = Number(nowMs);
+  if (!Number.isFinite(t) || !Number.isFinite(now) || t <= 0) return false;
+  return now + 120000 >= t && now - t <= JOIN_WINDOW_MS;
+}
+
 function hashOnly(path) {
   const i = String(path || '').indexOf('#');
   return (i >= 0 ? path.slice(i) : '#/feed').slice(0, 100);
@@ -134,5 +143,5 @@ function hashOnly(path) {
 
 module.exports = {
   ADMIN_EMAIL, NON_GAME_CAP, GAME_NAMES, isAdminToken, clockFrom, decideSend,
-  turnRecipient, inboxPush, turnMessage, safePath, buildAnnouncement, hashOnly, clip
+  turnRecipient, inboxPush, turnMessage, safePath, buildAnnouncement, hashOnly, clip, joinIsLive
 };

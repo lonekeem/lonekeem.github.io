@@ -674,6 +674,7 @@ const routes = [
   [/^#\/music$/, (t) => music.page(t), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
+  [/^#\/members$/, (t) => import('./members.js').then((m) => m.page(main, { stale: () => stale(t), toast })), ''],
   [/^#\/mod(?:\/(\w+))?(?:\?.*)?$/, (tab, t) => mod.page(tab, t, stale), ''],
   [/^#\/support$/, () => mod.supportPage(main), 'messages'],
   [/^#\/mod-invite$/, () => mod.invitePage(main), 'me'],
@@ -1288,6 +1289,7 @@ async function pageSettings() {
   if (del) del.onclick = () => accountDeleter.open(S.profile);
   const setPhoto = async (url) => {
     await updateDoc(doc(db, 'users', S.user.uid), { photoURL: url });
+    updateDoc(doc(db, 'members', S.user.uid), { photoURL: url }).catch(() => {});
     S.profile.photoURL = url;
     profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile });
     refreshAvatarsFor(S.user.uid, url);
@@ -1323,6 +1325,8 @@ async function pageSettings() {
         b.delete(doc(db, 'usernames', p.username));
       }
       b.update(doc(db, 'users', S.user.uid), { displayName, username, bio, pronouns, website, color, ...userSearchFields({ displayName, username }) });
+      const memberRef = doc(db, 'members', S.user.uid);
+      if ((await getDoc(memberRef)).exists()) b.update(memberRef, { displayName, username, displayNameLower: displayName.toLowerCase().slice(0, 100), color });
       await b.commit();
       Object.assign(S.profile, { displayName, username, bio, pronouns, website, color });
       profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile });
@@ -1472,6 +1476,9 @@ async function pageAdmin(token) {
   const big = (id, emoji, title, desc, extra = '') => `<div class="card pad adm-tool" style="margin-bottom:12px"><div class="row" style="flex-wrap:wrap;gap:10px"><div style="flex:1;min-width:220px"><b style="font-size:1.05rem">${emoji} ${title}</b><p class="muted small" style="margin:3px 0 0">${desc}</p></div>${extra}</div><p class="small muted" id="${id}-msg" style="margin:8px 0 0"></p></div>`;
   main.innerHTML = `<h1 class="page-title">🛡️ Admin</h1>
     <p class="muted small">Signed in as ${esc(S.user.email)}. Only you can see this page.</p>
+    <a class="card pad adm-tool nm-card" href="#/members" id="nm-open">
+      <span class="nm-card-row"><span><b>New Members</b><span class="muted small">Everyone who joined, newest first.</span></span><span class="nm-badge" id="nm-badge" hidden>0</span></span>
+    </a>
     ${devices.noticeHtml()}
     <div class="card pad adm-tool" style="margin-bottom:14px;border:2px solid var(--blue)"><b style="font-size:1.15rem">🛍️ Publish shop prices</b>
       <p class="muted small" style="margin:3px 0 8px">Sends every price in the app (dances, outfits, jewelry, looks, backgrounds, Rare Pals, pal items and Zombie Armory items in ★ and 💎) to the live shop, so people can buy them.</p>
@@ -1495,6 +1502,7 @@ async function pageAdmin(token) {
   mod.adminSection($('#adm-mods'));
   donate.mountAdmin($('#adm-donate'));
   import('./push.js').then((m) => { const h = document.getElementById('push-admin-host'); if (h) h.innerHTML = m.adminHtml(); m.wireAdmin(toast); }).catch(() => {});
+  import('./members.js').then((m) => m.paintAdminBadge(document.getElementById('nm-badge'))).catch(() => {});
   if ($('#adm-founder')) { $('#adm-founder').onclick = () => founderSet(true); $('#adm-founder-off').onclick = () => founderSet(false); }
   const st = $('#shop-status'), pub = $('#shop-pub');
   const showStatus = async () => {
@@ -1686,14 +1694,23 @@ async function pageReset() {
 async function createProfile(displayName, username) {
   if (await uidForUsername(username)) throw new Error('That username is taken. Try another.');
   const uid = S.user.uid;
+  const name = displayName.slice(0, 50);
+  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const tok = await S.user.getIdTokenResult();
+  const signup = tok.signInProvider === 'google.com' ? 'google' : tok.signInProvider === 'password' ? 'email' : '';
   const b = writeBatch(db);
   b.set(doc(db, 'usernames', username), { uid });
   b.set(doc(db, 'users', uid), {
-    displayName: displayName.slice(0, 50), username, bio: '', color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    ...userSearchFields({ displayName: displayName.slice(0, 50), username }),
+    displayName: name, username, bio: '', color,
+    ...userSearchFields({ displayName: name, username }),
     ...(pendingBirthday ? { birthY: pendingBirthday.birthY, birthM: pendingBirthday.birthM } : {}),
     createdAt: serverTimestamp(), welcomed: false
   });
+  b.set(doc(db, 'members', uid), {
+    displayName: name, username, displayNameLower: name.toLowerCase().slice(0, 100), color, photoURL: '',
+    createdAt: serverTimestamp(), signup
+  });
+  b.set(doc(db, 'members', uid, 'secret', 'email'), { email: String(S.user.email || '').slice(0, 200) });
   pendingBirthday = null;
   b.set(doc(db, 'follows', `${uid}_${STUDIO_UID}`), { follower: uid, followee: STUDIO_UID, createdAt: serverTimestamp() });
   await b.commit();
@@ -1707,6 +1724,10 @@ async function loadSession() {
   const snap = await getDoc(doc(db, 'users', uid));
   S.profile = snap.exists() ? snap.data() : null;
   if (!S.profile) return;
+  if (!S.profile.createdAt) {
+    try { await updateDoc(doc(db, 'users', uid), { createdAt: serverTimestamp() }); }
+    catch (e) { console.warn('createdAt', e.code || e.message); }
+  }
   profileCache.set(uid, { uid, ...S.profile });
   const [fol, blk, sav] = await Promise.all([
     getDocs(query(collection(db, 'follows'), where('follower', '==', uid), limit(500))),

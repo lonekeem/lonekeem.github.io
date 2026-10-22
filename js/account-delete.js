@@ -146,6 +146,8 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
     await step('Deleting your profile…', async () => {
       const b = writeBatch(db);
       b.delete(doc(db, 'users', uid));
+      b.delete(doc(db, 'members', uid, 'secret', 'email'));
+      b.delete(doc(db, 'members', uid));
       if (username) b.delete(doc(db, 'usernames', username));
       await b.commit(); profileGone = true;
     });
@@ -173,7 +175,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       <h2 class="del-title">Delete your account?</h2>
       <p class="muted small">This can’t be undone. We’ll permanently delete:</p>
       <ul class="del-list small">
-        <li>Your profile, <b>@${esc(handle)}</b> handle and photo link</li>
+        <li>Your profile, <b>@${esc(handle)}</b> handle, photo link and member record</li>
         <li>Your posts and stories, with their comments, stars and views</li>
         <li>Your comments on other people’s posts</li>
         <li>Your follows and followers, saved posts, blocks, notifications and push tokens</li>
