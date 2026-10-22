@@ -4,7 +4,7 @@
 // The lightbar blinks for a moment when a report opens. There is no siren.
 // Written by Lone Keem.
 import { poseCar } from '../world/cars.js';
-import { areaAt, BOUNDS, roadD } from '../world/layout.js';
+import { areaAt, BOUNDS, roadD, roomState } from '../world/layout.js';
 import { note, setHelperPlace, toastFixed } from './watch.js';
 import { placeOf, scrub } from './core.js';
 import { ROSTER, crewCount, pathAt, aheadBlocked, groundIssue, teamShown, lifeInit, stepLife } from './team.js';
@@ -382,10 +382,13 @@ export function attachHelper(api, W) {
 
   function scan(dt) {
     scanT += dt;
+    // Interiors sit east of the walkable map on purpose (layout ROOMS.x0 = 400, past BOUNDS.x1).
+    // Rescue must not treat that strip as out of bounds, or every Go in is undone a moment later.
+    const indoors = !!(roomState.box || roomState.inId);
     const badNum = !Number.isFinite(P.x) || !Number.isFinite(P.y) || !Number.isFinite(P.z);
     const gy = Number.isFinite(P.x) && Number.isFinite(P.z) ? ground(P.x, P.z) : 0;
-    const under = Number.isFinite(P.y) && (P.y < -30 || P.y < gy - 6);
-    const out = Number.isFinite(P.x) && (P.x < BOUNDS.x0 - 8 || P.x > BOUNDS.x1 + 8 || P.z < BOUNDS.z0 - 8 || P.z > BOUNDS.z1 + 8);
+    const under = !indoors && Number.isFinite(P.y) && (P.y < -30 || P.y < gy - 6);
+    const out = !indoors && Number.isFinite(P.x) && (P.x < BOUNDS.x0 - 8 || P.x > BOUNDS.x1 + 8 || P.z < BOUNDS.z0 - 8 || P.z > BOUNDS.z1 + 8);
     if (badNum) { fixPlayer('nan', 'position'); stuckFor = 0; return; }
     if (under) { fixPlayer('under', 'under the map'); return; }
     if (out) { fixPlayer('bounds', 'out of bounds'); return; }
@@ -395,7 +398,7 @@ export function attachHelper(api, W) {
     const mag = mv ? Math.hypot(mv.x || 0, mv.y || 0) : 0;
     const dist = Math.hypot(P.x - last.x, P.z - last.z);
     const driving = W.driving && W.driving();
-    if (mag > 0.45 && dist < 0.15 && !P.sit && !driving) stuckFor += 1;
+    if (!indoors && mag > 0.45 && dist < 0.15 && !P.sit && !driving) stuckFor += 1;
     else stuckFor = 0;
     last = { x: P.x, z: P.z };
     if (stuckFor >= 4) { stuckFor = 0; fixPlayer('stuck', 'could not move'); }
