@@ -69,6 +69,17 @@ export function mountMusicEmbed(box, e, { source } = {}) {
   return {
     service: e.service,
     pause() { if (ctrl) try { ctrl.pause(); } catch { /* */ } },
+    // Spotify's controller can pause and resume. Apple's embed cannot; callers keep its iframe mounted.
+    toggle() {
+      if (!ctrl) return false;
+      try {
+        if (typeof ctrl.togglePlay === 'function') ctrl.togglePlay();
+        else if (playing) ctrl.pause();
+        else if (typeof ctrl.play === 'function') ctrl.play();
+        else return false;
+        return true;
+      } catch { return false; }
+    },
     destroy() { dead = true; removeEventListener('kemy:media-play', onOther); try { ctrl?.destroy(); } catch { /* */ } box.innerHTML = ''; if (playing) fire('stop', { source: src, service: e.service }); playing = false; }
   };
 }

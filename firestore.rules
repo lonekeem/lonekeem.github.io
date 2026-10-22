@@ -2307,7 +2307,7 @@ service cloud.firestore {
       // parked cars (display only): 'model.colour[.PLATE.bg.fg.border.frame]' joined by ';', max 50 entries / 1800 chars
       function carsOk(c) { return c is string && c.size() <= 1800 && c.matches('^[a-z]{2,8}[.][0-9][A-Z0-9.;a-z]*$|^$') && c.split(';').size() <= 50; } // clients parse + re-check each entry (and the plate word filter)
       function radioOk(r) { return r is map && r.keys().hasOnly(['k', 'url', 't', 's']) && r.k in ['link', 'kemy', 'off']
-        && (r.k != 'link' || (r.url is string && r.url.size() <= 300 && r.url.matches('^https://(open[.]spotify[.]com|embed[.]music[.]apple[.]com|music[.]apple[.]com)/.*')))
+        && (r.k != 'link' || (r.url is string && r.url.size() <= 300 && r.url.matches('^https://(open[.]spotify[.]com|embed[.]music[.]apple[.]com|music[.]apple[.]com|(www[.])?youtube[.]com|m[.]youtube[.]com|(www[.])?youtube-nocookie[.]com|(www[.])?youtu[.]be)/.*')))
         && (!('t' in r) || (r.t is int && r.t >= 0 && r.t < 50)) && (!('s' in r) || r.s is int); }
       function extOk(e) { return e is map && e.keys().hasOnly(['w', 'r', 'd', 't']) && (!('w' in e) || isStr(e.w, 0, 9)) && (!('r' in e) || isStr(e.r, 0, 9)) && (!('d' in e) || isStr(e.d, 0, 9)) && (!('t' in e) || isStr(e.t, 0, 9)); }
       function decorOk(d) { return d is map && d.keys().hasOnly(['wall', 'walls', 'floor', 'ext', 'items', 'v']) && (!('wall' in d) || isStr(d.wall, 0, 9)) && (!('walls' in d) || isStr(d.walls, 0, 120)) && (!('floor' in d) || d.floor in ['wood', 'dark', 'tile', 'carpet', 'marble', 'mint', 'rose', 'night', 'gold'])
