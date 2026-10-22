@@ -12,6 +12,8 @@ import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
 import { FX_DEFAULT } from './fx/looks.js';
 import { emojiPicker, insertAtCursor } from './richcomments.js';
+import { PHRASES, phraseOnly, isPhrase } from './safe-chat.js';
+import { hideKey, isHidden } from './chat-hide.js';
 // Emoji in live chat (all live layouts share the .lv-form markup).
 if (typeof document !== 'undefined' && !window.__lvEmoji) { window.__lvEmoji = 1; document.addEventListener('click', (e) => { const b = e.target.closest('.lv-emoji'); if (!b) return; const inp = b.parentNode.querySelector('input'); emojiPicker((em) => { insertAtCursor(inp, em); }); }); }
 
@@ -183,19 +185,30 @@ export function createLive(ctx) {
   const tapIgnore = (e) => !!e.target.closest('button, a, input, textarea, form, label, .lv-top, .lv-row, .lv-ytnote, .lv-chat, .lv-hostnote, .lv-wait-in .btn');
   const FLAG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>';
   function chatLine(c, cid) {
-    const rep = cid && S.user && c.authorId !== me() ? `<button class="lv-rep" data-rep="${esc(cid)}" aria-label="Report message from ${esc(c.name)}">${FLAG}</button>` : '';
-    return `<div class="lv-msg" data-cid="${esc(cid || '')}">${avatar({ uid: c.authorId, displayName: c.name, username: c.username, color: c.color }, 'xs', false)}<p><b>${esc(c.name)}</b> <span class="lv-t">${esc(c.text)}</span></p>${rep}</div>`;
+    const key = hideKey('live', c.authorId || '', c.text || '');
+    const mine = !S.user || c.authorId === me();
+    const rep = cid && S.user && !mine ? `<button class="lv-rep" data-rep="${esc(cid)}" aria-label="Report message from ${esc(c.name)}">${FLAG}</button><button class="lv-rep" data-block="${esc(c.authorId || '')}" aria-label="Block ${esc(c.name)}">Block</button>` : '';
+    return `<div class="lv-msg" data-cid="${esc(cid || '')}" data-uid="${esc(c.authorId || '')}" data-hide="${esc(key)}" ${isHidden(key) ? 'hidden' : ''}>${avatar({ uid: c.authorId, displayName: c.name, username: c.username, color: c.color }, 'xs', false)}<p><b>${esc(c.name)}</b> <span class="lv-t">${esc(c.text)}</span></p>${rep}</div>`;
   }
   function watchChat(id, root, onStars) {
     let first = true;
     const list = root.querySelector('.lv-chat');
-    list.addEventListener('click', (e) => { const b = e.target.closest('[data-rep]'); if (!b) return; const t = b.closest('.lv-msg').querySelector('.lv-t')?.textContent || ''; if (window.kemyModLine) window.kemyModLine(t); if (window.kemyModReport) window.kemyModReport({ targetType: 'live chat', targetId: `${id}/${b.dataset.rep}`, postId: id, name: 'live chat' }); else ctx.reportDialog('live chat', `${id}/${b.dataset.rep}`, id, t); });
+    list.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-rep],[data-block]'); if (!b) return;
+      const row = b.closest('.lv-msg'); const t = row?.querySelector('.lv-t')?.textContent || ''; const uid = row?.dataset.uid || '';
+      if (b.dataset.block && uid) { if (!confirm('Block this player?')) return; try { await setDoc(doc(db, 'users', me(), 'blocks', uid), { createdAt: serverTimestamp() }); S.blocked.add(uid); row.remove(); toast('Blocked'); } catch (er) { toast(friendlyError(er)); } return; }
+      if (window.kemyModLine) window.kemyModLine(t);
+      const key = row?.dataset.hide || '';
+      if (window.kemyModReport) window.kemyModReport({ targetType: 'live chat', targetId: `${id}/${b.dataset.rep}`, postId: id, name: 'live chat', hideKey: key });
+      else ctx.reportDialog('live chat', `${id}/${b.dataset.rep}`, id, t, uid, key);
+    });
     return onSnapshot(query(collection(db, 'lives', id, 'chat'), orderBy('createdAt'), limitToLast(30)), (qs) => {
       qs.docChanges().forEach((ch) => {
         if (ch.type !== 'added') return;
         const c = ch.doc.data();
         if (S.blocked.has(c.authorId)) return;
         if (c.type === 'msg') {
+          if (isHidden(hideKey('live', c.authorId || '', c.text || ''))) return;
           list.insertAdjacentHTML('beforeend', chatLine(c, ch.doc.id));
           while (list.children.length > 30) list.firstElementChild.remove();
           list.scrollTop = list.scrollHeight;
@@ -226,10 +239,35 @@ export function createLive(ctx) {
   }
   function wireChatForm(root, id) {
     const form = root.querySelector('.lv-form'); if (!form) return;
+    const original = form.innerHTML;
     let last = 0;
+    const paint = () => {
+      if (!document.body.contains(form)) return;
+      const on = phraseOnly();
+      if (on && form.dataset.phrases !== '1') {
+        form.dataset.phrases = '1';
+        form.innerHTML = `<div class="safe-phrases" role="group" aria-label="Pick a phrase">${PHRASES.map((p) => `<button type="button" data-phrase="${esc(p)}">${esc(p)}</button>`).join('')}</div>`;
+      } else if (!on && form.dataset.phrases === '1') {
+        form.dataset.phrases = '';
+        form.innerHTML = original;
+      }
+    };
+    paint();
+    addEventListener('kemy:chat-mode', paint);
+    form.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-phrase]'); if (!b) return;
+      e.preventDefault();
+      if (Date.now() - last < 1100) { toast('Slow down a bit 💜'); return; }
+      last = Date.now();
+      try { await sendChat(id, b.dataset.phrase); }
+      catch (err) { toast(err.code === 'permission-denied' ? 'Slow down a little, or this live has ended.' : friendlyError(err)); }
+    });
     form.onsubmit = async (e) => {
       e.preventDefault();
-      const input = form.querySelector('input'); const text = input.value.trim(); if (!text) return;
+      if (phraseOnly()) { paint(); return; }
+      const input = form.querySelector('input'); if (!input) return;
+      const text = input.value.trim(); if (!text) return;
+      if (!isPhrase(text) && phraseOnly()) return;
       if (Date.now() - last < 1100) { toast('Slow down a bit 💜'); return; }
       if (!spamOk('live', text)) return;
       last = Date.now(); input.value = '';

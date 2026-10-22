@@ -29,6 +29,32 @@ service cloud.firestore {
     function kidSafe(t) {
       return t is string && !t.lower().matches('(?s).*(\\bfuck|\\bshit|\\bbitch|\\basshole|\\bcunt|\\bslut|\\bwhore|\\bnigg|\\bfagg|\\bretard|\\bporn|\\bpenis|\\bvagina|\\bsex\\b|https?://|www\\.|[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}|[0-9]{3}[-. ]?[0-9]{3}[-. ]?[0-9]{4}|discord\\.gg|snapchat|instagram|whatsapp).*');
     }
+    // Links, phones, emails, spelled-out numbers, and other-app invites. Used on chat, comments, and bios.
+    function contactFree(t) {
+      return t is string && !t.lower().matches('(?s).*(\\btelegram\\b|\\bkik\\b|\\btiktok\\b|tik tok|\\binsta\\b|\\binstagram\\b|\\bwhatsapp\\b|\\bdiscord\\b|\\bsnapchat\\b|\\bsnap\\b|add me on|\\badd me\\b|text me|\\bdm me\\b|my snap|t\\.me/|wa\\.me|discord\\.gg|[.](com|net|org|gg|io|ly|app|link|xyz)\\b|(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)(?:[\\s,.-]+(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)){5,}|(?:[0-9][\\s.\\-()]*){10,}).*');
+    }
+    // Questions that ask a child for personal details, or to keep a secret. Blocked for everyone.
+    function groomFree(t) {
+      return t is string && !t.lower().matches('(?s).*(how old are you|how old r u|your age|\\basl\\b|a/s/l|where do you live|where you live|your address|what school|which school|your school|are you alone|home alone|send pic|send a pic|send photo|dont tell|don.t tell|keep this secret).*');
+    }
+    // Under-13 display names are picked from this list. Same words as js/safe-names.js.
+    function safeDisplay(t) {
+      return t.matches('^(Sunny|Happy|Brave|Kind|Calm|Swift|Cosy|Gold|Lucky|Bright|Gentle|Merry|Soft|Tiny|Cool) (Panda|Puppy|Fox|Otter|Bunny|Koala|Tiger|Dolphin|Owl|Star|Bear|Duck|Frog|Lion|Wolf)$');
+    }
+    // A saved birthday that is 13 or older. A missing birthday is not 13+.
+    function knownTeen(d) {
+      let y = d.get('birthY', 0);
+      let m = d.get('birthM', 0);
+      return y is int && m is int && y >= 1900 && y <= 2100 && m >= 1 && m <= 12
+        && (request.time.year() - y) * 12 + (request.time.month() - m) >= 156;
+    }
+    // Free-text public chat: 13+ and not flagged under 13. Everyone else uses preset phrases.
+    function chatFree(u) {
+      return isAdmin() || (knownTeen(get(userPath(u)).data) && !exists(u13Path(u)));
+    }
+    function presetSay(t) {
+      return t.matches('^(Good game!|Want to race\\?|Nice car!|Follow me!|Thanks!|Hi!|Bye!|Wanna play\\?|Hello!|Nice shot!|Lets go!|Wait for me!|GG!|Nice one!|Well played!|😂|😍|😮|🥳|👍|💜|🔥|⭐|😎|🤩|🙌|👏|👋|🎉)$');
+    }
     function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     // "Sign out everywhere" (js/devices.js): sessions that signed in before users/{uid}.sessionsValidAfter are refused
@@ -55,16 +81,14 @@ service cloud.firestore {
     // Banned right now (the admin can never be locked out).
     // ---------- Kid & teen safety (js/safety.js) ----------
     // Birthday (birthY/birthM, self-declared, set once; only the admin or a human moderator can
-    // change it), Community Rules agreement (rulesAt), and a mod-controlled under-13 flag
-    // (underage/{uid}) that the user can't touch. Posting, uploads, comments and DMs need all three.
+    // change it), Community Rules agreement (rulesAt), and an under-13 flag (underage/{uid}).
+    // A player whose birthday is under 13 can save that flag. They cannot remove it.
+    // Posting, uploads, comments and lives need a known 13+ birthday, the rules agreement, and no flag.
     function u13Path(u) { return /databases/$(database)/documents/underage/$(u); }
-    function ageOkData(d) {
-      let y = d.get('birthY', 0);
-      return y is int && (request.time.year() - y) * 12 + (request.time.month() - d.get('birthM', 12)) >= 156;
-    }
     function canCreate(u) {
       let d = get(userPath(u)).data;
-      return isAdmin() || u == 'studio' || (ageOkData(d) && d.get('rulesAt', null) is timestamp && !exists(u13Path(u)));
+      // knownTeen fails closed when the birthday is missing, under 13, or not a real month/year.
+      return isAdmin() || u == 'studio' || (knownTeen(d) && d.get('rulesAt', null) is timestamp && !exists(u13Path(u)));
     }
     // Parental Controls (js/parental.js): users/{uid}.pc flags. Read from the already-fetched profile
     // doc so these checks add no extra lookups. pcOff(d, k): that feature was switched off by a parent.
@@ -99,7 +123,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
-                               'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt',
+                               'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt', 'ageHonestAt',
                                'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter', 'pc'])
         && (!('pc' in d) || validPc(d.pc))
         && validBirth(d)
@@ -111,13 +135,15 @@ service cloud.firestore {
         && kidSafe(d.username)
         && cleanStr(d.bio, 0, 160)
         && kidSafe(d.bio)
+        && contactFree(d.bio)
         && (!('pronouns' in d) || isStr(d.pronouns, 0, 20))
         && (!('website' in d) || d.website == ''
             || (isStr(d.website, 12, 100) && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
         && isStr(d.color, 1, 20)
         && (!('activePet' in d) || (d.activePet is string && d.activePet.matches('^(p[1-6])?$')))
         && d.welcomed is bool
-        && d.createdAt is timestamp;
+        && d.createdAt is timestamp
+        && (!('ageHonestAt' in d) || d.ageHonestAt is timestamp);
     }
     // Search fields (lowercase copies used for prefix search). Optional for older profiles.
     function validUserSearch(d) {
@@ -343,6 +369,13 @@ service cloud.firestore {
         && validProfile(request.resource.data)
         && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt', 'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter'])
         && request.resource.data.createdAt == request.time
+        && (!('ageHonestAt' in request.resource.data) || request.resource.data.ageHonestAt == request.time)
+        && (isAdmin() || knownTeen(request.resource.data) || (
+          safeDisplay(request.resource.data.displayName)
+          && request.resource.data.bio == ''
+          && request.resource.data.get('pronouns', '') == ''
+          && request.resource.data.get('website', '') == ''
+          && request.resource.data.get('pc', {}).get('vis', '') == 'private'))
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if actingAs(uid)
         && (uid != me() || !('sessionsValidAfter' in resource.data) || (request.auth.token.auth_time + 1) * 1000 > resource.data.sessionsValidAfter.toMillis())
@@ -364,6 +397,16 @@ service cloud.firestore {
         && (!('birthY' in resource.data) || (request.resource.data.get('birthY', 0) == resource.data.birthY && request.resource.data.get('birthM', 0) == resource.data.birthM))
         // Rules agreement: set to now, once.
         && (!('rulesAt' in changed()) || (!('rulesAt' in resource.data) && request.resource.data.rulesAt == request.time))
+        // Honest-age note: shown once, then kept.
+        && (!('ageHonestAt' in changed()) || (!('ageHonestAt' in resource.data) && request.resource.data.ageHonestAt == request.time))
+        // Under 13, or flagged under 13: no free-text name, bio, photo, website, or public profile.
+        && (isAdmin() || (knownTeen(request.resource.data) && !exists(u13Path(uid))) || (
+          (!('displayName' in changed()) || safeDisplay(request.resource.data.displayName))
+          && (!('bio' in changed()) || request.resource.data.bio == '')
+          && (!('pronouns' in changed()) || request.resource.data.get('pronouns', '') == '')
+          && (!('website' in changed()) || request.resource.data.get('website', '') == '')
+          && (!('photoURL' in changed()) || request.resource.data.get('photoURL', '') == '')
+          && (!('pc' in changed()) || request.resource.data.get('pc', {}).get('vis', 'private') == 'private')))
         // Profile photo: '' (removed) or an image on our Cloudinary cloud (blocked until the
         // real cloud name is set, same placeholder as media posts). Checked only when it changes.
         && (!('photoURL' in changed()) || request.resource.data.photoURL == ''
@@ -788,6 +831,8 @@ service cloud.firestore {
           && isStr(request.resource.data.authorColor, 1, 20)
           && validBody(request.resource.data)
           && kidSafe(request.resource.data.text)
+          && contactFree(request.resource.data.text)
+          && groomFree(request.resource.data.text)
           && (isAdmin() || linksOk(request.resource.data.text, me_()))
           && request.resource.data.createdAt == request.time
           && request.resource.data.get('likeCount', 0) == 0
@@ -1002,7 +1047,7 @@ service cloud.firestore {
           && request.resource.data.name == get(userPath(me())).data.displayName
           && request.resource.data.username == get(userPath(me())).data.username
           && isStr(request.resource.data.color, 1, 20)
-          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && kidSafe(request.resource.data.text) && !tooManyLinks(request.resource.data.text) && request.resource.data.count == 0)
+          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && kidSafe(request.resource.data.text) && contactFree(request.resource.data.text) && groomFree(request.resource.data.text) && (chatFree(me()) || presetSay(request.resource.data.text)) && request.resource.data.count == 0)
               || (request.resource.data.type == 'star' && request.resource.data.text == ''
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
@@ -1023,6 +1068,12 @@ service cloud.firestore {
         && fid == me() + '_' + request.resource.data.followee
         && exists(userPath(request.resource.data.followee))
         && !blockedBy(request.resource.data.followee)
+        // Friend requests stay off for under 13 and for anyone whose age we do not know.
+        // Following the studio at signup is the one exception. A parent PIN cannot turn this on.
+        && (isAdmin()
+            || request.resource.data.followee == 'studio'
+            || (knownTeen(get(userPath(me())).data) && !exists(u13Path(me()))
+                && knownTeen(get(userPath(request.resource.data.followee)).data) && !exists(u13Path(request.resource.data.followee))))
         // Anti-spam: each follow stamps lastFollowAt (max one per 2 s); following the studio at signup is exempt.
         && (request.resource.data.followee == 'studio' || isAdmin()
             || getAfter(userPath(me())).data.get('lastFollowAt', null) == request.time)
@@ -1032,7 +1083,7 @@ service cloud.firestore {
     }
 
     // ---------- Direct messages (id = sortedUidA_sortedUidB) ----------
-    // The admin can read and reply to chats with the studio account ("studio").
+    // Player-to-player messages are turned off. Old threads can still be read. New writes are refused.
     function isBlocked(owner, who) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(who)); }
     match /chats/{chatId} {
       function parts() { return chatId.split('_'); }
@@ -1043,64 +1094,12 @@ service cloud.firestore {
       allow get: if inChat();
       allow list: if signedIn() && (me() in resource.data.participants
         || ('studio' in resource.data.participants && isAdmin()));
-      allow create: if signedIn() && notBanned()
-        && request.resource.data.keys().hasOnly(['participants', 'lastMessage', 'lastAt', 'lastSender', 'createdAt'])
-        && request.resource.data.participants is list
-        && request.resource.data.participants.size() == 2
-        && request.resource.data.participants[0] < request.resource.data.participants[1]
-        && chatId == request.resource.data.participants[0] + '_' + request.resource.data.participants[1]
-        && request.resource.data.lastSender in request.resource.data.participants
-        && actingAs(request.resource.data.lastSender)
-        && exists(userPath(otherOf(request.resource.data.lastSender)))
-        && !pcNoDm(get(userPath(otherOf(request.resource.data.lastSender))).data)
-        && !pcNoDm(getAfter(userPath(request.resource.data.lastSender)).data)
-        && !isBlocked(otherOf(request.resource.data.lastSender), request.resource.data.lastSender)
-        // DMs are friends-only: a new chat needs follows both ways (or the studio / a moderator).
-        && ('studio' in request.resource.data.participants || isMod()
-            || (exists(/databases/$(database)/documents/follows/$(request.resource.data.lastSender + '_' + otherOf(request.resource.data.lastSender)))
-                && exists(/databases/$(database)/documents/follows/$(otherOf(request.resource.data.lastSender) + '_' + request.resource.data.lastSender))))
-        && isStr(request.resource.data.lastMessage, 0, 1000)
-        && kidSafe(request.resource.data.lastMessage)
-        // Anti-spam: starting new conversations is limited (lastNewChatAt, one per 8 s).
-        && ('studio' in request.resource.data.participants || isMod()
-            || getAfter(userPath(request.resource.data.lastSender)).data.get('lastNewChatAt', null) == request.time)
-        && request.resource.data.lastAt == request.time
-        && request.resource.data.createdAt == request.time;
-      allow update: if inChat()
-        && changed().hasOnly(['lastMessage', 'lastAt', 'lastSender'])
-        && isStr(request.resource.data.lastMessage, 0, 1000)
-        && kidSafe(request.resource.data.lastMessage)
-        && request.resource.data.lastSender in parts()
-        && actingAs(request.resource.data.lastSender)
-        && request.resource.data.lastAt == request.time
-        && !isBlocked(otherOf(request.resource.data.lastSender), request.resource.data.lastSender);
+      // Private messages between players are off. Old chats stay readable. Nothing new can be written.
+      allow create, update: if false;
 
       match /messages/{mid} {
         allow read: if inChat();
-        allow create: if inChat() && notBanned()
-          && ('studio' in parts() || canCreate(request.resource.data.senderId))
-          && request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt', 'snap', 'viewed'])
-          && (!('snap' in request.resource.data) || snapOk(request.resource.data))
-          && (!('viewed' in request.resource.data) || ('snap' in request.resource.data && request.resource.data.viewed == false))
-          && request.resource.data.senderId in parts()
-          && actingAs(request.resource.data.senderId)
-          && cleanStr(request.resource.data.text, 1, 1000)
-          && kidSafe(request.resource.data.text)
-          && ('studio' in parts() || linksOk(request.resource.data.text, get(userPath(request.resource.data.senderId)).data))
-          && request.resource.data.createdAt == request.time
-          && !isBlocked(otherOf(request.resource.data.senderId), request.resource.data.senderId)
-          && getAfter(chatPath()).data.lastAt == request.time
-          && getAfter(userPath(request.resource.data.senderId)).data.lastMessageAt == request.time
-          && !pcNoDm(getAfter(userPath(request.resource.data.senderId)).data)
-          && !pcNoDm(get(userPath(otherOf(request.resource.data.senderId))).data);
-        // View-once snap: only the recipient can open it, which removes the media link for good.
-        allow update: if inChat()
-          && resource.data.get('viewed', true) == false
-          && resource.data.senderId != me()
-          && !(resource.data.senderId == 'studio' && isAdmin())
-          && request.resource.data.viewed == true
-          && !('snap' in request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewed', 'snap']);
+        allow create, update: if false;
         allow delete: if isMod() || leavingForGood();
       }
       function snapOk(d) {
@@ -1524,6 +1523,28 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
     }
 
+    // Chat lines hidden after 3 different reporters. Lives and park presence stay owner-written.
+    match /chatHides/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && id.matches('^[a-z]{2,8}_[a-z0-9]{1,12}$')
+        && request.resource.data.keys().hasOnly(['n', 'area', 'at'])
+        && request.resource.data.n == 1
+        && request.resource.data.area in ['park', 'live', 'cmt', 'game', 'world']
+        && request.resource.data.at == request.time
+        && !exists(/databases/$(database)/documents/chatHides/$(id)/by/$(me()));
+      allow update: if signedIn()
+        && changed().hasOnly(['n'])
+        && request.resource.data.n == resource.data.n + 1
+        && request.resource.data.n <= 30
+        && !exists(/databases/$(database)/documents/chatHides/$(id)/by/$(me()));
+      match /by/{who} {
+        allow read: if signedIn() && who == me();
+        allow create: if signedIn() && who == me()
+          && request.resource.data.keys().hasOnly(['at'])
+          && request.resource.data.at == request.time;
+      }
+    }
+
     // ---------- Reports (admin only can read) ----------
     function strikePath(u) { return /databases/$(database)/documents/reportStrikes/$(u); }
     function quotaPath(u) { return /databases/$(database)/documents/reportQuota/$(u); }
@@ -1709,6 +1730,13 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['by', 'reason', 'at'])
         && request.resource.data.by == me() && isStr(request.resource.data.reason, 0, 200)
         && request.resource.data.at == request.time;
+      // The same flag markUnder13 writes, saved by the player when their birthday is under 13.
+      // They cannot remove it. A human moderator still can.
+      allow create: if signedIn() && uid == me() && !isAdmin() && !knownTeen(get(userPath(uid)).data)
+        && request.resource.data.keys().hasOnly(['by', 'reason', 'at'])
+        && request.resource.data.by == me()
+        && request.resource.data.reason == 'Birthday is under 13'
+        && request.resource.data.at == request.time;
       allow delete: if isMod() && !isAI();
     }
     match /bans/{uid} {
@@ -1767,14 +1795,29 @@ service cloud.firestore {
                 && hp().post == get(livePost()).data && !existsAfter(livePost())));
       allow delete: if signedIn() && (isMod() || resource.data.authorId == me());
     }
-    // Bug reports & feedback from anyone signed in; moderators triage them.
+    // One team note per minute. The player writes this stamp in the same batch as the note.
+    match /feedbackQuota/{uid} {
+      allow read: if signedIn() && (uid == me() || isAdmin());
+      allow create: if signedIn() && uid == me()
+        && request.resource.data.keys().hasOnly(['at'])
+        && request.resource.data.at == request.time;
+      allow update: if signedIn() && uid == me()
+        && changed().hasOnly(['at'])
+        && request.resource.data.at == request.time
+        && resource.data.at + duration.value(60, 's') < request.time;
+      allow delete: if false;
+    }
+    // Bug reports and feedback. Only the admin (Keem) can read them. Players cannot see anyone's notes.
     match /feedback/{id} {
       function fb() { return request.resource.data; }
-      allow read: if signedIn() && (resource.data.uid == me() || isMod());
+      function quotaPath() { return /databases/$(database)/documents/feedbackQuota/$(me()); }
+      allow read: if isAdmin();
       allow create: if signedIn() && fb().keys().hasOnly(['uid', 'name', 'kind', 'text', 'page', 'ua', 'status', 'note', 'createdAt'])
         && fb().uid == me() && isStr(fb().name, 0, 60) && fb().kind in ['bug', 'feedback', 'idea']
         && cleanStr(fb().text, 1, 1500) && isStr(fb().page, 0, 200) && isStr(fb().ua, 0, 300)
-        && fb().status == 'new' && fb().note == '' && fb().createdAt == request.time;
+        && fb().status == 'new' && fb().note == '' && fb().createdAt == request.time
+        && getAfter(quotaPath()).data.at == request.time
+        && (!exists(quotaPath()) || get(quotaPath()).data.at + duration.value(60, 's') < request.time);
       allow update: if isMod() && changed().hasOnly(['status', 'note', 'handledBy', 'handledAt'])
         && fb().status in ['new', 'progress', 'fixed', 'closed'] && isStr(fb().note, 0, 1000)
         && fb().handledBy == me() && fb().handledAt == request.time;
@@ -2372,7 +2415,8 @@ service cloud.firestore {
         // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
         && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= -21000 && pp().x <= 10000 && pp().y is int && pp().y >= 0 && pp().y <= 60000
-        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && kidSafe(pp().say) && isStr(pp().tgt, 0, 128)
+        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && kidSafe(pp().say) && contactFree(pp().say) && groomFree(pp().say) && isStr(pp().tgt, 0, 128)
+        && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || chatFree(uid) || presetSay(pp().say))
         && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
         && pp().uname == get(/databases/$(database)/documents/users/$(uid)).data.username
         // Parental Controls: chat off means no new 'say' text (same profile doc as above, no extra lookup)

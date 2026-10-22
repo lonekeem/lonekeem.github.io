@@ -4,6 +4,7 @@ import {
   doc, getDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, writeBatch, serverTimestamp, increment, deleteField
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { fmtCount } from './views.js';
+import { hideKey, isHidden } from './chat-hide.js';
 import * as safety from './safety.js';
 import { spamOk } from './spam.js';
 import { attachComposer, mediaHtml, hydrateStickers } from './richcomments.js';
@@ -16,7 +17,7 @@ export const commentsQuery = (db, postId) => query(collection(db, 'posts', postI
 const isLive = (c) => !c.deleted;
 
 export function createComments(ctx) {
-  const { db, S, esc, avatar, badge, timeAgo, linkify, toast, friendlyError, isAdmin, reportDialog, notify } = ctx;
+  const { db, S, esc, avatar, badge, timeAgo, linkify, toast, friendlyError, isAdmin, reportDialog, notify, blockUser } = ctx;
   const likedCache = new Map(); // "postId/cid" -> bool
 
   async function addComment(p, text, reply, media) {
@@ -99,6 +100,9 @@ export function createComments(ctx) {
       const el = document.createElement('div');
       el.className = 'comment' + (isReply ? ' reply' : '') + (c.deleted ? ' is-deleted' : '');
       el.dataset.cid = c.id;
+      const lineKey = hideKey('cmt', c.authorId || '', c.text || c.id);
+      el.dataset.hide = lineKey;
+      if (isHidden(lineKey)) el.hidden = true;
       if (c.deleted) {
         el.innerHTML = `<span class="avatar sm cdel-av" aria-hidden="true"></span><div class="body"><div class="text muted cdel">Comment deleted</div></div>`;
         return el;
@@ -110,7 +114,7 @@ export function createComments(ctx) {
       el.innerHTML = `${avatar({ uid: c.authorId, displayName: c.authorName, username: c.authorUsername, color: c.authorColor }, 'sm')}
         <div class="body"><div><a class="cname" href="#/u/${esc(c.authorUsername)}">${esc(c.authorName)}</a>${badge(c.authorId)} <span class="muted small">${esc(timeAgo(c.createdAt))}</span></div>
         ${c.text ? `<div class="text">${linkify(esc(c.text))}</div>` : ''}${mediaHtml(c)}
-        <div class="cacts small">${me() && S.profile ? '<button type="button" class="link-btn small" data-c="reply">Reply</button>' : ''}${me() && !mine ? '<button type="button" class="link-btn small" data-c="report">Report</button>' : ''}${canDelete ? '<button type="button" class="link-btn small cdel-btn" data-c="del">Delete</button>' : ''}</div></div>
+        <div class="cacts small">${me() && S.profile && safety.canPostNow() ? '<button type="button" class="link-btn small" data-c="reply">Reply</button>' : ''}${me() && !mine ? '<button type="button" class="link-btn small" data-c="report">Report</button><button type="button" class="link-btn small" data-c="block">Block</button>' : ''}${canDelete ? '<button type="button" class="link-btn small cdel-btn" data-c="del">Delete</button>' : ''}</div></div>
         <button type="button" class="cstar ${liked ? 'on' : ''}" data-c="star" aria-pressed="${liked}" aria-label="${liked ? 'Remove your star' : 'Give this comment a star'}">${STAR}<span class="cn">${n ? fmtCount(n) : ''}</span></button>`;
       return el;
     }
@@ -164,7 +168,8 @@ export function createComments(ctx) {
         const parentId = c.parentId || c.id; expanded.add(parentId);
         setReply({ parentId, handle: c.authorUsername, uid: c.authorId, mention: !!c.parentId });
       }
-      if (a === 'report') reportDialog('comment', c.id, p.id, commentLabel(c) + (c.media && c.media.url ? ' ' + c.media.url : ''));
+      if (a === 'report') reportDialog('comment', c.id, p.id, commentLabel(c) + (c.media && c.media.url ? ' ' + c.media.url : ''), c.authorId, hideKey('cmt', c.authorId, c.text || c.id));
+      if (a === 'block' && blockUser) blockUser(c.authorId, c.authorUsername || 'player');
       if (a === 'del') {
         const hasReplies = !c.parentId && last.some((x) => x.parentId === c.id);
         if (!confirm(hasReplies ? 'Delete this comment? Its replies stay, under “Comment deleted”.' : 'Delete this comment?')) return;

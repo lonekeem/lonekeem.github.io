@@ -1,6 +1,5 @@
 // Pal Zombie Survival lobby: Play Solo, Create Team (short code + invite via Messages), Join with Code, Quick Match.
 // Team room shows each player's Pal (with outfit), a ready check, and the host's Start once 2-4 are ready.
-import { collection, getDocs, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { createNet, palSnap, cleanCode, MAX_TEAM, ZTABS, zSayIdx, zText } from './zombie-net.js';
 import { renderQuickChat } from './emote-wheel.js';
 import { getActivePal } from './core.js';
@@ -77,14 +76,7 @@ export function createZombieLobby(ctx) {
     $('[data-x=start]').onclick = async () => { const n = Object.keys(sess.players).length; if (n < 2) return; $('[data-x=start]').disabled = true;
       try { sess.sendState({ wave: 0, zs: [], score: 0, kills: {}, dia: {}, over: false, slam: [], seq: 0, n, ts: 0, brk: 2.5, bm: 0 }); await new Promise((r) => setTimeout(r, 400)); await sess.setLobby({ status: 'playing', n }); }
       catch (e) { $('.zl-err').textContent = 'Could not start: ' + (e.message || e.code); $('[data-x=start]').disabled = false; } };
-    $('[data-x=invite]').onclick = async () => { const box = $('.zl-inv'); box.hidden = !box.hidden; if (box.hidden) return; box.innerHTML = '<small>Loading your chats…</small>';
-      try { const qs = await getDocs(query(collection(db, 'chats'), where('participants', 'array-contains', uid), orderBy('lastAt', 'desc'), limit(8)));
-        const others = [...new Set(qs.docs.map((d) => d.data().participants.find((x) => x !== uid)).filter(Boolean))];
-        const profs = await Promise.all(others.map((o) => (ctx.getProfile ? ctx.getProfile(o).catch(() => null) : null)));
-        box.innerHTML = others.length ? others.map((o, i) => `<button data-to="${esc(o)}">${esc((profs[i] && profs[i].displayName) || 'Friend')}<span>✉️ Invite</span></button>`).join('') : '<small>No chats yet. Share the code instead!</small>';
-        box.querySelectorAll('[data-to]').forEach((b) => (b.onclick = async () => { b.disabled = true;
-          try { await ctx.sendMessage(b.dataset.to, `🧟 Join my Pal Zombie Survival team! Code ${code} 👉 ${location.origin}${location.pathname}#/arcade/zombie?join=${code}`); b.querySelector('span').textContent = '✓ Sent'; } catch { b.disabled = false; toast('Could not send the invite'); } }));
-      } catch { box.innerHTML = '<small>Share the code with your friends!</small>'; } };
+    $('[data-x=invite]').onclick = () => { toast('Private messages are off. Share this code: ' + code); };
     window.__zlobby = { code, get players() { return sess && sess.players; } };
   }
   return { page };

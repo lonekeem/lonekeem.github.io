@@ -165,19 +165,19 @@ function render(main) {
     <section class="pc-card"><p>${on() ? 'Parental Controls are <b>on</b>. Changes need the parent PIN.' : 'Pick a 4-digit parent PIN to turn on Parental Controls. Kids can’t change these settings without it.'}</p></section>
     <form id="pc-form" class="pc-card">
       <h2>Chat in games &amp; Pal Park</h2>${seg('chat', v.chat, [[true, 'On'], [false, 'Off']])}
-      <h2>Direct messages</h2>${seg('dm', v.dm, [['off', 'Off'], ['friends', 'Friends only'], ['everyone', 'Everyone']])}<p class="pc-note">Kemy only lets friends (who follow each other) start DMs, so “Everyone” works like Friends only.</p>
+      <h2>Direct messages</h2><p class="pc-note">Private messages between players are turned off for everyone. This can’t be switched back on. Public chat in games and Pal Park stays on, with a safety filter.</p>${seg('dm', 'off', [['off', 'Off']])}
       <h2>Going live</h2>${seg('live', v.live, [[true, 'On'], [false, 'Off']])}
       <h2>Commenting</h2>${seg('cmt', v.cmt, [[true, 'On'], [false, 'Off']])}
       <h2>Real-money purchases</h2>${seg('buy', v.buy, [['block', 'Blocked'], ['pin', 'Need PIN'], ['open', 'Allowed']])}
       <h2>Daily time limit</h2>${seg('time', v.time, [[30, '30m'], [60, '1h'], [120, '2h'], [0, 'Off']])}
-      <h2>Profile visibility</h2>${seg('vis', v.vis, [['private', 'Private'], ['friends', 'Friends'], ['public', 'Public']])}
+      <h2>Profile visibility</h2>${window.kemyPhraseOnly !== false ? '<p class="pc-note">This account is under 13, or has no birthday yet, so the profile stays private. A parent PIN cannot turn that off. Kemy does not have a separate parent-consent check.</p>' + seg('vis', 'private', [['private', 'Private']]) : seg('vis', v.vis, [['private', 'Private'], ['friends', 'Friends'], ['public', 'Public']])}
       <h2>Restricted mode</h2>${seg('safe', v.safe, [[true, 'On'], [false, 'Off']])}<p class="pc-note">Hides posts marked mature or sensitive, and posts other people have reported.</p>
       <p class="pc-err" id="pc-err" role="alert"></p>
       <button class="pc-btn pc-wide" type="submit">${on() ? 'Save' : 'Set PIN & turn on'}</button>
     </form>
     ${on() ? '<section class="pc-card"><div class="pc-row"><button class="pc-btn pc-ghost" id="pc-chpin">Change PIN</button><button class="pc-btn pc-ghost" id="pc-off">Turn off</button></div></section>' : ''}</div>`;
   const f = main.querySelector('#pc-form');
-  const read = () => { const r = (n) => f.querySelector(`input[name="pc-${n}"]:checked`).value; return { chat: r('chat') === 'true', dm: r('dm'), live: r('live') === 'true', cmt: r('cmt') === 'true', buy: r('buy'), time: Number(r('time')), vis: r('vis'), safe: r('safe') === 'true' }; };
+  const read = () => { const r = (n) => f.querySelector(`input[name="pc-${n}"]:checked`).value; return { chat: r('chat') === 'true', dm: r('dm'), live: r('live') === 'true', cmt: r('cmt') === 'true', buy: r('buy'), time: Number(r('time')), vis: window.kemyPhraseOnly !== false ? 'private' : r('vis'), safe: r('safe') === 'true' }; };
   f.onsubmit = async (e) => {
     e.preventDefault(); const val = read(), err = f.querySelector('#pc-err'); err.textContent = '';
     try {

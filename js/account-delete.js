@@ -195,7 +195,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
         <li>Your live sessions and your message threads</li>
         <li>Your login</li>
       </ul>
-      <p class="muted small">Photos and videos you uploaded stop showing in the app. To have the files themselves removed from our media host, email <a href="mailto:lillykemoy1@gmail.com?subject=Remove%20my%20media%20files">the admin</a>.</p>
+      <p class="muted small">Photos and videos you uploaded stop showing in the app. The files can remain on the media host, because the app cannot delete them from here. To ask for those files to be removed, use <a href="#/feedback">Message the Kemy team</a>.</p>
       <form id="del-form" autocomplete="off">
         <div class="field"><label for="del-confirm">Type <b>@${esc(handle)}</b> or <b>DELETE</b> to confirm</label>
           <input id="del-confirm" type="text" autocapitalize="none" spellcheck="false" autocomplete="off" required></div>
@@ -204,7 +204,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
         <p class="form-error" id="del-err" role="alert"></p>
         <p class="small muted" id="del-progress" aria-live="polite"></p>
         <div class="row" style="gap:8px;justify-content:flex-end"><button type="button" class="btn btn-sm btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-sm btn-danger btn-danger-solid" id="del-go" type="submit" disabled>Delete my account</button></div>
+        <button class="btn btn-sm btn-danger btn-danger-solid" id="del-go" type="submit" disabled>Delete my account and data</button></div>
       </form>`);
     const inp = document.getElementById('del-confirm'), go = document.getElementById('del-go'), err = document.getElementById('del-err'), prog = document.getElementById('del-progress');
     const okText = () => { const v = inp.value.trim(); return v === 'DELETE' || v.toLowerCase().replace(/^@/, '') === handle.toLowerCase(); };

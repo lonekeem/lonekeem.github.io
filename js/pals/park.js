@@ -11,6 +11,8 @@ import { clean, checkInput } from './talk.js';
 import { DECOR } from './wear.js';
 import { drawDancer } from './dance.js';
 import { createPark3D } from './park3d.js';
+import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-chat.js';
+import { hideKey, isHidden } from '../chat-hide.js';
 import { webglOK } from './pal3d.js';
 export const WORLD = { w: 3200, h: 2400 };
 export const ZONES = [
@@ -43,7 +45,7 @@ export function createPark(ctx) {
     main.innerHTML = `<section class="park"><div class="park-top"><b>🌳 Pal Park</b><span id="park-zone" class="park-zone"></span><span id="park-room" class="muted small"></span><a class="btn btn-sm" href="#/arcade" id="park-arcade">🎮 Arcade</a><a class="btn btn-sm btn-ghost" href="#/pals">Leave</a></div>
       <div class="park-view"><canvas id="park-cv" tabindex="0" aria-label="Pal Park. Use arrow keys or WASD to walk."></canvas>
         <div class="park-joy" id="park-joy" aria-hidden="true"><i></i></div>
-        <div class="park-btns"><button class="btn btn-sm" id="pk-emote" aria-label="Emotes">😊</button><button class="btn btn-sm" id="pk-chat" aria-label="Chat">💬</button><button class="btn btn-sm" id="pk-act" aria-label="Pet nearby Pal" disabled>🐾</button></div>
+        <div class="park-btns"><button class="btn btn-sm" id="pk-emote" aria-label="Emotes">😊</button><button class="btn btn-sm" id="pk-chat" aria-label="Chat">💬</button><button class="btn btn-sm" id="pk-act" aria-label="Pet nearby Pal" disabled>🐾</button><button class="btn btn-sm btn-ghost" id="pk-rep" disabled>Report</button><button class="btn btn-sm btn-ghost" id="pk-block" disabled>Block</button></div>
         <div class="park-panel" id="park-panel" hidden></div><div class="park-found" id="park-found"></div></div>
       <p class="small muted park-help">Walk with the joystick, arrow keys/WASD or a gamepad. Tap a player for Report/Block. Find 16 treasures a day for Star Coins! Step into a portal to play Pal Games.</p></section>`;
     const cv = main.querySelector('#park-cv'); const view = main.querySelector('.park-view'); const c = cv.getContext('2d');
@@ -97,7 +99,7 @@ export function createPark(ctx) {
       openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="park-card"><h2>${esc(o.name)}</h2><p class="muted">@${esc(o.uname)} · with ${esc((o.pal && o.pal.name) || 'their Pal')}</p>
         <div class="btns"><a class="btn btn-sm" href="#/u/${esc(o.uname)}" data-close>View profile</a><button class="btn btn-sm btn-ghost" id="pc-pet">🐾 Pet their Pal</button><button class="btn btn-sm btn-ghost" id="pc-rep">Report</button><button class="btn btn-sm btn-ghost" id="pc-block">Block</button></div></div>`);
       document.getElementById('pc-pet').onclick = () => { closeModal(); petOther(o); };
-      document.getElementById('pc-rep').onclick = () => { closeModal(); report(o); };
+      document.getElementById('pc-rep').onclick = () => { closeModal(); if (window.kemyModReport) window.kemyModReport({ targetType: 'user', targetId: o.uid, targetUid: o.uid, name: '@' + (o.uname || 'player'), hideKey: hideKey('park', o.uid, o.say || '') }); else report(o); };
       document.getElementById('pc-block').onclick = async () => { if (!confirm(`Block @${o.uname}? You won’t see them in Pal Park.`)) return; try { await setDoc(doc(db, 'users', S.user.uid, 'blocks', o.uid), { createdAt: serverTimestamp() }); blocked.add(o.uid); others.delete(o.uid); closeModal(); toast(`Blocked @${o.uname}`); } catch (er) { toast(friendlyError(er)); } };
     }
     function report(o) {
@@ -108,12 +110,23 @@ export function createPark(ctx) {
     const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };
     main.querySelector('#pk-emote').onclick = () => { if (!toggle('e')) return; panel.innerHTML = EMOTES.map((x) => `<button class="pk-e" data-e="${x}">${x}</button>`).join(''); };
     main.querySelector('#pk-chat').onclick = () => { if (!toggle('c')) return;
-      panel.innerHTML = PHRASES.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`;
-      panel.querySelector('#pk-f').onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
+      const kid = phraseOnly();
+      const list = kid ? SAFE_SAY : PHRASES;
+      panel.innerHTML = list.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + (kid ? `<p class="small" style="margin:8px 0 0">${esc(PHRASE_NOTE)}</p>` : `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`);
+      const f = panel.querySelector('#pk-f'); if (f) f.onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
     panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
-    let lastSay = 0; function say(t) { if (Date.now() - lastSay < 2000) return toast('Slow down a bit 💜'); if (!spamOk('park', t)) return; lastSay = Date.now(); P.say = t.slice(0, 60); P.sayAt = Date.now(); dirty = true; send(true); }
+    let lastSay = 0; function say(t) {
+      if (phraseOnly() && !isPhrase(t)) return toast(PHRASE_NOTE);
+      const gate = window.kemyChatGate ? window.kemyChatGate(t, 'park', '') : { ok: true, text: t };
+      if (!gate.ok) return;
+      t = gate.text;
+      if (Date.now() - lastSay < 2000) return toast('Slow down a bit 💜'); if (!spamOk('park', t)) return; lastSay = Date.now(); P.say = t.slice(0, 60); P.sayAt = Date.now(); dirty = true; send(true);
+    }
     function emote(x, tgt = '') { P.e = x; P.eAt = Date.now(); P.tgt = tgt; dirty = true; send(true); }
     let near = null; const actBtn = main.querySelector('#pk-act'); actBtn.onclick = () => act();
+    const repBtn = main.querySelector('#pk-rep'), blockBtn = main.querySelector('#pk-block');
+    repBtn.onclick = () => { if (!near) return; if (window.kemyModLine && near.say) window.kemyModLine((near.name || 'Someone') + ': ' + near.say); if (window.kemyModReport) window.kemyModReport({ targetType: 'chat message', targetId: near.uid, targetUid: near.uid, name: '@' + (near.uname || 'player'), hideKey: hideKey('park', near.uid, near.say || '') }); else report(near); };
+    blockBtn.onclick = async () => { if (!near) return; if (!confirm(`Block @${near.uname}?`)) return; try { await setDoc(doc(db, 'users', S.user.uid, 'blocks', near.uid), { createdAt: serverTimestamp() }); blocked.add(near.uid); others.delete(near.uid); toast(`Blocked @${near.uname}`); } catch (er) { toast(friendlyError(er)); } };
     function act() { if (near) petOther(near); }
     function petOther(o) { emote('🐾', o.uid); o.hearts = 70; toast(`You petted ${(o.pal && o.pal.name) || 'their Pal'}! 💜`); P.happy = 60; }
     // game loop
@@ -133,7 +146,7 @@ export function createPark(ctx) {
       for (const [id, o] of others) { if (blocked.has(id) || nowMs - o.at > STALE_MS * 2) { if (nowMs - o.at > STALE_MS * 2) others.delete(id); continue; }
         const k = 0.18 * dt; o.mv = Math.hypot(o.tx - o.x, o.ty - o.y) > 1; o.x += (o.tx - o.x) * k; o.y += (o.ty - o.y) * k; o.px = o.x; o.py = o.y;
         const dd = Math.hypot(o.px - P.x, o.py - P.y); if (dd < nd) { nd = dd; near = o; } }
-      actBtn.disabled = !near;
+      actBtn.disabled = !near; if (repBtn) repBtn.disabled = !near; if (blockBtn) blockBtn.disabled = !near;
       // treasures
       for (const it of items) if (!found.has(it.id) && Math.hypot(it.x - P.x, it.y - P.y) < 34) { found.add(it.id); localStorage.setItem(tk, JSON.stringify([...found])); paintFound(); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: 10, why: 'for a treasure' } })); P.happy = 50; }
       // portals
@@ -181,7 +194,8 @@ export function createPark(ctx) {
       x = px; y = py - 30; const b = mv ? Math.abs(Math.sin(t * 0.3)) * 3 : 0;
       c.fillStyle = mine ? '#ffd34d' : '#fff'; c.font = '700 11px Inter, sans-serif'; c.textAlign = 'center'; c.strokeStyle = 'rgba(30,10,60,.6)'; c.lineWidth = 3; c.strokeText(name, x, y - 52 - b); c.fillText(name, x, y - 52 - b); c.lineWidth = 1;
       const nowMs = Date.now();
-      if (st.say && nowMs - st.sayAt < 6000) { c.font = '600 12px Inter, sans-serif'; const tw = Math.min(180, c.measureText(st.say).width + 16); c.fillStyle = '#fff'; c.beginPath(); c.roundRect(x - tw / 2, y - 88 - b, tw, 24, 10); c.fill(); c.fillStyle = '#2a1458'; c.fillText(st.say.slice(0, 30), x, y - 71 - b); }
+      const sayHide = st.say && isHidden(hideKey('park', mine ? (S.user && S.user.uid) : (st.uid || ''), st.say));
+      if (st.say && !sayHide && nowMs - st.sayAt < 6000) { c.font = '600 12px Inter, sans-serif'; const tw = Math.min(180, c.measureText(st.say).width + 16); c.fillStyle = '#fff'; c.beginPath(); c.roundRect(x - tw / 2, y - 88 - b, tw, 24, 10); c.fill(); c.fillStyle = '#2a1458'; c.fillText(st.say.slice(0, 30), x, y - 71 - b); }
       if (st.e && nowMs - st.eAt < 3000) { c.font = '24px sans-serif'; c.fillText(st.e, x + 22, y - 44 - b - ((nowMs - st.eAt) / 150)); }
       c.textAlign = 'left';
     }
