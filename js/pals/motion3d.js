@@ -144,12 +144,13 @@ export function plantFeet(root, P, legs) {
   const air = clamp((hipsY - (legs ? 0.64 : 0.95)) / 0.5, 0, 1); const bs = 1 - air * 0.45; sh.body.scale.set(0.95 * bs, 1, 0.6 * bs); sh.body.material.opacity = 0.75 - air * 0.45;
   if (!legs) { sh.L.visible = sh.R.visible = false; return; }
   const ul = J.fit ? J.fit.ul : 0.27, ll = J.fit ? J.fit.ll : 0.27, reach = (ul + ll) * 0.9995;
+  const hipBase = root.userData.hip0 != null ? root.userData.hip0 + 0.018 : 0.64;
   root.updateMatrix(); J.Hips.updateMatrix(); J.Hips.updateMatrixWorld(true);
   const toRoot = _m.copy(root.matrixWorld).invert();
   for (const [n, key, lk] of [['Left', 'fL', 'lL'], ['Right', 'fR', 'lR']]) {
     const up = J[n + 'UpperLeg'], lo = J[n + 'LowerLeg'], ft = J[n + 'Foot'];
     const fk = ft.getWorldPosition(_v).applyMatrix4(toRoot); // where the dance put the foot
-    const fkQ = _q2.copy(ft.quaternion); const restY = 0.64 - (ul + ll); const rx = up.position.x;
+    const fkQ = _q2.copy(ft.quaternion); const restY = hipBase - (ul + ll); const rx = up.position.x;
     let tgt, pitch = 0, wgt;
     const f = P[key];
     if (f) { tgt = new THREE.Vector3(rx + f[0], restY + f[1], f[2]); pitch = f[3]; wgt = f[4]; }

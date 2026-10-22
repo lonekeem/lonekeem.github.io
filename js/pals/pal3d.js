@@ -13,6 +13,7 @@ import { dressHalloween } from './halloween3d.js';
 import { accAnchors, dressAccessories, dressPack } from './acc3d.js';
 import { DANCES3D, clipFor } from './dances3d.js';
 import { gaitPose, jumpPose, plantFeet, springs, advancePhase } from './motion3d.js';
+import { FOUNDER_MOTION, founderPose } from './founder-motion.js';
 
 const D = Math.PI / 180;
 let R = null, scene, cam, keyL, shadowPlane;
@@ -148,6 +149,7 @@ function build(pal) {
   const skin = ['frog', 'kemy', 'turtle', 'dragon', 'penguin', 'seal', 'jelly', 'starsprite'].includes(sp.id);
   const mB = mat(B, skin ? { sheen: 0.2, cc: 0.6, r: 0.45, sss: 0.1, rim: 0.3 } : { fur: 1 }), mA = mat(A), mDark = mat(shade(B, -0.25)), mLight = mat(shade(B, 0.5));
   const mEye = new THREE.MeshPhysicalMaterial({ color: E, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.4, sheen: 0.4, sheenColor: new THREE.Color(E).lerp(new THREE.Color('#9a7aff'), 0.6) }), mWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  if (sp.id === 'founder') { mEye.color.set('#07070a'); mEye.roughness = 0.05; mEye.clearcoat = 1; mEye.clearcoatRoughness = 0.02; }
   const mPink = mat('#ff9ec4', { op: 0.75, sheen: 0 }), mNose = mat('#3a2440', { sheen: 0, cc: 1, r: 0.3 });
   const FD = sp.id === 'founder'; if (FD) { // pearly, softly glowing axolotl skin
     for (const mm of [mB]) { mm.bumpMap = furTex(); mm.bumpScale = 0.04; mm.emissiveMap = glitterTex(); mm.userData.k = { ...mm.userData.k, sss: 0.22, rim: 0.5, sssCol: new THREE.Color('#ff7ab8'), rimCol: new THREE.Color('#ffe6ff') }; mm.clearcoat = 0.55; mm.clearcoatRoughness = 0.25; mm.roughness = 0.38; mm.sheen = 1; mm.sheenColor.set('#c9b0ff'); mm.sheenRoughness = 0.35; mm.emissive.set('#ffe0f4'); mm.emissiveIntensity = 0.35; } }
@@ -158,7 +160,9 @@ function build(pal) {
   const [bw, bh, bd] = kind === 'blob' ? bodyScale(sp.id) : [1, 1, 1]; // per-species body type (small/medium/large/long/round)
   J.Spine = bone('Spine', J.Hips, 0, 0.12, 0); J.Chest = bone('Chest', J.Spine, 0, 0.32 * bh, 0);
   J.Neck = bone('Neck', J.Chest, 0, 0.2 * bh, 0);
-  J.TB = new THREE.Group(); J.TB.scale.set(bw, bh, bd); J.Spine.add(J.TB); J.TBh = new THREE.Group(); J.TBh.position.y = 0.12; J.TBh.scale.set(bw, bh, bd); J.Hips.add(J.TBh); J.Head = bone('Head', J.Neck, 0, 0.1, 0);
+  J.TB = new THREE.Group(); J.TB.scale.set(bw, bh, bd); J.Spine.add(J.TB); J.TBh = new THREE.Group(); J.TBh.position.y = 0.12; J.TBh.scale.set(bw, bh, bd); J.Hips.add(J.TBh);
+  if (FD) { J.TB.scale.multiply(new THREE.Vector3(1.16, 1.06, 1.2)); J.TBh.scale.multiply(new THREE.Vector3(1.16, 1.06, 1.2)); }
+  J.Head = bone('Head', J.Neck, 0, 0.1, 0);
   // torso: pear-shaped belly + chest (soft, chubby kid proportions)
   if (kind === 'blob') {
     const torso = mesh(geo('torso', () => { const pts = [[0, -0.24], [0.2, -0.22], [0.33, -0.15], [0.41, -0.02], [0.42, 0.1], [0.38, 0.24], [0.31, 0.36], [0.25, 0.46], [0.22, 0.54], [0.2, 0.62], [0, 0.66]].map(([r, y]) => new THREE.Vector2(r, y));
@@ -181,7 +185,7 @@ function build(pal) {
     for (const [x, y, r] of [[0, 0, 0.4], [-0.35, -0.05, 0.3], [0.35, -0.05, 0.3], [-0.18, 0.25, 0.28], [0.2, 0.25, 0.3]]) mesh(sph(r), mat(B, { sheen: 1 }), J.Chest).position.set(x, y, 0);
   }
   // head: big round head, slightly squashed, kid-friendly
-  const headR = (kind === 'blob' ? 0.44 : 0.4) * (sp.id === 'jelly' ? 0 : 1);
+  const headR = (kind === 'blob' ? (FD ? 0.5 : 0.44) : 0.4) * (sp.id === 'jelly' ? 0 : 1);
   if (headR) { const h = mesh(sph(1), mB, J.Head); h.scale.set(headR * 1.08, headR, headR * 0.98); h.position.y = headR * 0.82; const ch = mesh(sph(1), mB, J.Head); ch.scale.set(headR * 0.95, headR * 0.6, headR * 0.85); ch.position.set(0, headR * 0.52, headR * 0.08); }
   const hy = headR * 0.82 || 0.05, fz = headR * 0.9 || 0.6;
   const H = new THREE.Group(); H.position.y = hy - (sp.id === 'jelly' ? 0.42 : 0); J.Head.add(H); J.face = H;
@@ -190,13 +194,13 @@ function build(pal) {
   if (ex.has('mane')) for (let i = 0; i < 14; i++) { const a = i * Math.PI * 2 / 14; mesh(sph(0.16), mA, H).position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.5, -0.12); }
   if (ex.has('wool')) for (let i = 0; i < 6; i++) mesh(sph(0.14), mat('#ffffff'), H).position.set(-0.25 + i * 0.1, 0.42 + (i % 2) * 0.04, 0.05);
   // eyes (glossy, with catch-lights) + blush
-  const eyes = []; const er = 0.085 * (ex.has('frogeyes') ? 1.3 : 1);
+  const eyes = []; const er = (FD ? 0.155 : 0.085) * (ex.has('frogeyes') ? 1.3 : 1);
   for (const s of [-1, 1]) {
     const ey = ex.has('frogeyes') ? 0.36 : 0.06, ex0 = s * 0.19, hz = headR ? headR * 0.98 * Math.sqrt(Math.max(0.05, 1 - (ex0 / (headR * 1.08)) ** 2 - (ey / headR) ** 2)) : fz;
     const g = new THREE.Group(); g.position.set(ex0, ey, ex.has('frogeyes') ? fz * 0.92 : hz - er * 0.22); g.rotation.y = s * 0.28; H.add(g);
     if (ex.has('frogeyes')) mesh(sph(0.15), mB, g).position.z = -0.06;
     if (new THREE.Color(B).getHSL({}).l < 0.3) { const w = mesh(sph(1), mat('#ffffff', { sheen: 0 }), g); w.scale.set(er * 1.5, er * 1.6, er * 0.5); w.position.z = -0.02; }
-    const e = mesh(sph(1), mEye, g); e.scale.set(er, er * 1.15, er * 0.42);
+    const e = mesh(sph(1), mEye, g); e.scale.set(er, er * (FD ? 1.02 : 1.15), er * (FD ? 0.78 : 0.42));
     const hl = mesh(sph(0.027), mWhite, g); hl.position.set(-0.028, 0.04, er * 0.4); hl.castShadow = false; const hl2 = mesh(sph(0.011), mWhite, g); hl2.position.set(0.025, -0.03, er * 0.4);
     const lid = mesh(sph(1), mB, g); lid.scale.set(er * 1.2, er * 1.3, er * 0.6); lid.position.y = er * 2.6; lid.userData.open = er * 2.6; lid.userData.shut = er * 0.25; g.userData.lid = lid; eyes.push(g);
     if (sp.id === 'panda' || ex.has('eyepatch')) { const p = mesh(sph(1), mat(A), H); p.scale.set(0.13, 0.15, 0.05); p.position.set(s * 0.19, 0.04, fz * 0.88); p.rotation.z = s * 0.4; }
@@ -222,7 +226,7 @@ function build(pal) {
     for (const sx of [-1, 1]) { const tk = mesh(cone(0.022, 0.09), mat('#fffaf0', { sheen: 0, cc: 0.8 }), H); tk.position.set(sx * 0.1, -0.15, snz * 0.86); tk.rotation.set(0.9, 0, sx * -0.3); }
   }
   // mouth: small smile
-  const mo = mesh(geo('smile', () => new THREE.TorusGeometry(0.05, 0.012, 6, 12, Math.PI)), mNose, H); mo.rotation.z = Math.PI; mo.position.set(0, sn === 'trunk' ? -0.2 : -0.16, snz * 0.97 + 0.02); J.mouth = mo;
+  const mo = mesh(geo(FD ? 'axsmile' : 'smile', () => new THREE.TorusGeometry(FD ? 0.055 : 0.05, FD ? 0.011 : 0.012, 8, 18, Math.PI)), mNose, H); mo.rotation.z = Math.PI; mo.position.set(0, sn === 'trunk' ? -0.2 : (FD ? -0.17 : -0.16), snz * 0.97 + 0.02); J.mouth = mo;
   // ears
   J.ears = []; const ea = sp.ears; const of0 = pal.outfit || {}; const hasHat = !!(of0.head && (WEAR_BY[of0.head] || ITEM[of0.head]));
   for (const s of [-1, 1]) {
@@ -234,9 +238,9 @@ function build(pal) {
     if (ea === 'big') { m = mesh(sph(1), mB, e); m.scale.set(0.3, 0.36, 0.075); m.position.set(s * 0.24, 0, 0); m.rotation.y = -s * 0.35; const i = mesh(sph(1), mat('#ffb8d4'), e); i.scale.set(0.21, 0.26, 0.04); i.position.set(s * 0.25, 0, 0.045); i.rotation.y = -s * 0.35; e.position.set(s * 0.36, 0.04, -0.06); e.userData.flap = 1; }
     if (ea === 'ossicones') { m = mesh(cap(0.03, 0.16), mDark, e); m.position.y = 0.1; mesh(sph(0.055), mA, e).position.y = 0.22; e.position.set(s * 0.14, 0.42, 0); }
     if (ea === 'gills' && FD) { e.position.set(s * 0.4, 0.12, -0.02); for (let i = 0; i < 3; i++) { const st0 = new THREE.Group(); st0.position.set(s * 0.04, 0.12 - i * 0.12, 0); st0.rotation.z = -s * (1.15 - i * 0.55); st0.rotation.y = s * 0.15; e.add(st0);
-        const L = 0.34 - i * 0.03; const stalk = mesh(geo('fgst' + i, () => { const g = new THREE.CapsuleGeometry(0.03, L, 8, 16); g.translate(0, L / 2, 0); return g; }), mat('#7a4ad0', { cc: 0.6, sheen: 1, r: 0.35, em: '#5a2ab0' }), st0);
-        for (let k = 0; k < 7; k++) { const u = (k + 1) / 8; for (const q of [-1, 1]) { const fr = mesh(geo('fgfr', () => { const g = new THREE.SphereGeometry(1, 16, 10); g.translate(0, 1, 0); return g; }), mat(new THREE.Color('#8a55dc').lerp(new THREE.Color('#f2b4f0'), u).getStyle(), { cc: 0.5, sheen: 1, r: 0.4, em: '#7a3ad0' }), st0); fr.position.set(0, L * u, 0); fr.scale.set(0.018, 0.055 + 0.03 * Math.sin(u * 3), 0.014); fr.rotation.z = q * (0.9 + u * 0.3); } }
-        st0.add(filaments(L, 18, '#8a55dc', hasHat ? 0.75 : 1)); st0.userData.base = st0.rotation.z; (J.gill = J.gill || []).push(st0);
+        const L = 0.36 - i * 0.03; const stalk = mesh(geo('fgst' + i, () => { const g = new THREE.CapsuleGeometry(0.028, L, 8, 16); g.translate(0, L / 2, 0); return g; }), mat('#7c3aed', { cc: 0.55, sheen: 1, r: 0.38, em: '#5b21b6' }), st0);
+        for (let k = 0; k < 8; k++) { const u = (k + 1) / 9; for (const q of [-1, 1]) { const fr = mesh(geo('fgfr', () => { const g = new THREE.SphereGeometry(1, 16, 10); g.translate(0, 1, 0); return g; }), mat(new THREE.Color('#8b5cf6').lerp(new THREE.Color('#ddd6fe'), u).getStyle(), { cc: 0.45, sheen: 1, r: 0.42, em: '#6d28d9' }), st0); fr.position.set(0, L * u, 0); fr.scale.set(0.02, 0.07 + 0.035 * Math.sin(u * 3), 0.016); fr.rotation.z = q * (1.05 + u * 0.35); } }
+        st0.add(filaments(L, 22, '#c4b5fd', hasHat ? 0.75 : 1)); st0.userData.base = st0.rotation.z; (J.gill = J.gill || []).push(st0);
         if (hasHat && i === 0) { st0.rotation.z = -s * 1.45; st0.userData.base = st0.rotation.z; st0.scale.setScalar(0.85); } }
       J.ears.push(e); continue; }
     if (ea === 'gills') for (let i = 0; i < 3; i++) { const g = mesh(cap(0.035, 0.2), mA, e); g.position.set(s * 0.12, 0.05 - i * 0.12, 0); g.rotation.z = -s * (0.9 - i * 0.6) - (hasHat && i === 0 ? s * 0.3 : 0); e.position.set(s * 0.4, 0.05, 0);
@@ -248,7 +252,8 @@ function build(pal) {
   if (ex.has('rainbowmane')) ['#ff8ab8', '#ffd34d', '#7fe0a0', '#7fb8ff', '#c49aff'].forEach((c, i) => mesh(sph(0.1), mat(c), H).position.set(-0.05, 0.42 - i * 0.12, -0.32 - i * 0.02));
   // arms: shoulder > upper > lower > hand (+3 fingers); flippers / wings swap the hand shape
   const armType = ex.has('wings') ? 'wing' : ex.has('flippers') ? 'flipper' : 'paw';
-  const ua = 0.3, la = 0.27, ar = (kind === 'blob' ? 0.09 : 0.078) * (1 + (bw - 1) * 0.6), shY = kind === 'blob' ? 0.1 : 0;
+  const stub = FD ? 0.56 : 1;
+  const ua = 0.3 * stub, la = 0.27 * stub, ar = (kind === 'blob' ? (FD ? 0.118 : 0.09) : 0.078) * (1 + (bw - 1) * 0.6), shY = kind === 'blob' ? 0.1 : 0;
   for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) {
     const sh = bone(n + 'Shoulder', J.Chest, s * (kind === 'blob' ? 0.36 * bw : 0.45), shY, 0);
     const up = bone(n + 'UpperArm', sh, 0, 0, 0); const lo = bone(n + 'LowerArm', up, 0, -ua, 0); const hd = bone(n + 'Hand', lo, 0, -la, 0);
@@ -256,13 +261,13 @@ function build(pal) {
     else if (armType === 'flipper') { const w = mesh(sph(1), mB, up); w.scale.set(0.07, 0.3, 0.13); w.position.y = -0.22; }
     else {
       mesh(cap(ar, ua), mB, up).position.y = -ua / 2; mesh(cap(ar * 0.92, la), mB, lo).position.y = -la / 2; mesh(sph(ar * 1.12), mB, up); mesh(sph(ar * 0.98), mB, lo);
-      const p = mesh(sph(1), skin ? mB : mLight, hd); p.scale.set(0.11, 0.1, 0.09); p.position.y = -0.04;
-      for (const f of [-1, 0, 1]) { const fi = mesh(cap(0.022, 0.04), skin ? mB : mLight, hd); fi.position.set(f * 0.04, -0.11, 0.015); fi.rotation.z = f * 0.25; }
+      const p = mesh(sph(1), skin ? mB : mLight, hd); p.scale.set(FD ? 0.14 : 0.11, FD ? 0.12 : 0.1, FD ? 0.13 : 0.09); p.position.y = FD ? -0.02 : -0.04;
+      if (!FD) for (const f of [-1, 0, 1]) { const fi = mesh(cap(0.022, 0.04), skin ? mB : mLight, hd); fi.position.set(f * 0.04, -0.11, 0.015); fi.rotation.z = f * 0.25; }
     }
     J[n + 'Shoulder'] = sh; J[n + 'UpperArm'] = up; J[n + 'LowerArm'] = lo; J[n + 'Hand'] = hd;
   }
   // legs: hip > upper > lower > foot (+ toe pads)
-  const ul = 0.27, ll = 0.27, lr = 0.122 * (1 + (bw - 1) * 0.6); J.legL = ul + ll;
+  const ul = 0.27 * stub, ll = 0.27 * stub, lr = (FD ? 0.15 : 0.122) * (1 + (bw - 1) * 0.6); J.legL = ul + ll;
   const legs = kind === 'blob' && sp.feet !== 'none' && !ex.has('float');
   for (const [s, n] of [[1, 'Left'], [-1, 'Right']]) {
     const up = bone(n + 'UpperLeg', J.Hips, s * 0.19 * bw, 0, 0); const lo = bone(n + 'LowerLeg', up, 0, -ul, 0); const ft = bone(n + 'Foot', lo, 0, -ll, 0);
@@ -270,7 +275,7 @@ function build(pal) {
       mesh(cap(lr, ul), mB, up).position.y = -ul / 2; mesh(cap(lr * 0.9, ll), mB, lo).position.y = -ll / 2; mesh(sph(lr * 1.15), mB, up); mesh(sph(lr * 0.95), mB, lo);
       if (sp.feet === 'webbed') { const f = mesh(sph(1), mat('#ffa53a', { sheen: 0 }), ft); f.scale.set(0.11, 0.035, 0.16); f.position.set(0, -0.02, 0.06); }
       else if (sp.feet === 'flippers') { const f = mesh(sph(1), mDark, ft); f.scale.set(0.12, 0.04, 0.2); f.position.set(0, -0.02, 0.08); }
-      else { const f = mesh(sph(1), mB, ft); f.scale.set(0.13, 0.08, 0.17); f.position.set(0, -0.02, 0.05); for (const q of [-1, 0, 1]) { const tp = mesh(sph(0.025), mat('#ffb3cf', { sheen: 0 }), ft); tp.position.set(q * 0.045, -0.04, 0.18); } }
+      else { const f = mesh(sph(1), mB, ft); f.scale.set(FD ? 0.16 : 0.13, FD ? 0.1 : 0.08, FD ? 0.18 : 0.17); f.position.set(0, -0.02, 0.05); if (!FD) for (const q of [-1, 0, 1]) { const tp = mesh(sph(0.025), mat('#ffb3cf', { sheen: 0 }), ft); tp.position.set(q * 0.045, -0.04, 0.18); } }
     }
     J[n + 'UpperLeg'] = up; J[n + 'LowerLeg'] = lo; J[n + 'Foot'] = ft;
   }
@@ -281,24 +286,18 @@ function build(pal) {
   J.tail = []; const tl = sp.tail;
   if (tl !== 'none') {
     let p = bone('Tail1', J.Hips, 0, 0.05, -0.3); J.tail.push(p);
-    const segs = { wag: [0.05, 0.16], thin: [0.042, 0.18], tuft: [0.042, 0.17], fluffy: [0.11, 0.14], ringed: [0.09, 0.15], axo: [0.07, 0.17], dragon: [0.07, 0.18], flat: [0.08, 0.1] }[tl];
-    if (segs) { for (let i = 0; i < 3; i++) { const m = mesh(cap(segs[0] * 1.35 * (1 - i * 0.16), segs[1]), tl === 'ringed' && i === 1 ? mA : tl === 'flat' ? mDark : mB, p); m.position.y = segs[1] / 2 + 0.03; if (tl === 'flat') m.scale.z = 0.4; p = bone('Tail' + (i + 2), p, 0, segs[1] + 0.03, 0); J.tail.push(p); } p.parent.rotation && 0; }
+    const segs = (FD && tl === 'axo') ? [0.1, 0.24] : { wag: [0.05, 0.16], thin: [0.042, 0.18], tuft: [0.042, 0.17], fluffy: [0.11, 0.14], ringed: [0.09, 0.15], axo: [0.07, 0.17], dragon: [0.07, 0.18], flat: [0.08, 0.1] }[tl];
+    const tailMat = FD ? mat('#ffb3d4', { op: 0.62, cc: 0.85, sheen: 1, r: 0.22, em: '#ff8ec8', sss: 0.4, rim: 0.7 }) : null;
+    if (segs) { for (let i = 0; i < 3; i++) { const m = mesh(cap(segs[0] * 1.35 * (1 - i * 0.16), segs[1]), tl === 'ringed' && i === 1 ? mA : tl === 'flat' ? mDark : (tailMat || mB), p); m.position.y = segs[1] / 2 + 0.03; if (tl === 'flat') m.scale.z = 0.4; if (FD) m.castShadow = false; p = bone('Tail' + (i + 2), p, 0, segs[1] + 0.03, 0); J.tail.push(p); } p.parent.rotation && 0; }
     if (tl === 'tuft' || tl === 'fluffy') mesh(sph(tl === 'tuft' ? 0.07 : 0.1), tl === 'tuft' ? mA : mat('#ffffff'), p);
     if (tl === 'dragon') { const k = mesh(cone(0.09, 0.16), mA, p); k.position.y = 0.04; }
     if (tl === 'puff' || tl === 'stub') mesh(sph(tl === 'puff' ? 0.12 : 0.08), tl === 'puff' ? mat('#ffffff') : mDark, J.tail[0]);
     if (tl === 'curl') mesh(geo('curl', () => new THREE.TorusGeometry(0.075, 0.032, 12, 24, Math.PI * 1.6)), mA, J.tail[0]);
     J.tail[0].rotation.x = -2.2;
     if (tl === 'axo' && !FD) { const fin = mat(shade(B, 0.35), { op: 0.45, cc: 1, sheen: 1, r: 0.25, em: A, sss: 0.4, rim: 0.8 }); fin.side = THREE.DoubleSide; fin.depthWrite = false; J.tail.forEach((b, i) => { const f = mesh(sph(1), fin, b); f.scale.set(0.01, 0.14, 0.13 + i * 0.04); f.position.y = 0.1; f.castShadow = false; }); }
-    if (FD) { const fin = mat('#e6ccff', { op: 0.42, cc: 1, sheen: 1, r: 0.2, em: '#c49aff', sss: 0.5, rim: 1.1 }); fin.side = THREE.DoubleSide; fin.depthWrite = false;
-      J.tail.forEach((b, i) => { const f = mesh(sph(1), fin, b); f.scale.set(0.012, 0.17, 0.18 + i * 0.05); f.position.set(0, 0.1, 0); });
-      const tip = mesh(sph(1), fin, J.tail[J.tail.length - 1]); tip.scale.set(0.012, 0.22, 0.26); tip.position.y = 0.2; }
-  }
-  if (FD) { // floating sparkles + founder crown
-    J.spark = fireflies(root, 18, 1);
-    const cr = new THREE.Group(); cr.position.set(0.16, headR * 1.0, 0.05); cr.rotation.set(-0.15, 0, -0.35); H.add(cr); const gm = mat('#ffd34d', { cc: 1, r: 0.25, sheen: 0, em: '#a07000' }); gm.metalness = 0.7;
-    mesh(geo('fcr', () => new THREE.CylinderGeometry(0.085, 0.075, 0.06, 20, 1, true)), gm, cr).material.side = THREE.DoubleSide;
-    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; const k = mesh(cone(0.022, 0.07), gm, cr); k.position.set(Math.sin(a) * 0.08, 0.06, Math.cos(a) * 0.08); mesh(sph(0.012), gm, cr).position.set(Math.sin(a) * 0.08, 0.1, Math.cos(a) * 0.08); }
-    mesh(sph(0.018), mat('#ff6fae', { cc: 1, em: '#a02060' }), cr).position.set(0, 0.01, 0.085);
+    if (FD) { const fin = mat('#ffc2e0', { op: 0.38, cc: 1, sheen: 1, r: 0.2, em: '#ff9ec8', sss: 0.45, rim: 0.9 }); fin.side = THREE.DoubleSide; fin.depthWrite = false;
+      J.tail.forEach((b, i) => { const f = mesh(sph(1), fin, b); f.scale.set(0.01, 0.2, 0.22 + i * 0.06); f.position.set(0, 0.12, 0); f.castShadow = false; });
+      const tip = mesh(sph(1), fin, J.tail[J.tail.length - 1]); tip.scale.set(0.01, 0.28, 0.32); tip.position.y = 0.28; tip.castShadow = false; }
   }
   if (!FD) J.spark = fireflies(root, 7, 0.75);
   if (ex.has('batwings') || ex.has('fairywings')) for (const s of [-1, 1]) { const w = bone('Wing' + s, J.Chest, s * 0.18, 0.1, -0.25); const m = mesh(sph(1), mat(ex.has('fairywings') ? '#e8f4ff' : A, { op: ex.has('fairywings') ? 0.6 : 1 }), w); m.scale.set(0.32, 0.22, 0.02); m.position.x = s * 0.3; (J.wings = J.wings || []).push(w); }
@@ -330,7 +329,7 @@ function build(pal) {
   if (vr === 'rare_galaxy' || vr === 'rare_glow' || vr === 'rare_crystal') for (let i = 0; i < 10; i++) { const a = i * 2.4, y = 0.1 + (i % 5) * 0.12; const st = mesh(sph(0.02), new THREE.MeshBasicMaterial({ color: '#fffbe0' }), J.Spine); st.position.set(Math.sin(a) * 0.43, y, Math.cos(a) * 0.4); }
   // rest pose
   J.LeftUpperArm.rotation.z = 0.25; J.RightUpperArm.rotation.z = -0.25;
-  root.scale.setScalar(S); root.userData = { J, sp, legs, kind, S }; root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  root.scale.setScalar(S); root.userData = { J, sp, legs, kind, S }; if (FD) root.userData.hip0 = ul + ll + 0.02; root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   return root;
 }
 // ---------------------------------------------------------------- posing
@@ -342,7 +341,7 @@ function slotFor(c, key) { let m = slots.get(c); if (!m) { m = new Map(); slots.
 function apply(rootObj, P, t, mode) {
   const { J, legs } = rootObj.userData; const L = J.legL;
   // standing knees keep a soft bend (hips 2 cm under full leg reach) so small hip rises never lift the feet
-  J.Hips.position.set(P.hx || 0, (legs ? 0.622 : 0.95) + (P.hy || 0), P.hz || 0);
+  J.Hips.position.set(P.hx || 0, (legs ? (rootObj.userData.hip0 ?? 0.622) : 0.95) + (P.hy || 0), P.hz || 0);
   J.Hips.rotation.set(P.hrx || 0, P.hry || 0, P.hrz || 0);
   const sq = clamp1(P.sq || 0); J.Hips.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5); // squash & stretch (jumps)
   for (const [n, s, v] of [['Left', 1, P.shL], ['Right', -1, P.shR]]) if (J[n + 'Shoulder']) J[n + 'Shoulder'].rotation.set(v ? v[0] : 0, 0, v ? s * v[1] + (P.sh || 0) * 0 : 0); // shoulder rolls
@@ -368,12 +367,15 @@ function apply(rootObj, P, t, mode) {
   plantFeet(rootObj, P, legs);
   // life: breathing, blink, ears + tail spring
   const br = Math.sin(t * 0.05) * 0.015; J.Chest.scale.set(1 + br, 1 + br, 1 + br);
-  const bt = t % 260; const shut = bt < 5 || (Math.floor(t / 260) % 3 === 1 && bt > 14 && bt < 19) || mode === 'sleep'; /* blink, sometimes a double blink */ for (const e of J.eyes) { const l = e.userData.lid; if (l) { l.position.y += ((shut ? l.userData.shut : l.userData.open) - l.position.y) * 0.6; l.visible = l.position.y < l.userData.open * 0.95; } }
+  const fd = !!(rootObj.userData.sp && rootObj.userData.sp.founder), M = FOUNDER_MOTION;
+  const blinkEvery = fd ? M.blinkEvery : 260, blinkShut = fd ? M.blinkFrames : 5;
+  const bt = t % blinkEvery; const shut = bt < blinkShut || (Math.floor(t / blinkEvery) % 3 === 1 && bt > blinkShut + 8 && bt < blinkShut + 14) || mode === 'sleep'; /* blink, sometimes a double blink */ for (const e of J.eyes) { const l = e.userData.lid; if (l) { l.position.y += ((shut ? l.userData.shut : l.userData.open) - l.position.y) * 0.6; l.visible = l.position.y < l.userData.open * 0.95; } }
   const sg = springs(rootObj, P); sp.e = sg.e[0] * 2.2 + (P.hrz || 0) * 0.3; // spring-driven floppy parts
   J.ears.forEach((e, i) => { e.rotation.x = sp.e * 0.4 + sg.e[0] * 0.3; e.rotation.y = e.userData.flap ? (i ? 1 : -1) * (Math.sin(t * 0.09) * 0.18 + (mode === 'react' ? Math.sin(t * 0.6) * 0.4 : 0)) : 0; e.userData.z ??= e.rotation.z; e.rotation.z = e.userData.z + Math.sin(t * 0.07 + i) * 0.04 + (i ? -1 : 1) * sp.e * 0.2; });
   sp.tl = sg.tl[0];
-  if (J.gill) J.gill.forEach((g, i) => { g.rotation.z = g.userData.base + Math.sin(t * 0.11 + i * 1.3) * 0.06 + sg.e[1] * 0.25 * (i % 2 ? 1 : -1); g.rotation.x = Math.sin(t * 0.07 + i) * 0.08 + sg.e[0] * 0.3; });
-  J.tail.forEach((b, i) => { if (i) b.rotation.set(0.3 + sg.tl[1] * 0.3 * i, 0, Math.sin(t * (P.tw || 0.1) - i * 0.6) * 0.25 + sp.tl * (0.3 + i * 0.12)); else { b.rotation.z = Math.sin(t * (P.tw || 0.1)) * 0.3 + sp.tl; b.rotation.x = sg.tl[1] * 0.3; } });
+  if (J.gill) { const amp = fd ? M.gillWiggle : 0.06, spd = fd ? M.gillSpeed : 0.11; J.gill.forEach((g, i) => { g.rotation.z = g.userData.base + Math.sin(t * spd + i * 1.3) * amp + sg.e[1] * 0.25 * (i % 2 ? 1 : -1); g.rotation.x = Math.sin(t * spd * 0.6 + i) * (fd ? amp * 0.55 : 0.08) + sg.e[0] * 0.3; }); }
+  const tailAmp = fd ? M.tailSway : 0.25;
+  J.tail.forEach((b, i) => { if (i) b.rotation.set(0.3 + sg.tl[1] * 0.3 * i, 0, Math.sin(t * (P.tw || 0.1) - i * 0.6) * tailAmp + sp.tl * (0.3 + i * 0.12)); else { b.rotation.z = Math.sin(t * (P.tw || 0.1)) * (fd ? M.tailSway : 0.3) + sp.tl; b.rotation.x = sg.tl[1] * 0.3; } });
   if (J.tent) J.tent.forEach((b, i) => { b.rotation.x = Math.sin(t * 0.12 + i) * 0.3 + sg.e[0] * 0.6; b.rotation.z = Math.cos(t * 0.1 + i) * 0.2 + sg.tl[0] * 0.25; });
   if (J.wings) J.wings.forEach((w, i) => { w.rotation.y = (i ? -1 : 1) * (0.4 + Math.sin(t * 0.3) * 0.3); });
   if (J.trunk) { const up = mode === 'react' || mode === 'happy'; J.trunk.forEach((b, k) => { b.rotation.x = (up ? -0.45 : -(0.08 + k * 0.06)) + Math.sin(t * 0.08 - k * 0.55) * (0.07 + k * 0.012) + sg.e[0] * 0.12 * k; b.rotation.z = Math.sin(t * 0.05 - k * 0.4) * 0.05 * k + sg.e[1] * 0.1 * k; }); }
@@ -440,7 +442,8 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
     P = gaitPose(ph, spd, st.turn || 0, ud.J.legL || 0.54, legs);
   } else if (md === 'hop') P = jumpPose(((t % 72) + 72) % 72 / 72, 0.45);
   else P = modePose(md, t);
-  if (md === 'idle' && !st.dance3d && !st.still) P = idleLife(P, t);
+  if (md === 'idle' && !st.dance3d && !st.still && !(ud.sp && ud.sp.founder)) P = idleLife(P, t);
+  if (ud.sp && ud.sp.founder && !st.dance3d) P = founderPose(P, t, md);
   if (st.dance3d) { const D3 = clipFor(st.dance3d, m.userData.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
   if (!sane(P)) P = modePose('idle', t); // never leave a broken / T-pose on screen
   // overlap & follow-through: every joint eases toward its target (limbs a bit slower than the hips), so moves and
@@ -595,6 +598,7 @@ export function posePal3D(m, st = {}) {
   if (st.dance3d === 'sit') P = sitPose(t); // seated (beds, chairs, couches in Kemy homes): thighs forward, feet hanging
   else if (st.dance3d) { const D3 = clipFor(st.dance3d, ud.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
   if (st.extra) P = { ...P, ...st.extra };
+  if (ud.sp && ud.sp.founder && !st.dance3d) P = founderPose(P, t, md);
   if (!sane(P)) P = modePose('idle', t);
   const pv = ud.prev; if (pv && Math.abs(t - (ud.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }
   ud.prev = P; ud.pt = t;

@@ -70,6 +70,7 @@ const COLORS = ['#8a2be2', '#4da3ff', '#e2448a', '#2bb673', '#f2a33a', '#6a3df0'
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 const LINK_RE = /^https:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be|tiktok\.com)\/.*$/i;
 const isAdmin = () => !!(S.user && S.user.email === ADMIN_EMAIL && S.user.emailVerified);
+import('./pals/founder-gate.js').then((m) => m.setFounderAdminCheck(isAdmin)).catch(() => {});
 
 // ---------------------------------------------------------------- helpers
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1405,7 +1406,7 @@ async function pageAdmin(token) {
       <p class="muted small" style="margin:3px 0 8px">Sends every price in the app (dances, outfits, jewelry, looks, backgrounds, Rare Pals, pal items and Zombie Armory items in ★ and 💎) to the live shop, so people can buy them.</p>
       <p class="small" id="shop-status">Checking the live shop…</p>
       <button class="btn" id="shop-pub" style="font-size:1.05rem;padding:12px 22px">Publish shop prices</button></div>
-    ${big('founder', '👑', 'Kemy (Founder) Pal', 'Your admin-only Pal: the Kemy app-icon axolotl, 1.2x size, crown and sparkles. Keeps your Pal’s name, level and outfit. Only your verified admin account can use it.', '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" id="adm-founder">👑 Make my active Pal the Founder</button><button class="btn btn-sm btn-ghost" id="adm-founder-off">Switch back</button></div>')}
+    ${big('founder', '🩷', 'Kemy (Founder) Pal', 'Your admin-only Pal: a pink axolotl with glossy dark eyes, a small smile, purple gills and a long pink tail. It can’t be bought, traded or hatched by anyone else. Keeps your Pal’s name, level and outfit.', '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-sm" id="adm-founder">Make my active Pal the Founder</button><button class="btn btn-sm btn-ghost" id="adm-founder-off">Switch back</button></div>')}
     ${big('reindex', '🔎', 'Build search index', 'Adds search keywords and #hashtags to every post and profile that’s missing them.', '<button class="btn btn-sm" id="reindex">Build search index</button>')}
     ${big('studio', '🎬', 'Lone Keem Studios account', 'Private messages are off. You can still post as the studio and read studio notifications.', '<div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn btn-sm btn-ghost" href="#/notifications/studio">Studio notifications</a><a class="btn btn-sm btn-ghost" href="#/new">Post as the studio</a><a class="btn btn-sm btn-ghost" href="#/mod/bugs">Team notes</a></div>')}
     ${big('feat', '★', 'Feature posts (Studio Picks)', 'Open any movie, show or song and tap “Feature in Studio Picks” (tap again to unfeature).', '<a class="btn btn-sm btn-ghost" href="#/watch">Go to Watch</a>')}

@@ -2,6 +2,7 @@
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, increment, deleteDoc, deleteField }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { SPEC } from './art.js';
+import { assertFounderSpecies } from './founder-gate.js';
 export const MAX_PALS = 6;
 export const STATS = ['happy', 'hunger', 'energy', 'clean']; // hunger = fullness (100 = full)
 const DECAY = { happy: 2, hunger: 4, energy: 3, clean: 3 };   // points per hour
@@ -29,7 +30,7 @@ export function createStore(db, uid) {
   return {
     async list() { const s = await getDocs(col()); return s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); },
     async get(id) { const s = await getDoc(ref(id)); return s.exists() ? { id, ...s.data() } : null; },
-    async create(id, data) { await setDoc(ref(id), newPal(id, data)); return this.get(id); },
+    async create(id, data) { assertFounderSpecies(data && data.species); await setDoc(ref(id), newPal(id, data)); return this.get(id); },
     // save stats/xp/look. xp gain per write is capped at 60 by the rules, and writes are 1s apart.
     // Saves are queued one at a time (rapid shop taps used to fire two writes inside the rules' 1 s window and get
     // permission-denied = "going a little fast"); the gap is measured from when the last write FINISHED, and a write
@@ -40,6 +41,7 @@ export function createStore(db, uid) {
     },
     async _save1(p, patch = {}) {
       const wait = 1150 - (Date.now() - lastWrite); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      if (patch.species !== undefined) assertFounderSpecies(patch.species);
       const xp = Math.min(p.xp + Math.min(60, Math.max(0, patch.xpGain || 0)), 4900);
       const data = { stats: patch.stats || liveStats(p), xp, level: xpToLevel(xp), at: serverTimestamp(), updatedAt: serverTimestamp() };
       for (const k of ['name', 'colors', 'pattern', 'acc', 'species', 'outfit', 'voice', 'bg', 'variant']) if (patch[k] !== undefined) data[k] = patch[k];

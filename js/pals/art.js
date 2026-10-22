@@ -3,6 +3,7 @@ const TAU = Math.PI * 2;
 export const VIBES = { water: { name: 'Water', c: '#5aa8ff' }, star: { name: 'Star', c: '#ffd34d' }, leaf: { name: 'Leaf', c: '#6fd39a' }, flame: { name: 'Flame', c: '#ff8a5c' }, spark: { name: 'Spark', c: '#ffe14d' }, moon: { name: 'Moon', c: '#b9a6ff' } };
 import { drawWear } from './wear.js';
 import { SPECIES , FOUNDER } from './species.js';
+import { FOUNDER_MOTION as FM } from './founder-motion.js';
 export { SPECIES };
 const ALIAS = { twinkbun: 'bunny', nimbo: 'cloudpuff', ember: 'puppy', mossy: 'turtle', prism: 'fox', zap: 'chick', luno: 'owl', petal: 'hamster' };
 export const SPEC = Object.fromEntries(SPECIES.map((s) => [s.id, s])); SPEC.founder = FOUNDER;
@@ -64,13 +65,13 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (R3 && !st.flat) { try { if (R3(c, x, y, size, pal, st)) return; } catch (e) { console.warn('3D Pal draw error:', e); if (++err3 > 30) R3 = null; } }
   else if (!R3 && wait3D && !st.flat) { if (NEED3D) NEED3D(); (LOADING || drawWait)(c, x, y, size); return; }
   const sp = SPEC[pal.species] || SPECIES[0]; const col = pal.colors || {};
-  const B = col.body || sp.body, A = col.accent || sp.acc, E = col.eye || '#24133f';
+  const B = sp.founder ? sp.body : (col.body || sp.body), A = sp.founder ? sp.acc : (col.accent || sp.acc), E = col.eye || '#24133f';
   const stage = stageOf(pal.level || 1); const t = st.t || 0; const face = st.face || 1; const mood = st.mood || {};
   const ex = new Set(sp.extras || []); const kind = sp.body2 || 'blob'; const floaty = ex.has('float');
   const mode = st.mode === 'react' ? (['spin', 'roll'].includes(sp.react) ? 'happy' : 'happy') : st.mode;
   const k = size / 40; c.save(); c.translate(x, y); c.scale(k, k);
   let bob = 0, tilt = 0, sx = 1, sy = 1, leg = 0, earF = 0, tailW = Math.sin(t * 0.1) * 0.2, wing = 0, mouthOpen = 0, cheek = 1, spin = 0;
-  if (mode === 'idle') { bob = Math.sin(t * 0.06) * 0.8; earF = Math.sin(t * 0.05) * 0.06; }
+  if (mode === 'idle') { bob = Math.sin(t * (sp.founder ? FM.idleBobSpeed : 0.06)) * (sp.founder ? 2.4 : 0.8); earF = Math.sin(t * (sp.founder ? FM.gillSpeed : 0.05)) * (sp.founder ? 0.16 : 0.06); }
   if (mode === 'walk') { leg = Math.sin(t * 0.35); bob = -Math.abs(leg) * 1.2; tilt = 0.06 * face; tailW = Math.sin(t * 0.35) * 0.4; earF = leg * 0.1; }
   if (mode === 'hop') { bob = -Math.abs(Math.sin(t * 0.18)) * 9; earF = -0.25; }
   if (mode === 'happy') { tilt = Math.sin(t * 0.4) * 0.22; bob = -Math.abs(Math.sin(t * 0.2)) * 6; tailW = Math.sin(t * 0.9) * 0.6; wing = Math.sin(t * 0.7) * 0.6; earF = Math.sin(t * 0.4) * 0.2; }
@@ -95,17 +96,19 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   // ---------------- rig: joints for arms (shoulder/elbow/hand) and legs (hip/knee/foot)
   const hasLegs = kind === 'blob' && sp.feet !== 'none' && !floaty, legH = hasLegs ? 3.4 : 0;
   const armKind = kind !== 'blob' ? '' : ex.has('wings') ? 'wing' : ex.has('flippers') ? 'flipper' : 'paw';
-  const RG = rigPose(st.mode === 'react' ? 'happy' : st.mode || 'idle', t, st.rig, leg);
+  const founderWave = sp.founder && (mode === 'wave' || (mode === 'idle' && ((t + FM.waveDelay) % FM.waveEvery) < FM.waveLen));
+  const RG = rigPose(founderWave ? 'wave' : (st.mode === 'react' ? 'happy' : st.mode || 'idle'), t, st.rig, leg);
+  if (founderWave && FM.waveArm === 'aL') { const lift = 105 + Math.sin(t * FM.waveSpeed) * 12; RG.sL = lift; RG.eL = -(50 + Math.sin(t * FM.waveSpeed) * 22); RG.sR = 14; RG.eR = 20; }
   c.translate(0, -legH);
   c.lineWidth = 1; c.lineJoin = 'round'; c.lineCap = 'round'; const line = shade(A === '#ffffff' ? B : A, -0.4); c.strokeStyle = line;
   const light = shade(B, 0.5), dark = shade(B, -0.12);
   const P = (fn) => { c.save(); fn(); c.restore(); };
   const fillS = (f) => { c.fillStyle = f; c.fill(); c.stroke(); };
-  const hy = -13.5 - (bodyG - 1) * 6, hr = 9.2; // head centre / radius
+  const hy = -13.5 - (bodyG - 1) * 6, hr = sp.founder ? 10.2 : 9.2; // head centre / radius
   // ---------------- back layer: tail, wings
   const tail = sp.tail;
   P(() => { c.translate(-6 * bodyG, -5); c.rotate(-0.5 + tailW);
-    if (tail === 'axo') { c.beginPath(); c.moveTo(0, -3); c.quadraticCurveTo(-8, -6, -13 - stage * 2, -2); c.quadraticCurveTo(-8, 2, 0, 3); c.closePath(); fillS(dark); }
+    if (tail === 'axo') { const L = sp.founder ? 22 + stage * 3 : 13 + stage * 2; c.beginPath(); c.moveTo(0, -3); c.quadraticCurveTo(-L * 0.55, -7, -L, -2); c.quadraticCurveTo(-L * 0.55, 3, 0, 3); c.closePath(); if (sp.founder) { c.globalAlpha = 0.62; c.fillStyle = '#ffb3d4'; c.fill(); c.globalAlpha = 0.4; c.fillStyle = '#ffd0ea'; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-L * 0.5, -9, -L - 2, -1); c.quadraticCurveTo(-L * 0.45, 8, 0, 0); c.fill(); c.globalAlpha = 1; c.stroke(); } else fillS(dark); }
     if (tail === 'wag' || tail === 'thin') { c.strokeStyle = tail === 'wag' ? B : dark; c.lineWidth = tail === 'wag' ? 3 : 2; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-6, -1, -7, -8 - stage); c.stroke(); c.lineWidth = 1; }
     if (tail === 'tuft') { c.strokeStyle = dark; c.lineWidth = 1.6; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-6, 1, -8, -6); c.stroke(); c.fillStyle = A; ell(c, -8, -7, 2.2, 2.6); c.fill(); }
     if (tail === 'fluffy') { c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-12, -6, -8, -16 - stage * 3); c.quadraticCurveTo(-1, -9, 0, 0); fillS(B); c.fillStyle = A; ell(c, -8, -14 - stage * 3, 2.6, 3); c.fill(); }
@@ -130,7 +133,8 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (feetPos) drawWear(c, 'feet', pal.outfit, { ...WG(), feet: feetPos });
   if (!hasLegs && feet === 'flippers') { for (const s of [-1, 1]) { ell(c, s * 5, -0.8, 3.4, 1.3, s * 0.3); fillS(dark); } }
   if (kind === 'blob') {
-    ell(c, 0, -5.5 * bodyG, 6.8 * bodyG, 5.2 * bodyG); const g = c.createLinearGradient(0, -11, 0, 0); g.addColorStop(0, light); g.addColorStop(1, B); fillS(g);
+    const chub = sp.founder ? 1.16 : 1;
+    ell(c, 0, -5.5 * bodyG, 6.8 * bodyG * chub, 5.2 * bodyG * chub); const g = c.createLinearGradient(0, -11, 0, 0); g.addColorStop(0, light); g.addColorStop(1, B); fillS(g);
     if (ex.has('belly')) { c.fillStyle = sp.id === 'penguin' || sp.id === 'owl' ? '#fbf6ff' : shade(B, 0.55); ell(c, 0.5, -4.6 * bodyG, 4 * bodyG, 3.6 * bodyG); c.fill(); }
     if (ex.has('stripes')) { c.strokeStyle = A; c.lineWidth = 1.3; for (const a of [-4, 0, 4]) { c.beginPath(); c.moveTo(a, -10 * bodyG); c.lineTo(a + 1, -7 * bodyG); c.stroke(); } c.lineWidth = 1; c.strokeStyle = line; }
     if (ex.has('giraffespots')) { c.fillStyle = A; for (const [a, b] of [[-3, -7], [3, -5], [-1, -3], [4, -9]]) { ell(c, a, b * bodyG, 1.5, 1.2); c.fill(); } }
@@ -150,7 +154,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (ears === 'big') earPair((s) => { c.translate(s * 8, hy); c.rotate(s * (Math.sin(t * (R === 'spray' ? 0.6 : 0.08)) * 0.2 + earF)); ell(c, s * 3, 0, 5.5 + stage, 7.5 + stage); fillS(B); ell(c, s * 3, 0.5, 3.6 + stage * 0.6, 5.4 + stage * 0.6); c.fillStyle = A; c.fill(); });
   if (ears === 'ossicones') earPair((s) => { c.strokeStyle = shade(B, -0.3); c.lineWidth = 1.6; c.beginPath(); c.moveTo(s * 2.5, hy - 6); c.lineTo(s * 3, hy - 11 - stage); c.stroke(); c.fillStyle = A; ell(c, s * 3, hy - 11.5 - stage, 1.6, 1.6); c.fill(); c.lineWidth = 1; c.strokeStyle = line; ell(c, s * 8.5, hy - 3, 3, 1.6, s * 0.4); fillS(B); });
   if (ears === 'tuft') { if (sp.id === 'chick') P(() => { c.fillStyle = A; c.beginPath(); c.moveTo(-2, hy - 6); c.lineTo(0, hy - 11 - stage * 2); c.lineTo(1, hy - 8.5); c.lineTo(3, hy - 13 - stage * 2); c.lineTo(3.5, hy - 6); c.closePath(); c.fill(); c.stroke(); }); else earPair((s) => { c.beginPath(); c.moveTo(s * 3.5, hy - 5); c.lineTo(s * 7, hy - 11 - stage); c.lineTo(s * 7.5, hy - 4); c.closePath(); fillS(A); }); }
-  if (ears === 'gills') for (const s of [-1, 1]) for (let i = 0; i < 3; i++) P(() => { c.translate(s * 7.5, hy - 1.5 + i * 2.6); c.rotate((s < 0 ? Math.PI : 0) + s * (-0.75 + i * 0.6) + (Math.sin(t * 0.08 + i) * 0.08 + earF) * s); const L = 7.6 + stage * 1.6; c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(2, -3.4, L * 0.65, -3.2, L, -1.6); c.quadraticCurveTo(L * 0.8, 0, L, 1.4); c.bezierCurveTo(L * 0.65, 3, 2, 3, 0, 0); fillS(A); c.strokeStyle = shade(A, 0.5); c.lineWidth = 0.8; c.beginPath(); c.moveTo(0.5, 0); c.lineTo(L - 1.3, 0); c.stroke(); });
+  if (ears === 'gills') for (const s of [-1, 1]) for (let i = 0; i < 3; i++) P(() => { c.translate(s * 7.5, hy - 1.5 + i * 2.6); c.rotate((s < 0 ? Math.PI : 0) + s * (-0.75 + i * 0.6) + (Math.sin(t * (sp.founder ? FM.gillSpeed : 0.08) + i) * (sp.founder ? 0.2 : 0.08) + earF) * s); const L = (sp.founder ? 10.2 : 7.6) + stage * 1.6; c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(2, -3.4, L * 0.65, -3.2, L, -1.6); c.quadraticCurveTo(L * 0.8, 0, L, 1.4); c.bezierCurveTo(L * 0.65, 3, 2, 3, 0, 0); fillS(A); if (sp.founder) { c.globalAlpha = 0.55; c.fillStyle = '#ddd6fe'; c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(1, -5, L * 0.7, -4.4, L + 1.5, -1); c.quadraticCurveTo(L * 0.7, 0.4, L + 1.2, 2.2); c.bezierCurveTo(L * 0.55, 4.2, 1, 3.2, 0, 0); c.fill(); c.globalAlpha = 1; } c.strokeStyle = shade(A, 0.5); c.lineWidth = 0.8; c.beginPath(); c.moveTo(0.5, 0); c.lineTo(L - 1.3, 0); c.stroke(); });
   if (ex.has('mane')) P(() => { c.fillStyle = A; for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ell(c, Math.cos(a) * (hr + 1), hy + Math.sin(a) * 8.6, 3.4 + stage * 0.5, 3.4 + stage * 0.5); c.fill(); } });
   if (ex.has('wool')) P(() => { c.fillStyle = '#fff'; for (const [a, b] of [[-6, -6], [-2, -8], [2, -8], [6, -6], [0, -9]]) { ell(c, a, hy + b, 3.4, 3); c.fill(); c.stroke(); } });
   // ---------------- head
@@ -173,10 +177,11 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   // ---------------- face
   const fx = 1.2, ey = ex.has('frogeyes') ? hy - 6 : kind === 'star' ? hy + 1.5 : kind === 'cloud' ? -9 : hy - 0.1;
   c.fillStyle = '#ff9fc8'; c.globalAlpha = ex.has('blush2') ? 0.95 : 0.75; ell(c, fx - 6, (ex.has('frogeyes') ? hy : ey) + 2.5, 1.9, 1.1); c.fill(); ell(c, fx + 6, (ex.has('frogeyes') ? hy : ey) + 2.5, 1.9, 1.1); c.fill(); c.globalAlpha = 1;
-  const closed = mode === 'sleep' || (mode === 'happy' && Math.sin(t * 0.4) > 0.6) || (mode === 'idle' && t % 200 < 7) || mode === 'shake' || R === 'roar';
-  const eyeL = fx - 3.6, eyeR = fx + 3.6; const eyeCol = ex.has('eyepatch') ? '#1a1020' : E;
-  if (closed) { c.strokeStyle = ex.has('eyepatch') ? '#fff' : E; c.lineWidth = 1.1; const u = mode === 'happy' || R ? -1.4 : 1; c.beginPath(); c.moveTo(eyeL - 1.5, ey); c.quadraticCurveTo(eyeL, ey + u, eyeL + 1.5, ey); c.moveTo(eyeR - 1.5, ey); c.quadraticCurveTo(eyeR, ey + u, eyeR + 1.5, ey); c.stroke(); }
-  else { c.fillStyle = eyeCol; ell(c, eyeL, ey, 2, 2.3); c.fill(); ell(c, eyeR, ey, 2, 2.3); c.fill(); c.fillStyle = '#fff'; ell(c, eyeL + 0.6, ey - 0.9, 0.75, 0.75); c.fill(); ell(c, eyeR + 0.6, ey - 0.9, 0.75, 0.75); c.fill(); }
+  const closed = mode === 'sleep' || (mode === 'happy' && Math.sin(t * 0.4) > 0.6) || (mode === 'idle' && t % (sp.founder ? FM.blinkEvery : 200) < (sp.founder ? FM.blinkFrames : 7)) || mode === 'shake' || R === 'roar';
+  const eyeL = fx - 3.6, eyeR = fx + 3.6; const eyeCol = sp.founder ? '#07070a' : (ex.has('eyepatch') ? '#1a1020' : E);
+  const exr = sp.founder ? 2.7 : 2, eyr = sp.founder ? 3.15 : 2.3;
+  if (closed) { c.strokeStyle = sp.founder ? '#07070a' : (ex.has('eyepatch') ? '#fff' : E); c.lineWidth = 1.1; const u = mode === 'happy' || R ? -1.4 : 1; c.beginPath(); c.moveTo(eyeL - 1.5, ey); c.quadraticCurveTo(eyeL, ey + u, eyeL + 1.5, ey); c.moveTo(eyeR - 1.5, ey); c.quadraticCurveTo(eyeR, ey + u, eyeR + 1.5, ey); c.stroke(); }
+  else { c.fillStyle = eyeCol; ell(c, eyeL, ey, exr, eyr); c.fill(); ell(c, eyeR, ey, exr, eyr); c.fill(); c.fillStyle = '#fff'; ell(c, eyeL + 0.7, ey - 1, sp.founder ? 0.95 : 0.75, sp.founder ? 0.95 : 0.75); c.fill(); ell(c, eyeR + 0.7, ey - 1, sp.founder ? 0.95 : 0.75, sp.founder ? 0.95 : 0.75); c.fill(); }
   c.strokeStyle = '#24133f'; c.lineWidth = 0.8;
   const my = (ex.has('frogeyes') ? hy + 1 : ey) + 3; const snout = sp.snout;
   if (snout === 'muzzle') { c.fillStyle = shade(B, 0.6); ell(c, fx, my - 0.4, 3.2, 2.3); c.fill(); }
@@ -246,7 +251,8 @@ function drawArms(c, R, { B, line, light, bodyG, sp, ex }) {
     // hand / paw with little fingers (frogs get round finger tips)
     c.fillStyle = B; c.strokeStyle = line; c.lineWidth = 0.8; ell(c, x2, y2, 1.55 * bodyG, 1.45 * bodyG); c.fill(); c.stroke();
     const dx = s * Math.sin(a2), dy = Math.cos(a2);
-    if (sp.id === 'frog') { c.fillStyle = light; for (const q of [-0.6, 0, 0.6]) { ell(c, x2 + (dx * Math.cos(q) - dy * Math.sin(q) * s) * 1.7, y2 + (dy * Math.cos(q) + dx * Math.sin(q) * s) * 1.7, 0.55, 0.55); c.fill(); } }
+    if (sp.founder) { ell(c, x2, y2, 1.9 * bodyG, 1.7 * bodyG); c.fill(); c.stroke(); }
+    else if (sp.id === 'frog') { c.fillStyle = light; for (const q of [-0.6, 0, 0.6]) { ell(c, x2 + (dx * Math.cos(q) - dy * Math.sin(q) * s) * 1.7, y2 + (dy * Math.cos(q) + dx * Math.sin(q) * s) * 1.7, 0.55, 0.55); c.fill(); } }
     else { c.strokeStyle = line; c.lineWidth = 0.45; for (const q of [-0.45, 0, 0.45]) { const ux = dx * Math.cos(q) - dy * Math.sin(q), uy = dy * Math.cos(q) + dx * Math.sin(q); c.beginPath(); c.moveTo(x2 + ux * 0.7, y2 + uy * 0.7); c.lineTo(x2 + ux * 1.45, y2 + uy * 1.45); c.stroke(); } }
   }
   c.lineWidth = 1; c.strokeStyle = line;
