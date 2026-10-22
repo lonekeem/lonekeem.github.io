@@ -41,5 +41,12 @@ ok('park chat still uses kidSafe', rules.includes('kidSafe(pp().say)'));
 ok('tv rules allow a youtube list and not a new home field', rules.includes("r.keys().hasOnly(['k', 'url', 't', 's', 'list'])") && rules.includes('youtube') && rules.includes("hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor', 'cars'])"));
 ok('a youtube url would be blocked by the chat filter', /https?:\/\/|www\./i.test('https://www.youtube.com/watch?v=' + ID) && radioLinkOk('https://www.youtube.com/watch?v=' + ID));
 
+const homes = readFileSync(new URL('../../js/world/homes.js', import.meta.url), 'utf8');
+const keepAt = homes.indexOf('.kh-radio.dock.yt-keep');
+const keep = homes.slice(keepAt, homes.indexOf('.kh-note-btn{', keepAt));
+ok('youtube minimize stays a 2px in-viewport sliver', keep.includes('width:2px!important') && keep.includes('height:2px!important') && keep.includes('opacity:.01!important') && keep.includes('position:fixed!important') && keep.includes('visibility:visible!important') && keep.includes('display:block!important') && !keep.includes('display:none') && !keep.includes('-9999'));
+ok('spotify minimize still parks far off-screen', homes.includes('left:-9999px!important') && homes.includes("'-9999px'"));
+ok('a hidden youtube frame is told to keep playing', homes.includes('onStateChange') && homes.includes('playVideo') && homes.includes('nudgeYt'));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
