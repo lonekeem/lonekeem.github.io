@@ -7,6 +7,7 @@ import {
   doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, increment
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { GENRES, RATINGS, artOf, gradientCss, fmtRuntime, fmtDur } from './works.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 
 const MAX_EPISODES = 300;
 export const epLabel = (x) => `S${x.s} E${x.e}`;
@@ -230,7 +231,7 @@ export function createSeries(ctx) {
         <div class="sbanner-in"><span class="sb-series">${s.ownerId === 'studio' ? 'LONE KEEM STUDIOS ORIGINAL' : 'SERIES'}</span>
         <h1>${esc(s.title)}</h1>
         <p class="ssub">${esc(s.genre)} · ${s.seasons > 1 ? s.seasons + ' seasons · ' : ''}${live.length} episode${live.length === 1 ? '' : 's'}${s.rating !== 'all' ? ` · <span class="wb-r inline">${esc(s.rating)}+</span>` : ''} <span class="wb-ai">AI-made</span></p>
-        <div class="sby">${avatar({ uid: s.ownerId, displayName: s.ownerName, username: s.ownerUsername, color: s.ownerColor }, 'sm')}<a href="#/u/${esc(s.ownerUsername)}">${esc(s.ownerName)}</a>${badge(s.ownerId)} · <span id="s-fn">${Number(s.followerCount) || 0}</span> followers</div>
+        <div class="sby">${avatar({ uid: s.ownerId, displayName: s.ownerName, username: s.ownerUsername, color: s.ownerColor }, 'sm')}<a class="${adminNameClass(s.ownerId)}" href="#/u/${esc(s.ownerUsername)}">${esc(faceName(s.ownerId, s.ownerName))}</a>${badge(s.ownerId)} · <span id="s-fn">${Number(s.followerCount) || 0}</span> followers</div>
         <div class="sacts">${live.length ? `<a class="btn" id="s-play" href="#/post/${esc((cont || live[0]).p)}">${cont ? `▶ Continue ${epLabel(cont)}` : '▶ Play S' + live[0].s + ' E' + live[0].e}</a>` : ''}
           ${canEdit(s) ? `<a class="btn btn-ghost" href="#/series/${esc(s.id)}/edit">Edit series</a><a class="btn btn-ghost" href="#/new/aimovie?series=${esc(s.id)}">✨ Make next episode</a>` : `<button class="btn ${following ? 'btn-ghost' : ''}" id="s-follow" aria-pressed="${following}">${following ? '✓ Following' : '+ Follow'}</button>`}
           ${S.user && !canEdit(s) ? '<button class="btn btn-ghost" id="s-report">Report</button>' : ''}</div></div></section>

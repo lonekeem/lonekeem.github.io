@@ -17,6 +17,7 @@ import { loadDiscover } from './discover.js';
 import { prefsStore as sharedPrefsStore } from './interests.js';
 import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from './autoplay.js';
 import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['music', 'Music'], ['trending', 'Trending']];
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
@@ -180,7 +181,7 @@ export function createWatch(ctx) {
         <div class="vmeta">
           <div class="vcreator">
             ${avatar(p, '', true)}
-            <a class="vname" href="#/u/${esc(p.authorUsername)}">${esc(p.authorName)}${badge(p.authorId)}</a>
+            <a class="vname${adminNameClass(p.authorId) ? ' ' + adminNameClass(p.authorId) : ''}" href="#/u/${esc(p.authorUsername)}">${esc(faceName(p.authorId, p.authorName))}</a>${badge(p.authorId)}
             ${mine ? '' : `<button class="vfollow ${following ? 'on' : ''}" data-a="follow" data-uid="${esc(p.authorId)}" aria-pressed="${following}">${following ? 'Following' : 'Follow'}</button>`}
           </div>
           ${p.text ? `<p class="vcaption" data-a="more">${linkify(esc(p.text))}</p>` : ''}

@@ -12,6 +12,7 @@ import { walletState } from './wallet-chip.js';
 import { fxOn, setFx } from './polish.js';
 import { renderDriveSettings, linkAccount } from './world/drivecfg.js';
 import { teamShown, setTeamShown } from './helper/team.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 
 const SHARE_URL = 'https://lonekeem.github.io/app.html';
 export const APP_VERSION = '2026.10.22';
@@ -147,7 +148,7 @@ function html(ctx) {
   const joy = loadSettings();
   const account = signed ? `
     <div class="set-me">${avatar({ ...S.profile, uid: S.user.uid }, '', false)}
-      <div class="who"><b>${esc(S.profile.displayName)}</b><div class="muted small">@${esc(S.profile.username)}</div><div class="muted small">${esc(S.user.email || '')}</div></div></div>
+      <div class="who"><b class="${adminNameClass(S.user.uid)}">${esc(faceName(S.user.uid, S.profile.displayName))}</b><div class="muted small">@${esc(S.profile.username)}</div><div class="muted small">${esc(S.user.email || '')}</div></div></div>
     <div class="set-links">
       <a class="set-link" href="#/settings/account">Edit profile, username and avatar<span class="go" aria-hidden="true">›</span></a>
       <a class="set-link" href="#/pals">Your Pal<span class="go" aria-hidden="true">›</span></a>

@@ -8,6 +8,7 @@ import { blockedQuery, BLOCKED_MSG, matchScore, queryTerms, rankItems, groupOf, 
 import { learnSearch, learnTap } from './interests.js';
 import { loadDiscover } from './discover.js';
 import { ytTile } from './music.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 import { YOUTUBE } from './media-config.js';
 
 const RECENT_KEY = 'lks-recent-searches';
@@ -166,7 +167,7 @@ export function createSearch(ctx) {
   }
   const userRow = (u) => `<div class="suser">
       <a class="suser-main" href="#/u/${esc(u.username)}" data-save>${avatar(u, '', false)}
-        <span class="meta"><span class="nm"><b>${esc(u.displayName)}</b>${badge(u.uid)}</span><span class="muted small">@${esc(u.username)} · <span data-fc="${esc(u.uid)}">${followerCounts.has(u.uid) ? fmtFollowers(followerCounts.get(u.uid)) : '– followers'}</span></span></span></a>
+        <span class="meta"><span class="nm"><b class="${adminNameClass(u.uid)}">${esc(faceName(u.uid, u.displayName))}</b>${badge(u.uid)}</span><span class="muted small">@${esc(u.username)} · <span data-fc="${esc(u.uid)}">${followerCounts.has(u.uid) ? fmtFollowers(followerCounts.get(u.uid)) : '– followers'}</span></span></span></a>
       ${followBtn(u)}</div>`;
   const fmtFollowers = (n) => `${fmtCount(n)} follower${n === 1 ? '' : 's'}`;
   const fmtCount = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n);
@@ -207,7 +208,7 @@ export function createSearch(ctx) {
     if (stale(token)) return;
     $('#ex-tags').innerHTML = tagChips(tags);
     $('#ex-people').innerHTML = people.length ? people.map((u) => `<div class="pcard">
-        <a href="#/u/${esc(u.username)}">${avatar(u, 'lg', false)}<b>${esc(u.displayName)}${badge(u.uid)}</b><span class="muted small">@${esc(u.username)}</span></a>
+        <a href="#/u/${esc(u.username)}">${avatar(u, 'lg', false)}<b class="${adminNameClass(u.uid)}">${esc(faceName(u.uid, u.displayName))}${badge(u.uid)}</b><span class="muted small">@${esc(u.username)}</span></a>
         ${followBtn(u)}</div>`).join('') : '<p class="muted small">No creators yet.</p>';
     wireFollow(slot);
   }

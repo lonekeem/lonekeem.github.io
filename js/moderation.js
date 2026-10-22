@@ -8,6 +8,8 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 import { markUnder13, undoUnder13 } from './safety.js';
+import { STUDIO_UID } from './firebase-init.js';
+import { isAdminUid, ownerBadgeHtml } from './kemy-name.js';
 const DAY = 86400000;
 const FOREVER = () => Timestamp.fromMillis(Date.UTC(9999, 0, 1));
 export const TEMPLATES = {
@@ -47,7 +49,7 @@ export function createModeration(ctx) {
   const iAmMod = () => !!S.user && (isAdmin() || S.mods.has(S.user.uid));
   const isModUid = (uid) => S.mods.has(uid);
   const aiTag = (uid) => (uid && S.modsAI.has(uid)) ? '<span class="ai-tag" title="This moderator is an AI helper, not a person">🤖 AI Helper</span>' : '';
-  const badge = (uid) => (uid && S.mods.has(uid)) ? '<span class="badge mod-badge" data-modbadge role="button" tabindex="0" title="Kemy Moderator" aria-label="Kemy Moderator">✓</span>' + aiTag(uid) : '';
+  const badge = (uid) => (uid === STUDIO_UID || isAdminUid(uid)) ? ownerBadgeHtml() : ((uid && S.mods.has(uid)) ? '<span class="badge mod-badge" data-modbadge role="button" tabindex="0" title="Kemy Moderator" aria-label="Kemy Moderator">✓</span>' + aiTag(uid) : '');
   const isAIme = () => !!S.user && S.modsAI.has(S.user.uid) && !isAdmin();
   window.kemyModBadge = badge; window.kemyIsMod = isModUid;
   document.addEventListener('click', (e) => { const b = e.target.closest('[data-modbadge]'); if (!b) return; e.preventDefault(); e.stopPropagation(); toast('✓ Kemy Moderator · helps keep Kemy safe and kind'); }, true);

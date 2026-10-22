@@ -6,6 +6,7 @@
 // Seen state: per viewer in localStorage (instant ring colour) + the viewers subcollection.
 import { LIMITS } from './media-config.js';
 import { ICONS } from './icons.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 
 const IC = {
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
@@ -62,11 +63,11 @@ export function createStories(ctx) {
   // ------------------------------------------------------------ rings row (Posts feed)
   const ringCls = (g) => (!g ? 'none' : groupSeen(g) ? 'seen' : 'unseen');
   function bubble(u, uid, g, { own = false } = {}) {
-    const label = own ? 'Your story' : (u.displayName || u.username || '');
+    const label = own ? 'Your story' : faceName(uid, u.displayName || u.username || '');
     return `<div class="sbub" data-uid="${esc(uid)}">
       <button class="sring ${ringCls(g)}" data-open="${esc(uid)}" aria-label="${esc(own ? (g ? 'View your story' : 'Add to your story') : `View ${label}’s story`)}">${avatar({ ...u, uid }, 'story', false)}</button>
       ${own ? `<button class="sadd" data-add aria-label="Add to your story">${IC.plus}</button>` : ''}
-      <span class="sname">${esc(label)}</span></div>`;
+      <span class="sname${adminNameClass(uid) ? ' ' + adminNameClass(uid) : ''}">${esc(label)}</span></div>`;
   }
   async function renderRow(slot, token, stale) {
     if (!slot) return;
@@ -179,7 +180,7 @@ export function createStories(ctx) {
       paintBars();
       const u = g.user;
       $('sv-who').href = `#/u/${encodeURIComponent(u.username || '')}`;
-      $('sv-who').innerHTML = `${avatar({ ...u, uid: g.uid }, 'sm', false)}<b>${esc(u.displayName || '')}</b>${badge(g.uid)}<span>${esc(timeAgo(st.createdAt))}</span>`;
+      $('sv-who').innerHTML = `${avatar({ ...u, uid: g.uid }, 'sm', false)}<b class="${adminNameClass(g.uid)}">${esc(faceName(g.uid, u.displayName || ''))}</b>${badge(g.uid)}<span>${esc(timeAgo(st.createdAt))}</span>`;
       cap.textContent = st.caption || ''; cap.hidden = !st.caption;
       $('sv-more').hidden = !owner();
       const isVid = st.mediaType === 'video';

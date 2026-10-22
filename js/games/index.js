@@ -1,6 +1,8 @@
 // Lone Keem Studios Games: hub, routing and the two-player board games (Star Drop, KL Grid,
 // Checkers) online and against the computer. Trivia and Star Cards live in trivia.js / starcards.js.
 import { recordAndShow } from '../leaderboard.js';
+import { faceName, adminNameClass, isAdminUid, ownerBadgeHtml } from '../kemy-name.js';
+import { STUDIO_UID } from '../firebase-init.js';
 import { ENGINES } from './boards.js';
 import { createNet, BOARD_TYPES, EMOTES, TURN_SECONDS, tsMs, isBot } from './net.js';
 import { sfx } from './sfx.js';
@@ -136,7 +138,7 @@ export function createGames(ctx) {
       try {
         const rows = await net.leaderboard(type);
         if (stale(token)) return;
-        box.innerHTML = rows.length ? `<ol class="g-lb">${rows.map((r, i) => `<li class="${r.uid === myUid() ? 'me' : ''}"><span class="g-rank">${i < 3 ? STAR('r' + i) : ''}<b>${i + 1}</b></span>${avatar({ uid: r.uid, displayName: r.name, username: r.uname, color: r.color }, 'sm', true)}<a href="#/u/${esc(r.uname)}" class="g-lb-n">${esc(r.name)}<small class="muted">@${esc(r.uname)}</small></a><span class="g-lb-s"><b>${r[type + '_w'] || 0}</b> W · ${r[type + '_l'] || 0} L</span></li>`).join('')}</ol>`
+        box.innerHTML = rows.length ? `<ol class="g-lb">${rows.map((r, i) => `<li class="${r.uid === myUid() ? 'me' : ''}"><span class="g-rank">${i < 3 ? STAR('r' + i) : ''}<b>${i + 1}</b></span>${avatar({ uid: r.uid, displayName: r.name, username: r.uname, color: r.color }, 'sm', true)}<a href="#/u/${esc(r.uname)}" class="g-lb-n${adminNameClass(r.uid) ? ' ' + adminNameClass(r.uid) : ''}">${esc(faceName(r.uid, r.name))}${r.uid === STUDIO_UID || isAdminUid(r.uid) ? ownerBadgeHtml() : (window.kemyModBadge ? window.kemyModBadge(r.uid) : '')}<small class="muted">@${esc(r.uname)}</small></a><span class="g-lb-s"><b>${r[type + '_w'] || 0}</b> W · ${r[type + '_l'] || 0} L</span></li>`).join('')}</ol>`
           : '<div class="empty">No online wins yet. Be the first on the board!</div>';
       } catch (e) { box.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
     };
@@ -224,7 +226,7 @@ export function createGames(ctx) {
     paintHow();
     net.leaderboard(type).then((rows) => {
       const box = $('#g-lb'); if (!box) return;
-      box.innerHTML = rows.length ? `<ol class="g-lb">${rows.map((r, i) => `<li class="${r.uid === myUid() ? 'me' : ''}"><span class="g-rank">${i < 3 ? STAR('r' + i) : ''}<b>${i + 1}</b></span>${avatar({ uid: r.uid, displayName: r.name, username: r.uname, color: r.color }, 'sm', true)}<a href="#/u/${esc(r.uname)}" class="g-lb-n">${esc(r.name)}<small class="muted">@${esc(r.uname)}</small></a><span class="g-lb-s"><b>${r[type + '_w'] || 0}</b> W · ${r[type + '_l'] || 0} L</span></li>`).join('')}</ol>` : '<div class="empty">No online wins yet.</div>';
+      box.innerHTML = rows.length ? `<ol class="g-lb">${rows.map((r, i) => `<li class="${r.uid === myUid() ? 'me' : ''}"><span class="g-rank">${i < 3 ? STAR('r' + i) : ''}<b>${i + 1}</b></span>${avatar({ uid: r.uid, displayName: r.name, username: r.uname, color: r.color }, 'sm', true)}<a href="#/u/${esc(r.uname)}" class="g-lb-n${adminNameClass(r.uid) ? ' ' + adminNameClass(r.uid) : ''}">${esc(faceName(r.uid, r.name))}${r.uid === STUDIO_UID || isAdminUid(r.uid) ? ownerBadgeHtml() : (window.kemyModBadge ? window.kemyModBadge(r.uid) : '')}<small class="muted">@${esc(r.uname)}</small></a><span class="g-lb-s"><b>${r[type + '_w'] || 0}</b> W · ${r[type + '_l'] || 0} L</span></li>`).join('')}</ol>` : '<div class="empty">No online wins yet.</div>';
     }).catch((e) => { const box = $('#g-lb'); if (box) box.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; });
     lobbyEmotes();
   }

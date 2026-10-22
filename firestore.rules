@@ -37,6 +37,16 @@ service cloud.firestore {
     function groomFree(t) {
       return t is string && !t.lower().matches('(?s).*(how old are you|how old r u|your age|\\basl\\b|a/s/l|where do you live|where you live|your address|what school|which school|your school|are you alone|home alone|send pic|send a pic|send photo|dont tell|don.t tell|keep this secret).*');
     }
+    // The display name "Kemy" (and lookalikes: Kemy_, K3my, k.e.m.y) belongs to the admin.
+    // Same pattern as js/kemy-name.js reservedKemy. Studio edits run as the admin.
+    function reservedKemy(n) {
+      return n is string && n.lower().matches('^[^a-z]*k[^a-z]*[e3][^a-z]*m[^a-z]*y[^a-z]*$');
+    }
+    function namesOpen(d) {
+      return isAdmin()
+        || ((!('displayName' in d) || !reservedKemy(d.displayName))
+            && (!('username' in d) || !reservedKemy(d.username)));
+    }
     // Under-13 display names are picked from this list. Same words as js/safe-names.js.
     function safeDisplay(t) {
       return t.matches('^(Sunny|Happy|Brave|Kind|Calm|Swift|Cosy|Gold|Lucky|Bright|Gentle|Merry|Soft|Tiny|Cool) (Panda|Puppy|Fox|Otter|Bunny|Koala|Tiger|Dolphin|Owl|Star|Bear|Duck|Frog|Lion|Wolf)$');
@@ -110,6 +120,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn()
         && name.matches('^[a-z0-9_.]{3,20}$')
+        && (isAdmin() || !reservedKemy(name))
         && request.resource.data.keys().hasOnly(['uid'])
         && actingAs(request.resource.data.uid)
         && getAfter(userPath(request.resource.data.uid)).data.username == name;
@@ -129,6 +140,7 @@ service cloud.firestore {
         && validBirth(d)
         && validUserSearch(d)
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
+        && namesOpen(d)
         && cleanStr(d.displayName, 1, 50)
         && kidSafe(d.displayName)
         && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
@@ -252,6 +264,7 @@ service cloud.firestore {
       }
       function memberShape(d) {
         return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive'])
+          && namesOpen(d)
           && cleanStr(d.displayName, 1, 50)
           && kidSafe(d.displayName)
           && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
