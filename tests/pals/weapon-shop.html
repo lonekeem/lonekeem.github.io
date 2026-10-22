@@ -1,0 +1,17 @@
+<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Weapon shop harness</title>
+<body style="margin:0;background:#140c28"><script type="module">
+// Offline Weapon Shop. ?coins=850&owned=sling,foam:2&open=star&inv=z_foam
+import { openWeaponShop } from '../../js/pals/zombie-shop.js';
+import { saveProgress, WEAPONS } from '../../js/pals/zombie-weapons.js';
+const q = new URLSearchParams(location.search);
+const uid = 'harness';
+const owned = { goo: { lvl: 1 }, pop: { lvl: 1 }, hammer: { lvl: 1 } };
+for (const bit of (q.get('owned') || 'sling,foam:2,zip').split(',').filter(Boolean)) {
+  const [id, lvl] = bit.split(':');
+  if (WEAPONS[id]) owned[id] = { lvl: Math.max(1, Math.min(5, Number(lvl) || 1)) };
+}
+const coins = Math.max(0, Math.min(999999, Number(q.get('coins') ?? 850)));
+saveProgress(uid, { v: 1, coins, owned, loadout: ['goo', 'sling', 'foam'].filter((id) => owned[id] || WEAPONS[id]?.free), equipped: 'sling' });
+const inv = Object.fromEntries((q.get('inv') || '').split(',').filter(Boolean).map((k) => [k, 1]));
+window.__shop = openWeaponShop({ uid, inv, focus: q.get('open') || '' });
+</script>
