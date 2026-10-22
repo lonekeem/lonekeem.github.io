@@ -1,7 +1,8 @@
 // Notification sound names. The files are made by tools/make-notify-sounds.py.
 // Written by Lone Keem.
-export const DEFAULT_CHIME = 'soft-breeze';
+export const DEFAULT_CHIME = 'morning-dew';
 export const CHIME_SOUNDS = [
+  { id: 'morning-dew', name: 'Morning Dew', file: 'sounds/notify/morning-dew.ogg' },
   { id: 'soft-breeze', name: 'Soft Breeze', file: 'sounds/notify/soft-breeze.ogg' },
   { id: 'kalimba-hello', name: 'Kalimba Hello', file: 'sounds/notify/kalimba-hello.ogg' },
   { id: 'kalimba-sparkle', name: 'Kalimba Sparkle', file: 'sounds/notify/kalimba-sparkle.ogg' },

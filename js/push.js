@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'https://www.gst
 import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-messaging.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import { deviceId, deviceLabel } from './devices.js';
-import { chimeOn, setChimeOn, playChime, chimeSound, setChimeSound, previewSound, CHIME_SOUNDS, validChime } from './chime.js';
+import { chimeOn, setChimeOn, playChime, chimeSound, setChimeSound, previewSound, CHIME_SOUNDS, validChime, DEFAULT_CHIME } from './chime.js';
 
 const TYPES = [
   ['invite', 'Friend invites and game challenges', 'When someone follows you or asks you to play.'],
@@ -331,10 +331,16 @@ function soundPicker() {
     input.name = 'chime-sound';
     input.value = s.id;
     input.checked = s.id === current;
-    input.setAttribute('aria-label', s.name);
+    input.setAttribute('aria-label', s.id === DEFAULT_CHIME ? s.name + ', Default' : s.name);
     input.onchange = () => { if (input.checked) chooseSound(s.id); };
     const name = document.createElement('span');
     name.textContent = s.name;
+    if (s.id === DEFAULT_CHIME) {
+      const tag = document.createElement('em');
+      tag.className = 'chime-default';
+      tag.textContent = 'Default';
+      name.append(document.createTextNode(' '), tag);
+    }
     lab.append(input, name);
     row.append(lab);
     if (s.file) {

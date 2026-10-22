@@ -183,6 +183,50 @@ def build(name, mono, peak=PEAK):
     write_ogg(name, finish(mono, peak))
 
 
+# Morning Dew uses the original Soft Breeze echo: feedback-free taps, run twice, then half wet.
+DEW_TAPS = (
+    (0.029, 0.4), (0.043, 0.35), (0.067, 0.3), (0.097, 0.25),
+    (0.139, 0.2), (0.191, 0.15), (0.257, 0.1),
+)
+
+
+def multitap(x, rate):
+    wet = np.zeros_like(x)
+    for sec, gain in DEW_TAPS:
+        delay = int(round(sec * rate))
+        if 0 < delay < len(x):
+            wet[delay:] += gain * x[:-delay]
+    return wet
+
+
+def morning_dew_stereo():
+    # G5 (784 Hz), then C6 (1047 Hz) at 0.35 s. About 2.6 s, peak 0.5, 0.4 s fade.
+    rate = SR
+    total = int(round(2.6 * rate))
+    note_n = int(round(1.8 * rate))
+    dry = np.zeros(total, dtype=np.float64)
+    t = np.arange(note_n) / rate
+    att = np.clip(t / 0.03, 0.0, 1.0)
+    env = att * np.exp(-1.8 * t)
+    for freq, at in ((784.0, 0.0), (1047.0, 0.35)):
+        voice = (np.sin(2 * np.pi * freq * t)
+                 + 0.15 * np.sin(2 * np.pi * (2 * freq) * t)
+                 + np.sin(2 * np.pi * (freq + 1.2) * t)
+                 + 0.15 * np.sin(2 * np.pi * (2 * freq + 1.2) * t))
+        sig = voice * env
+        i0 = int(round(at * rate))
+        dry[i0:i0 + len(sig)] += sig[:total - i0]
+    wet = multitap(multitap(dry, rate), rate)
+    mix = 0.5 * dry + 0.5 * wet
+    top = np.max(np.abs(mix))
+    if top > 0:
+        mix *= 0.5 / top
+    fade_n = int(round(0.4 * rate))
+    mix[-fade_n:] *= np.linspace(1.0, 0.0, fade_n, endpoint=True)
+    stereo = np.stack([mix, mix], axis=1).astype(np.float32)
+    return np.clip(stereo, -1.0, 1.0)
+
+
 def main():
     # Gentle one-pole cutoff for the sounds marked lowpassed.
     LO = 1400.0
@@ -275,6 +319,7 @@ def main():
 
     ding = fm(midi(88), 1, 0.6, 1.5, 3) + 0.45 * pad(midi(76))
     build('airy-ding', ding)
+    write_ogg('morning-dew', morning_dew_stereo())
 
 
 if __name__ == '__main__':

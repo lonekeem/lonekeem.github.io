@@ -6,7 +6,7 @@ import { CHIME_SOUNDS, DEFAULT_CHIME, chimeFile, validChime } from './notify-sou
 const MUTE_KEY = 'kemy-chime-mute';
 const SOUND_KEY = 'kemy-chime-sound';
 const BADGE_KEY = 'kemy-chime-badge';
-const GAP_MS = 2400;
+const GAP_MS = 2600;
 
 export { CHIME_SOUNDS, DEFAULT_CHIME, validChime };
 
