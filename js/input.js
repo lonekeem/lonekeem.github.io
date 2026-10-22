@@ -240,9 +240,18 @@ function typing(t) {
   return !/^(range|checkbox|radio|color|file|button|submit)$/.test(type);
 }
 
+function isShown(el) {
+  if (!el || el.hidden || (el.closest && el.closest('[hidden]'))) return false;
+  const st = getComputedStyle(el);
+  return st.display !== 'none' && st.visibility !== 'hidden';
+}
 function overlayEl() {
   if (typeof document === 'undefined') return null;
-  return document.querySelector('#modal-root .modal-backdrop, .kc-set, .kc-tut, .ks-panel, .zw-ov, .ew-ov, .kd-plate, .zg-pause, .set-remap.capturing');
+  const sel = '#modal-root .modal-backdrop, .kc-set, .kc-tut, .ks-panel, .zw-ov, .ew-ov, .kd-plate, .zg-pause, .set-remap.capturing';
+  const hit = [...document.querySelectorAll(sel)].find(isShown);
+  if (hit) return hit;
+  const house = document.querySelector('.kh-radio.min:not(.dock)');
+  return isShown(house) ? house : null;
 }
 
 function inPlay() {
@@ -322,6 +331,8 @@ function closeTop() {
   if (done) { done.click(); return true; }
   const modal = document.querySelector('#modal-root [data-close]');
   if (modal) { modal.click(); return true; }
+  const house = document.querySelector('.kh-radio.min:not(.dock) [data-min]');
+  if (house) { house.click(); return true; }
   return false;
 }
 
@@ -371,6 +382,7 @@ function onKeyDown(e) {
     return;
   }
   if (typing(e.target)) return;
+  if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.closest && e.target.closest('.kh-note-btn, .kh-radio')) return;
   const k = normKey(e);
   if (!k) return;
   noteDevice('keyboard');
@@ -379,6 +391,11 @@ function onKeyDown(e) {
   if (k === 'Escape' || (play && boundKey(k, 'menu'))) {
     if (closeTop()) { e.preventDefault(); return; }
     if (play) { world.menu && world.menu(); e.preventDefault(); return; }
+  }
+  if (k === 'Tab' && !e.shiftKey) {
+    const note = document.querySelector('.kh-note-btn:not([hidden])');
+    const modal = [...document.querySelectorAll('#modal-root .modal-backdrop, .kc-set, .kc-tut, .ks-panel')].some(isShown);
+    if (note && !modal && document.activeElement !== note) { note.focus(); e.preventDefault(); return; }
   }
   if (!play && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') && menuMode()) {
     if (e.target && e.target.type === 'range') return;
@@ -505,7 +522,9 @@ export function tick() {
     return frame;
   }
   if (pressed.confirm) {
-    if (menuMode()) activateFocus();
+    const ae = document.activeElement;
+    if (ae && ae.closest && ae.closest('.kh-note-btn, .kh-radio')) ae.click();
+    else if (menuMode()) activateFocus();
     else if (play) {
       if (!(world.interact && world.interact())) world.jump && world.jump();
     }
@@ -530,7 +549,12 @@ export function tick() {
     }
   }
   if (pressed.map && play) world.map && world.map();
-  if (pressed.tabPrev && !(play && world.driving && world.driving())) switchTab(-1);
+  if (pressed.tabPrev && !(play && world.driving && world.driving())) {
+    const note = document.querySelector('.kh-note-btn:not([hidden])');
+    const modal = [...document.querySelectorAll('#modal-root .modal-backdrop, .kc-set, .kc-tut, .ks-panel')].some(isShown);
+    if (note && !modal && document.activeElement !== note) note.focus();
+    else switchTab(-1);
+  }
   if (pressed.tabNext) switchTab(1);
   if (menuMode() && !play) {
     if (pressed.up) moveFocus('ArrowUp');
