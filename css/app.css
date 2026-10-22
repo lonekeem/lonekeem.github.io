@@ -1785,6 +1785,10 @@ input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible { o
 .nm { max-width: 640px; margin: 0 auto; }
 .nm-back { display: inline-block; margin-bottom: 8px; color: #e9d5ff; font-weight: 700; text-decoration: none; min-height: 44px; line-height: 44px; }
 .nm-lead { margin-top: 0; }
+.nm-total { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+.nm-total b { font-size: 2.75rem; line-height: 1; color: #ffd34d; font-weight: 800; }
+.nm-total span { color: #e9d5ff; font-weight: 700; }
+.nm-count-note { margin: 0 0 10px; }
 .nm-push { margin: 8px 0 12px; color: var(--text); }
 .nm-search { display: block; font-weight: 700; margin-top: 4px; }
 #nm-q { width: 100%; margin: 4px 0 8px; background: #07050c; border: 1px solid #8a2be2; border-radius: 12px; padding: 12px 14px; font-size: 16px; color: var(--text); }

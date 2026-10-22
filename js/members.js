@@ -1,4 +1,5 @@
 // New Members: an admin-only list of who joined Kemy, plus one member's detail.
+// The totals at the top are Firestore count() queries. Online is Pal Park presence.
 // The directory is members/{uid}. Public profiles stay on users/{uid}. Emails are not on the
 // public profile, and this page hides them until the admin taps Show email.
 // Detail reads that already exist for the app (wallet, games, homes, follows, Pals) and the
@@ -72,6 +73,86 @@ function millis(ts) {
   return ts && typeof ts.toMillis === 'function' ? ts.toMillis() : 0;
 }
 
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const comma = (n) => num(n).toLocaleString('en-US');
+
+// Sunday 12:00am, the 1st, and today, as instants in America/New_York.
+const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+function nyParts(date) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  });
+  const o = {};
+  for (const p of fmt.formatToParts(date)) if (p.type !== 'literal') o[p.type] = p.value;
+  return { y: Number(o.year), m: Number(o.month), d: Number(o.day), h: Number(o.hour), min: Number(o.minute), s: Number(o.second), weekday: o.weekday };
+}
+function shiftYMD(y, m, d, days) {
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+function nyMidnight(y, m, d) {
+  const utcWall = Date.UTC(y, m - 1, d, 0, 0, 0);
+  const seen = nyParts(new Date(utcWall));
+  const seenWall = Date.UTC(seen.y, seen.m - 1, seen.d, seen.h, seen.min, seen.s);
+  return new Date(utcWall - (seenWall - utcWall));
+}
+function periodStarts(now = new Date()) {
+  const p = nyParts(now);
+  const sun = shiftYMD(p.y, p.m, p.d, -(DOW[p.weekday] || 0));
+  return { today: nyMidnight(p.y, p.m, p.d), week: nyMidnight(sun.y, sun.m, sun.d), month: nyMidnight(p.y, p.m, 1) };
+}
+
+const PARK_ROOMS = 20;
+const ONLINE_MS = 60000;
+
+async function countMembersFrom(start) {
+  const q = start
+    ? query(collection(db, 'members'), where('createdAt', '>=', start))
+    : query(collection(db, 'members'));
+  const snap = await getCountFromServer(q);
+  return snap.data().count || 0;
+}
+
+async function countOnline() {
+  const since = new Date(Date.now() - ONLINE_MS);
+  const parts = await Promise.all(Array.from({ length: PARK_ROOMS }, (_, i) =>
+    getCountFromServer(query(collection(db, 'parkRooms', 'r' + (i + 1), 'p'), where('at', '>', since))).then((s) => s.data().count || 0)
+  ));
+  return parts.reduce((a, b) => a + b, 0);
+}
+
+function countCell(value, label) {
+  const shown = value == null ? '—' : comma(value);
+  return `<div class="nm-stat"><b>${esc(shown)}</b><span>${esc(label)}</span></div>`;
+}
+
+async function paintCounts(box, stale) {
+  if (!box) return;
+  const { today, week, month } = periodStarts();
+  const settled = await Promise.all([
+    countMembersFrom(null).then((n) => n, () => null),
+    countMembersFrom(today).then((n) => n, () => null),
+    countMembersFrom(week).then((n) => n, () => null),
+    countMembersFrom(month).then((n) => n, () => null),
+    countOnline().then((n) => n, () => null)
+  ]);
+  if (stale && stale()) return;
+  const [total, todayN, weekN, monthN, online] = settled;
+  if (total == null) {
+    box.innerHTML = '<p class="muted small nm-count-note">Couldn’t count members.</p>';
+    return;
+  }
+  box.innerHTML = `<p class="nm-total"><b>${esc(comma(total))}</b><span>members</span></p>
+    <div class="nm-stats">
+      ${countCell(todayN, 'Joined today')}
+      ${countCell(weekN, 'This week')}
+      ${countCell(monthN, 'This month')}
+      ${countCell(online, 'Online now')}
+    </div>
+    <p class="muted small nm-count-note">Today, this week, and this month start at midnight in New York. Online is Pal Park in the last minute.</p>`;
+}
+
 let fns = null;
 function functionsApp() {
   if (!fns) {
@@ -91,18 +172,20 @@ export async function memberCountSince(seenAt) {
 
 export async function paintAdminBadge(el) {
   if (!el || !isAdmin()) return;
+  const title = document.getElementById('nm-card-title');
   try {
     const seen = await getDoc(doc(db, 'users', auth.currentUser.uid, 'prefs', 'members'));
-    const n = await memberCountSince(seen.exists() ? seen.get('seenAt') : null);
+    const [total, n] = await Promise.all([
+      memberCountSince(null),
+      memberCountSince(seen.exists() ? seen.get('seenAt') : null)
+    ]);
+    if (title) title.textContent = `Members ${comma(total)} · ${comma(n)} new`;
     el.textContent = n > 99 ? '99+' : String(n);
     el.hidden = n < 1;
   } catch {
     el.hidden = true;
   }
 }
-
-const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-const comma = (n) => num(n).toLocaleString('en-US');
 
 function onKemyStreet(plot) {
   const m = /^h(\d{2,3})$/.exec(String(plot || ''));
@@ -265,6 +348,7 @@ export async function page(main, { stale, toast, mod } = {}) {
     <div id="nm-shell">
     <a class="nm-back" href="#/admin">← Admin</a>
     <h1 class="page-title">New Members</h1>
+    <div id="nm-counts" aria-live="polite"><p class="nm-total"><b>…</b><span>members</span></p></div>
     <p class="muted small nm-lead">Newest first. Tap a member for their Pal, games, and home. Times are New York time. Emails stay hidden until you tap.</p>
     <label class="check nm-push"><input type="checkbox" id="nm-push"> <span>Ping me when someone new joins<br><span class="muted small">Off during quiet hours (9pm–8am). Turn on notifications in Settings so your phone can get it. When Kemy is closed, the phone plays its own sound.</span></span></label>
     <label class="nm-search" for="nm-q">Search</label>
@@ -514,7 +598,7 @@ export async function page(main, { stale, toast, mod } = {}) {
     if (s.exists() && s.get('joinPush') === true) push.checked = true;
   }).catch(() => {});
 
-  setDoc(doc(db, 'users', uid, 'prefs', 'members'), { seenAt: serverTimestamp() }).catch(() => {});
+  const markSeen = setDoc(doc(db, 'users', uid, 'prefs', 'members'), { seenAt: serverTimestamp() }).catch(() => {});
 
   const fill = main.querySelector('#nm-fill');
   fill.onclick = async () => {
@@ -534,5 +618,5 @@ export async function page(main, { stale, toast, mod } = {}) {
     fill.disabled = false;
   };
 
-  await more(true);
+  await Promise.all([more(true), paintCounts(main.querySelector('#nm-counts'), stale), markSeen]);
 }

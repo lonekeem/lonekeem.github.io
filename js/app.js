@@ -1477,7 +1477,7 @@ async function pageAdmin(token) {
   main.innerHTML = `<h1 class="page-title">🛡️ Admin</h1>
     <p class="muted small">Signed in as ${esc(S.user.email)}. Only you can see this page.</p>
     <a class="card pad adm-tool nm-card" href="#/members" id="nm-open">
-      <span class="nm-card-row"><span><b>New Members</b><span class="muted small">Everyone who joined, newest first.</span></span><span class="nm-badge" id="nm-badge" hidden>0</span></span>
+      <span class="nm-card-row"><span><b id="nm-card-title">Members</b><span class="muted small">Everyone who joined, newest first.</span></span><span class="nm-badge" id="nm-badge" hidden>0</span></span>
     </a>
     ${devices.noticeHtml()}
     <div class="card pad adm-tool" style="margin-bottom:14px;border:2px solid var(--blue)"><b style="font-size:1.15rem">🛍️ Publish shop prices</b>
