@@ -1,11 +1,12 @@
-// Kemy Helper's team: local pals in matching yellow, not networked. The leader
-// walks Pal Park and Kemy Street. The crew walks, drives, or sits at the Game Hub.
-// Only nearby pals are drawn. Written by Lone Keem.
+// Kemy Helper's team: local pals in matching yellow, not networked. They wander
+// like players: look around, wave, sit, browse, and some park the car and hop out.
+// The yellow outfit and Helper tag stay on. Only nearby pals are drawn.
+// Written by Lone Keem.
 import { poseCar } from '../world/cars.js';
 import { areaAt, BOUNDS, roadD } from '../world/layout.js';
 import { note, setHelperPlace, toastFixed } from './watch.js';
 import { placeOf, scrub } from './core.js';
-import { ROSTER, crewCount, pathAt, aheadBlocked, groundIssue, teamShown } from './team.js';
+import { ROSTER, crewCount, pathAt, aheadBlocked, groundIssue, teamShown, lifeInit, stepLife } from './team.js';
 import { playLabel, stepPlay } from './play.js';
 
 function starGeo(THREE) {
@@ -117,12 +118,14 @@ export function attachHelper(api, W) {
       id: src.id, role: src.role, name: src.name, lead: !!src.lead, job: src.job,
       speed: src.speed, side: src.side || 0, path: src.path || null,
       dist: src.dist || 0, x: src.x || 0, z: src.z || 0, yaw: src.yaw || 0,
-      home: src.role === 'sit' ? { x: src.x, z: src.z, yaw: src.yaw } : null,
-      root: null, car: null, tag: null, prevG: null, spin: 0, cool: 0, step: 0
+      life: lifeInit(), mode: 'go', onFoot: src.role !== 'drive', say: '',
+      fx: src.x || 0, fz: src.z || 0, fyaw: src.yaw || 0,
+      root: null, car: null, tag: null, bub: null, stool: null, toy: null, prevG: null, spin: 0, cool: 0, step: 0
     };
     if (m.path) {
       const p = pathAt(m.path, m.dist, m.side);
       m.x = p.x; m.z = p.z; m.yaw = p.yaw;
+      m.fx = p.x; m.fz = p.z; m.fyaw = p.yaw;
     }
     return m;
   });
@@ -139,7 +142,9 @@ export function attachHelper(api, W) {
 .kh-card textarea{width:100%;min-height:88px;border-radius:12px;border:0;padding:10px;font:600 16px Inter,system-ui,sans-serif;box-sizing:border-box;color:#24133f}
 .kh-card .row{display:flex;gap:8px}
 .kh-card .row button{flex:1}
-.kh-job{margin:0 0 8px;font-weight:700}`;
+.kh-job{margin:0 0 8px;font-weight:700}
+.kh-say{position:absolute;z-index:8;max-width:140px;background:#fff;color:#3b2504;border:2px solid #6d28d9;border-radius:12px;padding:3px 8px;font:700 12px Inter,system-ui,sans-serif;pointer-events:none;white-space:nowrap}
+.kh-say[hidden]{display:none}`;
     document.head.appendChild(st);
   }
   const btn = document.createElement('button');
@@ -166,7 +171,7 @@ export function attachHelper(api, W) {
   btn.onclick = () => {
     titleEl.textContent = focus && focus.lead ? 'Kemy Helper' : 'Helper';
     const job = focus ? focus.job : '';
-    jobEl.textContent = focus && focus.role === 'sit' ? job.replace('a quick game', playLabel()) : job;
+    jobEl.textContent = focus && focus.mode === 'play' ? job.replace('a quick game', playLabel()) : job;
     panel.hidden = false;
     box.focus();
   };
@@ -234,13 +239,17 @@ export function attachHelper(api, W) {
     if (!m.root) {
       m.root = proto.clone(true);
       dress(m.root, m.lead);
-      if (m.role === 'sit') {
+      if (m.id === 'play') {
         const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.28, 8), mats.vest);
         stool.position.y = 0.14;
         const toy = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.08, 0.18), mats.star);
-        toy.position.set(0, 0.92, 0.28);
+        toy.position.set(0, 0.72, 0.36);
         stool.frustumCulled = false;
         toy.frustumCulled = false;
+        stool.visible = false;
+        toy.visible = false;
+        m.stool = stool;
+        m.toy = toy;
         m.root.add(stool, toy);
       }
       scene.add(m.root);
@@ -264,6 +273,25 @@ export function attachHelper(api, W) {
       m.tag.dataset.n = m.name;
       m.tag.onclick = (e) => { e.stopPropagation(); focus = m; btn.click(); };
       tags.appendChild(m.tag);
+      m.bub = document.createElement('div');
+      m.bub.className = 'kh-say';
+      m.bub.hidden = true;
+      tags.appendChild(m.bub);
+    }
+  }
+
+  function mount(m, onFoot) {
+    if (!m.car || !m.root) return;
+    if (onFoot && m.root.parent === m.car) {
+      scene.add(m.root);
+      m.root.scale.set(1, 1, 1);
+      m.root.position.set(m.fx, ground(m.fx, m.fz), m.fz);
+      m.root.rotation.set(0, m.fyaw, 0);
+    } else if (!onFoot && m.root.parent !== m.car) {
+      m.car.add(m.root);
+      m.root.scale.setScalar(0.68);
+      m.root.position.set(0, 0.42, -0.15);
+      m.root.rotation.set(0, 0, 0);
     }
   }
 
@@ -278,6 +306,8 @@ export function attachHelper(api, W) {
       m.dist += 8;
       const p = pathAt(m.path, m.dist, m.side);
       m.x = p.x; m.z = p.z; m.yaw = p.yaw;
+      m.fx = p.x; m.fz = p.z; m.fyaw = p.yaw;
+      m.life.mode = 'go'; m.life.left = 0; m.life.say = ''; m.life.spot = null; m.onFoot = m.role !== 'drive';
     }
     toastFixed();
     note({ type, text, autoFixed: true, game: placeGame(m.x, m.z), place: spot(m) });
@@ -379,71 +409,115 @@ export function attachHelper(api, W) {
   }
 
   function sim(m, dt, blocks, driving) {
-    if (m.role === 'sit') {
-      m.x = m.home.x; m.z = m.home.z; m.yaw = m.home.yaw;
-      return;
-    }
+    const feetX = Number.isFinite(m.fx) ? m.fx : m.x;
+    const feetZ = Number.isFinite(m.fz) ? m.fz : m.z;
     let hold = false;
-    if (m.role === 'drive') {
+    if (m.role === 'drive' && m.life.mode !== 'park') {
       for (let i = 0; i < blocks.length; i++) {
         const px = blocks[i][0], pz = blocks[i][1];
         if (Math.hypot(m.x - px, m.z - pz) < 3.6 || aheadBlocked(m.x, m.z, m.yaw, px, pz, 8)) hold = true;
       }
-    } else if (!driving && Math.hypot(m.x - P.x, m.z - P.z) < 2.8) hold = true;
-    if (!hold) m.dist += m.speed * dt;
-    const p = pathAt(m.path, m.dist, m.side);
-    m.x = p.x; m.z = p.z;
-    if (hold && m.role !== 'drive') m.yaw = Math.atan2(P.x - m.x, P.z - m.z);
-    else m.yaw = p.yaw;
+    } else if (m.role !== 'drive' && !driving && Math.hypot(feetX - P.x, feetZ - P.z) < 2.8) hold = true;
     m.hold = hold;
+    if (hold && m.role !== 'drive' && m.life.mode === 'go' && performance.now() > m.life.greet) {
+      m.life.mode = 'wave';
+      m.life.left = 1.8;
+      m.life.elapsed = 0;
+      m.life.say = 'Hi!';
+      m.life.yaw = null;
+      m.life.greet = performance.now() + 9000;
+    }
+    const p = stepLife(m.life, m, dt);
+    m.mode = p.mode;
+    m.onFoot = p.onFoot;
+    m.say = p.say;
+    m.moving = p.moving;
+    if (m.role === 'drive') {
+      m.x = p.carX; m.z = p.carZ; m.yaw = p.carYaw;
+      m.fx = p.x; m.fz = p.z; m.fyaw = p.onFoot ? p.yaw : p.carYaw;
+    } else {
+      m.x = m.fx = p.x; m.z = m.fz = p.z;
+      m.yaw = p.yaw;
+      if (hold && p.mode !== 'sit' && p.mode !== 'play') m.yaw = Math.atan2(P.x - m.fx, P.z - m.fz);
+      m.fyaw = m.yaw;
+    }
   }
 
   function pose(m, show) {
+    const sitting = m.mode === 'sit' || m.mode === 'play';
     const gy = show ? ground(m.x, m.z) : 0;
     if (m.car) {
       m.car.visible = show;
-      m.root.visible = show;
+      if (m.root) m.root.visible = show;
       if (!show) return;
       m.car.position.set(m.x, gy, m.z);
       m.car.rotation.y = m.yaw;
       m.car.updateMatrixWorld(true);
-      if (!m.hold) {
+      mount(m, m.onFoot);
+      if (m.moving) {
         m.spin += m.speed * 0.4;
         const wheels = m.car.userData.wheels;
         for (let i = 0; i < wheels.length; i++) wheels[i].rotation.x = m.spin;
       }
-    } else {
+    }
+    if (!m.root) return;
+    if (!m.car) {
       m.root.visible = show;
       if (!show) return;
-      m.root.position.set(m.x, gy, m.z);
-      m.root.rotation.y = m.yaw;
     }
-    m.step += 0.16;
+    if (!m.car || m.onFoot) {
+      const fg = show ? ground(m.fx, m.fz) : 0;
+      m.root.position.set(m.fx, fg + (sitting ? 0.36 : 0), m.fz);
+      m.root.rotation.set(sitting ? 1.05 : 0, m.fyaw, 0);
+      m.root.scale.set(1, sitting ? 0.62 : 1, 1);
+    }
+    if (m.stool) m.stool.visible = m.mode === 'play';
+    if (m.toy) m.toy.visible = m.mode === 'play';
+    m.step += m.moving ? 0.16 : 0.08;
     const arms = m.root.userData.arms;
     if (!arms || !arms[0]) return;
-    if (m.role === 'sit') {
-      arms[0].rotation.x = -1.05;
-      arms[1].rotation.x = -1.05 + Math.sin(m.step) * 0.15;
+    arms[0].position.y = 0.76;
+    arms[1].position.y = 0.76;
+    arms[0].rotation.z = 0.25;
+    arms[1].rotation.z = -0.25;
+    if (sitting) {
+      arms[0].rotation.x = -1.25;
+      arms[1].rotation.x = -1.25;
+      arms[0].rotation.z = 0.45;
+      arms[1].rotation.z = -0.45;
       return;
     }
-    const swing = m.hold ? Math.sin(m.step) * 0.2 : Math.sin(m.step * 2) * 0.45;
+    if (m.mode === 'wave') {
+      arms[0].rotation.x = 0.35;
+      arms[1].position.y = 1.2;
+      arms[1].rotation.z = -0.35;
+      arms[1].rotation.x = Math.sin(m.step * 8) * 0.45;
+      return;
+    }
+    if (m.mode === 'shop' || m.mode === 'look') {
+      arms[0].rotation.x = -0.35;
+      arms[1].rotation.x = -0.55;
+      return;
+    }
+    const swing = m.moving ? Math.sin(m.step * 2) * 0.45 : Math.sin(m.step) * 0.08;
     arms[0].rotation.x = swing;
-    arms[1].rotation.x = m.hold ? -0.7 : -swing;
-    if (!m.car) m.root.position.y += m.hold ? 0 : Math.abs(Math.sin(m.step * 2)) * 0.05;
+    arms[1].rotation.x = -swing;
+    if (!m.car || m.onFoot) m.root.position.y += m.moving ? Math.abs(Math.sin(m.step * 2)) * 0.05 : 0;
   }
 
   function tagAt(m, show, dist) {
     if (!m.tag) return;
     if (!show || dist > 34) {
       if (m.tag.style.display !== 'none') m.tag.style.display = 'none';
+      if (m.bub && !m.bub.hidden) m.bub.hidden = true;
       return;
     }
-    const head = m.car ? m.car.localToWorld(tv.set(0, 1.7, -0.15)) : tv.set(m.x, ground(m.x, m.z) + 1.8, m.z);
+    const head = m.car && !m.onFoot ? m.car.localToWorld(tv.set(0, 1.7, -0.15)) : tv.set(m.fx, ground(m.fx, m.fz) + (m.mode === 'sit' || m.mode === 'play' ? 1.25 : 1.8), m.fz);
     head.project(api.cam);
     const vis = head.z < 1 && Math.abs(head.x) < 1.05 && Math.abs(head.y) < 1.05;
     const disp = vis ? '' : 'none';
     if (m.tag.style.display !== disp) m.tag.style.display = disp;
-    if (!vis) return;
+    if (!vis) { if (m.bub && !m.bub.hidden) m.bub.hidden = true; return; }
     const w = view.clientWidth, h = view.clientHeight;
     const px = (head.x + 1) / 2 * w, py = (1 - head.y) / 2 * h;
     const left = Math.round(px - m.tag.offsetWidth / 2) + 'px';
@@ -451,6 +525,16 @@ export function attachHelper(api, W) {
     if (m.tag.style.left !== left) m.tag.style.left = left;
     if (m.tag.style.top !== top) m.tag.style.top = top;
     if (m.tag.style.transform !== 'none') m.tag.style.transform = 'none';
+    if (m.bub) {
+      const talk = !!(show && vis && m.say);
+      if (m.bub.hidden !== !talk) m.bub.hidden = !talk;
+      if (talk) {
+        if (m.bub.textContent !== m.say) m.bub.textContent = m.say;
+        m.bub.style.left = left;
+        m.bub.style.top = Math.round(py - m.tag.offsetHeight - 28) + 'px';
+        m.bub.style.transform = 'none';
+      }
+    }
   }
 
   function update(dt) {
@@ -469,10 +553,13 @@ export function attachHelper(api, W) {
         if (m.root) m.root.visible = false;
         if (m.car) m.car.visible = false;
         if (m.tag && m.tag.style.display !== 'none') m.tag.style.display = 'none';
+        if (m.bub && !m.bub.hidden) m.bub.hidden = true;
         continue;
       }
       sim(m, dt, blocks, driving);
-      const d = Math.hypot(m.x - P.x, m.z - P.z);
+      const nearX = m.onFoot ? m.fx : m.x;
+      const nearZ = m.onFoot ? m.fz : m.z;
+      const d = Math.hypot(nearX - P.x, nearZ - P.z);
       const show = d < reach;
       if (show || d < reach + 36) ensure(m);
       if (m.root) {
@@ -481,7 +568,7 @@ export function attachHelper(api, W) {
       }
       if (d < closest) { closest = d; closestM = m; }
     }
-    const talk = closestM && closest < 2.8 && (closestM.role !== 'drive' || closestM.hold || closest < 2.6);
+    const talk = closestM && closest < 2.8 && (closestM.role !== 'drive' || closestM.onFoot || closestM.hold || closest < 2.6);
     btn.hidden = !talk;
     if (talk) focus = closestM;
     if (cap > 2) {
@@ -492,7 +579,7 @@ export function attachHelper(api, W) {
     if (tick !== glanceI && cap > 0) {
       glanceI = tick;
       const g = members[tick % cap];
-      if (g && g.role !== 'sit') glance(g);
+      if (g) glance(g);
     }
     scan(dt);
     watchGrief();
@@ -504,7 +591,8 @@ export function attachHelper(api, W) {
     pub.tag = lead.tag;
     pub.cap = cap;
     pub.focus = focus ? focus.id : '';
-    pub.members = members.map((m, i) => ({ id: m.id, role: m.role, name: m.name, x: m.x, z: m.z, shown: i < cap, job: m.job }));
+    pub.members = members.map((m, i) => ({ id: m.id, role: m.role, name: m.name, x: m.fx, z: m.fz, carX: m.x, carZ: m.z, shown: i < cap, job: m.job, mode: m.mode, onFoot: m.onFoot, say: m.say || '' }));
+    pub.step = (n) => { const k = Math.max(1, Math.min(400, n | 0)); for (let i = 0; i < k; i++) update(0.05); };
   }
 
   return {
@@ -516,6 +604,7 @@ export function attachHelper(api, W) {
         if (m.car) scene.remove(m.car);
         else if (m.root) scene.remove(m.root);
         if (m.tag) m.tag.remove();
+        if (m.bub) m.bub.remove();
       }
       btn.remove();
       panel.remove();
