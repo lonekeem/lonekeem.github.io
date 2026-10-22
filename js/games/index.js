@@ -17,7 +17,7 @@ const CPU_KEY = 'lks-games-cpu';
 export function createGames(ctx) {
   const { S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale } = ctx;
   if (!document.getElementById('games-css')) {
-    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=1'; document.head.appendChild(l);
+    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=2'; document.head.appendChild(l);
   }
   const net = createNet({ db, S });
   const signedIn = () => !!(S.user && S.profile);
@@ -27,6 +27,7 @@ export function createGames(ctx) {
   function addCpuResult(type, r) { const all = cpuRec(); const x = all[type] || { w: 0, l: 0, d: 0 }; x[r]++; all[type] = x; localStorage.setItem(CPU_KEY, JSON.stringify(all)); }
   const qs = (s) => Object.fromEntries(new URLSearchParams(s || ''));
   const chip = (p, extra = '') => `<div class="gp ${extra}">${p.uid && !isBot(p.uid) && p.uname ? avatar({ uid: p.uid, displayName: p.name, username: p.uname, color: p.color }, 'sm', false) : `<span class="avatar sm gp-bot" style="--c:#3b2466" aria-hidden="true">${CONTROLLER}</span>`}<span class="gp-n">${esc(p.name)}${p.uid && !isBot(p.uid) ? (window.kemyModBadge ? window.kemyModBadge(p.uid) : '') : ''}</span></div>`;
+  const gearBtn = () => `<a class="g-icon g-gear" href="#/settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>`;
   const muteBtn = () => `<button class="g-icon" data-g="mute" aria-pressed="${sfx.muted}" aria-label="${sfx.muted ? 'Turn sound on' : 'Mute sound'}">${sfx.muted ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.6 9a4.2 4.2 0 0 1 0 6M18.4 6.4a8 8 0 0 1 0 11.2"/></svg>'}</button>`;
   function wireMute(root) {
     root.querySelectorAll('[data-g=mute]').forEach((b) => b.onclick = () => {
@@ -35,7 +36,7 @@ export function createGames(ctx) {
   }
   function shell(title, body, back = '#/games') {
     main.innerHTML = `<section class="gm-wrap">
-      <div class="gm-bar"><a class="g-icon" href="${back}" aria-label="Back">←</a><h1>${title}</h1><span class="spacer"></span>${muteBtn()}</div>${body}</section>`;
+      <div class="gm-bar"><a class="g-icon" href="${back}" aria-label="Back">←</a><h1>${title}</h1><div class="g-tools">${muteBtn()}${gearBtn()}</div></div>${body}</section>`;
     wireMute(main);
   }
   function burst(host, n = 14) {
@@ -98,7 +99,7 @@ export function createGames(ctx) {
       <a class="cs-hero" href="#/arcade/show" aria-label="Play the Kemy Challenge Show"><span class="zf-badge">🆕 New · up to 30 players</span><svg class="cs-sun" viewBox="0 0 120 150" aria-hidden="true"><rect x="55" y="70" width="10" height="80" rx="5" fill="#4caf50"/><ellipse cx="38" cy="112" rx="18" ry="7" fill="#5cc85c" transform="rotate(-25 38 112)"/><g fill="#ffd23f" stroke="#e7a92b" stroke-width="2">${Array.from({ length: 14 }, (_, i) => `<ellipse cx="60" cy="22" rx="9" ry="20" transform="rotate(${i * 360 / 14} 60 60)"/>`).join('')}</g><circle cx="60" cy="60" r="27" fill="#b07a3e"/><circle cx="50" cy="55" r="6" fill="#7dffb0"/><circle cx="70" cy="55" r="6" fill="#7dffb0"/><path d="M48 70 Q60 80 72 70" stroke="#3a2010" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
         <span class="zf-txt"><b>Kemy Challenge Show</b><small>Freeze Dash 🌻 · Cookie Carve 🍪 · Tug Splash 🪢 · Bubble Bridge 🫧 · Bumper Summit 👑. Last Pal standing wins!</small><span class="zf-play cs-play">▶ Play</span></span></a>
       <a class="zf-hero" href="#/arcade/zombie" aria-label="Play Pal Zombie Survival"><span class="zf-badge">⭐ Featured Game</span><svg class="zf-zom" viewBox="0 0 120 130" aria-hidden="true"><g stroke="#1d3b14" stroke-width="3" stroke-linejoin="round"><path d="M10 70 L48 64 L48 76 L12 82Z" fill="#8fd16a"/><ellipse cx="62" cy="96" rx="30" ry="30" fill="#7cc35a"/><rect x="40" y="88" width="44" height="34" rx="10" fill="#6a4fc4"/><path d="M50 92 l10 0 M70 104 l10 0" stroke="#a99be8"/><circle cx="62" cy="48" r="32" fill="#8fd16a"/><path d="M18 58 L50 54 L50 66 L20 72Z" fill="#8fd16a"/></g><circle cx="50" cy="44" r="10" fill="#fff" stroke="#1d3b14" stroke-width="3"/><circle cx="76" cy="40" r="7" fill="#fff" stroke="#1d3b14" stroke-width="3"/><circle cx="52" cy="46" r="4" fill="#222"/><circle cx="75" cy="42" r="3" fill="#222"/><path d="M48 62 q14 10 28 0" fill="#3a1a1a" stroke="#1d3b14" stroke-width="3"/><path d="M60 66 q4 10 9 2" fill="#ff8fb1" stroke="#1d3b14" stroke-width="2"/><path d="M70 22 l6 -8 M74 24 l10 -4" stroke="#1d3b14" stroke-width="3" stroke-linecap="round"/><path d="M36 30 l8 6 M40 26 l2 8" stroke="#5a3a2a" stroke-width="2.4"/></svg><img class="zf-pal" src="assets/featured/pal-bear.webp" alt="" width="215" height="187"><div class="zf-txt"><b>Pal Zombie Survival</b><small>Team up with your Pal and splat goofy zombies with bubble blasters!</small><span class="zf-play">▶ Play</span></div></a><a class="zf-arcade" href="#/arcade">🕹️ Open the Arcade <span aria-hidden="true">›</span></a>
-      <div class="g-hero"><span class="g-hero-ic">${CONTROLLER}</span><div><h1>Games</h1><p class="muted">Free, turn-based and made by the studio. Play friends, get matched, or take on the computer.</p></div>${muteBtn()}</div>
+      <div class="g-hero"><span class="g-hero-ic">${CONTROLLER}</span><div><h1>Games</h1><p class="muted">Free, turn-based and made by the studio. Play friends, get matched, or take on the computer.</p></div><div class="g-tools">${muteBtn()}${gearBtn()}</div></div>
       <div class="g-quick">
         <a class="g-qbtn" href="#/games/pick/friend"><span>${STAR()}</span>Play a friend</a>
         <a class="g-qbtn" href="#/games/pick/quick"><span>${CONTROLLER}</span>Quick match</a>

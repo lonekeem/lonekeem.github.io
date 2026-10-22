@@ -214,6 +214,26 @@ textarea { resize: vertical; min-height: 96px; }
 .bottom-nav a.active svg { color: var(--purple-light); }
 .bottom-nav a.post-btn svg { width: 42px; height: 30px; padding: 4px; border-radius: 10px; background: linear-gradient(135deg, var(--purple), #3f7fe8); color: #fff !important; }
 .bottom-nav .dot { top: 8px; right: calc(50% - 18px); }
+@media (max-width: 430px) {
+  .app-header .brand span { display: none; }
+  .app-header .brand img { width: 32px; height: 32px; }
+  .app-header .inner { gap: 4px; padding-left: 8px; padding-right: 6px; }
+  .header-actions { gap: 0; }
+  .header-actions .icon-btn { padding: 6px; }
+  .header-actions .mod-pill { padding: 0 4px; }
+  .header-actions .mod-word { display: none; }
+  .app-header .header-actions .wchip { padding: 3px 3px; gap: 2px; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .top-nav { display: none; }
+  .header-actions { margin-left: auto; }
+  .app-main { padding-bottom: calc(var(--bottom-h) + 16px + env(safe-area-inset-bottom)); }
+  .bottom-nav {
+    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    background: rgba(5,3,10,.92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-top: 1px solid rgba(255,255,255,.08); padding-bottom: env(safe-area-inset-bottom);
+  }
+}
 @media (max-width: 760px) {
   .top-nav { display: none; }
   .header-actions { margin-left: auto; }

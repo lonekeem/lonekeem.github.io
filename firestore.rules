@@ -186,6 +186,20 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['recent', 'updatedAt'])
         && request.resource.data.recent is list && request.resource.data.recent.size() <= 20
         && request.resource.data.updatedAt == request.time;
+      // Device settings copy (js/settings-hub.js). Owner only. Games still read local storage.
+      allow create, update: if signedIn() && uid == me() && docId == 'hub' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['gfx', 'saver', 'fps', 'screen', 'size', 'sens', 'opacity', 'lefty', 'haptics', 'master', 'music', 'effects', 'radio', 'updatedAt'])
+        && request.resource.data.gfx in ['auto', 'low', 'medium', 'high', 'ultra']
+        && request.resource.data.saver is bool && request.resource.data.fps is bool && request.resource.data.screen is bool
+        && request.resource.data.size is int && request.resource.data.size >= 64 && request.resource.data.size <= 110
+        && request.resource.data.sens is number && request.resource.data.sens >= 0.3 && request.resource.data.sens <= 2.5
+        && request.resource.data.opacity is number && request.resource.data.opacity >= 0.3 && request.resource.data.opacity <= 1
+        && request.resource.data.lefty is bool && request.resource.data.haptics is bool
+        && request.resource.data.master is int && request.resource.data.master >= 0 && request.resource.data.master <= 100
+        && request.resource.data.music is int && request.resource.data.music >= 0 && request.resource.data.music <= 100
+        && request.resource.data.effects is int && request.resource.data.effects >= 0 && request.resource.data.effects <= 100
+        && request.resource.data.radio is bool
+        && request.resource.data.updatedAt == request.time;
     }
 
     // New Members directory (js/members.js). Public profiles stay on users/{uid}.

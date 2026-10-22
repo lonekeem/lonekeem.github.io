@@ -1,5 +1,5 @@
 import { cachedQuery, cachedDoc, BUSY_MSG } from './fs-cache.js';
-import { initPolish, fxOn, setFx } from './polish.js';
+import { initPolish } from './polish.js';
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetectWifi } from './autoplay.js';
 import { startAutoplayAll } from './autoplay-all.js';
@@ -44,7 +44,8 @@ import { createDonate } from './donate.js';
 import * as loadScreen from './loadscreen.js';
 import { gameName, GAMES } from './games/art.js';
 import { loadDiscover } from './discover.js';
-import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, getMode as themeMode, setMode as setThemeMode, getVolume as themeVol, setVolume as setThemeVol, THEME_CREDIT, THEME_TITLE, TRACKS as THEME_TRACKS, getPick as themePick, setPick as setThemePick, PLAYLIST_CREDIT } from './theme.js';
+import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, setMode as setThemeMode, THEME_TITLE } from './theme.js';
+import { page as pageSettingsHub } from './settings-hub.js';
 // Heavy feature modules load on demand (their route, or idle time after the feed): calls are queued until the
 // module arrives, so the feed never downloads games, Pals, live streaming or three.js. Written by Lone Keem
 function lazyMod(load) {
@@ -154,6 +155,7 @@ const ICON = {
   save: ICONS.save,
   more: ICONS.more,
   bell: ICONS.bell,
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/></svg>',
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>',
   google: '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>'
@@ -591,7 +593,7 @@ async function showWelcome() {
       <a class="btn" id="welcome-watch" href="#/watch/stand-up-strong" data-close>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>
         Watch now</a>
-      <a class="btn btn-ghost" href="#/settings" data-close>Set up my profile</a>
+      <a class="btn btn-ghost" href="#/settings/account" data-close>Set up my profile</a>
     </div>
     <p class="small muted" style="margin:10px 0 0"><button type="button" class="link-btn" id="welcome-theme" data-theme-ctl aria-pressed="false">🎵 Play Kemy’s theme</button> · ${esc(THEME_TITLE)} by Keem</p>
     <form class="welcome-bio" id="welcome-bio">
@@ -619,16 +621,17 @@ function renderChrome(name) {
   setTimeout(() => donate.mountPill(ha), 0);
   if (S.user && S.profile) {
     ha.innerHTML = `${searchBtn}
-      ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${mod.totalCount() ? `, ${mod.totalCount()} need attention` : ''}">🛡️ Mod${mod.totalCount() ? `<span class="mod-count">${mod.totalCount() > 99 ? '99+' : mod.totalCount()}</span>` : ''}</a>` : ''}
+      ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${mod.totalCount() ? `, ${mod.totalCount()} need attention` : ''}">🛡️<span class="mod-word"> Mod</span>${mod.totalCount() ? `<span class="mod-count">${mod.totalCount() > 99 ? '99+' : mod.totalCount()}</span>` : ''}</a>` : ''}
       ${isAdmin() ? `<a class="icon-btn" href="#/admin" aria-label="Admin">${ICON.shield}</a>` : ''}
+      <a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a>
       <a class="icon-btn" href="#/notifications" aria-label="Notifications">${ICON.bell}${S.unreadNotes ? '<span class="dot"></span>' : ''}</a>
       ${avatar({ ...S.profile, uid: S.user.uid }, 'sm')}`;
     mountHeaderChip(ha);
   } else if (S.user && !S.profile) {
-    ha.innerHTML = `<button class="icon-btn" id="hdr-signout">Sign out</button>`;
+    ha.innerHTML = `<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a><button class="icon-btn" id="hdr-signout">Sign out</button>`;
     $('#hdr-signout').onclick = () => signOut(auth);
   } else {
-    ha.innerHTML = `${searchBtn}<a class="signin-pill" href="#/login">Sign in</a>`;
+    ha.innerHTML = `${searchBtn}<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a><a class="signin-pill" href="#/login">Sign in</a>`;
   }
   document.getElementById('msg-dot').hidden = !S.unreadChats;
   // Full-screen feed hides the header: keep a floating Moderator button there.
@@ -668,7 +671,8 @@ const routes = [
   [/^#\/game\/([\w-]+)$/, (id, t) => games.open(id, t), 'games'],
   [/^#\/rules$/, () => safety.rulesPage(main), 'me'],
   [/^#\/updates$/, (t) => import('./updates.js').then((m) => m.page(main, { token: t, stale, toast })), 'games'],
-  [/^#\/settings$/, pageSettings, 'me'],
+  [/^#\/settings$/, (t) => pageSettingsHub(main, { token: t, stale, toast, esc, avatar, isAdmin, S, openDelete: () => { if (S.profile) accountDeleter.open(S.profile); }, getProfile, palsLoad: () => pals.load() }), 'me'],
+  [/^#\/settings\/account$/, pageSettings, 'me'],
   [/^#\/settings\/parental$/, () => parental.page(main), 'me'],
   [/^#\/settings\/interests$/, (t) => interestsPage({ main, esc, toast, getDoc, doc, db, loadDiscover, stale, token: t }), 'me'],
   [/^#\/music$/, (t) => music.page(t), 'explore'],
@@ -1088,13 +1092,13 @@ async function pageProfile(username, tab, token) {
         </div>
       </div>
       <div id="ppal"></div>
-      ${u.bio ? `<p class="bio">${bioHtml(u.bio)}</p>` : mine ? `<a class="btn btn-sm btn-ghost add-bio" href="#/settings" id="add-bio">✍️ Add a bio</a>` : ''}
+      ${u.bio ? `<p class="bio">${bioHtml(u.bio)}</p>` : mine ? `<a class="btn btn-sm btn-ghost add-bio" href="#/settings/account" id="add-bio">✍️ Add a bio</a>` : ''}
       ${safeWebsite(u.website) ? `<a class="pweb" href="${esc(u.website)}" target="_blank" rel="nofollow noopener noreferrer ugc">🔗 ${esc(prettyUrl(u.website))}</a>` : ''}
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
         <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine || uid === STUDIO_UID ? '<span id="p-donate"></span>' : ''}${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
-        ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
+        ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings/account">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && !blocked && !(uid === STUDIO_UID && isAdmin()) ? `<a class="btn btn-sm btn-ghost" href="#/chat/${esc(uid)}" id="msg">Message</a>` : ''}
         ${!mine && S.user && uid !== STUDIO_UID ? `<button class="btn btn-sm btn-ghost" id="report-user">Report</button>` : ''}${!mine && isAdmin() && uid !== STUDIO_UID ? '<span id="p-modinv"></span>' : ''}
@@ -1194,10 +1198,9 @@ async function pageSettings() {
   if (!requireAuth()) return;
   const p = S.profile;
   main.innerHTML = `
-    <h1 class="page-title">Edit profile</h1>
-    <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><a class="btn btn-sm btn-ghost" href="#/rules" id="set-rules">📜 Community Rules</a><a class="btn btn-sm btn-ghost" href="#/feedback" id="set-feedback">🐞 Report a bug / Send feedback</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
+    <div class="row" style="gap:8px;align-items:center"><a class="icon-btn" href="#/settings" aria-label="Back to settings">←</a><h1 class="page-title" style="margin:0">Edit profile</h1></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><a class="btn btn-sm btn-ghost" href="#/rules" id="set-rules">📜 Community Rules</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
     ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Mod Hub${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
-    ${isAdmin() ? '<a class="btn btn-block" href="#/admin" id="set-admin" style="margin-bottom:14px">🛡️ Admin tools (publish shop prices, reports, studio)</a>' : ''}
     <div id="set-donate"></div>
     <form id="settings" class="card pad">
       <div class="av-edit" id="av-edit">
@@ -1223,35 +1226,8 @@ async function pageSettings() {
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-autoplay-wifi" ${wifiOnly() ? 'checked' : ''} ${autoplayEnabled() ? '' : 'disabled'}> <span>Autoplay on Wi-Fi only</span></label>
       <p class="muted small" id="s-ap-note">Videos start muted as you scroll. ${saveData() ? 'Data Saver is on, so videos wait for a tap.' : ''}${canDetectWifi() ? '' : ' (This browser can’t tell Wi-Fi from mobile data, so Wi-Fi only has no effect here.)'}</p>
     </section>
-    <section class="card pad push-card" id="push-card" aria-labelledby="push-h" style="margin-top:16px" data-push-state="off">
-      <h2 id="push-h">Notifications</h2>
-      <div id="push-box"><p class="muted small">Loading notification settings…</p></div>
-    </section>
-    <button type="button" class="card pad set-link" data-watch-intro style="margin-top:16px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">🎬</span><span><b>Watch intro</b><br><span class="muted small">Replay Kemy’s welcome video anytime.</span></span></button>
-    <button type="button" class="card pad set-link" data-watch-howto style="margin-top:12px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">📱</span><span><b>How to save Kemy</b><br><span class="muted small">Add Kemy to your phone’s home screen (iPhone &amp; Android).</span></span></button>
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
-    ${parental.settingsLink()}
     ${devices.settingsHtml()}
-    <section class="card pad" style="margin-top:16px" aria-labelledby="snd-h">
-      <h2 id="snd-h" style="font-size:1.05rem">Sound</h2>
-      <p class="muted small" style="margin:0 0 8px">Kemy’s theme plays softly on your profile, Pals and settings, and stops for videos, lives and games.</p>
-      <div class="seg theme-seg" role="radiogroup" aria-label="Theme song">${[['play', '🎵 Play'], ['mute', '🔇 Mute'], ['off', 'Off']].map(([k, l]) => `<label><input type="radio" name="s-theme-mode" value="${k}" ${themeMode() === k || (k === 'mute' && !themeMode()) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
-      <label for="s-theme-vol" style="margin-top:12px">Volume <span class="muted small" id="s-theme-vol-n">${Math.round(themeVol() * 100)}%</span></label>
-      <input type="range" id="s-theme-vol" min="0" max="100" step="5" value="${Math.round(themeVol() * 100)}" style="width:100%">
-      <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn btn-sm btn-ghost" type="button" id="s-theme" data-theme-ctl>🎵 Play theme</button></div>
-      <label for="s-theme-pick" style="margin-top:12px">Playlist</label>
-      <select id="s-theme-pick" style="width:100%"><option value="all">All songs in order (loops)</option><option value="shuffle">Shuffle</option>${THEME_TRACKS.map((t, i) => `<option value="${i}">Only “${esc(t.title)}”</option>`).join('')}</select>
-      <ol class="small" style="margin:8px 0 0;padding-left:20px">${THEME_TRACKS.map((t) => `<li><b>${esc(t.title)}</b> by ${esc(t.artist)} · ${Math.floor(t.dur / 60)}:${String(Math.round(t.dur % 60)).padStart(2, '0')}</li>`).join('')}</ol>
-      <p class="muted small" style="margin:10px 0 0" id="s-theme-credit">${esc(PLAYLIST_CREDIT)}. Written by Lone Keem.</p>
-    </section>
-    <section class="card pad" style="margin-top:16px" aria-labelledby="spals-h">
-      <h2 id="spals-h" style="font-size:1.05rem">Pals</h2>
-      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-fx" ${fxOn() ? 'checked' : ''}> <span>Fancy effects<br><span class="muted small">Glass blur, 3D tilt and the animated background. Turn off for older phones.</span></span></label>
-      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-dance" disabled> <span>Pals dance to music<br><span class="muted small">When the theme song, a song or a music video plays.</span></span></label>
-      <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-pal-keep" disabled> <span>Keep Pal on screen while scrolling<br><span class="muted small">A small Pal in the corner. Double-tap it to hide, triple-tap the screen to bring it back, drag to move.</span></span></label>
-      <label for="s-pal-gfx" style="margin-top:8px">Pal graphics</label><select id="s-pal-gfx" style="width:100%"><option value="ultra">Ultra (sharpest 3D, opt-in)</option><option value="high">High (3D, default)</option><option value="low">Low (lighter 3D, saves battery)</option><option value="flat">2D art (no 3D)</option></select>
-         <p class="small" style="margin:8px 0 0"><button type="button" class="btn btn-sm btn-ghost" id="s-dance-shop">💃 Dances &amp; Dance Shop</button></p>
-    </section>
     <section class="card pad" style="margin-top:16px">
       <h2 style="font-size:1.05rem">Account</h2>
       <p class="muted small">Signed in as ${esc(S.user.email || '')}</p>
@@ -1263,27 +1239,12 @@ async function pageSettings() {
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
     </section>`}`;
   donate.mountSettings($('#set-donate')); devices.wireSettings();
-  import('./push.js').then((m) => m.wireSettings(toast)).catch(() => { const b = document.getElementById('push-box'); if (b) b.textContent = 'Notifications aren’t available right now.'; });
   $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
   $('#s-autoplay-wifi').onchange = (e) => { setWifiOnly(e.target.checked); };
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
   wireCounter($('#s-pro'), $('#s-pro-n'), 20); wireCounter($('#s-web'), $('#s-web-n'), 100);
   if (sessionStorage.getItem('lks-focus-bio')) { sessionStorage.removeItem('lks-focus-bio'); setTimeout(() => { const t = $('#s-bio'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus(); } }, 60); }
-  document.querySelectorAll('[name=s-theme-mode]').forEach((r) => { r.onchange = () => { setThemeMode(r.value, { start: r.value === 'play' }); toast(r.value === 'play' ? 'Theme song on' : r.value === 'mute' ? 'Theme song muted' : 'Theme song off'); }; });
-  $('#s-fx').onchange = (e) => { setFx(e.target.checked); toast(e.target.checked ? 'Fancy effects on ✨' : 'Effects off (lighter)'); };
-  Promise.all([import('./pals/dance.js'), import('./pals/dance-ui.js')]).then(([{ danceEnabled, setDanceEnabled }, { keepOn: palKeepOn, setKeep: setPalKeep }]) => {
-    const d = $('#s-pal-dance'), k = $('#s-pal-keep'); if (!d || !k) return;
-    d.checked = danceEnabled(); k.checked = palKeepOn(); d.disabled = k.disabled = false;
-    d.onchange = (e) => { setDanceEnabled(e.target.checked); toast(e.target.checked ? 'Pals will dance to music 💃' : 'Pal dancing off'); };
-    k.onchange = (e) => { setPalKeep(e.target.checked); toast(e.target.checked ? 'Your Pal will stay on screen' : 'Floating Pal off'); };
-  }).catch(() => {});
-  { const g = $('#s-pal-gfx'); import('./pals/pal3d.js').then((m) => { g.value = m.gfxLevel(); g.onchange = () => { m.setGfx(g.value); toast(g.value === 'flat' ? 'Pals use 2D art (reload to apply)' : 'Pal graphics: ' + g.value + (g.value === 'low' ? ' (lighter 3D)' : '')); }; }).catch(() => { g.value = 'low'; g.disabled = true; }); }
-  $('#s-dance-shop').onclick = () => pals.load().then(() => dispatchEvent(new Event('kemy:dance-shop'))).catch((e) => toast(friendlyError(e)));
-  { const sel = $('#s-theme-pick'); sel.value = themePick(); sel.onchange = () => { setThemePick(sel.value); toast(sel.value === 'shuffle' ? 'Shuffling theme songs' : sel.value === 'all' ? 'Playing all theme songs' : 'Playing ' + THEME_TRACKS[+sel.value].title); }; }
-  $('#s-theme-vol').oninput = (e) => { const v = +e.target.value / 100; setThemeVol(v); $('#s-theme-vol-n').textContent = e.target.value + '%'; };
-  { const b = $('#s-theme'); const paint = () => { b.textContent = themePlaying() ? '⏸ Stop theme' : '🎵 Play theme'; };
-    b.onclick = async () => { if (themePlaying()) stopTheme(); else await playTheme({ force: true }); paint(); };
-    document.addEventListener('kemy-theme', paint); S.unsubs.push(() => document.removeEventListener('kemy-theme', paint)); }
+  if (sessionStorage.getItem('lks-focus-security')) { sessionStorage.removeItem('lks-focus-security'); setTimeout(() => { const t = document.getElementById('security'); if (t) t.scrollIntoView({ block: 'center' }); }, 60); }
   $('#s-out').onclick = async () => { await signOut(auth); location.hash = '#/feed'; };
   const del = $('#s-delete');
   if (del) del.onclick = () => accountDeleter.open(S.profile);
@@ -1432,7 +1393,7 @@ async function pageNotifications(asStudio, token) {
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
   const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', house: '', daily: '', announce: '', mod: '', mod_invite: '' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
-    if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
+    if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings/account"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? (String(n.text || '').includes('Pal Games') ? `#/games/pals/${esc(n.postId)}` : `#/game/${esc(n.postId)}`) : n.type === 'house' ? '#/street' : n.type === 'daily' ? '#/pals' : n.type === 'announce' ? (String(n.postId || '').startsWith('#/') ? esc(n.postId) : '#/feed') : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
