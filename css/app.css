@@ -1721,12 +1721,24 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .wn-page { max-width: 640px; margin: 0 auto; }
 .wn-lead { margin: 6px 0 0; color: #f4f1fa; }
 .wn-credit { margin: 4px 0 14px; }
+.wn-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.wn-tab {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  border: 2px solid #c4b5fd; background: #1a1030; color: #f4f1fa;
+  font-weight: 700; font-size: .95rem;
+}
+.wn-tab[aria-selected="true"] { background: #ffd34d; color: #241400; border-color: #ffd34d; }
 .wn-list { display: grid; gap: 12px; }
 .wn-card {
   display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: start;
   background: #1a1030; color: #f4f1fa; border: 2px solid #c4b5fd; border-radius: 18px; padding: 14px;
 }
 .wn-emoji { font-size: 1.8rem; line-height: 1.2; text-align: center; }
+.wn-card .wn-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.wn-tag { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: .75rem; font-weight: 800; line-height: 1.3; }
+.wn-tag-new { background: #ffd34d; color: #241400; }
+.wn-tag-fix { background: #1d4ed8; color: #fff; }
+.wn-tag-soon { background: #e9d5ff; color: #2a1848; }
 .wn-date { margin: 0; color: #ffd34d; font-weight: 700; font-size: .85rem; }
 .wn-card h2 { font-size: 1.12rem; margin: 2px 0 0; color: #fff; }
 .wn-card p { margin: 6px 0 0; color: #f4f1fa; }
@@ -1734,7 +1746,7 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 .wn-card .wn-play { margin-top: 12px; background: #ffd34d; color: #241400; box-shadow: none; }
 .wn-card .wn-play:hover { background: #ffe58a; color: #241400; }
 .wn-form { margin-top: 16px; }
-.wn-form input, .wn-form textarea { width: 100%; margin: 4px 0 10px; background: #07050c; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 16px; }
+.wn-form input, .wn-form textarea, .wn-form select { width: 100%; margin: 4px 0 10px; background: #07050c; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 16px; color: var(--text); }
 .wn-form .wn-ping { margin: 4px 0 12px; color: var(--text); }
 .wn-form h2 { font-size: 1.05rem; margin-bottom: 6px; }
 

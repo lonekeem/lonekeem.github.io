@@ -6,7 +6,15 @@ import { auth, db, ADMIN_EMAIL } from './firebase-init.js';
 import { collection, doc, getDoc, getDocs, setDoc, query, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 const SEEN_KEY = 'kemy-updates-seen';
+const TYPES = { new: 'New', fix: 'Bug Fix', soon: 'Coming Soon' };
+const FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'new', label: 'New' },
+  { id: 'fix', label: 'Fixes' },
+  { id: 'soon', label: 'Coming Soon' }
+];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let activeFilter = 'all';
 
 let pack = null;
 let loading = null;
@@ -39,13 +47,26 @@ export function normalize(raw, id) {
   const title = String((raw && raw.title) || '').trim().slice(0, 80);
   const body = String((raw && raw.body) || '').trim().slice(0, 400);
   if (!title || !body) return null;
+  const type = TYPES[String((raw && raw.type) || '').toLowerCase()] ? String(raw.type).toLowerCase() : 'new';
   return {
     id: String(id || raw.id || '').slice(0, 40),
-    date, title, body,
+    date, title, body, type,
     emoji: String((raw && raw.emoji) || '').trim().slice(0, 16),
     image: safeImage(raw && raw.image),
     link: safeHref(raw && raw.link)
   };
+}
+// Coming Soon is pinned for display only. The gold dot follows date order, so a shipped
+// entry with a newer date still lights the dot while teasers stay at the top of the page.
+export function displayOrder(entries) {
+  const soon = [];
+  const rest = [];
+  for (const e of entries || []) (e.type === 'soon' ? soon : rest).push(e);
+  return soon.concat(rest);
+}
+export function passesFilter(entry, filter) {
+  if (filter === 'new' || filter === 'fix' || filter === 'soon') return entry.type === filter;
+  return true;
 }
 export function mergeUpdates(base, remote) {
   const map = new Map();
@@ -139,12 +160,13 @@ export async function paintDots() {
 
 function card(e) {
   const when = pretty(e.date);
+  const type = TYPES[e.type] ? e.type : 'new';
   const art = e.image ? `<img class="wn-img" src="${esc(e.image)}" alt="">` : '';
   const play = e.link ? `<a class="btn wn-play" href="${esc(e.link)}">Play it</a>` : '';
   return `<article class="wn-card">
     <div class="wn-emoji" aria-hidden="true">${esc(e.emoji || '✨')}</div>
     <div>
-      <p class="wn-date">${esc(when)}</p>
+      <p class="wn-meta"><span class="wn-tag wn-tag-${type}">${esc(TYPES[type])}</span><span class="wn-date">${esc(when)}</span></p>
       <h2>${esc(e.title)}</h2>
       <p>${esc(e.body)}</p>
       ${art}
@@ -153,12 +175,36 @@ function card(e) {
   </article>`;
 }
 
+function listHtml(entries) {
+  const shown = displayOrder(entries).filter((e) => passesFilter(e, activeFilter));
+  if (!shown.length) {
+    const empty = activeFilter === 'fix' ? 'No bug fixes in this list yet.'
+      : activeFilter === 'new' ? 'No new features in this list yet.'
+      : activeFilter === 'soon' ? 'Nothing coming soon just yet.'
+      : 'Nothing new just yet. Check back soon.';
+    return `<div class="card pad empty">${empty}</div>`;
+  }
+  return shown.map(card).join('');
+}
+
+function tabsHtml() {
+  return `<div class="wn-tabs" role="tablist" aria-label="Filter updates">${FILTERS.map((f) =>
+    `<button type="button" class="wn-tab" role="tab" data-wn-filter="${f.id}" aria-selected="${f.id === activeFilter ? 'true' : 'false'}">${f.label}</button>`
+  ).join('')}</div>`;
+}
+
 function formHtml() {
   const today = new Date();
   const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   return `<form class="card pad wn-form" id="wn-form">
     <h2>Add an update</h2>
-    <p class="muted small">Only the Kemy admin can post. It shows up here for everyone. Same id as a built-in entry replaces that one.</p>
+    <p class="muted small">Only the Kemy admin can post. It shows up here for everyone. Same id replaces that entry. When a Coming Soon idea ships, post the same id, pick New, and set today's date.</p>
+    <label for="wn-type">Type</label>
+    <select id="wn-type" required>
+      <option value="new">New</option>
+      <option value="fix">Bug Fix</option>
+      <option value="soon">Coming Soon</option>
+    </select>
     <label for="wn-date">Date</label>
     <input id="wn-date" type="date" required value="${iso}">
     <label for="wn-id">Id <span class="muted small">(optional, like star-pool, to replace that entry)</span></label>
@@ -194,11 +240,16 @@ function wireForm(toast) {
     const title = document.getElementById('wn-title').value.trim();
     const body = document.getElementById('wn-body').value.trim();
     const date = document.getElementById('wn-date').value;
+    const type = document.getElementById('wn-type').value;
     const emoji = document.getElementById('wn-emoji').value.trim();
     const image = safeImage(document.getElementById('wn-image').value);
     const link = safeHref(document.getElementById('wn-link').value);
     const ping = document.getElementById('wn-ping').checked;
     if (msg) msg.textContent = '';
+    if (!TYPES[type]) {
+      if (msg) msg.textContent = 'Pick New, Bug Fix or Coming Soon.';
+      return;
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || title.length < 1 || body.length < 1) {
       if (msg) msg.textContent = 'Add a date, a title and a short description.';
       return;
@@ -221,18 +272,16 @@ function wireForm(toast) {
     try {
       const ref = doc(db, 'updates', id);
       const existing = await getDoc(ref);
-      const data = { date, title: title.slice(0, 80), body: body.slice(0, 400) };
+      const data = { date, type, title: title.slice(0, 80), body: body.slice(0, 400) };
       if (emoji) data.emoji = emoji.slice(0, 16);
       if (image) data.image = image;
       if (link) data.link = link;
       data.createdAt = existing.exists() && existing.data().createdAt ? existing.data().createdAt : serverTimestamp();
       await setDoc(ref, data);
       const entry = normalize({ ...data, emoji, image, link }, id);
-      if (entry && pack) {
-        pack.entries = mergeUpdates(pack.entries, [entry]);
-        pack.seen = entry.id;
-      }
-      try { localStorage.setItem(SEEN_KEY, id); } catch { /* ignore */ }
+      if (entry && pack) pack.entries = mergeUpdates(pack.entries, [entry]);
+      const head = pack && pack.entries && pack.entries[0];
+      if (head) markSeen(head.id);
       let pingNote = '';
       if (ping) {
         try {
@@ -249,8 +298,10 @@ function wireForm(toast) {
       if (msg) msg.textContent = 'Posted.' + pingNote;
       toast && toast('Update posted');
       const list = document.getElementById('wn-list');
-      if (list && pack) list.innerHTML = pack.entries.map(card).join('');
+      if (list && pack) list.innerHTML = listHtml(pack.entries);
       form.reset();
+      const typePick = document.getElementById('wn-type');
+      if (typePick) typePick.value = 'new';
       document.getElementById('wn-date').value = date;
     } catch (e) {
       if (msg) msg.textContent = (e && e.code === 'permission-denied') ? 'Only the Kemy admin can post updates.' : 'Could not save that. Please try again.';
@@ -259,21 +310,38 @@ function wireForm(toast) {
   };
 }
 
+function wireTabs() {
+  document.querySelectorAll('[data-wn-filter]').forEach((btn) => {
+    btn.onclick = () => {
+      activeFilter = btn.getAttribute('data-wn-filter') || 'all';
+      document.querySelectorAll('[data-wn-filter]').forEach((b) => {
+        b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+      });
+      const list = document.getElementById('wn-list');
+      if (list && pack) list.innerHTML = listHtml(pack.entries);
+    };
+  });
+}
+
 export async function page(main, ctx) {
   const token = ctx && ctx.token;
   const stale = (ctx && ctx.stale) || (() => false);
   const toast = ctx && ctx.toast;
+  activeFilter = 'all';
   main.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
   try { await ensure(); } catch { pack = pack || { entries: [], seen: '' }; }
   if (stale(token)) return;
   const entries = (pack && pack.entries) || [];
   main.innerHTML = `<section class="wn-page">
     <h1 class="page-title">What's New</h1>
-    <p class="wn-lead">Everything Keem has added to Kemy, newest first.</p>
+    <p class="wn-lead">Coming soon sits at the top. New things and fixes follow, newest first.</p>
     <p class="muted small wn-credit">Written by Lone Keem.</p>
-    <div class="wn-list" id="wn-list">${entries.length ? entries.map(card).join('') : '<div class="card pad empty">Nothing new just yet. Check back soon.</div>'}</div>
+    ${tabsHtml()}
+    <div class="wn-list" id="wn-list">${listHtml(entries)}</div>
     ${isAdmin() ? formHtml() : ''}
   </section>`;
+  wireTabs();
   if (isAdmin()) wireForm(toast);
+  // Date order, not the pinned Coming Soon card, so a newer shipped entry still lights the dot.
   if (entries[0]) markSeen(entries[0].id);
 }
