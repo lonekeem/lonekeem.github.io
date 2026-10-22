@@ -4,8 +4,8 @@ import { cachedQuery } from './fs-cache.js';
 // Every video post in Firestore shows up here automatically: studio + community uploads
 // (mediaType 'video', e.g. Cloudinary H.264 MP4 with a so_1 jpg poster), photo posts
 // (mediaType 'image', shown as full-screen image slides), plus any post with a YouTube or
-// TikTok link (shown as a poster card with a Watch button, because third-party embeds can't
-// autoplay or swipe well).
+// TikTok link. The player is created for the slide on screen and the next one only, and a
+// swipe on the picture still moves the feed.
 // All stars (likes) / comments / saves / follows go through the shared actions in app.js.
 
 import { burstStar, onDoubleTap } from './tapstar.js';
@@ -288,7 +288,11 @@ export function createWatch(ctx) {
     const blocked = () => document.hidden || sheetRoot.classList.contains('open') || !!document.querySelector('.modal-backdrop, .pal-chat, .pal-talk, .mm-root, .live-room');
     function playActive(force) {
       const sl0 = slides[active];
-      if (sl0?.dataset.kind === 'youtube') { if (force || (canAutoplay() && !blocked())) autoEmbed(sl0); return; }
+      if (sl0?.dataset.kind === 'youtube') {
+        if (!force && sl0.dataset.userPaused) return;
+        if (force || (canAutoplay() && !blocked())) autoEmbed(sl0);
+        return;
+      }
       const v = vid(active); if (!v) return;
       if (!force && (!canAutoplay() || blocked())) { if (!v.getAttribute('src')) { v.preload = 'metadata'; v.src = v.dataset.src; } slides[active].classList.add('paused'); return; }
       if (!muted) claimAudio('feed');
@@ -304,47 +308,71 @@ export function createWatch(ctx) {
     function closeEmbed(sl) {
       const box = sl?.querySelector('.vembed'); if (!box || box.hidden) return;
       const fr = box.querySelector('iframe'); ytCmd(fr, 'pauseVideo');
-      try { sl._yt?.destroy?.(); } catch { /* gone */ } sl._yt = null; sl._ytTry = null;
-      box.innerHTML = ''; box.hidden = true; sl.querySelector('.vcard').hidden = false;   // destroy the player
+      try { sl._yt?.destroy?.(); } catch { /* gone */ } sl._yt = null; sl._ytTry = null; sl._preload = false; sl._ytOk = false;
+      sl.classList.remove('yt-on', 'paused'); delete sl.dataset.userPaused;
+      box.innerHTML = ''; box.hidden = true; const card = sl.querySelector('.vcard'); if (card) card.hidden = false;
       clearTimeout(sl._ytTimer);
+    }
+    // Drop players that are no longer the slide on screen or the next one.
+    function trimEmbeds(i) {
+      slides.forEach((sl, j) => { if (j !== i && j !== i + 1 && sl.querySelector('.vembed iframe')) closeEmbed(sl); });
+    }
+    function warmNext(i) {
+      const nx = slides[i + 1];
+      if (!nx || nx.dataset.kind !== 'youtube' || nx.style.display === 'none' || nx.querySelector('.vembed iframe')) return;
+      if (!slides[i]?._ytOk) return;
+      autoEmbed(nx, true);
     }
     // YouTube: lazily create a muted autoplaying youtube-nocookie player for the slide in view.
     const ytCmd = (fr, func, args = []) => { try { fr?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*'); } catch { /* gone */ } };
     // Uses the IFrame Player API: mute() + playVideo() on ready, retry while unstarted/cued, again on re-entry and on any tap.
-    function autoEmbed(sl) {
+    function autoEmbed(sl, preload) {
       const p = byId.get(sl.dataset.id); if (!p) return;
       const box = sl.querySelector('.vembed'); if (!box) return;
-      if (!box.hidden) { ytPlay(sl); return; }
-      openEmbed(p, sl, true);
+      if (!preload) sl._preload = false;
+      if (!preload && sl.dataset.userPaused && !box.hidden) return;
+      if (!box.hidden && sl._ytTry) { if (!preload) ytPlay(sl); return; }
+      openEmbed(p, sl, true, !!preload);
       const fr = box.querySelector('iframe'); sl._ytOk = false;
-      const tryPlay = () => { const pl = sl._yt; if (!pl || !pl.playVideo) { ytCmd(fr, 'mute'); ytCmd(fr, 'playVideo'); return; } try { if (muted) pl.mute(); else pl.unMute(); pl.playVideo(); } catch { /* not ready */ } };
+      const tryPlay = () => {
+        if (sl._preload && slides[active] !== sl) { ytCmd(fr, 'pauseVideo'); return; }
+        const pl = sl._yt; if (!pl || !pl.playVideo) { ytCmd(fr, 'mute'); ytCmd(fr, 'playVideo'); return; }
+        try { if (muted) pl.mute(); else pl.unMute(); pl.playVideo(); } catch { /* not ready */ }
+      };
       sl._ytTry = tryPlay;
       loadYT().then((YT) => {
         if (!box.contains(fr)) return;
         sl._yt = new YT.Player(fr, { events: {
           onReady: () => { tryPlay(); },
           onStateChange: (e) => {
-            if (e.data === 1) { sl._ytOk = true; clearTimeout(sl._ytTimer); if (!muted) claimAudio('feed'); }
-            else if ((e.data === -1 || e.data === 5) && slides[active] === sl && !blocked()) setTimeout(tryPlay, 300);
+            if (e.data === 1 && sl._preload && slides[active] !== sl) { ytCmd(fr, 'pauseVideo'); return; }
+            if (e.data === 1) {
+              sl._ytOk = true; sl.classList.add('yt-on'); const card = sl.querySelector('.vcard'); if (card) card.hidden = true;
+              clearTimeout(sl._ytTimer); if (!muted) claimAudio('feed'); warmNext(+sl.dataset.i);
+            } else if (e.data === 2 && sl.dataset.userPaused) sl.classList.add('paused');
+            else if ((e.data === -1 || e.data === 5) && slides[active] === sl && !sl._preload && !blocked()) setTimeout(tryPlay, 300);
             try { const f = sl._yt.getIframe(); f.dataset.kemyUnmuted = e.data === 1 && /music|dance/.test(sl.dataset.cat || '') && !sl._yt.isMuted() ? '1' : '0'; } catch { /* */ }
           },
           onError: (e) => {
             if (!isHardYtError(e.data)) return fallback();
-            // Removed, private or embedding turned off: hide it and move on to the next video.
+            // Removed, private or embedding turned off: hide it. Only the slide on screen advances.
             markYtBlocked(p.ytId || youTubeId(p.linkUrl), 'err' + e.data, p.id);
-            const i = +sl.dataset.i; closeEmbed(sl); sl.style.display = 'none';
+            const i = +sl.dataset.i; const wasActive = slides[active] === sl;
+            closeEmbed(sl); sl.style.display = 'none';
+            if (!wasActive) return;
             const nx = slides.slice(i + 1).find((x) => x.style.display !== 'none');
-            if (nx) { feed.scrollTo({ top: nx.offsetTop, behavior: 'auto' }); if (slides[active] === sl) { active = -1; activate(+nx.dataset.i); } }
+            if (nx) { feed.scrollTo({ top: nx.offsetTop, behavior: 'auto' }); active = -1; activate(+nx.dataset.i); }
           }
         } });
-      }).catch(() => { /* API unavailable: the autoplay=1&mute=1 URL still applies */ });
+      }).catch(() => { /* API unavailable: the autoplay URL still applies */ });
       // Not playing after ~4 s: one more try, then show the thumbnail (tapping it, or re-entering view, tries again).
-      const fallback = () => { if (sl._ytOk || !box.contains(fr)) return; closeEmbed(sl); sl.classList.add('yt-wait'); };
-      sl._ytTimer = setTimeout(() => { if (sl._ytOk) return; tryPlay(); sl._ytTimer = setTimeout(fallback, 1500); }, 2500);
+      // A preloaded next slide stays mounted and paused, so it must not get this timeout.
+      const fallback = () => { if (sl._ytOk || sl._preload || !box.contains(fr)) return; closeEmbed(sl); sl.classList.add('yt-wait'); };
+      if (!preload) sl._ytTimer = setTimeout(() => { if (sl._ytOk || sl._preload) return; tryPlay(); sl._ytTimer = setTimeout(fallback, 1500); }, 2500);
     }
     function ytPlay(sl) { if (sl && sl._ytTry) sl._ytTry(); }
     // A tap anywhere in the feed counts as the gesture iOS wants: resume the YouTube item in view.
-    const offUnlock = onUnlock(() => { const sl = slides[active]; if (!sl || sl.dataset.kind !== 'youtube' || blocked()) return;
+    const offUnlock = onUnlock(() => { const sl = slides[active]; if (!sl || sl.dataset.kind !== 'youtube' || blocked() || sl.dataset.userPaused) return;
       if (sl.querySelector('.vembed iframe')) ytPlay(sl); });
     const offUnlockV = onUnlock(() => { const sl = slides[active], v = vid(active); if (v && v.paused && !sl.dataset.userPaused && !blocked() && canAutoplay()) setTimeout(() => { if (v.paused && !sl.dataset.userPaused) playActive(); }, 350); });
     function pauseActive() {
@@ -352,7 +380,7 @@ export function createWatch(ctx) {
       const fr = slides[active]?.querySelector('.vembed iframe'); if (fr) ytCmd(fr, 'pauseVideo');
     }
     function resumeActive() {
-      if (active < 0 || blocked()) return;
+      if (active < 0 || blocked() || slides[active]?.dataset.userPaused) return;
       const fr = slides[active]?.querySelector('.vembed iframe');
       if (fr) { if (slides[active]._ytTry) slides[active]._ytTry(); else ytCmd(fr, 'playVideo'); } else playActive();
     }
@@ -376,6 +404,7 @@ export function createWatch(ctx) {
       if (prev) { vid(active)?.pause(); closeEmbed(prev); delete prev.dataset.userPaused; }
       active = i;
       wrap.dataset.kind = slides[i].dataset.kind || '';
+      trimEmbeds(i);
       // Preload only the current and the next video; free anything far away.
       slides.forEach((sl, j) => {
         const v = sl.querySelector('video'); if (!v) return;
@@ -389,13 +418,18 @@ export function createWatch(ctx) {
       const id = slides[i].dataset.id;
       if (id && location.hash.startsWith('#/watch')) history.replaceState(null, '', '#/watch/' + (tab === 'foryou' ? '' : tab + '/') + id);
       playActive();
+      if (slides[i]?._ytOk) warmNext(i);
     }
 
     // Autoplay the slide that is (mostly) on screen; pause the rest.
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
         if (e.isIntersecting && e.intersectionRatio >= 0.6) activate(+e.target.dataset.i);
-        else if (!e.isIntersecting) { const v = e.target.querySelector('video'); if (v && !v.paused) v.pause(); }
+        else if (!e.isIntersecting) {
+          const v = e.target.querySelector('video'); if (v && !v.paused) v.pause();
+          const fr = e.target.querySelector('.vembed iframe');
+          if (fr && slides[active] !== e.target) ytCmd(fr, 'pauseVideo');
+        }
       });
     }, { root: feed, threshold: [0, 0.6] });
 
@@ -509,7 +543,7 @@ export function createWatch(ctx) {
       if (a === 'outlink') { st.signal(p, 'open'); return; }
       if (a === 'share') return share(p);
       if (a === 'comment') { st.signal(p, 'open'); return openComments(p, sl); }
-      if (a === 'watch') { st.signal(p, 'watch', 1); return openEmbed(p, sl); }
+      if (a === 'watch') { st.signal(p, 'watch', 1); sl.classList.remove('yt-wait'); delete sl.dataset.userPaused; return autoEmbed(sl); }
       if (a === 'menu') return openMenu(p, sl);
       if (a === 'like') {
         if (needAuth(p.id, 'give stars')) return;
@@ -572,17 +606,33 @@ export function createWatch(ctx) {
       catch { prompt('Copy this link:', url); }
     }
 
-    function openEmbed(p, sl, auto) {
+    function openEmbed(p, sl, auto, preload) {
       const box = sl.querySelector('.vembed'); const kind = sl.dataset.kind;
-      if (!auto) { clearTimeout(sl._ytTimer); claimAudio('feed'); }
+      if (!box) return;
+      sl._preload = !!preload;
+      if (!auto && !preload) { clearTimeout(sl._ytTimer); claimAudio('feed'); }
       const yid = encodeURIComponent(p.ytId || youTubeId(p.linkUrl));
+      const play = preload ? 0 : 1;
       const src = kind === 'youtube'
-        ? `https://www.youtube-nocookie.com/embed/${yid}?enablejsapi=1&autoplay=1&mute=${auto ? 1 : 0}&playsinline=1&rel=0&loop=1&playlist=${yid}&origin=${encodeURIComponent(location.origin)}`
-        : `https://www.tiktok.com/player/v1/${encodeURIComponent(tikTokId(p.linkUrl))}?autoplay=1&rel=0`;
+        ? `https://www.youtube-nocookie.com/embed/${yid}?enablejsapi=1&autoplay=${play}&mute=${auto || preload ? 1 : 0}&playsinline=1&rel=0&loop=1&playlist=${yid}&origin=${encodeURIComponent(location.origin)}`
+        : `https://www.tiktok.com/player/v1/${encodeURIComponent(tikTokId(p.linkUrl))}?autoplay=${play}&rel=0`;
       box.innerHTML = `<button class="vembed-close" data-a="close-embed" aria-label="Close player">${IC.close}</button>
-        <div class="vembed-frame ${kind === 'tiktok' || p.short || p.linkUrl.includes('/shorts/') ? 'tall' : ''}"><iframe src="${esc(src)}" title="${kind === 'youtube' ? 'YouTube' : 'TikTok'} video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
-      box.hidden = false; sl.querySelector('.vcard').hidden = true;
+        <div class="vembed-frame ${kind === 'tiktok' || p.short || p.linkUrl.includes('/shorts/') ? 'tall' : ''}"><iframe referrerpolicy="strict-origin-when-cross-origin" src="${esc(src)}" title="${kind === 'youtube' ? 'YouTube' : 'TikTok'} video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe><div class="vswipe" aria-hidden="true"></div></div>`;
+      box.hidden = false;
+      const card = sl.querySelector('.vcard'); if (card) card.hidden = false;
+      sl.classList.remove('yt-on');
       box.querySelector('.vembed-close').onclick = (e) => { e.stopPropagation(); closeEmbed(sl); };
+      const swipe = box.querySelector('.vswipe');
+      if (swipe) {
+        let y0 = 0;
+        swipe.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+        swipe.addEventListener('pointerup', (e) => {
+          if (Math.abs(e.clientY - y0) > 10) return;
+          const st = sl._yt && sl._yt.getPlayerState && sl._yt.getPlayerState();
+          if (st === 1) { ytCmd(box.querySelector('iframe'), 'pauseVideo'); sl.classList.add('paused'); sl.dataset.userPaused = '1'; }
+          else { delete sl.dataset.userPaused; sl.classList.remove('paused'); ytPlay(sl); }
+        });
+      }
     }
 
     // ---------------------------------------------------------- more menu (copy / report / block / delete)
@@ -685,7 +735,7 @@ export function createWatch(ctx) {
 
     // Start at the deep-linked video (if any), then begin observing.
     const startIndex = Math.max(0, startId ? posts.findIndex((p) => p.id === startId) : 0);
-    feed.scrollTop = startIndex * feed.clientHeight;
+    feed.scrollTop = slides[startIndex] ? slides[startIndex].offsetTop : 0;
     slides.forEach((sl) => io.observe(sl));
     feed.focus({ preventScroll: true });
     session = { wrap };
