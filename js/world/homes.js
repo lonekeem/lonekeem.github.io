@@ -3,7 +3,7 @@
 // garage (the roll-up door opens for the owner and closes after), "Park here" saves the car in that bay, your last
 // spot + a car left on the street are remembered (localStorage + a throttled private Firestore doc).
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, addDoc, deleteField } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear } from './layout.js';
 import { CAR, CARS, PAINTS, buildCar, poseCar, addPlate } from './cars.js';
 import { parseCar } from './drive.js';
@@ -11,24 +11,12 @@ import { GALLERY } from './cities.js';
 import { checkInput } from '../pals/talk.js';
 import { ADMIN_EMAIL, EMU } from '../firebase-init.js';
 import { attachHomeLife } from './homelife.js';
+import { RADIO_RE, ytId, ytWatchUrl, ytEmbedSrc, radioLinkOk, PREVIEW_NOTE, YT_MAX, cleanTitle, titleOk, parseYtList, serYtList, radioKeep, playKeyOf } from './house-tv.js';
+export { RADIO_RE, radioLinkOk };
+export const ytRadioId = ytId;
 export const plateBad = (t) => { const s = String(t || ''); return !!(checkInput(s) || checkInput(s.toLowerCase()) || checkInput(s.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').toLowerCase())); };
 import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, serItems, defaultItems, WALL_SW, WALL_ROOMS, parseWalls, EXT_SW, FLOORS } from './interior.js';
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export const RADIO_RE = /^https:\/\/(?:open\.spotify\.com|embed\.music\.apple\.com|music\.apple\.com|(?:www\.|m\.)?youtube\.com|(?:www\.)?youtube-nocookie\.com|(?:www\.)?youtu\.be)\//;
-// House TV accepts the same YouTube links as the rest of Kemy. The id is checked again before an iframe is created.
-export function ytRadioId(url) {
-  try {
-    const u = new URL(String(url).trim());
-    const host = u.hostname.replace(/^www\./, '');
-    let id = '';
-    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
-    else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
-      id = u.searchParams.get('v') || (u.pathname.match(/\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{11})/) || [])[1] || '';
-    }
-    return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
-  } catch { return ''; }
-}
-export const radioLinkOk = (url) => { const u = String(url || '').trim(); return !!u && u.length <= 300 && RADIO_RE.test(u) && (!/youtube|youtu\.be/.test(u) || !!ytRadioId(u)); };
 
 const lsg = (k) => { try { return localStorage.getItem(k); } catch { return null; } }, lss = (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } };
 export async function registerHomeItems() { const cat = await import('../pals/catalog.js'); const all = [...HOME_STYLES, ...GARAGES];
@@ -55,6 +43,10 @@ export function attachHomes(api, W, K) {
 .kh-in{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(16px,env(safe-area-inset-bottom)) + 150px);pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;background:#0f766e;color:#fff;font:800 15px Inter,sans-serif;padding:0 18px;z-index:8}.kh-in[hidden],.kh-p[hidden]{display:none}
 .kh-p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,6,30,.55);pointer-events:auto;z-index:30}.kh-c{background:#fff;color:#111;border-radius:18px;padding:16px;width:min(92vw,380px);max-height:80vh;overflow:auto;font:500 14px Inter,sans-serif}
 .kh-c h3{margin:0 0 6px;font:800 18px Inter,sans-serif;color:#111}.kh-c button{margin:6px 6px 0 0;border:0;border-radius:12px;padding:10px 14px;font:800 14px Inter,sans-serif;background:#6d28d9;color:#fff}.kh-c button.g{background:#e5e7eb;color:#111}.kh-c .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;color:#111}.kh-c small{color:#444}
+.kh-c .kh-lab{display:block;font-weight:800;margin:10px 0 4px}.kh-c input,.kh-c select{width:100%;min-height:40px;border-radius:10px;border:1px solid #ccc;padding:0 8px;box-sizing:border-box;font:600 14px Inter,sans-serif}
+.kh-c .kh-saved{list-style:none;margin:8px 0;padding:0;max-height:220px;overflow:auto}.kh-c .kh-saved li{display:flex;gap:4px;align-items:center;padding:4px 0;border-bottom:1px solid #eee}
+.kh-c .kh-saved button{margin:0;padding:6px 8px;min-height:34px}.kh-c .kh-saved .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;background:#f5f3ff;color:#111}
+.kh-c .kh-saved .t.on{box-shadow:inset 0 0 0 2px #f59e0b}.kh-c .kh-note{display:block;color:#444;font-size:12px;margin:4px 0 8px}
 @media (orientation:landscape) and (max-height:500px){.kh-home{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 300px)}.kh-in{bottom:110px}}`;
   document.head.appendChild(css);
   const homeB = document.createElement('button'); homeB.className = 'kh-home'; homeB.textContent = '🏠 Home'; const inB = document.createElement('button'); inB.className = 'kh-in'; inB.hidden = true;
@@ -216,14 +208,15 @@ export function attachHomes(api, W, K) {
   const noteBtn = document.createElement('button'); noteBtn.type = 'button'; noteBtn.className = 'kh-note-btn'; noteBtn.hidden = true; noteBtn.setAttribute('aria-label', 'House music. Show player');
   noteBtn.innerHTML = '<span class="kh-note-glyph" aria-hidden="true">♪</span><span class="kh-eq" aria-hidden="true"><i></i><i></i><i></i></span>';
   const dbar = document.createElement('div'); dbar.className = 'kh-dbar'; dbar.hidden = true; host.append(radioBox, noteBtn, decB, dbar);
-  const radioKey = (o) => (o && o.radio ? JSON.stringify(o.radio) : '');
+  const radioKey = (o) => playKeyOf(o && o.radio);
   let rad = null, miniAt = null, drag = null;
   const linkLabel = (url) => (ytRadioId(url) ? 'YouTube' : /apple/.test(url || '') ? 'Apple Music' : 'Spotify');
   function setRadioTitle(title) { const el = radioBox.querySelector('.kh-title'); if (el) el.textContent = title || 'Music'; if (rad) rad.tvTitle = title || rad.tvTitle; }
   function syncChrome() {
     const card = radioBox.classList.contains('min') && !radioBox.classList.contains('dock');
     const pp = radioBox.querySelector('[data-pp]'), mn = radioBox.querySelector('[data-min]'), ex = radioBox.querySelector('[data-ex]');
-    if (pp) { pp.hidden = !card; pp.textContent = rad && rad.paused ? '▶' : '⏸'; pp.setAttribute('aria-label', rad && rad.paused ? 'Play' : 'Pause'); }
+    const needTap = !!(rad && rad.yid && (!rad.emb || !rad.emb.started));
+    if (pp) { pp.hidden = !card && !needTap; pp.textContent = (rad && rad.paused) || needTap ? '▶' : '⏸'; pp.setAttribute('aria-label', (rad && rad.paused) || needTap ? 'Play' : 'Pause'); }
     if (mn) mn.hidden = card; if (ex) ex.hidden = !card;
     if (!noteBtn.hidden) {
       const title = (rad && rad.tvTitle) || 'House music';
@@ -340,31 +333,75 @@ export function attachHomes(api, W, K) {
   }
   function togglePlay() {
     if (!rad) return;
+    if (rad.yid && (!rad.emb || !rad.emb.started)) { beginYt(rad.yid, { autoplay: true, title: rad.tvTitle || 'YouTube' }); return; }
     if (rad.au) { if (rad.au.paused) rad.au.play().then(() => markPaused(false)).catch(() => {}); else { rad.au.pause(); markPaused(true); } return; }
     if (!rad.emb || typeof rad.emb.toggle !== 'function' || !rad.emb.toggle()) return;
     if (rad.emb.service === 'youtube') markPaused(!rad.paused);
   }
   function closeRadio() { radioOff = (inside && inside.id) || (rad && rad.plot) || null; stopRadio(); }
-  // YouTube (and the other embeds) stay the same iframe node. Minimize only resizes it — recreating the iframe pauses iPhone and Android.
-  function mountHouseYouTube(body, id) {
+  // The YouTube iframe is created inside the tap (autoplay + playsinline) and then left alone.
+  // Minimize, the ♪ button, walking, driving, and leaving the house only move that same frame.
+  function mountHouseYouTube(body, id, { autoplay, title } = {}) {
     const frame = document.createElement('iframe');
-    frame.className = 'kh-yt'; frame.title = 'YouTube'; frame.width = '100%'; frame.height = '180';
+    frame.className = 'kh-yt'; frame.title = title || 'YouTube'; frame.width = '100%'; frame.height = '180';
     frame.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen'); frame.allowFullscreen = true;
-    frame.src = 'https://www.youtube-nocookie.com/embed/' + id + '?enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=' + encodeURIComponent(location.origin);
+    frame.setAttribute('playsinline', '1'); frame.dataset.yt = id; frame.dataset.full = '1';
+    frame.src = ytEmbedSrc(id, { autoplay: !!autoplay, origin: location.origin });
     body.appendChild(frame);
-    const note = document.createElement('small'); note.className = 'kh-note'; note.textContent = 'Tap ▶ on the video, then Minimize. It keeps playing while you walk, drive, or leave.'; body.appendChild(note);
-    const cmd = (func) => { try { frame.contentWindow && frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: '' }), '*'); } catch { /* */ } };
+    const note = document.createElement('small'); note.className = 'kh-note'; note.textContent = 'Full video. It keeps playing in the mini player and the ♪ button while you walk, drive, or leave.'; body.appendChild(note);
+    if (!autoplay) {
+      const tap = document.createElement('button'); tap.type = 'button'; tap.className = 'kh-tap'; tap.dataset.tap = '1'; tap.textContent = 'Tap to play';
+      tap.addEventListener('click', (e) => { e.stopPropagation(); beginYt(id, { autoplay: true, title: (rad && rad.tvTitle) || title || 'YouTube' }); });
+      body.appendChild(tap);
+    }
+    const cmd = (func) => { try { frame.contentWindow && frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*'); } catch { /* */ } };
     frame.addEventListener('load', () => { try { frame.contentWindow && frame.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*'); } catch { /* */ } });
-    dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'house-radio', service: 'youtube' } }));
-    return { service: 'youtube', frame, toggle() { cmd(rad && rad.paused ? 'playVideo' : 'pauseVideo'); return true; }, pause() { cmd('pauseVideo'); },
-      destroy() { cmd('stopVideo'); frame.remove(); dispatchEvent(new CustomEvent('kemy:media-stop', { detail: { source: 'house-radio', service: 'youtube' } })); } };
+    const box = { service: 'youtube', frame, started: !!autoplay, play() { cmd('playVideo'); }, toggle() { cmd(rad && rad.paused ? 'playVideo' : 'pauseVideo'); return true; }, pause() { cmd('pauseVideo'); },
+      destroy() { try { cmd('stopVideo'); } catch { /* */ } frame.remove(); if (box.started) dispatchEvent(new CustomEvent('kemy:media-stop', { detail: { source: 'house-radio', service: 'youtube' } })); } };
+    if (autoplay) dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'house-radio', service: 'youtube' } }));
+    return box;
   }
-  function fetchYtTitle(id, me0, by) {
-    fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id)).then((r) => (r.ok ? r.json() : null)).then((d) => {
-      if (!d || !d.title || rad !== me0) return;
-      const title = String(d.title).replace(/\s+/g, ' ').trim().slice(0, 80);
-      setRadioTitle(title); if (inside && inside.id === me0.plot) tvShow(title.slice(0, 28), by);
+  function oembedTitle(id) {
+    return fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(ytWatchUrl(id))).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const t = cleanTitle(d && d.title); return titleOk(t) ? t : '';
+    }).catch(() => '');
+  }
+  function fetchYtTitle(id, me0) {
+    oembedTitle(id).then((title) => {
+      if (!title || rad !== me0) return;
+      setRadioTitle(title); if (inside && inside.id === me0.plot) tvShow(title.slice(0, 28), (owners.get(me0.plot) || {}).name);
+      const o = owners.get(myPlot); if (!o || o.owner !== uid || me0.plot !== myPlot || !o.radio) return;
+      const items = parseYtList(o.radio.list); const hit = items.find((x) => x.id === id);
+      if (!hit || hit.title !== 'YouTube') return;
+      hit.title = title;
+      saveRadio({ k: o.radio.k, url: o.radio.url, t: o.radio.t, s: o.radio.s, list: serYtList(items) }).catch(() => {});
     }).catch(() => {});
+  }
+  // Show the card before setting an autoplay src. A display:none iframe will not start on iPhone.
+  function beginYt(id, { autoplay = false, title = 'YouTube', hold = false } = {}) {
+    const plot = (inside && inside.id) || (rad && rad.plot) || myPlot || '';
+    if (rad && rad.yid === id && rad.emb && rad.emb.frame && rad.emb.frame.isConnected) {
+      if (autoplay && !rad.emb.started) {
+        radioBox.hidden = false; expandRadio();
+        rad.emb.frame.src = ytEmbedSrc(id, { autoplay: true, origin: location.origin });
+        rad.emb.started = true;
+        const tap = radioBox.querySelector('[data-tap]'); if (tap) tap.remove();
+        dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'house-radio', service: 'youtube' } }));
+        markPaused(false); fetchYtTitle(id, rad);
+      } else if (autoplay) { rad.emb.play(); markPaused(false); }
+      if (hold) rad.holdUntil = Date.now() + 6000;
+      rad.playKey = 'link|' + id; radioBox.hidden = false;
+      if (window.__kh) window.__kh.radio = 'link';
+      return;
+    }
+    stopRadio();
+    const me0 = (rad = { playKey: 'link|' + id, plot, yid: id, paused: !autoplay, tvTitle: title || 'YouTube', holdUntil: hold ? Date.now() + 6000 : 0 });
+    paintChrome(me0.tvTitle); radioBox.hidden = false;
+    me0.emb = mountHouseYouTube(radioBox.querySelector('.kh-rb'), id, { autoplay, title: me0.tvTitle });
+    syncChrome();
+    if (inside && inside.id === plot) tvShow(me0.tvTitle, (owners.get(plot) || {}).name);
+    if (autoplay) fetchYtTitle(id, me0);
+    if (window.__kh) window.__kh.radio = 'link';
   }
   radioBox.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b || !radioBox.contains(b) || b.dataset.p != null) return;
@@ -397,21 +434,28 @@ export function attachHomes(api, W, K) {
   async function startRadio() {
     if (!inside || radioOff === inside.id) return;
     const plot = inside.id, o = owners.get(plot), Rd = o && o.radio;
-    if (!Rd || (Rd.k !== 'link' && Rd.k !== 'kemy')) { stopRadio(); return; }
-    const key = radioKey(o);
-    if (rad && rad.key === key && rad.plot === plot) { radioBox.hidden = false; tvShow(rad.tvTitle || 'Music', o.name); if (window.__kh) window.__kh.radio = Rd.k; return; }
-    const yid = Rd.k === 'link' ? ytRadioId(Rd.url || '') : '';
-    if (Rd.k === 'link' && !yid && (!RADIO_RE.test(Rd.url || '') || !radioLinkOk(Rd.url))) { stopRadio(); return; }
+    const key = playKeyOf(Rd);
+    if (rad && rad.holdUntil && Date.now() < rad.holdUntil && key !== rad.playKey) return;
+    if (!key) { stopRadio(); return; }
+    if (rad && rad.playKey === key && rad.plot === plot && (rad.emb || rad.au)) {
+      rad.holdUntil = 0; radioBox.hidden = false;
+      const hit = rad.yid && parseYtList(Rd.list).find((x) => x.id === rad.yid);
+      if (hit) setRadioTitle(hit.title);
+      tvShow((hit && hit.title) || rad.tvTitle || 'Music', o.name);
+      if (window.__kh) window.__kh.radio = Rd.k; return;
+    }
+    const yid = Rd.k === 'link' ? ytId(Rd.url || '') : '';
+    if (yid) { const hit = parseYtList(Rd.list).find((x) => x.id === yid); beginYt(yid, { autoplay: false, title: (hit && hit.title) || 'YouTube' }); return; }
+    if (Rd.k === 'link' && !radioLinkOk(Rd.url)) { stopRadio(); return; }
     stopRadio();
-    const me0 = (rad = { key, plot, paused: false, tvTitle: Rd.k === 'kemy' ? 'Kemy Radio' : linkLabel(Rd.url || '') });
+    const me0 = (rad = { playKey: key, plot, paused: false, tvTitle: Rd.k === 'kemy' ? 'Kemy Radio' : linkLabel(Rd.url || '') });
     paintChrome(me0.tvTitle); radioBox.hidden = false;
     const body = radioBox.querySelector('.kh-rb');
-    if (Rd.k === 'link' && yid) { me0.emb = mountHouseYouTube(body, yid); setRadioTitle('YouTube'); fetchYtTitle(yid, me0, o.name); }
-    else if (Rd.k === 'link') {
+    if (Rd.k === 'link') {
       const { musicEmbed, mountMusicEmbed } = await import('../embeds.js'); if (rad !== me0) return;
       const e = musicEmbed(Rd.url); if (!e) { stopRadio(); return; }
       e.height = Math.min(e.height || 152, 152); me0.emb = mountMusicEmbed(body, e, { source: 'house-radio' });
-      const note = document.createElement('small'); note.className = 'kh-note'; note.textContent = 'Tap ▶ to listen. Spotify and Apple embeds play 30 s previews unless you’re signed in there.'; body.appendChild(note);
+      const note = document.createElement('small'); note.className = 'kh-note'; note.textContent = PREVIEW_NOTE; body.appendChild(note);
       setRadioTitle(e.service === 'apple' ? 'Apple Music' : 'Spotify');
     } else {
       const { TRACKS } = await import('../theme.js'); if (rad !== me0) return;
@@ -434,17 +478,67 @@ export function attachHomes(api, W, K) {
     radioBox.hidden = true; radioBox.innerHTML = ''; if (window.__kh) window.__kh.radio = null;
   }
   // owner writes (merge; rules re-check owner/name/garage/at on every write)
-  const homeW = (patch) => { const o = owners.get(myPlot); return setDoc(doc(db, 'homes', myPlot), { ...patch, owner: uid, name: S.profile.displayName, style: o.style, garage: o.garage || 0, at: serverTimestamp() }, { merge: true }); };
+  const homeW = (patch) => { const o = owners.get(myPlot); if (!myPlot || !o || o.owner !== uid) return Promise.reject(Object.assign(new Error('Only the owner can change this'), { code: 'permission-denied' })); return setDoc(doc(db, 'homes', myPlot), { ...patch, owner: uid, name: S.profile.displayName, style: o.style, garage: o.garage || 0, at: serverTimestamp() }, { merge: true }); };
   const wErr = (e) => say(e && e.code === 'permission-denied' ? '⚠️ Saving this needs the updated house rules (ask the admin to deploy firestore.rules)' : (e && e.message) || 'Could not save');
-  function radioPanel() { const o = owners.get(myPlot) || {}; const Rd = o.radio || {}; import('../theme.js').then(({ TRACKS }) => panel(`<h3>📺 TV &amp; house music</h3><p><small>Plays on the living room TV for you and visitors while inside. Paste a Spotify, Apple Music, or YouTube link, or pick a Kemy Radio track (synced for everyone). Minimize tucks it into a small music button and keeps it playing while you walk around.</small></p>
-      <input data-u placeholder="https://open.spotify.com/… or a YouTube link" value="${esc(Rd.k === 'link' ? Rd.url : '')}" style="width:100%;min-height:40px;border-radius:10px;border:1px solid #ccc;padding:0 8px;box-sizing:border-box"><button data-l>Use link</button>
-      <div class="kh-pick" style="margin-top:8px"><img data-cv alt="" width="44" height="44" hidden><div style="flex:1;min-width:0"><select data-t style="min-height:40px;border-radius:10px;max-width:100%">${TRACKS.map((t, i) => `<option value="${i}" ${Rd.k === 'kemy' && (Rd.t | 0) === i ? 'selected' : ''}>${esc(t.title)}</option>`).join('')}</select><small data-cr></small></div></div><button data-k>Play Kemy Radio</button><button class="g" data-o>Radio off</button>`,
+  // setDoc merge keeps nested keys we omit, so a cleared list or an old track number has to be deleted on purpose.
+  function saveRadio(next) { const docu = radioKeep((owners.get(myPlot) || {}).radio || {}, next); if (!docu) { say('Paste a YouTube, Spotify, or Apple Music link'); return Promise.resolve(false); }
+    const radio = { k: docu.k, url: 'url' in docu ? docu.url : deleteField(), t: 't' in docu ? docu.t : deleteField(), s: 's' in docu ? docu.s : deleteField(), list: docu.list ? docu.list : deleteField() };
+    return homeW({ radio }).then(() => true); }
+  function tvRows(items, edit, currentId) {
+    if (!items.length) return '<p><small>No saved YouTube videos yet.</small></p>';
+    return `<ul class="kh-saved">${items.map((it, i) => `<li><button type="button" class="t${it.id === currentId ? ' on' : ''}" data-play="${it.id}">${esc(it.title)}</button>${edit ? `<button type="button" class="g" data-up="${i}" aria-label="Move up"${i ? '' : ' disabled'}>↑</button><button type="button" class="g" data-dn="${i}" aria-label="Move down"${i < items.length - 1 ? '' : ' disabled'}>↓</button><button type="button" class="g" data-ren="${i}" aria-label="Rename">Rename</button><button type="button" class="g" data-rm="${i}" aria-label="Remove">Remove</button>` : ''}</li>`).join('')}</ul>`;
+  }
+  function playSaved(id, persist) {
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+    const src = owners.get(persist ? myPlot : (inside && inside.id)) || {};
+    const known = parseYtList(src.radio && src.radio.list).find((x) => x.id === id);
+    pan.hidden = true; radioOff = null;
+    beginYt(id, { autoplay: true, title: (known && known.title) || 'YouTube', hold: !!persist });
+    if (!persist) return;
+    const Rd = (owners.get(myPlot) || {}).radio || {};
+    let items = parseYtList(Rd.list);
+    const hit = items.find((x) => x.id === id);
+    const full = !hit && items.length >= YT_MAX;
+    const next = { k: 'link', url: ytWatchUrl(id) };
+    if (!full) { items = [{ id, title: hit ? hit.title : 'YouTube' }, ...items.filter((x) => x.id !== id)]; next.list = serYtList(items); }
+    else if (Rd.list) next.list = Rd.list;
+    saveRadio(next).then((ok) => { if (!ok) return; say(full ? '📺 Playing the full video. The saved list is full (20).' : '📺 Playing the full video'); }).catch(wErr);
+  }
+  function radioBase(Rd, list) { const next = { k: Rd.k || 'off', list }; if (Rd.k === 'link') next.url = Rd.url; if (Rd.k === 'kemy') { next.t = Rd.t; next.s = Rd.s; } return next; }
+  function watchPanel() {
+    if (!inside) return;
+    const o = owners.get(inside.id) || {}; const Rd = o.radio || {}; const items = parseYtList(Rd.list);
+    const curId = ytId(Rd.url || ''); const rows = curId && !items.some((x) => x.id === curId) ? [{ id: curId, title: 'YouTube' }, ...items] : items;
+    panel(`<h3>📺 TV</h3><p><small>YouTube plays the full video. Only ${esc(o.name || 'the owner')} can change the saved list.</small></p>${tvRows(rows, false, Rd.k === 'link' ? curId : '')}`,
+      (c) => { c.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => playSaved(b.dataset.play, false))); });
+  }
+  function radioPanel() {
+    const o = owners.get(myPlot) || {};
+    if (!myPlot || o.owner !== uid) { if (inside) watchPanel(); else say('Only the owner can edit this TV'); return; }
+    const Rd = o.radio || {}; const items = parseYtList(Rd.list); const curId = Rd.k === 'link' ? ytId(Rd.url || '') : '';
+    const spUrl = Rd.k === 'link' && !curId ? (Rd.url || '') : '';
+    import('../theme.js').then(({ TRACKS }) => panel(`<h3>📺 TV &amp; house music</h3><p><small>YouTube plays the full video on this TV, in the mini player, and on the ♪ button while you walk, drive, or leave the house.</small></p>
+      <label class="kh-lab" for="kh-yt">YouTube</label><input id="kh-yt" data-yt placeholder="https://www.youtube.com/watch?v=… or youtu.be/…" value="${esc(curId ? ytWatchUrl(curId) : '')}"><button type="button" data-add>Add to TV</button><button type="button" data-go>Play</button>
+      ${tvRows(items, true, curId)}
+      <label class="kh-lab" for="kh-sp">Spotify or Apple Music</label><input id="kh-sp" data-sp placeholder="https://open.spotify.com/… or music.apple.com/…" value="${esc(spUrl)}"><button type="button" data-spgo>Use Spotify or Apple</button><small class="kh-note">${esc(PREVIEW_NOTE)}</small>
+      <div class="kh-pick" style="margin-top:8px"><img data-cv alt="" width="44" height="44" hidden><div style="flex:1;min-width:0"><select data-t style="max-width:100%">${TRACKS.map((t, i) => `<option value="${i}" ${Rd.k === 'kemy' && (Rd.t | 0) === i ? 'selected' : ''}>${esc(t.title)}</option>`).join('')}</select><small data-cr></small></div></div><button type="button" data-k>Play Kemy Radio</button><button type="button" class="g" data-o>TV off</button>`,
     (c) => { const sel = c.querySelector('[data-t]'), img = c.querySelector('[data-cv]'), cr = c.querySelector('[data-cr]');
       const paintPick = () => { const t = TRACKS[+sel.value] || TRACKS[0]; if (t.cover) { img.hidden = false; img.src = t.cover; } else { img.hidden = true; img.removeAttribute('src'); } cr.textContent = `${t.artist}${t.credit ? ' · ' + t.credit : ''}`; };
       sel.onchange = paintPick; paintPick();
-      c.querySelector('[data-l]').onclick = () => { const u = c.querySelector('[data-u]').value.trim(); if (!radioLinkOk(u)) { say('Paste an open.spotify.com, music.apple.com, or YouTube link'); return; } homeW({ radio: { k: 'link', url: u } }).then(() => { pan.hidden = true; say('📻 Radio set'); }).catch(wErr); };
-      c.querySelector('[data-k]').onclick = () => homeW({ radio: { k: 'kemy', t: +c.querySelector('[data-t]').value, s: Date.now() } }).then(() => { pan.hidden = true; say('📻 Kemy Radio on'); }).catch(wErr);
-      c.querySelector('[data-o]').onclick = () => homeW({ radio: { k: 'off' } }).then(() => { pan.hidden = true; say('📻 Radio off'); }).catch(wErr); })); }
+      const fresh = () => (owners.get(myPlot) || {}).radio || Rd;
+      c.querySelector('[data-add]').onclick = () => { const id = ytId(c.querySelector('[data-yt]').value); if (!id) { say('Paste a YouTube link (youtube.com or youtu.be).'); return; } const cur = parseYtList(fresh().list); if (cur.some((x) => x.id === id)) { say('Already saved on this TV'); return; } if (cur.length >= YT_MAX) { say('The TV list holds 20 videos'); return; }
+        const list = serYtList([...cur, { id, title: 'YouTube' }]); saveRadio(radioBase(fresh(), list)).then(async (ok) => { if (!ok) return; say('📺 Saved on this TV'); if (!pan.hidden) radioPanel(); const title = await oembedTitle(id); if (!title) return; const now = fresh(); const have = parseYtList(now.list); const next = (have.some((x) => x.id === id) ? have : parseYtList(list)).map((x) => (x.id === id && x.title === 'YouTube' ? { id, title } : x)); await saveRadio(radioBase(now.k ? now : fresh(), serYtList(next))); if (!pan.hidden) radioPanel(); }).catch(wErr); };
+      c.querySelector('[data-go]').onclick = () => { const id = ytId(c.querySelector('[data-yt]').value); if (!id) { say('Paste a YouTube link (youtube.com or youtu.be).'); return; } playSaved(id, true); };
+      c.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => playSaved(b.dataset.play, true)));
+      c.querySelectorAll('[data-up]').forEach((b) => (b.onclick = () => { const i = +b.dataset.up; if (!i) return; const cur = parseYtList(fresh().list); if (!cur[i]) return; const n = cur.slice(); [n[i - 1], n[i]] = [n[i], n[i - 1]]; saveRadio(radioBase(fresh(), serYtList(n))).then(() => radioPanel()).catch(wErr); }));
+      c.querySelectorAll('[data-dn]').forEach((b) => (b.onclick = () => { const i = +b.dataset.dn; const cur = parseYtList(fresh().list); if (i >= cur.length - 1) return; const n = cur.slice(); [n[i + 1], n[i]] = [n[i], n[i + 1]]; saveRadio(radioBase(fresh(), serYtList(n))).then(() => radioPanel()).catch(wErr); }));
+      c.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { const cur = parseYtList(fresh().list).filter((_, j) => j !== +b.dataset.rm); saveRadio(radioBase(fresh(), cur.length ? serYtList(cur) : '')).then(() => radioPanel()).catch(wErr); }));
+      c.querySelectorAll('[data-ren]').forEach((b) => (b.onclick = () => { const i = +b.dataset.ren; const cur = parseYtList(fresh().list); const li = b.closest('li'); const t = li && li.querySelector('.t'); if (!t || !cur[i]) return; const inp = document.createElement('input'); inp.value = cur[i].title; inp.maxLength = 80; inp.setAttribute('aria-label', 'Video title'); t.replaceWith(inp); inp.focus(); let done = false;
+        const commit = () => { if (done) return; done = true; const typed = cleanTitle(inp.value); if (!titleOk(typed)) { say('That title isn’t allowed'); radioPanel(); return; } const n = cur.slice(); n[i] = { id: cur[i].id, title: typed }; saveRadio(radioBase(fresh(), serYtList(n))).then(() => radioPanel()).catch(wErr); };
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } }); inp.addEventListener('blur', commit); }));
+      c.querySelector('[data-spgo]').onclick = () => { const u = c.querySelector('[data-sp]').value.trim(); if (ytId(u)) { say('That is a YouTube link. Use the YouTube box so it plays in full.'); return; } if (!radioLinkOk(u)) { say('Paste an open.spotify.com or music.apple.com link'); return; } saveRadio({ k: 'link', url: u }).then((ok) => { if (!ok) return; pan.hidden = true; say('📻 Link set'); }).catch(wErr); };
+      c.querySelector('[data-k]').onclick = () => saveRadio({ k: 'kemy', t: +c.querySelector('[data-t]').value, s: Date.now() }).then((ok) => { if (!ok) return; pan.hidden = true; say('📻 Kemy Radio on'); }).catch(wErr);
+      c.querySelector('[data-o]').onclick = () => saveRadio({ k: 'off' }).then((ok) => { if (!ok) return; stopRadio(); pan.hidden = true; say('📺 TV off'); }).catch(wErr); })); }
   function guestPanel() { const o = owners.get(myPlot) || {}; const inv = Array.isArray(o.inv) ? o.inv : [], invN = Array.isArray(o.invN) ? o.invN : [];
     panel(`<h3>🚪 Open house & invites</h3><div class="row"><span>Open house<br><small>${o.open ? 'Anyone can visit' : 'Only you + invited friends'}</small></span><button data-o>${o.open ? 'On ✅' : 'Off'}</button></div>
       <div class="row"><input data-n placeholder="@username" style="flex:1;min-height:38px;border-radius:10px;border:1px solid #ccc;padding:0 8px"><button data-a>Invite</button></div>${inv.map((u, i) => `<div class="row"><span>@${esc(invN[i] || 'pal')}</span><button class="g" data-r="${i}">Remove</button></div>`).join('') || '<p><small>No invites yet.</small></p>'}`,
@@ -525,6 +619,7 @@ export function attachHomes(api, W, K) {
       for (const [id, o] of owners) if (o.owner === uid && !HOUSE_BY_ID[id]?.admin) { myPlot = id; myTier = o.garage || 0; } if (amAdmin && owners.get(ADMIN_PLOT)?.owner === uid && !myPlot) { myPlot = ADMIN_PLOT; myTier = 0; }
       for (const id of new Set([...prev.keys(), ...owners.keys()])) { const h = HOUSE_BY_ID[id]; if (!h || !h.sale) continue; const a = prev.get(id), b = owners.get(id); if (JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); if (JSON.stringify((a || {}).decor) !== JSON.stringify((b || {}).decor)) applyDecor(id); }
       if (inside && !canEnter(inside)) { goOut(); say('🚪 The owner closed this home'); } else if (inside && radioKey(prev.get(inside.id)) !== radioKey(owners.get(inside.id))) { radioOff = null; startRadio(); }
+      else if (rad && rad.yid) { const hit = parseYtList(((owners.get(rad.plot) || {}).radio || {}).list).find((x) => x.id === rad.yid); if (hit) setRadioTitle(hit.title); }
       syncCars(); ensurePalace(); if (!snapOk) { snapOk = true; firstSpawn(); } }
   async function buyHome(h, btn) { try { if (myPlot) throw new Error('You already own a home (one per player). Move out first to buy another.'); if (owners.has(h.id)) throw new Error('Someone just bought this one!');
       busy(btn, 'Buying…'); const st = HOME_STYLES[h.style]; const { econ: e, dia: d } = await shop(); const inv = await e.inventory(true); if (!inv[st.item]) { if (st.d) await d.buy(st.item); else await e.buy(st.item); }
@@ -536,7 +631,7 @@ export function attachHomes(api, W, K) {
     catch (e) { btn.disabled = false; btn.textContent = 'Try again'; say(e.code === 'permission-denied' ? 'The shop isn’t open for garages yet (prices not published).' : e.message || 'Could not build'); } }
   async function moveOut(btn) { try { busy(btn, 'Moving out…'); const b = writeBatch(db); b.delete(doc(db, 'homes', myPlot)); b.delete(doc(db, 'users', uid, 'pal', 'home')); await b.commit(); save.cars = []; persist(true); pan.hidden = true; say('📦 Moved out. Your deed stays, so you can claim another house of that style for free.'); } catch (e) { btn.disabled = false; say(e.message || 'Could not move out'); } }
   function salePanel(h) { const st = HOME_STYLES[h.style]; panel(`<h3>🏷️ ${st.name}</h3><div class="row"><span>Plot ${h.id} · ${(h.town ? h.town : 'Kemy Street')}</span><b>${price(st)}</b></div><p><small>Living room, kitchen and bedroom inside. One home per player. Add a garage later.</small></p>${myPlot ? `<p><b>You already own ${myPlot}.</b></p>` : '<button data-b>Buy for ' + price(st) + '</button>'}`, (c) => { const b = c.querySelector('[data-b]'); if (b) b.onclick = () => buyHome(h, b); }); }
-  function myPanel() { const h = HOUSE_BY_ID[myPlot]; const st = HOME_STYLES[h.style]; panel(`<h3>🏠 My ${st.name}</h3><div class="row"><span>Garage</span><b>${myTier ? myTier + ' bay' + (myTier > 1 ? 's' : '') : 'none'}</b></div>` + GARAGES.filter((g) => g.tier > myTier && g.tier <= maxTier(h)).map((g) => `<div class="row"><span>${g.name}</span><button data-g="${g.tier}">${price(g)}</button></div>`).join('') + `<p><small>${(() => { const G0 = garages.get(myPlot); const n = G0 ? G0.cars.length : 0; const ov = G0 ? G0.overflow : 0; return `🚗 ${n} car${n === 1 ? '' : 's'} parked here for everyone to see (garage holds ${garageCap(myTier)}, plus driveway${h.estate ? '' : ' + curb'} spots).${ov ? ` <b>${ov} more need a bigger garage.</b>` : ''}`; })()} Walk up to a parked car to drive it; drive home and tap 🅿️ Park at home.</small></p><div><button data-gu>🚪 Open house & invites</button><button data-rd>📻 House radio</button><button data-dc>🛠️ Decorate</button></div><button class="g" data-m>Move out</button>${h.admin ? '' : ' <button class="g" data-sell>🏷️ Sell house</button>'}`,
+  function myPanel() { const h = HOUSE_BY_ID[myPlot]; const st = HOME_STYLES[h.style]; panel(`<h3>🏠 My ${st.name}</h3><div class="row"><span>Garage</span><b>${myTier ? myTier + ' bay' + (myTier > 1 ? 's' : '') : 'none'}</b></div>` + GARAGES.filter((g) => g.tier > myTier && g.tier <= maxTier(h)).map((g) => `<div class="row"><span>${g.name}</span><button data-g="${g.tier}">${price(g)}</button></div>`).join('') + `<p><small>${(() => { const G0 = garages.get(myPlot); const n = G0 ? G0.cars.length : 0; const ov = G0 ? G0.overflow : 0; return `🚗 ${n} car${n === 1 ? '' : 's'} parked here for everyone to see (garage holds ${garageCap(myTier)}, plus driveway${h.estate ? '' : ' + curb'} spots).${ov ? ` <b>${ov} more need a bigger garage.</b>` : ''}`; })()} Walk up to a parked car to drive it; drive home and tap 🅿️ Park at home.</small></p><div><button data-gu>🚪 Open house & invites</button><button data-rd>📺 TV &amp; music</button><button data-dc>🛠️ Decorate</button></div><button class="g" data-m>Move out</button>${h.admin ? '' : ' <button class="g" data-sell>🏷️ Sell house</button>'}`,
     (c) => { c.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => buyGarage(+b.dataset.g, b))); c.querySelector('[data-gu]').onclick = () => guestPanel(); c.querySelector('[data-rd]').onclick = () => radioPanel(); c.querySelector('[data-dc]').onclick = () => { pan.hidden = true; if (inside && inside.id === myPlot) startDeco(); else { goIn(HOUSE_BY_ID[myPlot]); setTimeout(startDeco, 50); } }; c.querySelector('[data-m]').onclick = (e) => { if (e.target.dataset.sure) moveOut(e.target); else { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to move out'; } }; const sb = c.querySelector('[data-sell]'); if (sb) sb.onclick = () => sellPanel(); }); }
   // 🏷️ sell back: a server function (sellHome) checks ownership + the deed and credits 60% in the same currency, once
   const refundOf = (st) => (st.d ? { cur: '💎', n: Math.floor(st.d * 0.6), name: 'Diamonds' } : { cur: '⭐', n: Math.floor(st.p * 0.6), name: 'Star Coins' });
@@ -593,11 +688,12 @@ export function attachHomes(api, W, K) {
     g.shadowColor = pal.main; g.shadowBlur = 22 + Math.sin(t * 3) * 6; g.fillStyle = pal.main; g.fillText(lab, Wc / 2, 82); g.shadowBlur = 0; g.fillStyle = 'rgba(255,255,255,.9)'; g.font = '600 20px Inter, Arial, sans-serif';
     g.fillText('Now playing' + (tvBy ? ' · ' + tvBy + '’s TV' : ''), Wc / 2, 128, Wc - 60); g.shadowBlur = 0; if (tvTex) tvTex.needsUpdate = true; }
   function tvAct() { if (!inside) return; const o = owners.get(inside.id); if (o && o.owner === uid && inside.id === myPlot) { radioPanel(); return; }
-    if (rad) { if (radioOff === inside.id) { radioOff = null; startRadio(); } else say('📺 ' + (o && o.name ? o.name : 'The owner') + ' picks the music on this TV'); } else if (radioOff === inside.id) { radioOff = null; startRadio(); } else say('📺 The TV is off. Only ' + (o && o.name ? o.name : 'the owner') + ' can pick the music.'); }
+    const Rd = o && o.radio; if ((Rd && parseYtList(Rd.list).length) || ytId((Rd && Rd.url) || '')) { watchPanel(); return; }
+    if (rad) { if (radioOff === inside.id) { radioOff = null; startRadio(); } else say('📺 ' + (o && o.name ? o.name : 'The owner') + ' picks what plays on this TV'); } else if (radioOff === inside.id) { radioOff = null; startRadio(); } else say('📺 The TV is off. Only ' + (o && o.name ? o.name : 'the owner') + ' can pick what plays.'); }
   function nearTV() { const r = inside && rooms.get(inside.id); for (const sc of (r && r.I.screens ? r.I.screens() : [])) { if (Math.abs(P.y - sc.fl) > 1.2) continue; const dx = P.x - sc.x, dz = P.z - sc.z; const fwd = dx * Math.sin(sc.yaw) + dz * Math.cos(sc.yaw); if (Math.hypot(dx, dz) < 2.6 && fwd > -0.2) return true; } return false; }
   const lookOnly = () => !!(inside && inside.admin && !amAdmin); // 👑 the palace: visitors may only look around
   function roomPrompt() { if (lookOnly()) return null; const lp = life.prompt(); if (P.sit) return lp || { id: 'kh:stand', label: '🧍 Stand up' }; if (lp && lp.id !== 'kh:life:eatnow') return lp; const s = nearSeat(); if (s >= 0) { const c = seatsHere()[s].c; return { id: 'kh:sit:' + s, label: c[0] === 'b' ? '🛏️ Sit on bed' : c === 'cs' || c === 'cl' ? '🛋️ Sit' : '🪑 Sit' }; }
-    if (nearTV()) { const o = owners.get(inside.id); return { id: 'kh:tv', label: o && o.owner === uid ? '📺 TV music' : rad ? '📺 Now playing' : '📺 TV' }; } return lp; }
+    if (nearTV()) { const o = owners.get(inside.id); return { id: 'kh:tv', label: o && o.owner === uid ? '📺 TV' : rad ? '📺 Now playing' : '📺 TV' }; } return lp; }
 
   // ---------------------------------------------------------------- prompts + action routing
   api.houseLocked = (id) => { const h = HOUSE_BY_ID[id]; return !!(h && h.sale); };

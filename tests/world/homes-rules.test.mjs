@@ -1,7 +1,7 @@
 // Rules tests: Kemy World homes (big world plots, estates, admin palace, parked-car list, orphan cleanup, presence ranges).
 // Run: firebase emulators:exec --config firebase.emu.json --only firestore "node tests/world/homes-rules.test.mjs"
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp, deleteField } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-homes', firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
 let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, String(e.message).slice(0, 300)); } };
@@ -52,4 +52,17 @@ await ok('presence with cell + velocity + client time + anim', assertSucceeds((a
 await ok('bad anim rejected', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { c: '0_0', vx: 14, vz: 0, ct: Date.now(), an: 'fly' }); })()));
 await ok('wrong house id for the cell rejected', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { x: Math.round(420 * 16 + 1600), y: Math.round(660 * 16 + 1200), in: 'h488' }); })()));
 await ok('world save in the far south', assertSucceeds(setDoc(doc(PAL, 'users/pal/pal/world'), { x: -900, z: 1300, yaw: 0, cars: [], street: null, at: serverTimestamp() })));
+const yt = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+const list = 'jNQXAC9IVRw\tMe at the zoo\nM7lc1UVf-VE\tYouTube demo\n';
+await ok('owner saves a youtube tv list and last link', assertSucceeds(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'link', url: yt, list } })));
+await ok('last youtube link stays when the tv is off', assertSucceeds(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'off', url: yt, list } })));
+await ok('kemy radio can keep the last youtube link', assertSucceeds(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'kemy', t: 1, s: Date.now(), url: 'https://youtu.be/jNQXAC9IVRw', list } })));
+await ok('spotify link still allowed', assertSucceeds(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'link', url: 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT', list } })));
+await ok('apple link still allowed', assertSucceeds(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'link', url: 'https://music.apple.com/us/album/example/1234567890' } })));
+await ok('a link with no url fails', assertFails(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'link', url: deleteField() } })));
+await ok('owner can clear the saved list', assertSucceeds(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'off', url: yt, list: deleteField() } })));
+await ok('discord link rejected on the tv', assertFails(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'link', url: 'https://discord.gg/not-allowed' } })));
+await ok('a title with a link is rejected', assertFails(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'link', url: yt, list: 'jNQXAC9IVRw\thttps://discord.gg/no\n' } })));
+await ok('21 saved videos rejected', assertFails(upd(KID, 'kid', 'h483', 'mansion', { radio: { k: 'off', list: Array.from({ length: 21 }, (_, i) => String(i).padStart(11, 'a') + '\tYouTube\n').join('') } })));
+await ok('visitor cannot edit the tv list', assertFails(upd(PAL, 'pal', 'h483', 'mansion', { radio: { k: 'link', url: yt, list } })));
 console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

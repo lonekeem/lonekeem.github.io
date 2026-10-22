@@ -2306,9 +2306,13 @@ service cloud.firestore {
       function garageOk() { return hd().garage == 0 || (resource != null && hd().garage == resource.data.get('garage', 0)) || (hd().garage <= (isEstate() ? 7 : 5) && gHas(hd().garage)); }
       // parked cars (display only): 'model.colour[.PLATE.bg.fg.border.frame]' joined by ';', max 50 entries / 1800 chars
       function carsOk(c) { return c is string && c.size() <= 1800 && c.matches('^[a-z]{2,8}[.][0-9][A-Z0-9.;a-z]*$|^$') && c.split(';').size() <= 50; } // clients parse + re-check each entry (and the plate word filter)
-      function radioOk(r) { return r is map && r.keys().hasOnly(['k', 'url', 't', 's']) && r.k in ['link', 'kemy', 'off']
-        && (r.k != 'link' || (r.url is string && r.url.size() <= 300 && r.url.matches('^https://(open[.]spotify[.]com|embed[.]music[.]apple[.]com|music[.]apple[.]com|(www[.])?youtube[.]com|m[.]youtube[.]com|(www[.])?youtube-nocookie[.]com|(www[.])?youtu[.]be)/.*')))
-        && (!('t' in r) || (r.t is int && r.t >= 0 && r.t < 50)) && (!('s' in r) || r.s is int); }
+      // House TV. url is the last link (required while a link is on). list is the owner's saved YouTube
+      // videos only: "VIDEOID<tab>Title\n", 1 to 20. Chat still uses kidSafe, which blocks https://.
+      function radioUrl(u) { return u is string && u.size() <= 300 && u.matches('^https://(open[.]spotify[.]com|embed[.]music[.]apple[.]com|music[.]apple[.]com|(www[.])?youtube[.]com|m[.]youtube[.]com|(www[.])?youtube-nocookie[.]com|(www[.])?youtu[.]be)/.*'); }
+      function radioOk(r) { return r is map && r.keys().hasOnly(['k', 'url', 't', 's', 'list']) && r.k in ['link', 'kemy', 'off']
+        && (r.k != 'link' || 'url' in r) && (!('url' in r) || radioUrl(r.url))
+        && (!('t' in r) || (r.t is int && r.t >= 0 && r.t < 50)) && (!('s' in r) || r.s is int)
+        && (!('list' in r) || (r.list is string && r.list.size() <= 2400 && r.list.matches('^([A-Za-z0-9_-]{11}\\t[^\\n\\t]{1,80}\\n){1,20}$') && !r.list.lower().matches('(?s).*(https?://|www[.]|discord[.]gg|discord[.]com).*'))); }
       function extOk(e) { return e is map && e.keys().hasOnly(['w', 'r', 'd', 't']) && (!('w' in e) || isStr(e.w, 0, 9)) && (!('r' in e) || isStr(e.r, 0, 9)) && (!('d' in e) || isStr(e.d, 0, 9)) && (!('t' in e) || isStr(e.t, 0, 9)); }
       function decorOk(d) { return d is map && d.keys().hasOnly(['wall', 'walls', 'floor', 'ext', 'items', 'v']) && (!('wall' in d) || isStr(d.wall, 0, 9)) && (!('walls' in d) || isStr(d.walls, 0, 120)) && (!('floor' in d) || d.floor in ['wood', 'dark', 'tile', 'carpet', 'marble', 'mint', 'rose', 'night', 'gold'])
         && (!('items' in d) || isStr(d.items, 0, 2000)) && (!('ext' in d) || extOk(d.ext)) && (!('v' in d) || d.v is int); }
