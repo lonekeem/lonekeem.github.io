@@ -14,6 +14,7 @@ import { FX_DEFAULT } from './fx/looks.js';
 import { emojiPicker, insertAtCursor } from './richcomments.js';
 import { PHRASES, phraseOnly, isPhrase } from './safe-chat.js';
 import { hideKey, isHidden } from './chat-hide.js';
+import { faceName, adminNameClass } from './kemy-name.js';
 // Emoji in live chat (all live layouts share the .lv-form markup).
 if (typeof document !== 'undefined' && !window.__lvEmoji) { window.__lvEmoji = 1; document.addEventListener('click', (e) => { const b = e.target.closest('.lv-emoji'); if (!b) return; const inp = b.parentNode.querySelector('input'); emojiPicker((em) => { insertAtCursor(inp, em); }); }); }
 
@@ -60,6 +61,8 @@ export function createLive(ctx) {
   const liveRef = (id) => doc(db, 'lives', id);
   const sub = (id, c, d) => doc(db, 'lives', id, c, d);
   const me = () => S.user?.uid;
+  const nm = (uid, name) => esc(faceName(uid, name));
+  const nc = (uid) => adminNameClass(uid) ? ' kemy-admin-name' : '';
 
   // ------------------------------------------------------------ discovery (feed / profile)
   async function liveNow() {
@@ -80,7 +83,7 @@ export function createLive(ctx) {
   function liveCard(l) {
     return `<a class="live-card" href="#/live/${esc(l.id)}" aria-label="${esc(l.hostName)} is live${l.title ? ': ' + esc(l.title) : ''}. Watch now">
       <span class="live-ring">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, '', false)}</span>
-      <span class="lc-meta"><b>${esc(l.hostName)}${badge(l.hostId)}</b><span class="small">${l.title ? esc(l.title) : 'is live now'}</span></span>
+      <span class="lc-meta"><b class="${nc(l.hostId)}">${nm(l.hostId, l.hostName)}${badge(l.hostId)}</b><span class="small">${l.title ? esc(l.title) : 'is live now'}</span></span>
       <span class="lc-side">${liveBadge(true)}<span class="small lc-n">${IC.people}${fmtCount(l.viewerCount || 0)}</span></span></a>`;
   }
   // "Live now" strip at the top of the feed + LIVE rings in the stories row.
@@ -100,7 +103,7 @@ export function createLive(ctx) {
       let b = row.querySelector(`.sbub[data-uid="${CSS.escape(l.hostId)}"]`);
       if (!b) {
         b = document.createElement('div'); b.className = 'sbub'; b.dataset.uid = l.hostId;
-        b.innerHTML = `<button class="sring none">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'story', false)}</button><span class="sname">${esc(l.hostName)}</span>`;
+        b.innerHTML = `<button class="sring none">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'story', false)}</button><span class="sname${nc(l.hostId)}">${nm(l.hostId, l.hostName)}</span>`;
         const own = row.querySelector(`.sbub[data-uid="${CSS.escape(me() || '-')}"]`);
         if (own && l.hostId !== me()) own.after(b); else row.prepend(b);
       }
@@ -188,7 +191,7 @@ export function createLive(ctx) {
     const key = hideKey('live', c.authorId || '', c.text || '');
     const mine = !S.user || c.authorId === me();
     const rep = cid && S.user && !mine ? `<button class="lv-rep" data-rep="${esc(cid)}" aria-label="Report message from ${esc(c.name)}">${FLAG}</button><button class="lv-rep" data-block="${esc(c.authorId || '')}" aria-label="Block ${esc(c.name)}">Block</button>` : '';
-    return `<div class="lv-msg" data-cid="${esc(cid || '')}" data-uid="${esc(c.authorId || '')}" data-hide="${esc(key)}" ${isHidden(key) ? 'hidden' : ''}>${avatar({ uid: c.authorId, displayName: c.name, username: c.username, color: c.color }, 'xs', false)}<p><b>${esc(c.name)}</b> <span class="lv-t">${esc(c.text)}</span></p>${rep}</div>`;
+    return `<div class="lv-msg" data-cid="${esc(cid || '')}" data-uid="${esc(c.authorId || '')}" data-hide="${esc(key)}" ${isHidden(key) ? 'hidden' : ''}>${avatar({ uid: c.authorId, displayName: faceName(c.authorId, c.name), username: c.username, color: c.color }, 'xs', false)}<p><b class="${nc(c.authorId)}">${nm(c.authorId, c.name)}</b>${badge(c.authorId)} <span class="lv-t">${esc(c.text)}</span></p>${rep}</div>`;
   }
   function watchChat(id, root, onStars) {
     let first = true;
@@ -449,7 +452,7 @@ export function createLive(ctx) {
       <video class="lv-video ${H.facing === 'user' ? 'mirror' : ''}" id="lv-video" autoplay playsinline muted></video>
       <div class="lv-shade"></div>
       <header class="lv-top">
-        <div class="lv-who">${avatar(host, 'sm', false)}<div><b>${esc(host.displayName)}</b><span class="small" id="lv-timer">0:00</span></div></div>
+        <div class="lv-who">${avatar(host, 'sm', false)}<div><b class="${nc(host.uid)}">${nm(host.uid, host.displayName)}</b>${badge(host.uid)}<span class="small" id="lv-timer">0:00</span></div></div>
         ${liveBadge()}
         <span class="lv-count" id="lv-count" aria-live="polite">${IC.people}<span>0</span></span>
         <button class="lv-end" id="lv-end">End</button>
@@ -646,7 +649,7 @@ export function createLive(ctx) {
         ${signedIn ? '<div class="spinner"></div>' : `<div class="row" style="justify-content:center;gap:10px"><a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/live/' + id)}">Log in</a><a class="btn btn-sm btn-ghost" href="#/signup">Sign up</a></div>`}</div></div>
       <div class="lv-shade"></div>
       <header class="lv-top">
-        <a class="lv-who" href="#/u/${esc(l.hostUsername)}">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'sm', false)}<div><b>${esc(l.hostName)}${badge(l.hostId)}</b><span class="small">${l.title ? esc(l.title) : '@' + esc(l.hostUsername)}</span></div></a>
+        <a class="lv-who" href="#/u/${esc(l.hostUsername)}">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'sm', false)}<div><b class="${nc(l.hostId)}">${nm(l.hostId, l.hostName)}${badge(l.hostId)}</b><span class="small">${l.title ? esc(l.title) : '@' + esc(l.hostUsername)}</span></div></a>
         ${signedIn && !mine && l.hostId !== me() && !following ? `<button class="lv-follow" id="lv-follow" aria-label="Follow ${esc(l.hostName)}">Follow</button>` : ''}
         ${liveBadge()}
         <span class="lv-count" id="lv-count" aria-live="polite">${IC.people}<span>${fmtCount(l.viewerCount || 0)}</span></span>
@@ -788,7 +791,7 @@ export function createLive(ctx) {
       <button class="lv-tapplay" id="lv-tapplay" hidden>${ICONS.live}<span>Tap to play</span></button>
       <div class="lv-shade"></div>
       <header class="lv-top">
-        <a class="lv-who" href="#/u/${esc(l.hostUsername)}">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'sm', false)}<div><b>${esc(l.hostName)}${badge(l.hostId)}</b><span class="small">${l.title ? esc(l.title) : '@' + esc(l.hostUsername)}</span></div></a>
+        <a class="lv-who" href="#/u/${esc(l.hostUsername)}">${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'sm', false)}<div><b class="${nc(l.hostId)}">${nm(l.hostId, l.hostName)}${badge(l.hostId)}</b><span class="small">${l.title ? esc(l.title) : '@' + esc(l.hostUsername)}</span></div></a>
         ${signedIn && !host && !following ? `<button class="lv-follow" id="lv-follow" aria-label="Follow ${esc(l.hostName)}">Follow</button>` : ''}
         ${liveBadge()}
         <span class="lv-count" id="lv-count" aria-live="polite" title="Signed-in viewers in the app">${IC.people}<span>${fmtCount(l.viewerCount || 0)}</span></span>
@@ -938,7 +941,7 @@ export function createLive(ctx) {
     main.innerHTML = `<section class="card pad center lv-summary" id="lv-ended">
       ${avatar({ uid: l.hostId, displayName: l.hostName, username: l.hostUsername, color: l.hostColor }, 'lg', false)}
       <h1 class="page-title" style="margin:10px 0 4px">This live has ended</h1>
-      <p class="muted" style="margin:0 0 14px">${esc(l.hostName || '')}${l.endedBy === 'admin' ? ' · ended by the studio' : ''}</p>
+      <p class="muted" style="margin:0 0 14px"><b class="${nc(l.hostId)}">${nm(l.hostId, l.hostName || '')}</b>${l.endedBy === 'admin' ? ' · ended by the studio' : ''}</p>
       ${mine ? `<div class="lv-sum-grid"><div><b>${l.totalViewers || 0}</b><span>Viewers</span></div><div><b>${l.peakViewers || 0}</b><span>Peak at once</span></div><div><b>${fmtCount(l.starCount || 0)}</b><span>Stars</span></div></div>` : ''}
       <div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">${l.hostUsername ? `<a class="btn btn-ghost" href="#/u/${esc(l.hostUsername)}">View profile</a>` : ''}<a class="btn" href="#/feed">Back to feed</a></div>
     </section>`;

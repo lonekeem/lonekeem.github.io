@@ -19,6 +19,7 @@ import { registerWorld } from '../input.js';
 import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
 import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-chat.js';
 import { hideKey, isHidden } from '../chat-hide.js';
+import { KEMY_NAME, faceName, isAdminUid, noteAdminUid } from '../kemy-name.js';
 import { emoteMs, EMOTE_BY_ID } from './emotes.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
@@ -492,6 +493,7 @@ export function createPark3D(ctx) {
         if (!o) { o = { uid: id, x, z, ix: x, iz: z, ivx: 0, ivz: 0, iyaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, dl: 100, fade: 0, y: typeof d.h === 'number' ? d.h / 10 : ground(x, z), yaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, seenS: d.sayAt || 0, seenE: d.eAt || 0, t: Math.random() * 100 }; others.set(id, o); }
         { const ct = typeof d.ct === 'number' ? d.ct : at; const off = Date.now() - ct; o.off = o.off == null ? off : Math.min(off, o.off + (off - o.off) * 0.1); const B = o.buf || (o.buf = []);
           if (!B.length || ct > B[B.length - 1].t) { const st = B.length >= 4 ? B.shift() : {}; st.t = ct; st.x = x; st.z = z; st.yaw = typeof d.r === 'number' ? d.r * Math.PI / 180 : null; st.vx = (d.vx || 0) / 10; st.vz = (d.vz || 0) / 10; B.push(st); } o.an = d.an || ''; }
+        if (d.name === KEMY_NAME) noteAdminUid(id);
         Object.assign(o, { tx: x, tz: z, th: typeof d.h === 'number' ? d.h / 10 : null, tr: typeof d.r === 'number' ? d.r * Math.PI / 180 : null, dn: d.dn || '', name: d.name, uname: d.uname, color: d.color, pal: d.pal, at, e: d.e, eAt: d.eAt, say: d.say, sayAt: d.sayAt, tgt: d.tgt });
         if (d.sayAt && d.sayAt > o.seenS && d.say && !isHidden(hideKey('park', id, clean(d.say)))) { o.seenS = d.sayAt; if (!muted.has(id) && !blocked.has(id)) logMsg(d.name, clean(d.say), d.color, { uid: id, uname: d.uname }); }
         if (d.eAt && d.eAt > o.seenE) { o.seenE = d.eAt; if (d.e && EMO_DANCE[d.e]) { o.dance = EMO_DANCE[d.e]; o.danceUntil = performance.now() + 6000; } if (d.tgt === S.user.uid && d.e === '🐾') toast(`@${d.uname} petted your Pal! 💜`); } });
@@ -530,9 +532,11 @@ export function createPark3D(ctx) {
       const el = document.createElement('div'); el.className = 'p3-tag' + (mine ? ' me' : '');
       el.innerHTML = `<div class="p3-bub" hidden></div><span></span>`;
       const span = el.querySelector('span');
-      const label = mine ? 'You · ' + (palSnap.name || 'Pal') : `${o.name || ''}`;
+      const who = mine ? (S.user && S.user.uid) : o.uid;
+      const label = faceName(who, mine ? 'You · ' + (palSnap.name || 'Pal') : (o.name || ''));
       span.dataset.n = label; span.textContent = label;
-      const mb = (window.kemyModBadge ? window.kemyModBadge(mine ? (S.user && S.user.uid) : o.uid) : '');
+      if (isAdminUid(who)) span.classList.add('kemy-admin-name');
+      const mb = (window.kemyFaceBadge ? window.kemyFaceBadge(who) : (window.kemyModBadge ? window.kemyModBadge(who) : ''));
       if (mb) span.insertAdjacentHTML('beforeend', mb);
       if (!mine) {
         const tools = document.createElement('span');
@@ -561,9 +565,11 @@ export function createPark3D(ctx) {
       const el = o.tag; if (!el) return;
       if (o !== meTag && o.name) {
         const span = el.querySelector(':scope > span');
-        if (span && span.dataset.n !== o.name) {
-          span.dataset.n = o.name; span.textContent = o.name;
-          const mb = window.kemyModBadge ? window.kemyModBadge(o.uid) : '';
+        const label = faceName(o.uid, o.name);
+        if (span && span.dataset.n !== label) {
+          span.dataset.n = label; span.textContent = label;
+          if (isAdminUid(o.uid)) span.classList.add('kemy-admin-name');
+          const mb = window.kemyFaceBadge ? window.kemyFaceBadge(o.uid) : (window.kemyModBadge ? window.kemyModBadge(o.uid) : '');
           if (mb) span.insertAdjacentHTML('beforeend', mb);
         }
       }
@@ -576,7 +582,7 @@ export function createPark3D(ctx) {
       const tf = `translate(${((v3.x + 1) / 2 * w).toFixed(1)}px,${((1 - v3.y) / 2 * h).toFixed(1)}px) translate(-50%,-100%)`;
       if (el.style.transform !== tf) el.style.transform = tf;
       const b = el.firstChild; const show = say && Date.now() - sayAt < 7000;
-      if (show) { if (b.dataset.s !== String(sayAt)) { b.dataset.s = String(sayAt); b.textContent = say; const mb = (window.kemyModBadge ? window.kemyModBadge(o === meTag ? (S.user && S.user.uid) : o.uid) : ''); if (mb) b.insertAdjacentHTML('afterbegin', mb + ' '); } if (b.hidden) b.hidden = false; }
+      if (show) { if (b.dataset.s !== String(sayAt)) { b.dataset.s = String(sayAt); b.textContent = say; const who = o === meTag ? (S.user && S.user.uid) : o.uid; const mb = (window.kemyFaceBadge ? window.kemyFaceBadge(who) : (window.kemyModBadge ? window.kemyModBadge(who) : '')); if (mb) b.insertAdjacentHTML('afterbegin', mb + ' '); } if (b.hidden) b.hidden = false; }
       else if (!b.hidden) b.hidden = true;
     }
     // chat log
@@ -584,7 +590,10 @@ export function createPark3D(ctx) {
     function logMsg(name, text, color, meta) {
       const d = document.createElement('div'); d.className = 'p3-msg';
       if (meta && meta.uid) { const key = hideKey('park', meta.uid, text); d.dataset.hide = key; if (isHidden(key)) d.hidden = true; }
-      const b = document.createElement('b'); b.textContent = (name || 'Someone') + ': '; b.style.color = color || '#d9c2ff';
+      const who = meta && meta.uid;
+      const shown = isAdminUid(who) ? (KEMY_NAME + (String(name || '').includes('(you)') ? ' (you)' : '')) : (name || 'Someone');
+      const b = document.createElement('b'); b.textContent = shown + ': '; b.style.color = isAdminUid(who) ? '#ff2d2d' : (color || '#d9c2ff');
+      if (isAdminUid(who)) b.classList.add('kemy-admin-name');
       d.append(b, document.createTextNode(text));
       if (meta && meta.uid && meta.uid !== S.user.uid) {
         const bar = document.createElement('span'); bar.className = 'p3-safe';
@@ -633,7 +642,7 @@ export function createPark3D(ctx) {
     function emote(x, tgt = '') { P.e = x; P.eAt = Date.now(); P.tgt = tgt; if (EMO_DANCE[x]) { P.dance = EMO_DANCE[x]; P.danceUntil = Date.now() + 6000; } dirty = true; send(true); }
     function playerCard(o) {
       const isM = muted.has(o.uid);
-      openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="park-card"><h2>${esc(o.name)}</h2><p class="muted">@${esc(o.uname)} · with ${esc((o.pal && o.pal.name) || 'their Pal')}</p>
+      openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="park-card"><h2 class="${isAdminUid(o.uid) ? 'kemy-admin-name' : ''}">${esc(faceName(o.uid, o.name))}</h2><p class="muted">@${esc(o.uname)} · with ${esc((o.pal && o.pal.name) || 'their Pal')}</p>
         <div class="btns"><a class="btn btn-sm" href="#/u/${esc(o.uname)}" data-close>View profile</a><button class="btn btn-sm btn-ghost" id="pc-pet">🐾 Pet their Pal</button><button class="btn btn-sm btn-ghost" id="pc-mute">${isM ? '🔈 Unmute' : '🔇 Mute chat'}</button><button class="btn btn-sm btn-ghost" id="pc-rep">Report</button><button class="btn btn-sm btn-ghost" id="pc-block">Block</button></div></div>`);
       document.getElementById('pc-pet').onclick = () => { closeModal(); emote('🐾', o.uid); toast(`You petted ${(o.pal && o.pal.name) || 'their Pal'}! 💜`); };
       document.getElementById('pc-mute').onclick = () => { if (isM) muted.delete(o.uid); else muted.add(o.uid); lss(MK, JSON.stringify([...muted])); closeModal(); toast(isM ? `Unmuted @${o.uname}` : `Muted @${o.uname}. You won’t see their chat.`); };
