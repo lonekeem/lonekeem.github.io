@@ -1518,6 +1518,10 @@ service cloud.firestore {
       let q = getAfter(quotaPath(me())).data;
       return q.at == request.time && q.hN <= 10 && q.dN <= 30;
     }
+    function helperQuotaOk() {
+      let q = getAfter(/databases/$(database)/documents/helperQuota/$(me())).data;
+      return q.at == request.time && q.hN >= 1 && q.hN <= 8;
+    }
     // Report rate counter, bumped by the reporter together with each report.
     match /reportQuota/{uid} {
       function q() { return request.resource.data; }
@@ -1575,6 +1579,36 @@ service cloud.firestore {
         && request.resource.data.status in ['open', 'review', 'resolved']
         && request.resource.data.handledBy == me() && request.resource.data.handledAt == request.time
         && isStr(request.resource.data.get('action', ''), 0, 40);
+    }
+
+    // Kemy Helper notes. Players may create a scrubbed note. Only the admin can read or mark it fixed.
+    function helperWin(start, n, oldStart, oldN) {
+      return (oldStart > request.time - duration.value(600, 's') && start == oldStart && n == oldN + 1 && n <= 8)
+        || ((oldStart <= request.time - duration.value(600, 's') || !exists(/databases/$(database)/documents/helperQuota/$(me()))) && start == request.time && n == 1);
+    }
+    match /helperQuota/{uid} {
+      function q() { return request.resource.data; }
+      allow read: if signedIn() && uid == me();
+      allow create: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'at'])
+        && q().at == request.time && q().hStart == request.time && q().hN == 1;
+      allow update: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'at'])
+        && q().at == request.time
+        && helperWin(q().hStart, q().hN, resource.data.hStart, resource.data.hN);
+    }
+    match /helperReports/{id} {
+      function hr() { return request.resource.data; }
+      function plain(v) { return isStr(v, 0, 180) && !v.matches('.*[@].*'); }
+      allow read: if isAdmin();
+      allow create: if signedIn() && helperQuotaOk()
+        && hr().keys().hasOnly(['type', 'game', 'place', 'device', 'text', 'autoFixed', 'status', 'at'])
+        && hr().type in ['error', 'reject', 'load', 'fps', 'stuck', 'bounds', 'under', 'wall', 'float', 'nan', 'desync', 'turn', 'note']
+        && isStr(hr().game, 0, 24) && isStr(hr().place, 0, 48) && isStr(hr().device, 0, 24)
+        && plain(hr().text) && hr().autoFixed is bool && hr().status == 'open' && hr().at == request.time;
+      allow update: if isAdmin()
+        && changed().hasOnly(['status', 'fixedAt'])
+        && request.resource.data.status == 'fixed'
+        && request.resource.data.fixedAt == request.time;
+      allow delete: if false;
     }
 
     // ∞ Pass (unlimited Star Coins + Diamonds): public (profile badge), written ONLY by the admin.
@@ -1860,6 +1894,15 @@ service cloud.firestore {
     match /config/palShop {
       allow read: if true;
       allow write: if isAdmin();
+    }
+    // Who receives the once-a-day Kemy Helper digest. The day stamp is written by the Cloud Function.
+    match /config/helperDigest {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.keys().hasOnly(['uid', 'updatedAt'])
+        && request.resource.data.uid == me() && request.resource.data.updatedAt == request.time;
+      allow update: if isAdmin() && changed().hasOnly(['uid', 'updatedAt'])
+        && request.resource.data.uid == me() && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
     }
     // Admin-only "ping me when someone joins" switch (js/members.js). The uid is the admin's own account.
     match /config/adminAlerts {

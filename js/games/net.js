@@ -133,6 +133,10 @@ export function createNet({ db, S }) {
           if (u && u.toMillis) link.noteServer(u.toMillis());
         }
         link.noteSnap(pending);
+        try {
+          const see = window.__kemyHelperSee;
+          if (see && !pending) see({ id: gid, g: s.exists() ? s.data() : null, grade: link.grade(), resync: wake });
+        } catch { /* the helper watch is optional */ }
         cb(s.exists() ? { id: s.id, ...s.data() } : null, { pending });
       }, (e) => {
         if (my !== gen || stopped) return;

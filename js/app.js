@@ -46,6 +46,7 @@ import { gameName, GAMES } from './games/art.js';
 import { loadDiscover } from './discover.js';
 import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, setMode as setThemeMode, THEME_TITLE } from './theme.js';
 import { page as pageSettingsHub } from './settings-hub.js';
+import { startHelper } from './helper/watch.js';
 // Heavy feature modules load on demand (their route, or idle time after the feed): calls are queued until the
 // module arrives, so the feed never downloads games, Pals, live streaming or three.js. Written by Lone Keem
 function lazyMod(load) {
@@ -125,6 +126,7 @@ function toast(msg) {
   clearTimeout(toast.t);
   toast.t = setTimeout(() => (root.innerHTML = ''), 3200);
 }
+startHelper({ toast });
 let busyAt = 0; window.kemyBusy = () => { if (Date.now() - busyAt > 60e3) { busyAt = Date.now(); toast(BUSY_MSG + ' (showing saved posts)'); } };
 function friendlyError(e) {
   const c = e && (e.code || '');
@@ -1437,6 +1439,7 @@ async function pageAdmin(token) {
   const big = (id, emoji, title, desc, extra = '') => `<div class="card pad adm-tool" style="margin-bottom:12px"><div class="row" style="flex-wrap:wrap;gap:10px"><div style="flex:1;min-width:220px"><b style="font-size:1.05rem">${emoji} ${title}</b><p class="muted small" style="margin:3px 0 0">${desc}</p></div>${extra}</div><p class="small muted" id="${id}-msg" style="margin:8px 0 0"></p></div>`;
   main.innerHTML = `<h1 class="page-title">🛡️ Admin</h1>
     <p class="muted small">Signed in as ${esc(S.user.email)}. Only you can see this page.</p>
+    <div id="kh-admin"></div>
     <a class="card pad adm-tool nm-card" href="#/members" id="nm-open">
       <span class="nm-card-row"><span><b id="nm-card-title">Members</b><span class="muted small">Everyone who joined, newest first.</span></span><span class="nm-badge" id="nm-badge" hidden>0</span></span>
     </a>
@@ -1463,6 +1466,7 @@ async function pageAdmin(token) {
   mod.adminSection($('#adm-mods'));
   donate.mountAdmin($('#adm-donate'));
   import('./push.js').then((m) => { const h = document.getElementById('push-admin-host'); if (h) h.innerHTML = m.adminHtml(); m.wireAdmin(toast); }).catch(() => {});
+  import('./helper/admin.js').then((m) => { if (!stale(token)) m.mountHelperAdmin(document.getElementById('kh-admin'), { stale, token, toast }); }).catch(() => {});
   import('./members.js').then((m) => {
     if (stale(token)) return;
     const unsub = m.watchAdminBadge(document.getElementById('nm-badge'));

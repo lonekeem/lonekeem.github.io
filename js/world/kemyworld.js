@@ -12,6 +12,7 @@ import { currentSeason, SEASONS } from '../seasons.js';
 const SEASONS_T = Object.fromEntries(Object.values(SEASONS).filter((x) => x.treat).map((x) => [x.treat.id, x.treat]));
 import { attachHomes } from './homes.js';
 import { attachRespawn } from './respawn.js';
+import { attachHelper } from '../helper/pal.js';
 import { buildCar, poseCar, CAR_IDX, CARS } from './cars.js';
 import { attachDrive } from './drive.js';
 export { worldGround, worldClamp } from './layout.js';
@@ -369,14 +370,15 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   function spawnStreet() { P.x = GATE.x + (Math.random() - 0.5) * 3; P.z = GATE.z + 6 + Math.random() * 3; P.yaw = 0; P.y = ground(P.x, P.z); }
   function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
-  const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, move: (m) => m, driving: () => false };
+  const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, loopAt, move: (m) => m, driving: () => false };
   const D = attachDrive(api, W); W.drive = D;
   const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
   const Rs = attachRespawn(api, W);
+  const Kh = attachHelper(api, W);
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat }); const Mp = attachMap(api, W);
-  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Mp.update(dt, now); Rs.update(dt); update(dt, now); };
-  W.destroy = () => { for (const x of [D, E, Ci, Hm, Mp, Rs]) try { x.destroy(); } catch { /* */ } destroy(); };
+  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
+  W.destroy = () => { for (const x of [D, E, Ci, Hm, Mp, Rs, Kh]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];
