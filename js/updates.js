@@ -156,6 +156,10 @@ export async function paintDots() {
   try { await ensure(); } catch { return; }
   const on = hasUnseen(pack.entries, pack.seen);
   document.querySelectorAll('[data-wn-dot]').forEach((d) => { d.hidden = !on; });
+  import('./chime.js').then((m) => {
+    if (on && pack.entries[0]) m.playBadge(pack.entries[0].id);
+    else m.cancelBadge();
+  }).catch(() => {});
 }
 
 function card(e) {
@@ -343,5 +347,8 @@ export async function page(main, ctx) {
   wireTabs();
   if (isAdmin()) wireForm(toast);
   // Date order, not the pinned Coming Soon card, so a newer shipped entry still lights the dot.
-  if (entries[0]) markSeen(entries[0].id);
+  if (entries[0]) {
+    markSeen(entries[0].id);
+    import('./chime.js').then((m) => m.cancelBadge()).catch(() => {});
+  }
 }

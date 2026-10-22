@@ -1725,6 +1725,14 @@ async function loadSession() {
     S.unreadNotes = !qs.empty;
     if (S.ready) renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav);
   }, () => {}));
+  // A new inbox item while Kemy is open plays the chime. The first snapshot is mail already waiting, so it stays quiet.
+  let inboxBoot = true;
+  S.globalUnsubs.push(onSnapshot(query(collection(db, 'users', uid, 'notifications'), orderBy('createdAt', 'desc'), limit(5)), (qs) => {
+    if (inboxBoot) { inboxBoot = false; return; }
+    if (qs.docChanges().some((c) => c.type === 'added' && c.doc.data().read !== true)) {
+      import('./chime.js').then((m) => m.playChime()).catch(() => {});
+    }
+  }, () => {}));
   S.globalUnsubs.push(onSnapshot(query(collection(db, 'chats'), where('participants', 'array-contains', uid), orderBy('lastAt', 'desc'), limit(20)), (qs) => {
     const seen = seenMap();
     S.unreadChats = qs.docs.some((d) => d.data().lastSender !== uid && (d.data().lastAt?.toMillis?.() || 0) > (seen[d.id] || 0) && !location.hash.includes(d.data().participants.find((x) => x !== uid)));

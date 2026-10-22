@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'https://www.gst
 import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-messaging.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import { deviceId, deviceLabel } from './devices.js';
+import { chimeOn, setChimeOn, playChime } from './chime.js';
 
 const TYPES = [
   ['invite', 'Friend invites and game challenges', 'When someone follows you or asks you to play.'],
@@ -85,6 +86,7 @@ async function listenForeground() {
     const d = (payload && payload.data) || {};
     const note = payload && payload.notification;
     banner((note && note.title) || d.title || 'Kemy', (note && note.body) || d.body || '', d.url || 'app.html');
+    playChime();
   });
   fg = true;
 }
@@ -160,6 +162,16 @@ function paint() {
   hint.className = 'muted small';
   hint.textContent = 'iPhone: add Kemy to your Home Screen (iOS 16.4 or newer) and open it from that icon. Android and desktop can turn this on right here.';
   box.appendChild(hint);
+  box.appendChild(row(
+    'push-chime',
+    'Soft chime',
+    'A quiet bloop while Kemy is open, and when the What’s New dot shows up. If Kemy is in the background, your phone plays its own sound.',
+    chimeOn(),
+    (ev) => {
+      setChimeOn(ev.target.checked);
+      if (ev.target.checked) playChime();
+    }
+  ));
 
   if (!on) {
     const btn = document.createElement('button');
