@@ -13,6 +13,7 @@ import { ADMIN_EMAIL, EMU } from '../firebase-init.js';
 import { attachHomeLife } from './homelife.js';
 export const plateBad = (t) => { const s = String(t || ''); return !!(checkInput(s) || checkInput(s.toLowerCase()) || checkInput(s.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').toLowerCase())); };
 import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, serItems, defaultItems, WALL_SW, WALL_ROOMS, parseWalls, EXT_SW, FLOORS } from './interior.js';
+import { itemAabb, pickIndex, nearestReach, nudgePlan, screenStep, clampPlan, xzGap } from './decorate.js';
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const RADIO_RE = /^https:\/\/(?:open\.spotify\.com|embed\.music\.apple\.com|music\.apple\.com|(?:www\.|m\.)?youtube\.com|(?:www\.)?youtube-nocookie\.com|(?:www\.)?youtu\.be)\//;
 // House TV accepts the same YouTube links as the rest of Kemy. The id is checked again before an iframe is created.
@@ -207,11 +208,24 @@ export function attachHomes(api, W, K) {
 .kh-note-btn:focus-visible,.kh-radio button:focus-visible{outline:3px solid #ffd34d;outline-offset:3px}
 .kh-now,.kh-pick{display:flex;gap:8px;align-items:center}.kh-now img,.kh-pick img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none}.kh-pick small{display:block;opacity:.75;font-size:11px;font-weight:600}
 .kh-dec{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 226px);pointer-events:auto;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(15,118,110,.85);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
-.kh-dbar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(8px,env(safe-area-inset-bottom)) + 4px);width:min(96vw,560px);max-height:46vh;overflow:auto;background:rgba(255,255,255,.97);color:#111;border-radius:16px;padding:8px;pointer-events:auto;z-index:12;font:600 13px Inter,sans-serif}
-.kh-dbar .tabs{display:flex;gap:6px;margin-bottom:6px}.kh-dbar button{border:0;border-radius:10px;padding:7px 10px;font:800 13px Inter,sans-serif;background:#e5e7eb;color:#111;min-height:36px}.kh-dbar button.on,.kh-dbar button.p{background:#6d28d9;color:#fff}
-.kh-dbar .sw{width:30px;height:30px;border-radius:50%;padding:0;min-height:0;border:2px solid #fff;box-shadow:0 0 0 1px #94a3b8;margin:2px}.kh-dbar .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}.kh-dbar .it{display:flex;flex-direction:column;align-items:center;font-size:12px}.kh-dbar .it i{font-style:normal;font-size:22px}.kh-dbar .it em{font-style:normal;font-size:11px;color:#6d28d9}
-.kh-dbar .mv{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.kh-dbar label{display:block;margin:6px 0 2px;font-weight:800}
-@media (orientation:landscape) and (max-height:500px){.kh-dec{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 400px)}.kh-dbar{max-height:44vh;width:min(62vw,520px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 6px);transform:none}.kh-dbar .grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:84px;overflow-x:auto}.kh-radio:not(.min){top:calc(max(8px,env(safe-area-inset-top)) + 4px)}}`; document.head.appendChild(css2);
+.kh-dbar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(8px,env(safe-area-inset-bottom)) + 150px);width:min(94vw,520px);display:flex;flex-direction:column;gap:6px;background:transparent;color:#111;pointer-events:none;z-index:12;font:600 13px Inter,sans-serif}
+.kh-dbar .kh-handle,.kh-dbar .kh-tools,.kh-dbar .kh-body{pointer-events:auto;background:rgba(255,255,255,.96);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
+.kh-dbar .kh-handle{display:flex;gap:6px;align-items:center;overflow-x:auto;touch-action:pan-x;padding:6px 8px}
+.kh-dbar .kh-body{padding:0 8px 6px;max-height:86px;overflow:hidden}
+.kh-dbar.open .kh-body{max-height:200px;overflow:auto}
+.kh-dbar button{border:0;border-radius:10px;padding:7px 10px;font:800 13px Inter,sans-serif;background:#e5e7eb;color:#111;min-height:40px;flex:none}
+.kh-dbar button.on,.kh-dbar button.p{background:#6d28d9;color:#fff}
+.kh-dbar .kh-grip{background:transparent;color:#111;padding-left:4px}
+.kh-dbar .kh-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px}
+.kh-dbar .kh-tools b,.kh-dbar .kh-tools small{flex:1 1 100%;color:#333;font-weight:700}
+.kh-dbar .kh-strip{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;padding:6px 0 2px}
+.kh-dbar .sw{width:32px;height:32px;border-radius:50%;padding:0;min-height:32px;min-width:32px;border:2px solid #fff;box-shadow:0 0 0 1px #94a3b8}
+.kh-dbar .it{flex:0 0 78px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;min-height:68px;text-align:center;line-height:1.15}
+.kh-dbar .it i{font-style:normal;font-size:20px}.kh-dbar .it em{font-style:normal;font-size:10px;color:#6d28d9}
+.kh-dbar label{display:block;margin:6px 0 2px;font-weight:800}
+body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my,body.kh-decorating .p3-chat,body.kh-decorating .p3-log,body.kh-decorating #ks-bag,body.kh-decorating .p3-top,body.kh-decorating #p3-set,body.kh-decorating .kc-gear{display:none!important}
+@media (min-width:900px) and (pointer:fine){.kh-dbar{bottom:12px}}
+@media (orientation:landscape) and (max-height:500px){.kh-dec{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 400px)}.kh-dbar{width:min(58vw,460px);left:auto;right:8px;bottom:8px;transform:none}.kh-dbar .kh-body,.kh-dbar.open .kh-body{max-height:28vh}.kh-radio:not(.min):not(.dock){top:calc(max(8px,env(safe-area-inset-top)) + 4px)}}`; document.head.appendChild(css2);
   const radioBox = document.createElement('div'); radioBox.className = 'kh-radio'; radioBox.hidden = true; const decB = document.createElement('button'); decB.className = 'kh-dec'; decB.textContent = '🛠️ Decorate'; decB.hidden = true;
   const noteBtn = document.createElement('button'); noteBtn.type = 'button'; noteBtn.className = 'kh-note-btn'; noteBtn.hidden = true; noteBtn.setAttribute('aria-label', 'House music. Show player');
   noteBtn.innerHTML = '<span class="kh-note-glyph" aria-hidden="true">♪</span><span class="kh-eq" aria-hidden="true"><i></i><i></i><i></i></span>';
@@ -476,37 +490,147 @@ export function attachHomes(api, W, K) {
 
   // ---------------------------------------------------------------- 🛠️ Decorate mode (owner, inside): paint, floors, furniture on a 0.5 m grid
   let owned = null; async function loadOwned() { try { const { econ: e } = await shop(); owned = await e.inventory(true); } catch { owned = {}; } return owned; }
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 32), new THREE.MeshBasicMaterial({ color: '#22c55e', transparent: true, opacity: 0.85, depthTest: false })); ring.rotation.x = -Math.PI / 2; ring.renderOrder = 9; ring.visible = false; root.add(ring);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 32), new THREE.MeshBasicMaterial({ color: '#fde047', transparent: true, opacity: 0.9, depthTest: false })); ring.rotation.x = -Math.PI / 2; ring.renderOrder = 9; ring.visible = false; root.add(ring);
+  const hi = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#fde047', transparent: true, opacity: 0.32, depthTest: false })); hi.renderOrder = 8; hi.visible = false; root.add(hi);
+  const hiEdge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: '#facc15', depthTest: false })); hiEdge.renderOrder = 9; hiEdge.visible = false; root.add(hiEdge);
+  const passMove = W.move || ((m) => m);
+  W.move = (m) => { if (deco && deco.moving && deco.sel >= 0 && m && m.mag > 0.2) { deco.stick = m; return { x: 0, y: 0, mag: 0, run: false }; } if (deco) deco.stick = null; return passMove(m); };
+  function itemBaseY(it) { return FLAT + (it.f && deco.r.I.two ? 3.35 : 0); }
+  function aabbOf(it) { return itemAabb(it, SC, deco.r.cx, deco.r.cz, itemBaseY(it)); }
+  function sameFloor(it) { if (!deco.r.I.two) return true; return (it.f || 0) === (P.y > FLAT + 2.5 ? 1 : 0); }
+  function aabbWalk(it) { return sameFloor(it) ? aabbOf(it) : null; }
+  function nearest() { return nearestReach(deco.items, P.x, P.z, aabbWalk, 1.35); }
+  function camBasis() {
+    const cam = api.cam; let fx = 0, fz = 1;
+    if (cam) { fx = P.x - cam.position.x; fz = P.z - cam.position.z; const len = Math.hypot(fx, fz) || 1; fx /= len; fz /= len; }
+    return { fx, fz, rx: fz, rz: -fx };
+  }
+  function placeHi() {
+    const it = deco && deco.items[deco.sel];
+    ring.visible = hi.visible = hiEdge.visible = !!it;
+    if (!it) return;
+    const b = aabbOf(it); const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, cz = (b.z0 + b.z1) / 2;
+    const sx = Math.max(0.45, b.x1 - b.x0), sy = Math.max(0.45, b.y1 - b.y0), sz = Math.max(0.45, b.z1 - b.z0);
+    hi.position.set(cx, cy, cz); hi.scale.set(sx, sy, sz); hiEdge.position.copy(hi.position); hiEdge.scale.copy(hi.scale);
+    ring.position.set(cx, b.y0 + 0.05, cz); ring.scale.setScalar(Math.max(0.8, Math.max(sx, sz) * 0.55));
+  }
+  function nudgeScreen(sx, sy) {
+    const it = deco && deco.items[deco.sel]; if (!it) return;
+    const step = screenStep(sx, sy, camBasis()); nudgePlan(it, step.dx, step.dz); relItems(); placeHi();
+  }
+  function rotateSel() { const it = deco && deco.items[deco.sel]; if (!it) return; it.r = (it.r + 1) & 3; relItems(); placeHi(); }
+  function removeSel() {
+    if (!deco || deco.sel < 0) return; const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece';
+    deco.items.splice(deco.sel, 1); deco.sel = -1; deco.moving = false; relItems(); drawDeco(); say(name + ' put away. You can place it again.');
+  }
+  function selectItem(i) { if (!deco || i < 0 || i >= deco.items.length) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; placeHi(); paintTools(); markMine(); }
   function startDeco() { if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
-    deco = { r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, ext: { ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), sel: -1, tab: 'f', t: 0 }; loadOwned().then(() => deco && drawDeco()); drawDeco(); decB.hidden = true; window.__kh && (window.__kh.deco = true); }
-  function endDeco(save) { const d = deco; if (!d) return; deco = null; dbar.hidden = true; ring.visible = false; decB.hidden = !(inside && inside.id === myPlot); window.__kh && (window.__kh.deco = false);
+    deco = { r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, ext: { ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), sel: -1, tab: 'f', t: 0, open: false, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false };
+    document.body.classList.add('kh-decorating');
+    if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
+    loadOwned().then(() => deco && drawDeco()); drawDeco(); decB.hidden = true; window.__kh && (window.__kh.deco = true); }
+  function endDeco(save) { const d = deco; if (!d) return; document.body.classList.remove('kh-decorating'); const parked = d.parkedRadio; deco = null; dbar.hidden = true; ring.visible = false; hi.visible = false; hiEdge.visible = false; decB.hidden = !(inside && inside.id === myPlot); window.__kh && (window.__kh.deco = false);
+    if (parked && rad && !radioBox.hidden) restoreCard();
     if (save) { const dec = { wall: d.wall, ...(d.walls ? { walls: d.walls } : {}), floor: d.floor, ext: d.ext, items: serItems(d.items), v: 1 }; homeW({ decor: dec }).then(() => say('💾 Home saved! Visitors see your new look.')).catch((e) => { wErr(e); applyDecor(myPlot); }); const r = rooms.get(myPlot); if (r) r.dk = JSON.stringify(dec); }
     else { const r = rooms.get(myPlot); if (r) r.dk = ''; applyDecor(myPlot); } }
-  const relItems = () => deco.r.I.setItems(deco.items);
-  function nearest() { const r = deco.r; const up = P.y > FLAT + 2.5 ? 1 : 0; let bi = -1, bd = 2.6; deco.items.forEach((it, i) => { if ((it.f || 0) !== up && deco.r.I.two) return; const d = Math.hypot(r.cx + it.x * SC - P.x, r.cz + it.z * SC - P.z); if (d < bd) { bd = d; bi = i; } }); return bi; }
-  function decoTick(dt) { deco.t += dt; if (deco.t > 0.3) { deco.t = 0; const n = nearest(); if (n !== deco.sel) { deco.sel = n; if (deco.tab === 's' || deco.tab === 'f') drawDeco(); } } const it = deco.items[deco.sel]; ring.visible = !!it; if (it) ring.position.set(deco.r.cx + it.x * SC, FLAT + (it.f && deco.r.I.two ? 3.37 : 0.03), deco.r.cz + it.z * SC); }
+  const relItems = () => { if (deco) deco.r.I.setItems(deco.items); };
+  function decoTick(dt) {
+    if (!deco.drag) { const n = nearest(); if (n >= 0 && n !== deco.sel) { const b = aabbOf(deco.items[n]); if (deco.sel < 0 || xzGap(P.x, P.z, b) < 0.75) selectItem(n); } }
+    placeHi();
+    const s = deco.stick; if (deco.moving && s && deco.sel >= 0 && s.mag > 0.45) { deco.stickT += dt; if (deco.stickT >= 0.28) { deco.stickT = 0; if (Math.abs(s.x) >= Math.abs(s.y)) nudgeScreen(Math.sign(s.x), 0); else nudgeScreen(0, Math.sign(s.y)); } }
+  }
   const priceOf = (D) => (D.d ? `💎${D.d}` : D.c ? `⭐${D.c}` : 'Free');
   const have = (c) => { const D = DECOR[c]; return !D.c && !D.d ? true : !!(owned && owned[decorItem(c)]); };
-  function drawDeco() { if (!deco) return; const t = deco.tab; const it = deco.items[deco.sel];
-    const selRow = `<div class="mv">${it ? `<b>${DECOR[it.c].e} ${DECOR[it.c].n}</b><button data-m="-1,0">⬅️</button><button data-m="1,0">➡️</button><button data-m="0,-1">⬆️</button><button data-m="0,1">⬇️</button><button data-rot>⟳</button><button data-del>🗑️</button>` : '<small>Walk next to a piece of furniture to move, rotate or remove it.</small>'}</div>`;
-    let body = '';
-    if (t === 'p') body = `<label>Inside walls · paint</label><div>${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join(' ')}</div>${WALL_SW.map((c) => `<button class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}<label>Floor</label>${Object.entries(FLOORS).map(([k, F]) => `<button data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join(' ')}
-      ${[['w', 'Outside walls'], ['r', 'Roof'], ['d', 'Front door'], ['t', 'Trim']].map(([k, n]) => `<label>${n}</label>${EXT_SW.map((c) => `<button class="sw" style="background:${c}" data-e="${k}:${c}"></button>`).join('')}`).join('')}<div><button data-e="reset">Reset outside colours</button></div>`;
-    else if (t === 'f') body = selRow + `<label>Add furniture <small>(placed in front of you)</small></label><div class="grid">${Object.entries(DECOR).map(([c, D]) => `<button class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D)}</em></button>`).join('')}</div>`;
-    dbar.innerHTML = `<div class="tabs"><button data-tab="f" class="${t === 'f' ? 'on' : ''}">🛋️ Furniture</button><button data-tab="p" class="${t === 'p' ? 'on' : ''}">🎨 Paint</button><span style="flex:1"></span><button class="g" data-x>Cancel</button><button class="p" data-sv>💾 Save</button></div>${body}`; dbar.hidden = false;
-    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; drawDeco(); })); dbar.querySelector('[data-x]').onclick = () => endDeco(false); dbar.querySelector('[data-sv]').onclick = () => endDeco(true);
-    dbar.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; drawDeco(); }));
-    dbar.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
-    dbar.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { deco.floor = b.dataset.fl; deco.r.I.setFloor(deco.floor); drawDeco(); }));
-    dbar.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say('🎨 Outside colour set (see it when you go out)'); }));
-    dbar.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { const it2 = deco.items[deco.sel]; if (!it2) return; const [dx, dz] = b.dataset.m.split(',').map(Number); it2.x = Math.max(-5.5, Math.min(5.5, it2.x + dx * 0.5)); it2.z = Math.max(-5.5, Math.min(5.5, it2.z + dz * 0.5)); relItems(); }));
-    const rb = dbar.querySelector('[data-rot]'); if (rb) rb.onclick = () => { const it2 = deco.items[deco.sel]; if (it2) { it2.r = (it2.r + 1) & 3; relItems(); } };
-    const db2 = dbar.querySelector('[data-del]'); if (db2) db2.onclick = () => { if (deco.sel >= 0) { deco.items.splice(deco.sel, 1); deco.sel = -1; relItems(); drawDeco(); } };
-    dbar.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
+  function mineName(it, i) { const D = DECOR[it.c]; const n = deco.items.slice(0, i + 1).filter((q) => q.c === it.c).length; const many = deco.items.filter((q) => q.c === it.c).length > 1; return `${D.e} ${D.n}${many ? ' ' + n : ''}${it.f ? ' · Up' : ''}`; }
+  function paintTools() {
+    const box = dbar.querySelector('.kh-tools'); if (!box || !deco) return; const it = deco.items[deco.sel];
+    box.innerHTML = it ? `<b>${DECOR[it.c].e} ${DECOR[it.c].n}${it.f ? ' · Upstairs' : ''}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-del>Remove</button>` : '<small>Tap a piece, walk up to it, or pick it from Mine.</small>';
+    const mv = box.querySelector('[data-move]'); if (mv) mv.onclick = () => { deco.moving = !deco.moving; paintTools(); };
+    box.querySelectorAll('[data-nudge]').forEach((b) => (b.onclick = () => { const [sx, sy] = b.dataset.nudge.split(',').map(Number); nudgeScreen(sx, sy); }));
+    const rb = box.querySelector('[data-rot]'); if (rb) rb.onclick = () => rotateSel();
+    const db2 = box.querySelector('[data-del]'); if (db2) db2.onclick = () => removeSel();
+  }
+  function markMine() { dbar.querySelectorAll('[data-mine]').forEach((b) => b.classList.toggle('on', +b.dataset.mine === deco.sel)); }
+  function paintBody() {
+    const body = dbar.querySelector('.kh-body'); if (!body || !deco) return; const t = deco.tab;
+    if (t === 'p') body.innerHTML = `<div class="kh-strip" aria-label="Wall colours">${WALL_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}</div><div class="kh-strip">${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button type="button" data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join('')}${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join('')}</div>${deco.open ? [['w', 'Walls'], ['r', 'Roof'], ['d', 'Door'], ['t', 'Trim']].map(([k, n]) => `<label>${n}</label><div class="kh-strip">${EXT_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-e="${k}:${c}" aria-label="${n} ${c}"></button>`).join('')}</div>`).join('') + '<button type="button" data-e="reset">Reset outside colours</button>' : ''}`;
+    else if (t === 'm') body.innerHTML = `<div class="kh-strip" aria-label="My furniture">${deco.items.map((it, i) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing placed yet.</small>'}</div>`;
+    else body.innerHTML = `<div class="kh-strip" aria-label="Add furniture">${Object.entries(DECOR).map(([c, D]) => `<button type="button" class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D)}</em></button>`).join('')}</div>`;
+    body.querySelectorAll('[data-mine]').forEach((b) => (b.onclick = () => selectItem(+b.dataset.mine)));
+    body.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; paintBody(); }));
+    body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
+    body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { deco.floor = b.dataset.fl; deco.r.I.setFloor(deco.floor); paintBody(); }));
+    body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say('🎨 Outside colour set (see it when you go out)'); }));
+    body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
       if (!have(c)) { if (!b.dataset.sure) { b.dataset.sure = 1; b.querySelector('em').textContent = 'Tap to buy ' + priceOf(D); return; } try { b.disabled = true; const { econ: e, dia: d } = await shop(); if (D.d) await d.buy(decorItem(c)); else await e.buy(decorItem(c)); owned = owned || {}; owned[decorItem(c)] = 1; say('🛍️ Bought ' + D.n); }
         catch (e) { b.disabled = false; say(e.code === 'permission-denied' ? 'The shop isn’t selling decor yet (prices not published).' : /Diamond|reading 'd'/.test(e.message || '') ? 'You need more 💎 Diamonds' : e.message || 'Could not buy'); return; } }
-      const r = deco.r; const fx = Math.sin(P.yaw || 0), fz = Math.cos(P.yaw || 0); const snap = (v) => Math.max(-5.5, Math.min(5.5, Math.round(v * 2) / 2));
-      deco.items.push({ c, x: snap((P.x - r.cx + fx * 1.6) / SC), z: snap((P.z - r.cz + fz * 1.6) / SC), r: (Math.round(((P.yaw || 0) + Math.PI) / (Math.PI / 2)) % 4 + 4) % 4, f: r.I.two && P.y > FLAT + 2.5 ? 1 : 0 }); deco.sel = deco.items.length - 1; relItems(); drawDeco(); })); }
+      const r = deco.r; const fx = Math.sin(P.yaw || 0), fz = Math.cos(P.yaw || 0);
+      deco.items.push({ c, x: clampPlan((P.x - r.cx + fx * 1.6) / SC), z: clampPlan((P.z - r.cz + fz * 1.6) / SC), r: (Math.round(((P.yaw || 0) + Math.PI) / (Math.PI / 2)) % 4 + 4) % 4, f: r.I.two && P.y > FLAT + 2.5 ? 1 : 0 }); deco.sel = deco.items.length - 1; relItems(); drawDeco(); }));
+  }
+  function drawDeco() { if (!deco) return; const t = deco.tab;
+    dbar.classList.toggle('open', !!deco.open); dbar.hidden = false;
+    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} Decorate</button><button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${deco.items.length}</button><button type="button" data-tab="p" class="${t === 'p' ? 'on' : ''}">Paint</button><button type="button" class="g" data-x>Cancel</button><button type="button" class="p" data-sv>Done</button></div><div class="kh-tools"></div><div class="kh-body"></div>`;
+    dbar.querySelector('[data-handle]').onclick = () => { deco.open = !deco.open; drawDeco(); };
+    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; drawDeco(); }));
+    dbar.querySelector('[data-x]').onclick = () => endDeco(false); dbar.querySelector('[data-sv]').onclick = () => endDeco(true);
+    paintTools(); paintBody(); }
+  function rayAt(clientX, clientY) {
+    const cam = api.cam, cv = view.querySelector('canvas'); if (!cam || !cv) return null;
+    const rect = cv.getBoundingClientRect(); if (rect.width < 2 || rect.height < 2) return null;
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1, ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+    const origin = cam.position.clone(); const dir = new THREE.Vector3(ndcX, ndcY, 0.5).unproject(cam).sub(origin).normalize();
+    return { origin, dir };
+  }
+  function onDecoDown(e) {
+    if (!deco || e.button > 0) return;
+    if (e.target.closest && e.target.closest('button, a, input, textarea, select, .kh-dbar, .kh-radio, .kh-note-btn, .kc-b, .kc-gear, .kh-p, .ks-panel')) return;
+    const ray = rayAt(e.clientX, e.clientY); if (!ray) return;
+    const hit = pickIndex(deco.items, ray.origin, ray.dir, aabbOf);
+    const idx = hit >= 0 ? hit : (deco.moving && deco.sel >= 0 ? deco.sel : -1);
+    if (idx < 0) return;
+    e.preventDefault(); e.stopPropagation(); selectItem(idx);
+    const it = deco.items[idx]; const y = itemBaseY(it) + 0.02;
+    let wx = null, wz = null;
+    if (Math.abs(ray.dir.y) > 1e-5) { const t = (y - ray.origin.y) / ray.dir.y; if (t > 0) { wx = ray.origin.x + ray.dir.x * t; wz = ray.origin.z + ray.dir.z * t; } }
+    deco.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, sel: idx, ox: it.x, oz: it.z, wx, wz };
+  }
+  function onDecoMove(e) {
+    const d = deco && deco.drag; if (!d || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y; if (dx * dx + dy * dy > 36) d.moved = true;
+    if (!d.moved || d.wx == null) return; const it = deco.items[d.sel]; if (!it) return;
+    const ray = rayAt(e.clientX, e.clientY); if (!ray || Math.abs(ray.dir.y) < 1e-5) return;
+    const y = itemBaseY(it) + 0.02, t = (y - ray.origin.y) / ray.dir.y; if (t < 0) return;
+    const wx = ray.origin.x + ray.dir.x * t, wz = ray.origin.z + ray.dir.z * t;
+    const nx = clampPlan(d.ox + (wx - d.wx) / SC), nz = clampPlan(d.oz + (wz - d.wz) / SC);
+    if (nx === it.x && nz === it.z) return; it.x = nx; it.z = nz; relItems(); placeHi();
+  }
+  function onDecoUp(e) { if (deco && deco.drag && e.pointerId === deco.drag.id) deco.drag = null; }
+  function onDecoKey(e) {
+    if (!deco) return; const tag = e.target && e.target.tagName; if (tag && /^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
+    if (deco.sel >= 0 && e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); nudgeScreen(-1, 0); }
+    else if (deco.sel >= 0 && e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); nudgeScreen(1, 0); }
+    else if (deco.sel >= 0 && e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); nudgeScreen(0, -1); }
+    else if (deco.sel >= 0 && e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); nudgeScreen(0, 1); }
+    else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); e.stopPropagation(); rotateSel(); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); removeSel(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endDeco(true); }
+  }
+  function decoratePad(pressed) {
+    if (!deco || !pressed) return false;
+    if (pressed.back) { endDeco(true); return true; }
+    if (deco.sel < 0 && (pressed.confirm || pressed.use)) { const n = nearest(); if (n >= 0) selectItem(n); return true; }
+    if (pressed.left) nudgeScreen(-1, 0); if (pressed.right) nudgeScreen(1, 0); if (pressed.up) nudgeScreen(0, -1); if (pressed.down) nudgeScreen(0, 1);
+    if (pressed.use) rotateSel(); if (pressed.menu) removeSel();
+    if (pressed.confirm) { deco.moving = !deco.moving; paintTools(); }
+    return true;
+  }
+  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, name: it ? DECOR[it.c].n : '', x: it ? it.x : null, z: it ? it.z : null, hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden }; }
+  function screenOf(i) {
+    if (!deco || !deco.items[i] || !api.cam) return null; const b = aabbOf(deco.items[i]); api.cam.updateMatrixWorld(); const v = new THREE.Vector3((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2); v.project(api.cam);
+    const rect = view.querySelector('canvas').getBoundingClientRect(); return { x: (v.x + 1) / 2 * rect.width + rect.left, y: (1 - v.y) / 2 * rect.height + rect.top, behind: v.z > 1 };
+  }
+  view.addEventListener('pointerdown', onDecoDown, true); view.addEventListener('pointermove', onDecoMove, true); view.addEventListener('pointerup', onDecoUp, true); view.addEventListener('pointercancel', onDecoUp, true);
+  addEventListener('keydown', onDecoKey, true);
   decB.onclick = () => startDeco();
   // ---------------------------------------------------------------- owners (live) + buying
   // reads stay per-area: one listener for the classic world (ids < 'hm'), one for my own homes, and one per far-south metro city,
@@ -664,8 +788,8 @@ export function attachHomes(api, W, K) {
   const life = attachHomeLife(api, { inside: () => inside, room: () => (inside && rooms.get(inside.id)) || null, say,
     sitAt: (o) => { P.sit = { x: o.x, z: o.z, y: o.y, yaw: o.yaw, seat: o.seat || null, back: o.back, off: () => (o.dn === 'sleep' ? life.act('wake') : null) }; P.x = o.x; P.z = o.z; P.yaw = o.yaw; api.markDirty && api.markDirty(); },
     unsit: () => { const st = P.sit; if (!st) return; P.sit = null; P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; api.markDirty && api.markDirty(); } });
-  window.__khApi = { life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, deco: () => deco, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
-  function destroy() { try { life.destroy(); } catch { /* */ } persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); pan.remove(); css.remove(); }
+  window.__khApi = { life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
+  function destroy() { try { life.destroy(); } catch { /* */ } document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); pan.remove(); css.remove(); css2.remove(); }
   void Q; void K;
   return { update, destroy };
 }
