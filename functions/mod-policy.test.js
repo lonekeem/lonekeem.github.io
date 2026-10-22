@@ -37,6 +37,18 @@ assert.equal(kind('five one two three four five six'), 'phone');
 assert.equal(kind('add me on snap'), 'social');
 assert.equal(p.scan('Nice car!').action, 'ok');
 assert.equal(p.scan('hello friend').action, 'ok');
+assert.equal(kind('how old are you'), 'groom');
+assert.equal(p.scan('how old are you').strike, false);
+assert.equal(p.scan('how old are you').action, 'block');
+assert.equal(kind('are you alone'), 'groom');
+assert.equal(kind('send pic'), 'groom');
+assert.equal(kind("don't tell your parents"), 'groom');
+assert.equal(kind('where do you live'), 'groom');
+assert.equal(kind('what school do you go to'), 'groom');
+assert.equal(p.scan('I like school').action, 'ok');
+assert.equal(p.scan('class assignment').action, 'ok');
+assert.equal(p.scan('snapshot').action, 'ok');
+assert.equal(p.scan('oh hell').kind, 'mild');
 
 const care = p.scan('i want to die');
 assert.equal(care.action, 'care');

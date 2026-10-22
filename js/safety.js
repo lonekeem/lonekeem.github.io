@@ -9,6 +9,14 @@ export function initSafety(ctx) { C = ctx; }
 export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export function ageMonths(y, m, now = new Date()) { return (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - m); }
 export const is13 = (p) => !!(p && Number.isInteger(p.birthY) && ageMonths(p.birthY, p.birthM) >= 156);
+// Under 13, unknown age, or a moderator flag. Admins are never limited.
+export function limited() {
+  if (C && C.isAdmin && C.isAdmin()) return false;
+  const S = C && C.S;
+  if (!S || !S.user || !S.profile) return false;
+  if (flagCache.uid === S.user.uid && flagCache.v === true) return true;
+  return !is13(S.profile);
+}
 export const SAFETY_NOTE = "For safety, links and contact info aren't allowed";
 const CONTACT_KIND = new Set(['phone', 'email', 'address', 'social', 'link']);
 export function contactBlocked(text) { return CONTACT_KIND.has(scan(String(text || '')).kind); }
@@ -33,6 +41,18 @@ export async function underageFlag(uid) {
 }
 export async function markUnder13(uid, reason = '') {
   await setDoc(doc(C.db, 'underage', uid), { by: C.S.user.uid, reason: String(reason || 'Marked by a moderator').slice(0, 200), at: serverTimestamp() });
+}
+// Same flag a moderator writes, saved from the birthday when it is under 13.
+export async function applyYoungFlag() {
+  const S = C && C.S;
+  if (!S || !S.user || !S.profile || (C.isAdmin && C.isAdmin())) return;
+  if (!Number.isInteger(S.profile.birthY) || is13(S.profile)) return;
+  if (flagCache.uid === S.user.uid && flagCache.v === true) return;
+  try {
+    await markUnder13(S.user.uid, 'Birthday is under 13');
+    flagCache = { uid: S.user.uid, v: true };
+    syncChatMode();
+  } catch { /* already saved, or the rules are not deployed yet */ }
 }
 export async function undoUnder13(uid) { await deleteDoc(doc(C.db, 'underage', uid)); }
 
@@ -90,7 +110,7 @@ export function readBirthday(id = 'bd') {
 }
 
 const KID_MSG = `<h2 style="font-size:1.25rem">Thanks for being honest! 💜</h2>
-  <p>Kemy keeps posting, uploading, comments and messages for people 13 and older. That's a safety rule (and the law in many places) to protect younger kids online.</p>
+  <p>Kemy keeps posting, photos, videos, voice, and the public feed for people 13 and older. Your profile stays private, friend requests stay off, and chat is a list of phrases.</p>
   <p>You can still <b>watch videos</b>, <b>play games</b> and use <b>quick chat</b> in games. Have fun!</p>`;
 const FLAG_MSG = `<h2 style="font-size:1.25rem">Some features are paused 💜</h2>
   <p>A Kemy moderator thinks you might be under 13, so posting, uploading, comments and messages are switched off for your account to keep you safe.</p>
@@ -138,7 +158,7 @@ async function saveAgree() {
 export async function gate() {
   const S = C.S; if (!S.user || !S.profile) return false;
   if (C.isAdmin()) return true;
-  if (await underageFlag(S.user.uid)) { showBlocked(true); return false; }
+  if (await underageFlag(S.user.uid)) { showBlocked(is13(S.profile)); return false; }
   if (!Number.isInteger(S.profile.birthY)) {
     if (!(await askAgeHonest())) return false;
     const ok = await new Promise((res) => {
@@ -153,7 +173,7 @@ export async function gate() {
     });
     if (!ok) return false;
   }
-  if (!is13(S.profile)) { showBlocked(false); return false; }
+  if (!is13(S.profile)) { await applyYoungFlag(); showBlocked(false); return false; }
   if (!S.profile.rulesAt) {
     const ok = await new Promise((res) => {
       C.openModal(`<h2 style="font-size:1.25rem">📜 Kemy Community Rules</h2><p>Please read these once before your first post.</p>${rulesHtml()}<p class="form-error" id="ra-err"></p>

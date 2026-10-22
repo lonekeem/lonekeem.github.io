@@ -31,6 +31,8 @@ import { ICONS } from './icons.js';
 import { createModeration, BlockSet } from './moderation.js';
 import { initKindGuard } from './kindguard.js';
 import * as safety from './safety.js';
+import { nameOptionsHtml, safeNameOk } from './safe-names.js';
+import { hideKey, noteReport, watchHides } from './chat-hide.js';
 import { initSpam, spamOk, followOk, postStamp, postDone } from './spam.js';
 import { initMediaScan, takeHold } from './mediascan.js';
 import { createAccountDeleter } from './account-delete.js';
@@ -265,6 +267,7 @@ async function savePost(postId, on) {
 async function followUser(uid, on) {
   const ref = doc(db, 'follows', `${S.user.uid}_${uid}`);
   if (on) {
+    if (uid !== STUDIO_UID && safety.limited()) throw Object.assign(new Error('Friend requests are off on this account.'), { code: 'kemy/friends-off' });
     if (!followOk()) throw Object.assign(new Error('Slow down a bit 💜'), { code: 'kemy/spam', quiet: true });
     const b = writeBatch(db); b.set(ref, { follower: S.user.uid, followee: uid, createdAt: serverTimestamp() });
     if (uid !== STUDIO_UID && !isAdmin()) b.update(doc(db, 'users', S.user.uid), { lastFollowAt: serverTimestamp() });
@@ -277,7 +280,8 @@ async function followUser(uid, on) {
 const comments = createComments({
   db, S, esc, avatar: (...x) => avatar(...x), badge: (...x) => badge(...x), timeAgo: (...x) => timeAgo(...x), linkify: (...x) => linkify(...x),
   toast: (m) => toast(m), friendlyError: (e) => friendlyError(e), isAdmin: () => isAdmin(),
-  reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x)
+  reportDialog: (...x) => reportDialog(...x), notify: (...x) => notify(...x),
+  blockUser: (uid, name) => blockUser(uid, name)
 });
 // Kind-words filter on every text box; tricks / repeated tries => 1-hour timeout + Mod Hub item.
 initKindGuard({ onBlock: ({ text }) => { if (window.kemyModWarn) window.kemyModWarn(); if (window.kemyModFlag) window.kemyModFlag(text || '', 'park', ''); } });
@@ -469,7 +473,7 @@ function renderPosts(container, posts, emptyMsg) {
 
 // ---------------------------------------------------------------- moderation actions
 const REPORT_REASONS = [['bullying', '😢 Bullying or being mean'], ['inappropriate', '🙈 Inappropriate (swearing, adult or scary)'], ['spam', '📢 Spam or scam'], ['personal', '🔒 Shares personal info'], ['under13', '🧒 Seems under 13'], ['other', '❓ Something else']];
-async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '') {
+async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '', hideKeyId = '') {
   if (!requireAuth()) return;
   if (!mod.iAmMod()) {
     const st = await getDoc(doc(db, 'reportStrikes', S.user.uid)).then((d) => (d.exists() ? d.data() : null)).catch(() => null);
@@ -501,7 +505,7 @@ async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '
       const b = writeBatch(db);
       b.set(doc(collection(db, 'reports')), {
         reporterId: S.user.uid, targetType, targetId, postId: postId || '', reason: reason.slice(0, 500),
-        excerpt: String(excerpt || '').slice(0, 300), targetUid: String(targetUid || ''), status: 'open', createdAt: serverTimestamp()
+        excerpt: [excerpt, window.kemyModRecent ? window.kemyModRecent() : ''].filter(Boolean).join(' · ').slice(0, 300), targetUid: String(targetUid || ''), status: 'open', createdAt: serverTimestamp()
       });
       // Report rate counter (rules: 10 per hour, 30 per day).
       const qref = doc(db, 'reportQuota', S.user.uid);
@@ -517,6 +521,7 @@ async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '
         if (!had && ps && ps.exists() && ps.data().authorId !== S.user.uid) { b.set(fl, { at: serverTimestamp() }); b.update(doc(db, 'posts', postId), { reportCount: increment(1) }); }
       }
       await b.commit();
+      if (hideKeyId) noteReport(db, S.user.uid, hideKeyId).catch(() => {});
       closeModal(); toast('Thanks. The report was sent.');
     } catch (e) { $('#report-err').textContent = e.code === 'permission-denied' ? 'Couldn’t send the report right now. Please try again in a minute.' : friendlyError(e); }
   };
@@ -577,11 +582,11 @@ async function showWelcome() {
       <a class="btn btn-ghost" href="#/settings/account" data-close>Set up my profile</a>
     </div>
     <p class="small muted" style="margin:10px 0 0"><button type="button" class="link-btn" id="welcome-theme" data-theme-ctl aria-pressed="false">🎵 Play Kemy’s theme</button> · ${esc(THEME_TITLE)} by Keem</p>
-    <form class="welcome-bio" id="welcome-bio">
+    ${safety.limited() ? '<p class="small muted">Your profile stays private, with a name from the Kemy list. Bios, photos, and friend requests stay off.</p>' : `<form class="welcome-bio" id="welcome-bio">
       <div class="row"><label for="w-bio"><b>Add a bio</b> <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="w-bio-n"></span></div>
       <textarea id="w-bio" maxlength="160" rows="3" placeholder="Who are you? What do you make? ✨"></textarea>
       <div class="row"><span class="small muted">Up to 4 lines · emoji, @names and #tags work</span><span class="spacer"></span><button class="btn btn-sm" type="submit">Save bio</button></div>
-    </form>`);
+    </form>`}`);
   { const ta = $('#w-bio'); if (ta) { wireCounter(ta, $('#w-bio-n'), 160); limitLines(ta);
     $('#welcome-bio').onsubmit = async (ev) => { ev.preventDefault(); const bio = cleanBio(ta.value); if (!bio) { ta.focus(); return; }
       if (safety.contactBlocked(bio)) { toast(safety.SAFETY_NOTE); return; }
@@ -617,6 +622,8 @@ function renderChrome(name) {
     ha.innerHTML = `${shareBtn}${searchBtn}<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.gear}</a><a class="signin-pill" href="#/login">Sign in</a>`;
   }
   document.getElementById('msg-dot').hidden = !S.unreadChats;
+  const postNav = document.querySelector('.bottom-nav .post-btn');
+  if (postNav) postNav.hidden = !!(S.user && S.profile && safety.limited());
   // Full-screen feed hides the header: keep a floating Moderator button there.
   let fab = document.getElementById('mod-fab');
   if (mod && mod.iAmMod() && S.profile) {
@@ -766,14 +773,14 @@ const watch = createWatch({
   S, db, main, STUDIO_UID, esc, $, avatar, badge, timeAgo, toast, friendlyError, openModal, closeModal, isAdmin, stale,
   isLiked, likePost, savePost, followUser, addComment, deleteComment, reportDialog, youTubeId, tikTokId,
   blockUser, deletePost, canDeletePost, linkify, SEARCH_ICON, comments,
-  openStory: () => { if (requireAuth()) composer.openStory(); },
+  openStory: async () => { if (!requireAuth()) return; if (!(await safety.gate())) return; composer.openStory(); },
   views: { viewsHtml, trackVideo, trackVisible },
   fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot, orderBy, writeBatch, serverTimestamp, increment, setDoc }
 });
 async function pageWatch(tab, postId, token) { return watch.render(postId, token, tab || 'foryou'); }
 const stories = createStories({
   S, db, esc, avatar, badge, timeAgo, toast, friendlyError, requireAuth, STUDIO_UID, isAdmin,
-  openStory: () => composer.openStory(), sendMessage, refreshProfile,
+  openStory: async () => { if (!requireAuth()) return; if (!(await safety.gate())) return; composer.openStory(); }, sendMessage, refreshProfile,
   fs: { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, writeBatch, Timestamp, serverTimestamp }
 });
 const live = lazyMod(() => import('./live.js').then(({ createLive }) => createLive({ palLive: (root, o) => pals.liveOverlay(root, o),
@@ -837,7 +844,7 @@ async function pageFeed(token) {
     <a class="pk-quick" href="#/park" aria-label="Open Pal Park"><span class="pk-quick-ic" aria-hidden="true">🌳</span><span><b>Pal Park</b><small>Hang out with friends in 3D</small></span><span class="pk-quick-go">Play ›</span></a>
     <div id="live-now"></div>
     <div id="stories" class="stories-slot"></div>
-    <div class="row"><h1 class="page-title">Posts</h1><span class="spacer"></span><a class="btn btn-sm btn-ghost" href="#/new">New post</a></div>
+    <div class="row"><h1 class="page-title">Posts</h1><span class="spacer"></span>${safety.canPostNow() ? '<a class="btn btn-sm btn-ghost" href="#/new">New post</a>' : ''}</div>
     <div id="posts"><div class="spinner"></div></div>`;
   live.renderFeed($('#live-now'), $('#stories'), stories.renderRow($('#stories'), token, stale), token);
   const rs = $('#resend'); if (rs) rs.onclick = async () => { try { await sendEmailVerification(S.user); toast('Verification email sent'); } catch (e) { toast(friendlyError(e)); } };
@@ -960,6 +967,7 @@ function textComposeForm(slot, open) {
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
 async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
+  if (!asStudio && !safety.canPostNow()) throw Object.assign(new Error('Posting photos and videos is off for this account.'), { code: 'kemy/young' });
   if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Slow down a bit 💜 Try posting again in a moment.'), { code: 'kemy/spam' });
   if (caption) safety.scanAge(caption, 'post');
   const urls = deliveryUrls(upload);
@@ -985,6 +993,7 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
 // Saves a 24h story after the Cloudinary upload. expiresAt is set a little under 24 h from the
 // client clock so the rule (expiresAt <= server time + 24 h) holds even with a few minutes of skew.
 async function saveStory({ upload, info, caption, asStudio }) {
+  if (!asStudio && !safety.canPostNow()) throw Object.assign(new Error('Stories are off for this account.'), { code: 'kemy/young' });
   const urls = deliveryUrls(upload);
   const { authorId, author } = await postAuthor(asStudio);
   const ref = doc(collection(db, 'stories'));
@@ -1018,7 +1027,7 @@ async function pagePost(postId, token) {
     <section class="card pad" aria-labelledby="c-title">
       <h2 id="c-title" style="font-size:1.1rem">Comments</h2>
       <div id="comments"><div class="spinner"></div></div>
-      ${S.user && S.profile
+      ${S.user && S.profile && safety.canPostNow()
         ? `<form class="comment-form" id="comment-form"><label for="comment-text" class="sr-only">Add a comment</label><input id="comment-text" type="text" maxlength="500" placeholder="Add a comment…" autocomplete="off"><button class="btn btn-sm" type="submit">Send</button></form><p class="form-error" id="comment-err"></p>`
         : `<p class="muted small" style="margin-top:12px"><a href="#/login?next=${encodeURIComponent('#/post/' + postId)}">Log in</a> or <a href="#/signup">create an account</a> to comment.</p>`}
     </section>`;
@@ -1043,6 +1052,11 @@ async function pageProfile(username, tab, token) {
   if (stale(token)) return;
   if (!u) { main.innerHTML = '<div class="empty">This profile is not available.</div>'; return; }
   const mine = !!(S.user && uid === S.user.uid);
+  const kidProfile = uid !== STUDIO_UID && !safety.is13(u);
+  if (!mine && kidProfile && !isAdmin() && !mod.iAmMod()) {
+    if (!stale(token)) main.innerHTML = `<div class="pc-block"><div class="pc-moon" aria-hidden="true">🔒</div><h2>This profile is private</h2><p>Players under 13, and accounts with no birthday yet, don’t share a public profile.</p><a class="btn" href="#/explore">Explore</a></div>`;
+    return;
+  }
   if (!mine && !isAdmin() && await parental.profileHidden(u, uid)) { if (!stale(token)) main.innerHTML = parental.privateProfileHtml(u.username); return; }
   const blocked = S.blocked.has(uid);
   const [fers, fing, pc, tot] = await Promise.all([
@@ -1076,14 +1090,14 @@ async function pageProfile(username, tab, token) {
         </div>
       </div>
       <div id="ppal"></div>
-      ${u.bio ? `<p class="bio">${bioHtml(u.bio)}</p>` : mine ? `<a class="btn btn-sm btn-ghost add-bio" href="#/settings/account" id="add-bio">✍️ Add a bio</a>` : ''}
+      ${u.bio ? `<p class="bio">${bioHtml(u.bio)}</p>` : mine && !safety.limited() ? `<a class="btn btn-sm btn-ghost add-bio" href="#/settings/account" id="add-bio">✍️ Add a bio</a>` : ''}
       ${safeWebsite(u.website) ? `<a class="pweb" href="${esc(u.website)}" target="_blank" rel="nofollow noopener noreferrer ugc">🔗 ${esc(prettyUrl(u.website))}</a>` : ''}
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
         <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine || uid === STUDIO_UID ? '<span id="p-donate"></span>' : ''}${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings/account">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
-        ${!mine && !blocked ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
+        ${!mine && !blocked && !safety.limited() && !kidProfile ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && S.user && uid !== STUDIO_UID ? `<button class="btn btn-sm btn-ghost" id="report-user">Report</button>` : ''}${!mine && isAdmin() && uid !== STUDIO_UID ? '<span id="p-modinv"></span>' : ''}
         ${!mine && S.user && uid !== STUDIO_UID ? (blocked ? `<button class="btn btn-sm btn-danger" id="unblock">Unblock</button>` : `<button class="btn btn-sm btn-danger" id="block">Block</button>`) : ''}
       </div>
@@ -1184,19 +1198,22 @@ async function pageSettings() {
     <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><a class="btn btn-sm btn-ghost" href="#/rules" id="set-rules">📜 Community Rules</a><a class="btn btn-sm btn-ghost" href="#/feedback" id="set-team">💬 Message the Kemy team</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
     ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Mod Hub${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
     <div id="set-donate"></div>
+    ${safety.limited() ? `<section class="card pad" id="young-limits"><h2 style="font-size:1.05rem">Your safety limits</h2><p class="small">Because this account is under 13, or has no birthday yet, chat is phrases only. Photos, videos, voice, bios, and the public feed stay off. Your profile is private and friend requests are off. A parent PIN cannot turn these off.</p><p class="small"><a href="kids-safety.html">Kids safety and parents</a></p></section>` : ''}
     <form id="settings" class="card pad">
-      <div class="av-edit" id="av-edit">
+      <div class="av-edit" id="av-edit" ${safety.limited() ? 'hidden' : ''}>
         <button type="button" class="av-pick" id="av-pick" aria-label="Change profile photo">${avatar({ ...p, uid: S.user.uid }, 'lg', false)}<span class="av-cam" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.8 5h4.4a1.5 1.5 0 0 1 1.2.6L17 8h3a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 8z"/><circle cx="12" cy="13" r="3.5"/></svg></span></button>
         <div><button type="button" class="link-btn" id="av-change">${safePhotoURL(p.photoURL) ? 'Change profile photo' : 'Add a profile photo'}</button>
         <p class="muted small" style="margin:2px 0 0">${safePhotoURL(p.photoURL) ? 'Your photo shows everywhere your name does.' : 'Until you add one, your avatar uses your initials and the color below.'}</p></div>
       </div>
-      <div class="field"><label for="s-name">Display name</label><input id="s-name" type="text" maxlength="50" required value="${esc(p.displayName)}"></div>
+      ${safety.limited()
+        ? `<div class="field"><label for="s-safe">Display name</label><select id="s-safe">${nameOptionsHtml(p.displayName)}</select><p class="small muted" style="margin:4px 0 0">Pick a name from the list. Real names stay off Kemy.</p></div>`
+        : `<div class="field"><label for="s-name">Display name</label><input id="s-name" type="text" maxlength="50" required value="${esc(p.displayName)}"></div>`}
       <div class="field"><label for="s-user">Username</label><input id="s-user" type="text" maxlength="20" required value="${esc(p.username)}" autocapitalize="none" autocomplete="off" spellcheck="false">
         <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore.</p></div>
-      <div class="field"><div class="row"><label for="s-bio">Bio</label><span class="spacer"></span><span class="small muted counter" id="s-bio-n" aria-live="polite"></span></div><textarea id="s-bio" maxlength="160" rows="4" style="min-height:96px" placeholder="Tell people about yourself ✨ Use @names and #tags">${esc(p.bio)}</textarea>
+      <div class="field" ${safety.limited() ? 'hidden' : ''}><div class="row"><label for="s-bio">Bio</label><span class="spacer"></span><span class="small muted counter" id="s-bio-n" aria-live="polite"></span></div><textarea id="s-bio" maxlength="160" rows="4" style="min-height:96px" placeholder="Tell people about yourself ✨ Use @names and #tags">${esc(p.bio)}</textarea>
         <p class="small muted" style="margin:4px 0 0">Up to 4 lines. Emoji, @mentions and #hashtags work.</p></div>
-      <div class="field"><div class="row"><label for="s-pro">Pronouns <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="s-pro-n"></span></div><input id="s-pro" type="text" maxlength="20" placeholder="e.g. she/her" value="${esc(p.pronouns || '')}" autocomplete="off"></div>
-      <div class="field"><div class="row"><label for="s-web">Website <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="s-web-n"></span></div><input id="s-web" type="text" inputmode="url" maxlength="100" placeholder="https://your-site.com" value="${esc(p.website || '')}" autocapitalize="none" autocomplete="url" spellcheck="false"></div>
+      <div class="field" ${safety.limited() ? 'hidden' : ''}><div class="row"><label for="s-pro">Pronouns <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="s-pro-n"></span></div><input id="s-pro" type="text" maxlength="20" placeholder="e.g. she/her" value="${esc(p.pronouns || '')}" autocomplete="off"></div>
+      <div class="field" ${safety.limited() ? 'hidden' : ''}><div class="row"><label for="s-web">Website <span class="muted small">(optional)</span></label><span class="spacer"></span><span class="small muted counter" id="s-web-n"></span></div><input id="s-web" type="text" inputmode="url" maxlength="100" placeholder="https://your-site.com" value="${esc(p.website || '')}" autocapitalize="none" autocomplete="url" spellcheck="false"></div>
       <fieldset class="field" style="border:0;padding:0;margin:0 0 14px"><legend style="font-weight:500;font-size:.92rem;margin-bottom:8px">Avatar color</legend>
         <div class="color-row">${COLORS.map((c) => `<label><input type="radio" name="color" value="${c}" ${c === p.color ? 'checked' : ''}><span class="swatch" style="background:${c}" title="${c}"></span></label>`).join('')}</div></fieldset>
       <p class="form-error" id="s-err"></p>
@@ -1216,9 +1233,9 @@ async function pageSettings() {
       <div class="row" style="flex-wrap:wrap"><button class="btn btn-sm btn-ghost" id="s-reset">Send password reset email</button><button class="btn btn-sm btn-ghost" id="s-out">Log out</button></div>
     </section>
     ${isAdmin() ? '' : `<section class="card pad danger-zone" style="margin-top:16px" aria-labelledby="dz-h">
-      <h2 id="dz-h" style="font-size:1.05rem">Delete account</h2>
+      <h2 id="dz-h" style="font-size:1.05rem">Delete my account and data</h2>
       <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
-      <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
+      <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete my account and data</button>
     </section>`}`;
   donate.mountSettings($('#set-donate')); devices.wireSettings();
   $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
@@ -1250,15 +1267,16 @@ async function pageSettings() {
   $('#settings').onsubmit = async (ev) => {
     ev.preventDefault();
     const err = $('#s-err'); err.textContent = '';
-    const displayName = $('#s-name').value.trim();
+    const young = safety.limited();
+    const displayName = young ? ($('#s-safe')?.value || '').trim() : $('#s-name').value.trim();
     const username = $('#s-user').value.trim().toLowerCase().replace(/^@/, '');
-    const bio = cleanBio($('#s-bio').value);
+    const bio = young ? '' : cleanBio($('#s-bio').value);
     if (bio !== (p.bio || '')) { if (safety.contactBlocked(bio)) { err.textContent = safety.SAFETY_NOTE; return; } if (!safety.piiOk(bio)) return; safety.scanAge(bio, 'user', S.user.uid); }
-    const pronouns = $('#s-pro').value.trim().slice(0, 20);
-    const website = normWebsite($('#s-web').value);
+    const pronouns = young ? '' : $('#s-pro').value.trim().slice(0, 20);
+    const website = young ? '' : normWebsite($('#s-web').value);
     if (website === null) { err.textContent = 'Website must be a valid https:// link (up to 100 characters).'; return; }
     const color = $('input[name=color]:checked')?.value || p.color;
-    if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
+    if (!displayName || (young && !safeNameOk(displayName))) { err.textContent = young ? 'Pick a name from the list.' : 'Please enter a display name.'; return; }
     if (window.kemyNameBad && (window.kemyNameBad(displayName) || window.kemyNameBad(username) || window.kemyNameBad(bio))) {
       if (window.kemyModWarn) window.kemyModWarn();
       if (window.kemyModFlag) window.kemyModFlag(displayName, 'name', '');
@@ -1273,11 +1291,16 @@ async function pageSettings() {
         b.set(doc(db, 'usernames', username), { uid: S.user.uid });
         b.delete(doc(db, 'usernames', p.username));
       }
-      b.update(doc(db, 'users', S.user.uid), { displayName, username, bio, pronouns, website, color, ...userSearchFields({ displayName, username }) });
+      const patch = { displayName, username, bio, pronouns, website, color, ...userSearchFields({ displayName, username }) };
+      if (young) {
+        patch.pc = { chat: true, dm: 'off', live: false, cmt: false, buy: 'pin', time: 0, vis: 'private', safe: true, ...(p.pc || {}), vis: 'private', dm: 'off' };
+        if (p.photoURL) patch.photoURL = '';
+      }
+      b.update(doc(db, 'users', S.user.uid), patch);
       const memberRef = doc(db, 'members', S.user.uid);
       if ((await getDoc(memberRef)).exists()) b.update(memberRef, { displayName, username, displayNameLower: displayName.toLowerCase().slice(0, 100), color });
       await b.commit();
-      Object.assign(S.profile, { displayName, username, bio, pronouns, website, color });
+      Object.assign(S.profile, { displayName, username, bio, pronouns, website, color, ...(young ? { pc: patch.pc, photoURL: patch.photoURL || '' } : {}) });
       profileCache.set(S.user.uid, { uid: S.user.uid, ...S.profile });
       updateProfile(S.user, { displayName }).catch(() => {});
       toast('Profile saved');
@@ -1504,10 +1527,13 @@ async function pageLogin() {
   };
 }
 function profileFields(prefillName = '') {
+  const teen = pendingBirthday && safety.ageMonths(pendingBirthday.birthY, pendingBirthday.birthM) >= 156;
   return `
-    <div class="field"><label for="p-name">Display name</label><input id="p-name" type="text" maxlength="50" autocomplete="name" required value="${esc(prefillName)}"></div>
+    <div class="field" id="p-name-safe" ${teen ? 'hidden' : ''}><label for="p-safe">Display name</label><select id="p-safe">${nameOptionsHtml(prefillName)}</select>
+      <p class="small muted" style="margin:4px 0 0">Under 13, pick a name from this list. Real names stay off Kemy.</p></div>
+    <div class="field" id="p-name-free" ${teen ? '' : 'hidden'}><label for="p-name">Display name</label><input id="p-name" type="text" maxlength="50" autocomplete="name" ${teen ? 'required' : ''} value="${esc(prefillName)}"></div>
     <div class="field"><label for="p-user">Username</label><input id="p-user" type="text" maxlength="20" required autocapitalize="none" autocomplete="username" spellcheck="false" placeholder="e.g. keemfan">
-      <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore.</p></div>
+      <p class="small muted" style="margin:4px 0 0">3–20 characters: lowercase letters, numbers, dot, underscore. This is a handle, not your real name.</p></div>
     <fieldset class="field topics-field" style="border:0;padding:0;margin:0 0 14px"><legend style="font-weight:500;font-size:.92rem;margin-bottom:6px">What do you like? <span class="muted small">(optional, shapes your For You feed)</span></legend>${topicChips('topic', (() => { try { return JSON.parse(sessionStorage.getItem('kemy-topics') || '[]'); } catch { return []; } })())}</fieldset>`;
 }
 // Remember topic picks from the sign-up / onboarding form until the profile exists.
@@ -1515,9 +1541,26 @@ document.addEventListener('change', (e) => { if (e.target.name !== 'topic' || !e
   const picks = [...document.querySelectorAll('input[name=topic]:checked')].map((i) => i.value); try { sessionStorage.setItem('kemy-topics', JSON.stringify(picks)); } catch { /* */ } });
 const agreeField = `<label class="check field"><input type="checkbox" id="p-agree" required> <span>I agree to the <a href="#/rules" target="_blank">Community Rules</a>, <a href="terms.html" target="_blank">Terms</a>, <a href="privacy.html" target="_blank">Privacy</a> and <a href="guidelines.html" target="_blank">Community Guidelines</a>.</span></label>`;
 const readProfileForm = () => ({
-  displayName: $('#p-name').value.trim(),
+  displayName: (document.getElementById('p-name-safe') && !document.getElementById('p-name-safe').hidden)
+    ? (document.getElementById('p-safe')?.value || '').trim()
+    : ($('#p-name')?.value || '').trim(),
   username: $('#p-user').value.trim().toLowerCase().replace(/^@/, '')
 });
+function bindNameMode(birthdayId) {
+  const apply = () => {
+    const bd = safety.readBirthday(birthdayId);
+    const young = !bd || safety.ageMonths(bd.birthY, bd.birthM) < 156;
+    const s = document.getElementById('p-name-safe');
+    const f = document.getElementById('p-name-free');
+    if (s) s.hidden = !young;
+    if (f) f.hidden = young;
+    const inp = document.getElementById('p-name');
+    if (inp) inp.required = !young;
+  };
+  document.getElementById(birthdayId + '-m')?.addEventListener('change', apply);
+  document.getElementById(birthdayId + '-y')?.addEventListener('change', apply);
+  apply();
+}
 async function pageSignup() {
   if (S.user) { location.replace(S.profile ? '#/feed' : '#/onboard'); return; }
   authShell('Create your account', 'Join the Lone Keem Studios community.', `
@@ -1544,7 +1587,9 @@ async function pageSignup() {
     if (!(await safety.askAgeHonest())) return;
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
-    if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
+    const bd = safety.readBirthday('sbd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; }
+    const young = safety.ageMonths(bd.birthY, bd.birthM) < 156;
+    if (!displayName || (young && !safeNameOk(displayName))) { err.textContent = young ? 'Pick a name from the list.' : 'Please enter a display name.'; return; }
     if (window.kemyNameBad && (window.kemyNameBad(displayName) || window.kemyNameBad(username))) {
       if (window.kemyModWarn) window.kemyModWarn();
       if (window.kemyModFlag) window.kemyModFlag(displayName, 'name', '');
@@ -1552,7 +1597,6 @@ async function pageSignup() {
       return;
     }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
-    const bd = safety.readBirthday('sbd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; }
     pendingBirthday = bd;
     const btn = $('#p-btn'); btn.disabled = true; btn.textContent = 'Creating…';
     try {
@@ -1563,6 +1607,7 @@ async function pageSignup() {
       sendEmailVerification(cred.user).catch(() => {});
     } catch (e) { pendingProfile = null; err.textContent = friendlyError(e); btn.disabled = false; btn.textContent = 'Create account'; }
   };
+  bindNameMode('sbd');
   safety.askAgeHonest();
 }
 async function pageOnboard() {
@@ -1573,13 +1618,15 @@ async function pageOnboard() {
     <button class="btn btn-block" type="submit">Continue</button></form>
     <p class="center small muted" style="margin-top:14px"><button class="link-btn" id="ob-out">Use a different account</button></p>`);
   $('#ob-out').onclick = () => signOut(auth);
-  if (!pendingBirthday) safety.askAgeHonest();
+  if (!pendingBirthday) { bindNameMode('obd'); safety.askAgeHonest(); }
   $('#onboard-form').onsubmit = async (ev) => {
     ev.preventDefault();
     if (!pendingBirthday && !(await safety.askAgeHonest())) return;
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
-    if (!displayName) { err.textContent = 'Please enter a display name.'; return; }
+    if (!pendingBirthday) { const bd = safety.readBirthday('obd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; } pendingBirthday = bd; }
+    const young = safety.ageMonths(pendingBirthday.birthY, pendingBirthday.birthM) < 156;
+    if (!displayName || (young && !safeNameOk(displayName))) { err.textContent = young ? 'Pick a name from the list.' : 'Please enter a display name.'; return; }
     if (window.kemyNameBad && (window.kemyNameBad(displayName) || window.kemyNameBad(username))) {
       if (window.kemyModWarn) window.kemyModWarn();
       if (window.kemyModFlag) window.kemyModFlag(displayName, 'name', '');
@@ -1587,7 +1634,6 @@ async function pageOnboard() {
       return;
     }
     if (!USERNAME_RE.test(username)) { err.textContent = 'Usernames are 3–20 characters: lowercase letters, numbers, dot or underscore.'; return; }
-    if (!pendingBirthday) { const bd = safety.readBirthday('obd'); if (!bd) { err.textContent = 'Please pick your birthday month and year.'; return; } pendingBirthday = bd; }
     try { await createProfile(displayName, username); go(pendingNext || '#/feed'); pendingNext = null; }
     catch (e) { err.textContent = friendlyError(e); }
   };
@@ -1609,6 +1655,8 @@ async function createProfile(displayName, username) {
   if (await uidForUsername(username)) throw new Error('That username is taken. Try another.');
   const uid = S.user.uid;
   const name = displayName.slice(0, 50);
+  const young = !pendingBirthday || safety.ageMonths(pendingBirthday.birthY, pendingBirthday.birthM) < 156;
+  if (young && !safeNameOk(name)) throw new Error('Pick a name from the list.');
   const color = COLORS[Math.floor(Math.random() * COLORS.length)];
   const tok = await S.user.getIdTokenResult();
   const signup = tok.signInProvider === 'google.com' ? 'google' : tok.signInProvider === 'password' ? 'email' : '';
@@ -1618,6 +1666,7 @@ async function createProfile(displayName, username) {
     displayName: name, username, bio: '', color,
     ...userSearchFields({ displayName: name, username }),
     ...(pendingBirthday ? { birthY: pendingBirthday.birthY, birthM: pendingBirthday.birthM } : {}),
+    ...(young ? { pc: { chat: true, dm: 'off', live: false, cmt: false, buy: 'pin', time: 0, vis: 'private', safe: true } } : {}),
     ...safety.ageHonestPatch(),
     createdAt: serverTimestamp(), welcomed: false
   });
@@ -1657,6 +1706,8 @@ async function loadSession() {
   S.saved = new Set(sav.docs.map((d) => d.id));
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = [];
   await safety.underageFlag(uid).catch(() => {});
+  await safety.applyYoungFlag().catch(() => {});
+  if (!window.__kemyHideWatch) window.__kemyHideWatch = watchHides(db);
   await mod.loadMine();
   mod.watchInvite();
   mod.watchMyThread((unread, exists) => { S.modThreadUnread = unread; S.modThreadExists = exists; document.getElementById('msg-dot').hidden = !(S.unreadChats || unread); });

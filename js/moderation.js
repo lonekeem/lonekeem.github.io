@@ -257,7 +257,7 @@ export function createModeration(ctx) {
     const b = S.ban;
     return `<section class="card pad center mod-susp"><div style="font-size:3rem" aria-hidden="true">⏸️</div><h1 class="page-title">Your account is paused</h1>
       <p>Your account is suspended <b>${esc(fmtUntil(b))}</b> for: <b>${esc(b.reason)}</b></p>
-      <p class="muted small">While it’s paused you can’t post, comment, chat, talk in Pal Park or join games. ${b.permanent ? '' : 'It turns back on by itself when the time is up.'} If you think this is a mistake, ask a grown-up to email <a href="mailto:lillykemoy1@gmail.com?subject=Kemy%20account%20suspension">the Kemy team</a>.</p>
+      <p class="muted small">While it’s paused you can’t post, comment, chat, talk in Pal Park or join games. ${b.permanent ? '' : 'It turns back on by itself when the time is up.'} If you think this is a mistake, ask a grown-up to use Message the Kemy team in Settings.</p>
       <div class="btns" style="justify-content:center;flex-wrap:wrap"><a class="btn btn-sm" href="#/support">💬 Message the moderators</a><a class="btn btn-sm btn-ghost" href="#/notifications">Notifications</a><a class="btn btn-sm btn-ghost" href="#/settings">Settings</a><a class="btn btn-sm btn-ghost" href="guidelines.html">Kemy rules</a></div></section>`;
   }
   const isSuspended = () => !!(S.user && activeBan(S.ban) && !isAdmin());

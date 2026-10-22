@@ -218,7 +218,11 @@ function html(ctx) {
         <div class="set-head"><span class="set-ic" aria-hidden="true">🛡️</span><h2>Privacy &amp; Safety</h2></div>
         <p><b>Who can message or invite me</b><br>${esc(whoText())}</p>
         <a class="set-link" href="#/settings/parental">Parent info<span class="go" aria-hidden="true">›</span></a>
+        <a class="set-link" href="kids-safety.html">Kids safety and parents<span class="go" aria-hidden="true">›</span></a>
         <a class="set-link" href="#/feedback">Message the Kemy team<span class="go" aria-hidden="true">›</span></a>
+        <a class="set-link" href="#/settings/account">Delete my account and data<span class="go" aria-hidden="true">›</span></a>
+        <h3 style="font-size:1rem;margin:12px 0 4px">For parents</h3>
+        <p class="muted small">Players under 13, and accounts with no birthday yet, get phrase chat only. They cannot post photos, videos, voice, or anything to the public feed. Their profile is private, friend requests are off, and their display name comes from a list. Kemy does not have a parent-consent check that lifts those limits. A 4-digit PIN is not that check. To reach Keem, use Message the Kemy team. Only the studio owner reads it.</p>
         <p class="set-status"><i aria-hidden="true">✓</i> Chat filter: on</p>
         <p class="muted small">Kemy hides unkind words in chat. This stays on.</p>
         <h3 style="font-size:1rem;margin:10px 0 4px">Blocked players</h3>
@@ -237,7 +241,9 @@ function html(ctx) {
         <div class="set-head"><span class="set-ic" aria-hidden="true">💜</span><h2>Help</h2></div>
         <div class="set-links">
           <a class="set-link" href="#/updates">What’s New<span class="go" aria-hidden="true">›</span></a>
+          <a class="set-link" href="kids-safety.html">Kids safety and parents<span class="go" aria-hidden="true">›</span></a>
           <a class="set-link" href="#/feedback">Message the Kemy team<span class="go" aria-hidden="true">›</span></a>
+          <a class="set-link" href="#/settings/account">Delete my account and data<span class="go" aria-hidden="true">›</span></a>
           <button class="set-link" type="button" data-watch-intro>Watch intro<span class="go" aria-hidden="true">›</span></button>
           <button class="set-link" type="button" data-watch-howto>How to save Kemy<span class="go" aria-hidden="true">›</span></button>
         </div>

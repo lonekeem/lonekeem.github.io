@@ -33,6 +33,14 @@ service cloud.firestore {
     function contactFree(t) {
       return t is string && !t.lower().matches('(?s).*(\\btelegram\\b|\\bkik\\b|\\btiktok\\b|tik tok|\\binsta\\b|\\binstagram\\b|\\bwhatsapp\\b|\\bdiscord\\b|\\bsnapchat\\b|\\bsnap\\b|add me on|\\badd me\\b|text me|\\bdm me\\b|my snap|t\\.me/|wa\\.me|discord\\.gg|[.](com|net|org|gg|io|ly|app|link|xyz)\\b|(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)(?:[\\s,.-]+(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)){5,}|(?:[0-9][\\s.\\-()]*){10,}).*');
     }
+    // Questions that ask a child for personal details, or to keep a secret. Blocked for everyone.
+    function groomFree(t) {
+      return t is string && !t.lower().matches('(?s).*(how old are you|how old r u|your age|\\basl\\b|a/s/l|where do you live|where you live|your address|what school|which school|your school|are you alone|home alone|send pic|send a pic|send photo|dont tell|don.t tell|keep this secret).*');
+    }
+    // Under-13 display names are picked from this list. Same words as js/safe-names.js.
+    function safeDisplay(t) {
+      return t.matches('^(Sunny|Happy|Brave|Kind|Calm|Swift|Cosy|Gold|Lucky|Bright|Gentle|Merry|Soft|Tiny|Cool) (Panda|Puppy|Fox|Otter|Bunny|Koala|Tiger|Dolphin|Owl|Star|Bear|Duck|Frog|Lion|Wolf)$');
+    }
     // A saved birthday that is 13 or older. A missing birthday is not 13+.
     function knownTeen(d) {
       let y = d.get('birthY', 0);
@@ -82,7 +90,8 @@ service cloud.firestore {
     }
     function canCreate(u) {
       let d = get(userPath(u)).data;
-      return isAdmin() || u == 'studio' || (ageOkData(d) && d.get('rulesAt', null) is timestamp && !exists(u13Path(u)));
+      // knownTeen fails closed when the birthday is missing, under 13, or not a real month/year.
+      return isAdmin() || u == 'studio' || (knownTeen(d) && d.get('rulesAt', null) is timestamp && !exists(u13Path(u)));
     }
     // Parental Controls (js/parental.js): users/{uid}.pc flags. Read from the already-fetched profile
     // doc so these checks add no extra lookups. pcOff(d, k): that feature was switched off by a parent.
@@ -364,6 +373,12 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt', 'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter'])
         && request.resource.data.createdAt == request.time
         && (!('ageHonestAt' in request.resource.data) || request.resource.data.ageHonestAt == request.time)
+        && (isAdmin() || knownTeen(request.resource.data) || (
+          safeDisplay(request.resource.data.displayName)
+          && request.resource.data.bio == ''
+          && request.resource.data.get('pronouns', '') == ''
+          && request.resource.data.get('website', '') == ''
+          && request.resource.data.get('pc', {}).get('vis', '') == 'private'))
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if actingAs(uid)
         && (uid != me() || !('sessionsValidAfter' in resource.data) || (request.auth.token.auth_time + 1) * 1000 > resource.data.sessionsValidAfter.toMillis())
@@ -387,6 +402,14 @@ service cloud.firestore {
         && (!('rulesAt' in changed()) || (!('rulesAt' in resource.data) && request.resource.data.rulesAt == request.time))
         // Honest-age note: shown once, then kept.
         && (!('ageHonestAt' in changed()) || (!('ageHonestAt' in resource.data) && request.resource.data.ageHonestAt == request.time))
+        // Under 13, or flagged under 13: no free-text name, bio, photo, website, or public profile.
+        && (isAdmin() || (knownTeen(request.resource.data) && !exists(u13Path(uid))) || (
+          (!('displayName' in changed()) || safeDisplay(request.resource.data.displayName))
+          && (!('bio' in changed()) || request.resource.data.bio == '')
+          && (!('pronouns' in changed()) || request.resource.data.get('pronouns', '') == '')
+          && (!('website' in changed()) || request.resource.data.get('website', '') == '')
+          && (!('photoURL' in changed()) || request.resource.data.get('photoURL', '') == '')
+          && (!('pc' in changed()) || request.resource.data.get('pc', {}).get('vis', 'private') == 'private')))
         // Profile photo: '' (removed) or an image on our Cloudinary cloud (blocked until the
         // real cloud name is set, same placeholder as media posts). Checked only when it changes.
         && (!('photoURL' in changed()) || request.resource.data.photoURL == ''
@@ -812,6 +835,7 @@ service cloud.firestore {
           && validBody(request.resource.data)
           && kidSafe(request.resource.data.text)
           && contactFree(request.resource.data.text)
+          && groomFree(request.resource.data.text)
           && (isAdmin() || linksOk(request.resource.data.text, me_()))
           && request.resource.data.createdAt == request.time
           && request.resource.data.get('likeCount', 0) == 0
@@ -1026,7 +1050,7 @@ service cloud.firestore {
           && request.resource.data.name == get(userPath(me())).data.displayName
           && request.resource.data.username == get(userPath(me())).data.username
           && isStr(request.resource.data.color, 1, 20)
-          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && kidSafe(request.resource.data.text) && contactFree(request.resource.data.text) && (chatFree(me()) || presetSay(request.resource.data.text)) && request.resource.data.count == 0)
+          && ((request.resource.data.type == 'msg' && cleanStr(request.resource.data.text, 1, 150) && kidSafe(request.resource.data.text) && contactFree(request.resource.data.text) && groomFree(request.resource.data.text) && (chatFree(me()) || presetSay(request.resource.data.text)) && request.resource.data.count == 0)
               || (request.resource.data.type == 'star' && request.resource.data.text == ''
                   && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 20))
           && request.resource.data.createdAt == request.time
@@ -1047,6 +1071,12 @@ service cloud.firestore {
         && fid == me() + '_' + request.resource.data.followee
         && exists(userPath(request.resource.data.followee))
         && !blockedBy(request.resource.data.followee)
+        // Friend requests stay off for under 13 and for anyone whose age we do not know.
+        // Following the studio at signup is the one exception. A parent PIN cannot turn this on.
+        && (isAdmin()
+            || request.resource.data.followee == 'studio'
+            || (knownTeen(get(userPath(me())).data) && !exists(u13Path(me()))
+                && knownTeen(get(userPath(request.resource.data.followee)).data) && !exists(u13Path(request.resource.data.followee))))
         // Anti-spam: each follow stamps lastFollowAt (max one per 2 s); following the studio at signup is exempt.
         && (request.resource.data.followee == 'studio' || isAdmin()
             || getAfter(userPath(me())).data.get('lastFollowAt', null) == request.time)
@@ -1496,6 +1526,28 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
     }
 
+    // Chat lines hidden after 3 different reporters. Lives and park presence stay owner-written.
+    match /chatHides/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && id.matches('^[a-z]{2,8}_[a-z0-9]{1,12}$')
+        && request.resource.data.keys().hasOnly(['n', 'area', 'at'])
+        && request.resource.data.n == 1
+        && request.resource.data.area in ['park', 'live', 'cmt', 'game', 'world']
+        && request.resource.data.at == request.time
+        && !exists(/databases/$(database)/documents/chatHides/$(id)/by/$(me()));
+      allow update: if signedIn()
+        && changed().hasOnly(['n'])
+        && request.resource.data.n == resource.data.n + 1
+        && request.resource.data.n <= 30
+        && !exists(/databases/$(database)/documents/chatHides/$(id)/by/$(me()));
+      match /by/{who} {
+        allow read: if signedIn() && who == me();
+        allow create: if signedIn() && who == me()
+          && request.resource.data.keys().hasOnly(['at'])
+          && request.resource.data.at == request.time;
+      }
+    }
+
     // ---------- Reports (admin only can read) ----------
     function strikePath(u) { return /databases/$(database)/documents/reportStrikes/$(u); }
     function quotaPath(u) { return /databases/$(database)/documents/reportQuota/$(u); }
@@ -1680,6 +1732,13 @@ service cloud.firestore {
       allow create: if isMod() && uid != me() && !exists(rolePath(uid))
         && request.resource.data.keys().hasOnly(['by', 'reason', 'at'])
         && request.resource.data.by == me() && isStr(request.resource.data.reason, 0, 200)
+        && request.resource.data.at == request.time;
+      // The same flag markUnder13 writes, saved by the player when their birthday is under 13.
+      // They cannot remove it. A human moderator still can.
+      allow create: if signedIn() && uid == me() && !isAdmin() && !knownTeen(get(userPath(uid)).data)
+        && request.resource.data.keys().hasOnly(['by', 'reason', 'at'])
+        && request.resource.data.by == me()
+        && request.resource.data.reason == 'Birthday is under 13'
         && request.resource.data.at == request.time;
       allow delete: if isMod() && !isAI();
     }
@@ -2359,7 +2418,7 @@ service cloud.firestore {
         // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
         && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= -21000 && pp().x <= 10000 && pp().y is int && pp().y >= 0 && pp().y <= 60000
-        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && kidSafe(pp().say) && contactFree(pp().say) && isStr(pp().tgt, 0, 128)
+        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && kidSafe(pp().say) && contactFree(pp().say) && groomFree(pp().say) && isStr(pp().tgt, 0, 128)
         && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || chatFree(uid) || presetSay(pp().say))
         && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
         && pp().uname == get(/databases/$(database)/documents/users/$(uid)).data.username

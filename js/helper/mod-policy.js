@@ -25,6 +25,7 @@ const LINK = /\b(?:https?:\/\/|www\.)\S+|\b[a-z0-9-]{2,}\.(?:com|net|org|gg|xyz|
 const SOCIAL = /\b(snapchat|snap|instagram|insta|whatsapp|discord|tiktok|telegram|kik)\b|tik tok|\b(my snap|add me on|add me|text me|dm me)\b|\bdiscord\.gg\b|\bt\.me\/|\bwa\.me\b/i;
 const HANDLE = /(?:snap(?:chat)?|discord|insta(?:gram)?|tik\s?tok|whatsapp|telegram|kik)[^\n]{0,30}@[a-z0-9._]{2,}|@[a-z0-9._]{2,}[^\n]{0,30}(?:snap(?:chat)?|discord|insta(?:gram)?|tik\s?tok|whatsapp|telegram|kik)|\b[a-z0-9._]{2,32}#\d{4}\b/i;
 const ADDRESS = /\b\d{1,5}\s+[a-z0-9.' ]{2,30}\s(?:street|st|road|rd|avenue|ave|lane|ln|drive|dr|court|ct|blvd|boulevard)\b/i;
+const GROOM = /\b(how old are you|how old r u|how old ru|what(?:'s| is) your age|whats your age|\basl\b|a\/s\/l|where do you live|where you live|what(?:'s| is) your address|whats your address|your address|what school|which school|your school|school do you|are you alone|r u alone|you alone|home alone|send (?:me )?(?:a )?pic\b|send (?:me )?(?:a )?photo\b|send pic|don'?t tell (?:your|anyone)|dont tell (?:your|anyone)|keep this (?:a )?secret)\b/i;
 
 function stars(w) { return '★'.repeat(Math.min(5, String(w).length)); }
 function maskOf(raw) { return String(raw || '').replace(WORD, stars).replace(MILD, stars); }
@@ -38,6 +39,7 @@ export function scan(text) {
   if (SLUR.test(t)) return { action: 'block', kind: 'slur', text: '', strike: true, serious: true, ban: false };
   if (SEX.test(t)) return { action: 'block', kind: 'sexual', text: '', strike: true, serious: true, ban: false };
   if (VIOLENT.test(t)) return { action: 'block', kind: 'violent', text: '', strike: true, serious: true, ban: false };
+  if (GROOM.test(t) || GROOM.test(raw)) return { action: 'block', kind: 'groom', text: '', strike: false, serious: true, ban: false };
   if (PHONE.test(raw) || SPELLED.test(raw)) return { action: 'block', kind: 'phone', text: '', strike: true, serious: true, ban: false };
   if (EMAIL.test(raw) || EMAIL.test(t)) return { action: 'block', kind: 'email', text: '', strike: true, serious: true, ban: false };
   if (ADDRESS.test(raw) || ADDRESS.test(t)) return { action: 'block', kind: 'address', text: '', strike: true, serious: true, ban: false };
