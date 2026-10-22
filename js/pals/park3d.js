@@ -15,6 +15,7 @@ import { getActivePal } from './core.js';
 import { clean } from './talk.js';
 import { treasures, EMOTES, PHRASES, PORTALS } from './park.js';
 import { createControls } from '../controls.js';
+import { registerWorld } from '../input.js';
 import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
 import { emoteMs, EMOTE_BY_ID } from './emotes.js';
 import { parkGames } from './park-games.js';
@@ -61,7 +62,7 @@ export function createPark3D(ctx) {
     if (!document.getElementById('p3-css')) { const l = document.createElement('link'); l.id = 'p3-css'; l.rel = 'stylesheet'; l.href = new URL('../../css/park3d.css', import.meta.url).href; document.head.appendChild(l); }
     const Q = gfxPreset(); const ULTRA = Q.tier === 'ultra', LOW = Q.tier === 'low'; void gfxLevel; // shared Graphics setting (js/gfx.js)
     main.innerHTML = `<section class="p3"><div class="p3-view" id="p3-view">
-      <canvas id="park-cv" class="p3-cv" tabindex="0" aria-label="Pal Park 3D. Joystick or WASD to walk, Space to jump, Shift to run. Drag to look around."></canvas>
+      <canvas id="park-cv" class="p3-cv" tabindex="0" aria-label="Pal Park 3D. WASD or arrows to walk, Q and E to turn, Space to jump, E or Space to enter, F to report. Drag or two-finger scroll to look."></canvas>
       <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span class="k-link-slot"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div><button class="p3-b" id="p3-set" aria-label="Control settings">⚙️</button>
       <div class="p3-log" id="p3-log" aria-live="polite"></div>
       <div class="p3-tags" id="p3-tags"></div>
@@ -401,20 +402,19 @@ export function createPark3D(ctx) {
     const ku = (e) => { keys[e.key.toLowerCase()] = false; }; addEventListener('keydown', kd); addEventListener('keyup', ku);
     let jumpQ = false;
     let runT = false;
-    tc = createControls(view, { tutorialKey: 'park', tutorialTitle: '🌳 Welcome to Pal Park!', keys: { ' ': 'jump', v: 'cam', e: 'emote' },
-      tips: ['🕹️ Put your thumb down anywhere on the left and slide to walk. Slide all the way to run.', '👆 Drag on the right to look around. Pinch to zoom.', '⤒ Big button = jump. 🏃 = run on/off.', '😊 Emote or dance (with music on, everyone dances to the beat!)', '👁 Switch between behind-your-Pal and through-your-Pal’s eyes.', '💬 Type in the chat bar to talk. Be kind!'],
+    tc = createControls(view, { tutorialKey: 'park', tutorialTitle: '🌳 Welcome to Pal Park!', keys: { ' ': 'jump', v: 'cam' },
+      onZoom: (z) => { C.dist = Math.max(2.5, Math.min(16, C.dist * z)); },
+      tips: ['🕹️ Put your thumb down anywhere on the left and slide to walk. Slide all the way to run.', '👆 Drag to look. Two-finger drag looks. Pinch or scroll zooms. Q and E turn.', '⤒ Jump. E or Space enters a door or car when the button is showing. F talks to Kemy Patrol.', '😊 Emote or dance (with music on, everyone dances to the beat!)', '👁 Switch between behind-your-Pal and through-your-Pal’s eyes.', 'A controller walks with the left stick and looks with the right stick.'],
       buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'run', icon: '🏃', label: 'Run' }, { id: 'emote', icon: '😊', label: 'Emote' }, { id: 'cam', icon: '👁', label: 'Camera' }] });
     tc.on('jump', () => { jumpQ = true; }); tc.on('run', () => { runT = !runT; tc.root.querySelector('[data-b=run]')?.classList.toggle('lock', runT); hint(runT ? 'Running 🏃' : 'Walking'); });
     tc.on('emote', () => openEmotes()); tc.on('cam', () => toggleCam());
     paintCam(); setTimeout(() => tc.tutorial(), 600); $('#p3-set').onclick = () => tc.settings();
     attachGfxSettings(tc, (e) => { if (e.fps) { fpsEl.hidden = !(gfxShowFps() || dbgFps); return; } if (e.changed) { tc.root.querySelector('.kc-set')?.remove(); setTimeout(() => page(), 50); } }); // Graphics tier: rebuild the scene with the new tier
-    { // tap a Pal + two-finger pinch zoom on the look side (the shared controls handle the drag-to-look)
-      const rz = tc.root.querySelector('.kc-r'); const pts = new Map(); let p0 = 0, ts = null;
-      rz.addEventListener('pointerdown', (e) => { pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 2) { const [a, b] = [...pts.values()]; p0 = Math.hypot(a[0] - b[0], a[1] - b[1]); } ts = pts.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null; });
-      rz.addEventListener('pointermove', (e) => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 2 && p0) { const [a, b] = [...pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); C.dist = Math.max(2.5, Math.min(16, C.dist * p0 / d)); p0 = d; tc.takeLook(); } });
-      const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) p0 = 0; if (ts && e.type === 'pointerup' && Math.hypot(e.clientX - ts.x, e.clientY - ts.y) < 10 && performance.now() - ts.t < 350) tap(e); ts = null; };
-      rz.addEventListener('pointerup', up); rz.addEventListener('pointercancel', up);
-      tc.root.addEventListener('wheel', (e) => { e.preventDefault(); C.dist = Math.max(2.5, Math.min(16, C.dist * (1 + Math.sign(e.deltaY) * 0.1))); }, { passive: false }); }
+    { // tap a Pal. Two-finger look, pinch, and scroll zoom live in the shared controls.
+      const rz = tc.root.querySelector('.kc-r'); let ts = null;
+      rz.addEventListener('pointerdown', (e) => { if (e.button > 0) return; ts = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }; });
+      const up = (e) => { if (!ts || e.pointerId !== ts.id) return; if (e.type === 'pointerup' && Math.hypot(e.clientX - ts.x, e.clientY - ts.y) < 12 && performance.now() - ts.t < 400) tap(e); ts = null; };
+      rz.addEventListener('pointerup', up); rz.addEventListener('pointercancel', up); }
     const jv = { x: 0, y: 0, test: false };
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
     function tap(e) { const r = cv.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, cam);
@@ -616,6 +616,19 @@ export function createPark3D(ctx) {
       for (const o of dead) o.parent && o.parent.remove(o); }
     const parkCull = () => { const dx = Math.max(0, Math.abs(P.x) - (W + 30)), dz = Math.max(0, Math.abs(P.z) - (H + 30)), d = Math.hypot(dx, dz); parkG.visible = d < Q.draw * 0.8; parkDet.visible = d < 50; };
     const W3 = attachWorld({ THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, db, toast, sky, sun, hemi, ground, cam, palObj, others, gaitFor, posePal3D, beatNow: () => beatNow(), proceduralTex, terrainMat: terrainM, tc, collide, floorAt, markDirty: () => { dirty = true; }, send: (f) => send(f) });
+    const unWorld = registerWorld({
+      active: () => document.body.contains(cv),
+      driving: () => !!(W3.driving && W3.driving()),
+      interact: () => { const b = document.getElementById('ks-act'); if (b && !b.hidden) { b.click(); return true; } return false; },
+      patrol: () => { const h = document.querySelector('.kh-act'); if (h && !h.hidden) { h.click(); return; } if (window.kemyModReport) window.kemyModReport({ targetType: 'world', targetId: 'park', name: 'a problem' }); },
+      menu: () => tc.settings(),
+      map: () => { const m = document.getElementById('ks-map'); if (m) m.click(); },
+      use: () => openEmotes(),
+      jump: () => { jumpQ = true; },
+      hotbar: (n) => { if (EMOTES[n]) emote(EMOTES[n]); },
+      zoom: (dir) => { C.dist = Math.max(2.5, Math.min(16, C.dist * (dir > 0 ? 0.92 : 1.08))); },
+      back: () => { const b = document.querySelector('#modal-root [data-close]'); if (b) b.click(); }
+    });
     if (/^#\/street/.test(location.hash)) W3.spawnStreet();
     // ---------------------------------------------------------------- main loop
     let fast = 0, qStep = 0, drvCls = false, cullAt = 0; const applyDraw = () => { scene.fog.near = Q.draw * 0.6; scene.fog.far = Q.draw * 1.15; waterM.uniforms.fogNear.value = scene.fog.near; waterM.uniforms.fogFar.value = scene.fog.far; cam.far = Math.min(420, Q.draw * 1.3 + 40); cam.updateProjectionMatrix(); fitSky(); };
@@ -711,11 +724,11 @@ export function createPark3D(ctx) {
       W3.update(dt, now); if (!R.shadowMap.autoUpdate) R.shadowMap.needsUpdate = (++shN & 1) === 0; R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
+    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, camState: () => ({ yaw: C.yaw, pitch: C.pitch, dist: C.dist }), gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
-    function cleanup() { if (!alive) return; alive = false; try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); unhookSize(); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
+    function cleanup() { if (!alive) return; alive = false; try { unWorld(); } catch { /* */ } try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); unhookSize(); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
       document.body.classList.remove('p3-on', 'p3-drive'); tc?.destroy(); try { scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } delete window.__p3star; delete window.__p3play; }
     stop = cleanup;
   }
