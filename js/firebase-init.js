@@ -15,10 +15,7 @@ export const firebaseConfig = {
 };
 
 // Web Push public key only. The private key stays in the Firebase console and must never be committed.
-// Firebase console → Project settings (gear) → Cloud Messaging → Web configuration →
-// Web Push certificates → Generate key pair → paste the Key pair value here, replacing the placeholder.
-// Until it is replaced, production push stays off. The local emulator can still save a test token.
-export const VAPID_KEY = 'REPLACE_WITH_WEB_PUSH_VAPID_PUBLIC_KEY';
+export const VAPID_KEY = 'BFJgem6Y2W1JaR-2eBHu0lZbOtP49qgiunK6wxgB1FJsqp0grTN0iTnM_hvp5B2YE0ww_UdXzn_zRxUr9QZ2Svc';
 export const VAPID_READY = /^[A-Za-z0-9_-]{80,}$/.test(VAPID_KEY);
 
 export const ADMIN_EMAIL = 'lillykemoy1@gmail.com';

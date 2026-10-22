@@ -107,12 +107,15 @@ test('announcements stay on Kemy and strip outside links', () => {
   assert.ok(p.buildAnnouncement({ title: 'H', body: 'Hello', url: '#/feed' }).error);
 });
 
-test('config placeholder and rules lock tokens to the owner', () => {
+test('web push public key is set and rules lock tokens to the owner', () => {
   const root = path.join(__dirname, '..');
   const init = fs.readFileSync(path.join(root, 'js/firebase-init.js'), 'utf8');
   const rules = fs.readFileSync(path.join(root, 'firestore.rules'), 'utf8');
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.match(init, /REPLACE_WITH_WEB_PUSH_VAPID_PUBLIC_KEY/);
+  const vapid = 'BFJgem6Y2W1JaR-2eBHu0lZbOtP49qgiunK6wxgB1FJsqp0grTN0iTnM_hvp5B2YE0ww_UdXzn_zRxUr9QZ2Svc';
+  assert.match(init, new RegExp("VAPID_KEY = '" + vapid + "'"));
+  assert.equal(/^[A-Za-z0-9_-]{80,}$/.test(vapid), true);
+  assert.equal(init.includes('REPLACE_WITH_WEB_PUSH_VAPID_PUBLIC_KEY'), false);
   assert.equal(init.includes('BEGIN PRIVATE'), false);
   assert.match(init, new RegExp("ADMIN_EMAIL = '" + p.ADMIN_EMAIL.replace('.', '\\.') + "'"));
   assert.match(rules, /match \/fcmTokens\/\{id\}/);
