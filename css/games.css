@@ -3,7 +3,7 @@
 .gm-wrap button, .gm-wrap a { -webkit-tap-highlight-color: transparent; }
 .gstar { width: 1em; height: 1em; fill: var(--gold, #ffc83d); filter: drop-shadow(0 0 4px rgba(138,43,226,.7)); vertical-align: -.12em; }
 .gm-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
-.gm-bar h1 { font-size: 1.3rem; margin: 0; }
+.gm-bar h1 { font-size: 1.3rem; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border); background: rgba(138,43,226,.1); color: var(--text); text-decoration: none; cursor: pointer; font-size: 1.1rem; flex-shrink: 0; }
 .g-icon svg { width: 20px; height: 20px; }
 .g-icon[aria-pressed="true"] { color: var(--muted); }
@@ -14,7 +14,8 @@
 .g-hero { display: flex; align-items: center; gap: 14px; margin: 4px 0 16px; }
 .g-hero h1 { font-size: 1.7rem; margin: 0; }
 .g-hero p { margin: 2px 0 0; font-size: .92rem; }
-.g-hero .g-icon { margin-left: auto; align-self: flex-start; }
+.g-tools { margin-left: auto; display: flex; gap: 6px; align-items: flex-start; flex-shrink: 0; }
+.g-hero .g-tools .g-icon, .gm-bar .g-tools .g-icon { width: 44px; height: 44px; margin-left: 0; }
 .g-hero-ic { flex-shrink: 0; width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; background: linear-gradient(140deg, #3a1470, #12081f); border: 1px solid rgba(181,123,255,.4); box-shadow: 0 0 28px rgba(138,43,226,.45); }
 .g-hero-ic svg { width: 34px; height: 34px; stroke: url(#lks-g); }
 .g-hero-ic svg .kf, .g-hero-ic svg .ks { fill: #ffc83d; stroke: none; }

@@ -364,8 +364,11 @@ function candidates(st, seat, balls, cx, cy) {
   }
   return out.sort((a, b) => b.score - a.score);
 }
+const AIM_ERR = { easy: 0.09, medium: 0.034, hard: 0.008, expert: 0.002 };
+const POW_ERR = { easy: 0.5, medium: 0.2, hard: 0.06, expert: 0.012 };
 export function aiShot(st, seat, balls, level = 'hard', rand = Math.random) {
-  const noise = { easy: 0.07, medium: 0.03, hard: 0.006 }[level] || 0.006;
+  const noise = AIM_ERR[level] || AIM_ERR.hard;
+  const powErr = POW_ERR[level] || POW_ERR.hard;
   const b = balls.map((o) => ({ ...o }));
   let place = null;
   if (st.bih) {
@@ -383,14 +386,19 @@ export function aiShot(st, seat, balls, level = 'hard', rand = Math.random) {
   }
   const c = b[0];
   if (st.brk) {
-    const o = b[1]; let ax = o.x - c.x + (rand() - 0.5) * 0.01, ay = o.y - c.y; const n = Math.sqrt(ax * ax + ay * ay);
-    return { vx: ax / n * MAX_SPEED, vy: ay / n * MAX_SPEED, follow: 0, side: 0, place, call: -1 };
+    const o = b[1]; let ax = o.x - c.x, ay = o.y - c.y;
+    const ang = (rand() - 0.5) * 2 * noise;
+    const rx = ax - ay * ang, ry = ay + ax * ang;
+    const n = Math.sqrt(rx * rx + ry * ry) || 1;
+    const sp = MAX_SPEED * (1 + (rand() - 0.5) * powErr);
+    return { vx: rx / n * sp, vy: ry / n * sp, follow: 0, side: 0, place, call: -1 };
   }
   let list = candidates(st, seat, b, c.x, c.y);
   let pick = list[0];
-  if (level === 'hard' && list.length > 1) {
+  const checks = level === 'expert' ? 6 : level === 'hard' ? 4 : level === 'medium' ? 2 : 0;
+  if (checks && list.length > 1) {
     // check the top few with the real engine; prefer ones that pot without a foul
-    for (const cand of list.slice(0, 4)) {
+    for (const cand of list.slice(0, checks)) {
       const sp = Math.min(MAX_SPEED, 1.2 + (cand.d1 + cand.d2) * 1.5);
       const r = simulate(b, { vx: cand.ax * sp, vy: cand.ay * sp, follow: 0, side: 0 }, { record: false });
       if (r.events.pocketed.includes(cand.id) && !r.events.pocketed.includes(0)) { pick = cand; break; }
@@ -405,6 +413,8 @@ export function aiShot(st, seat, balls, level = 'hard', rand = Math.random) {
   }
   const ang = (rand() - 0.5) * 2 * noise;
   const ax = pick.ax - pick.ay * ang, ay = pick.ay + pick.ax * ang, n = Math.sqrt(ax * ax + ay * ay);
-  const sp = Math.min(MAX_SPEED, 1.15 + (pick.d1 + pick.d2 * 1.2) * 1.45 + (level === 'easy' ? rand() * 0.6 : 0));
-  return { vx: ax / n * sp, vy: ay / n * sp, follow: level === 'hard' ? -0.2 : 0, side: 0, place, call: pick.id === 8 ? pick.p : -1 };
+  let sp = Math.min(MAX_SPEED, 1.15 + (pick.d1 + pick.d2 * 1.2) * 1.45);
+  sp *= 1 + (rand() - 0.5) * 2 * powErr;
+  sp = Math.max(0.6, Math.min(MAX_SPEED, sp));
+  return { vx: ax / n * sp, vy: ay / n * sp, follow: level === 'expert' || level === 'hard' ? -0.2 : 0, side: 0, place, call: pick.id === 8 ? pick.p : -1 };
 }

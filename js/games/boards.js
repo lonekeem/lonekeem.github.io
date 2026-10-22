@@ -41,10 +41,12 @@ function sdScore(board, me) {
   return s;
 }
 const SD_ORDER = [3, 2, 4, 1, 5, 0, 6];
+let until = 0;
+const slow = () => until && Date.now() > until;
 function sdSearch(board, turn, me, depth, alpha, beta) {
   const w = sdWinner(board);
   if (w) return w.winner === 'draw' ? 0 : (w.winner === me ? 100000 + depth : -100000 - depth);
-  if (depth === 0) return sdScore(board, me);
+  if (depth === 0 || slow()) return sdScore(board, me);
   const max = turn === me;
   let best = max ? -Infinity : Infinity;
   for (const c of SD_ORDER) {
@@ -69,16 +71,25 @@ export const stardrop = {
     const moves = this.moves(st), me = st.turn;
     const winNow = moves.find((m) => sdWinner(this.apply(st, m).board)?.winner === me);
     if (winNow) return winNow;
+    const block = moves.find((m) => { const c = +m, r = sdDropRow(st.board, c); return sdWinner(set(st.board, r * W + c, P(other(me))))?.winner === other(me); });
     if (level === 'easy') {
-      const block = moves.find((m) => { const c = +m, r = sdDropRow(st.board, c); return sdWinner(set(st.board, r * W + c, P(other(me))))?.winner === other(me); });
-      if (block && Math.random() < 0.6) return block;
+      if (block && Math.random() < 0.55) return block;
       return rnd(moves);
     }
-    let best = null, bv = -Infinity;
-    for (const c of SD_ORDER) {
-      const r = sdDropRow(st.board, c); if (r < 0) continue;
-      const v = sdSearch(set(st.board, r * W + c, P(me)), other(me), me, 6, -Infinity, Infinity);
-      if (v > bv) { bv = v; best = String(c); }
+    const cap = { medium: 3, hard: 5, expert: 8 }[level] || 5;
+    until = Date.now() + (level === 'expert' ? 480 : level === 'hard' ? 240 : 100);
+    let best = block || (moves.includes('3') ? '3' : moves[0]);
+    for (let d = 1; d <= cap; d++) {
+      if (slow() && d > 1) break;
+      let bv = -Infinity, cur = best;
+      const order = [best, ...moves.filter((c) => c !== best)];
+      for (const c of order) {
+        if (slow() && d > 1) break;
+        const r = sdDropRow(st.board, +c); if (r < 0) continue;
+        const v = sdSearch(set(st.board, r * W + c, P(me)), other(me), me, d - 1, -Infinity, Infinity);
+        if (v > bv) { bv = v; cur = c; }
+      }
+      best = cur;
     }
     return best ?? rnd(moves);
   }
@@ -133,7 +144,7 @@ function ultEval(board, me) {
 function ultSearch(board, last, turn, me, depth, alpha, beta) {
   const o = ultOutcome(board);
   if (o) return o.winner === 'draw' ? 0 : o.winner === me ? 10000 + depth : -10000 - depth;
-  if (depth === 0) return ultEval(board, me);
+  if (depth === 0 || slow()) return ultEval(board, me);
   const moves = ultMoves(board, last);
   const max = turn === me; let best = max ? -Infinity : Infinity;
   for (const m of moves) {
@@ -179,15 +190,29 @@ export const klgrid = {
     if (winNow) return winNow;
     if (level === 'easy') return rnd(moves);
     if (st.board.length === 9) {
+      if (level === 'medium') {
+        const block = moves.find((m) => line3(set(st.board, +m, P(other(me)))));
+        if (block) return block;
+        if (moves.includes('4')) return '4';
+        return rnd(moves);
+      }
       let best = null, bv = -Infinity;
       for (const m of moves) { const v = ttMinimax(set(st.board, +m, P(me)), other(me), me); if (v > bv) { bv = v; best = m; } }
+      if (level === 'hard' && Math.random() < 0.12) { const alt = moves.filter((m) => m !== best); if (alt.length) return rnd(alt); }
       return best;
     }
-    let best = null, bv = -Infinity;
-    const depth = moves.length > 20 ? 3 : 4;
-    for (const m of moves) {
-      const v = ultSearch(set(st.board, +m, P(me)), m, other(me), me, depth, -Infinity, Infinity) + Math.random();
-      if (v > bv) { bv = v; best = m; }
+    const cap = level === 'expert' ? 4 : level === 'hard' ? 3 : 2;
+    until = Date.now() + (level === 'expert' ? 420 : 180);
+    let best = moves[0];
+    for (let d = 1; d <= cap; d++) {
+      if (slow() && d > 1) break;
+      let bv = -Infinity, cur = best;
+      for (const m of [best, ...moves.filter((x) => x !== best)]) {
+        if (slow() && d > 1) break;
+        const v = ultSearch(set(st.board, +m, P(me)), m, other(me), me, d - 1, -Infinity, Infinity);
+        if (v > bv) { bv = v; cur = m; }
+      }
+      best = cur;
     }
     return best;
   }
@@ -253,7 +278,7 @@ function ckEval(board, me) {
 function ckSearch(board, turn, me, depth, alpha, beta) {
   const moves = ckMoves(board, turn);
   if (!moves.length) return turn === me ? -1000 - depth : 1000 + depth;
-  if (depth === 0) return ckEval(board, me);
+  if (depth === 0 || slow()) return ckEval(board, me);
   const max = turn === me; let best = max ? -Infinity : Infinity;
   for (const m of moves) {
     const v = ckSearch(ckApply(board, turn, m), other(turn), me, depth - 1, alpha, beta);
@@ -278,11 +303,20 @@ export const checkers = {
   sqRC, rcSq, owner,
   ai(st, level) {
     const moves = ckMoves(st.board, st.turn);
-    if (level === 'easy') return rnd(moves);
-    let best = null, bv = -Infinity;
-    for (const m of moves) {
-      const v = ckSearch(ckApply(st.board, st.turn, m), other(st.turn), st.turn, 5, -Infinity, Infinity) + Math.random() * 0.01;
-      if (v > bv) { bv = v; best = m; }
+    if (!moves.length) return null;
+    if (level === 'easy') return Math.random() < 0.45 && moves[0].split('-').length > 2 ? moves[0] : rnd(moves);
+    const cap = { medium: 2, hard: 4, expert: 6 }[level] || 4;
+    until = Date.now() + (level === 'expert' ? 460 : level === 'hard' ? 240 : 90);
+    let best = moves[0];
+    for (let d = 1; d <= cap; d++) {
+      if (slow() && d > 1) break;
+      let bv = -Infinity, cur = best;
+      for (const m of [best, ...moves.filter((x) => x !== best)]) {
+        if (slow() && d > 1) break;
+        const v = ckSearch(ckApply(st.board, st.turn, m), other(st.turn), st.turn, d - 1, -Infinity, Infinity);
+        if (v > bv) { bv = v; cur = m; }
+      }
+      best = cur;
     }
     return best;
   }

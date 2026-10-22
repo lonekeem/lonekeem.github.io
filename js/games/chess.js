@@ -2,6 +2,8 @@
 // (in a module worker when available); online play with an optional chess clock.
 import * as C from './chess-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
+import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
+import { syncPlates } from './plates.js';
 
 // Original piece art: simple rounded silhouettes, gold (white) and purple (black), star on the king.
 const SHAPES = {
@@ -18,19 +20,6 @@ export function pieceSvg(q) {
 }
 const NAMES = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
 const fmt = (ms) => { ms = Math.max(0, ms); const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-let worker = null;
-function think(board, cx, lvl) {
-  return new Promise((res) => {
-    try {
-      if (!worker) worker = new Worker(new URL('./chess-engine.js', import.meta.url), { type: 'module' });
-      const id = Math.random();
-      const on = (e) => { if (e.data.id !== id) return; worker.removeEventListener('message', on); res(e.data.move); };
-      worker.addEventListener('message', on);
-      worker.onerror = () => { worker = null; res(C.aiMove(board, cx, lvl)); };
-      worker.postMessage({ board, cx, lvl, id });
-    } catch { setTimeout(() => res(C.aiMove(board, cx, lvl)), 30); }
-  });
-}
 
 export function createChess(ctx) {
   const { S, main, esc, $, toast, friendlyError, openModal, closeModal, ui } = ctx;
@@ -82,20 +71,27 @@ export function createChess(ctx) {
     el.innerHTML = h || '<span class="muted">Gold moves first.</span>';
     el.scrollLeft = el.scrollWidth;
   }
-  const sideLbl = (i) => `<span class="g-pc ${i === 0 ? 'gold' : 'purple'}">${pieceSvg(i === 0 ? 'K' : 'k')}</span>`;
-  function bar(ps, turn, done, clocks, timer) {
-    return ps.map((p, i) => `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${ui.chip(p)}${sideLbl(i)}${clocks ? `<span class="ch-clock ${!done && turn === i ? 'run' : ''} ${clocks[i] < 20000 ? 'low' : ''}">${fmt(clocks[i])}</span>` : !done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : ''}</div>`).join('<span class="g-vs">vs</span>');
+  function paintBar(ps, turn, done, clocks, timer) {
+    const parent = $('#g-players'); if (!parent) return;
+    syncPlates(parent, ps.map((p, i) => {
+      const on = !done && turn === i;
+      const bits = [{ key: 'pc', className: 'g-pc ' + (i === 0 ? 'gold' : 'purple'), html: pieceSvg(i === 0 ? 'K' : 'k'), sig: i === 0 ? 'K' : 'k' }];
+      if (clocks) bits.push({ key: 'ck', className: 'ch-clock' + (on ? ' run' : '') + (clocks[i] < 20000 ? ' low' : ''), text: fmt(clocks[i]) });
+      else if (on && timer != null) bits.push({ key: 'tm', className: 'g-timer' + (timer <= 10 ? ' low' : ''), text: timer + 's' });
+      return { key: 'p' + i, className: 'g-pl' + (on ? ' on' : ''), side: String(i), person: p, bits };
+    }), { sep: true });
   }
   const endText = (o, names) => o.winner === 'draw' ? `Draw: ${o.why.toLowerCase()}.` : `${o.why}! ${names[o.winner === 'w' ? 0 : 1]} wins.`;
 
   // ------------------------------------------------------------ vs computer
   function local(params) {
-    const lvl = ['easy', 'medium', 'hard'].includes(params.lvl) ? params.lvl : 'medium';
+    const lvl = normLevel(params.lvl);
+    const pal = palByLevel(lvl);
     shell('Chess', '#/games/chess');
     ui.wireEmotes(main, '', () => '');
     const human = params.side === 'b' ? 1 : params.side === 'w' ? 0 : Math.random() < 0.5 ? 0 : 1;
     const me = { uid: ui.myUid(), name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' };
-    const cpu = { uid: 'cpu1', name: `CPU · ${lvl[0].toUpperCase() + lvl.slice(1)}` };
+    const cpu = { uid: 'cpu1', name: pal.name, bot: true };
     const ps = human === 0 ? [me, cpu] : [cpu, me];
     let ml = [], pos = C.parse(C.START), keys = [C.key(pos)], sans = [], sel = -1, last = '', over = null, alive = true, thinking = false;
     S.unsubs.push(() => { alive = false; });
@@ -103,9 +99,9 @@ export function createChess(ctx) {
     $('#ch-new').onclick = () => local({ ...params, side: '' });
     function refresh() {
       const turn = pos.w ? 0 : 1;
-      $('#g-players').innerHTML = bar(ps, turn, !!over);
+      paintBar(ps, turn, !!over);
       const o = C.outcome(pos, keys);
-      $('#g-status').textContent = over ? endText(over, ps.map((p) => p.name)) : (o.check ? 'Check! ' : '') + (turn === human ? 'Your move' : 'Computer is thinking…');
+      $('#g-status').textContent = over ? endText(over, ps.map((p) => p.name)) : (o.check ? 'Check! ' : '') + (turn === human ? 'Your move' : `${pal.name} is thinking…`);
       paintBoard({ pos, mySide: human, live: !over && turn === human, sel, last, onSelect: (s) => { sel = s; refresh(); }, onMove: (m) => doMove(m) });
       paintMoves(sans);
       if (!over && turn !== human && !thinking) cpuTurn();
@@ -119,7 +115,7 @@ export function createChess(ctx) {
         over = o; refresh();
         const res = o.winner === 'draw' ? 'd' : (o.winner === 'w') === (human === 0) ? 'w' : 'l';
         ui.addCpuResult('chess', res);
-        ui.resultModal({ title: res === 'd' ? 'Draw' : res === 'w' ? 'You win!' : 'The computer wins', sub: o.why, win: res === 'w', buttons: [{ label: 'Play again', onClick: () => local({ ...params, side: '' }) }, { label: 'Back to games', href: '#/games' }] });
+        ui.resultModal({ title: res === 'd' ? 'Draw' : res === 'w' ? 'You win!' : `${pal.name} wins`, sub: o.why, win: res === 'w', vsBot: true, buttons: [{ label: 'Play again', onClick: () => local({ ...params, side: '' }) }, { label: 'Back to games', href: '#/games' }] });
         return;
       }
       if (o.check) ui.sfx.play('pop');
@@ -127,9 +123,7 @@ export function createChess(ctx) {
     }
     async function cpuTurn() {
       thinking = true;
-      const t0 = Date.now();
-      const s = await think(C.boardOf(pos), C.cxOf(pos), lvl);
-      await new Promise((r) => setTimeout(r, Math.max(0, 450 - (Date.now() - t0))));
+      const s = await ask({ kind: 'chess', board: C.boardOf(pos), cx: C.cxOf(pos), level: lvl });
       thinking = false;
       if (!alive || over) return;
       const m = s && C.findMove(pos, s); if (m) doMove(m);
@@ -140,7 +134,7 @@ export function createChess(ctx) {
   // ------------------------------------------------------------ online
   async function online(g0) {
     const gid = g0.id;
-    let g = g0, ended = false, stopHb = null, claimT = 0, sel = -1, joinTried = false, iEnded = false, turnSeen = Date.now(), turnKey = '';
+    let g = g0, serverG = g0, ended = false, stopHb = null, claimT = 0, sel = -1, joinTried = false, iEnded = false, pendingNo = null;
     shell('Chess', '#/games');
     const names = (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; };
     ui.wireEmotes(main, gid, names);
@@ -148,13 +142,14 @@ export function createChess(ctx) {
     const timed = () => Array.isArray(g.clk) && g.clk.length === 2;
     const tick = setInterval(() => header(), 500);
     S.unsubs.push(() => { clearInterval(tick); clearTimeout(claimT); if (stopHb) stopHb(); });
-    const clocks = () => { if (!timed()) return null; const c = [...g.clk]; if (g.status === 'active') c[g.turn] -= Date.now() - turnSeen; return c; };
+    const elapsed = () => Math.max(0, net.serverNow() - (tsMs(g.turnAt) || net.serverNow()));
+    const clocks = () => { if (!timed()) return null; const c = [...g.clk]; if (g.status === 'active') c[g.turn] = Math.max(0, c[g.turn] - elapsed()); return c; };
     function header() {
       if (!$('#g-players')) return;
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
-      const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - turnSeen) / 1000)) : null;
-      $('#g-players').innerHTML = bar(ps, g.turn, g.status !== 'active', clocks(), left);
+      const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
+      paintBar(ps, g.turn, g.status !== 'active', clocks(), left);
       const st = $('#g-status'), me = side();
       if (g.status === 'waiting') st.textContent = me === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
       else if (g.status === 'done') st.textContent = g.endReason === 'cancelled' ? 'Cancelled' : g.winnerUid === 'draw' ? `Draw${g.why ? '' : ''}` : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (resigned)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;
@@ -168,24 +163,34 @@ export function createChess(ctx) {
       header(); actions();
     }
     async function move(m) {
+      if (pendingNo != null || g.status !== 'active' || side() !== g.turn) return;
+      const base = g;
       const p = C.parse(g.board, g.cx), me = side();
       const r = C.replay(g.ml);
       const np = C.play(p, m), mstr = C.moveStr(m), keys = [...r.keys, C.key(np)];
       const o = C.outcome(np, keys);
-      const upd = { board: C.boardOf(np), cx: C.cxOf(np), ml: (g.ml ? g.ml + ' ' : '') + mstr, last: mstr, turn: 1 - g.turn, moveNo: g.moveNo + 1, turnAt: net.fs.serverTimestamp() };
-      if (timed()) { const c = [...g.clk]; c[me] = Math.max(0, Math.round(c[me] - (Date.now() - turnSeen) - 500)); upd.clk = c; }
+      const expect = g.moveNo || 0;
+      const upd = { board: C.boardOf(np), cx: C.cxOf(np), ml: (g.ml ? g.ml + ' ' : '') + mstr, last: mstr, turn: 1 - g.turn, moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
+      if (timed()) { const c = [...g.clk]; c[me] = Math.max(0, Math.round(c[me] - elapsed())); upd.clk = c; }
       if (o.over) Object.assign(upd, o.winner === 'draw' ? { status: 'done', winnerUid: 'draw', endReason: 'draw' } : { status: 'done', winnerUid: ui.myUid(), endReason: 'win' });
-      sel = -1; ui.sfx.play(m.c ? 'capture' : 'place');
-      if (o.over) iEnded = true; try { await net.update(gid, upd); } catch (e) { iEnded = false; toast(friendlyError(e)); }
+      pendingNo = upd.moveNo;
+      g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } };
+      sel = -1; ui.sfx.play(m.c ? 'capture' : 'place'); draw();
+      try { await net.commitMove(gid, expect, upd); if (o.over) iEnded = true; }
+      catch (e) { pendingNo = null; iEnded = false; g = serverG.moveNo >= base.moveNo ? serverG : base; draw(); toast(e && e.code === 'stale' ? 'That move already happened.' : friendlyError(e)); }
     }
     function actions() {
       const box = $('#g-actions'); if (!box) return;
       const me = side();
-      if (g.status === 'waiting') box.innerHTML = `${me === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}`;
+      if (g.status === 'waiting') {
+        const offer = me === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => actions());
+        box.innerHTML = `${me === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
+      }
       else if (g.status === 'active') box.innerHTML = me >= 0 ? '<button class="btn btn-sm btn-danger" id="g-forfeit">Resign</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>' : '<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>';
       else box.innerHTML = `${me >= 0 && g.endReason !== 'cancelled' ? (g.rematch ? `<a class="btn btn-sm" href="#/game/${esc(g.rematch)}">Go to rematch</a>` : '<button class="btn btn-sm" id="g-rematch">Rematch</button>') : ''}<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;
       const sh = $('#g-share'); if (sh) sh.onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
       const cn = $('#g-cancel'); if (cn) cn.onclick = async () => { try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('chess', g.mode, gid); location.hash = '#/games'; } catch (e) { toast(friendlyError(e)); } };
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = async () => { stopOffer(gid); try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('chess', g.mode, gid); } catch { /* already gone */ } location.hash = `#/games/chess/cpu?lvl=${lastLevel()}&mode=${g.mode || ''}`; };
       const ff = $('#g-forfeit'); if (ff) ff.onclick = () => { if (confirm('Resign this game? It counts as a loss.')) net.update(gid, { status: 'done', winnerUid: g.players[1 - side()], endReason: 'forfeit' }).catch((e) => toast(friendlyError(e))); };
       const rm = $('#g-rematch'); if (rm) rm.onclick = async () => {
         rm.disabled = true;
@@ -198,10 +203,12 @@ export function createChess(ctx) {
       if (stopHb) { stopHb(); stopHb = null; }
       if (g.endReason === 'cancelled') return;
       const me = side();
-      if (me >= 0) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      const botGame = onlyBots(g.players, ui.myUid());
+      if (me >= 0 && !botGame) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      if (me >= 0 && botGame) ui.addCpuResult('chess', g.winnerUid === ui.myUid() ? 'w' : g.winnerUid === 'draw' ? 'd' : 'l');
       const win = me >= 0 && g.winnerUid === ui.myUid();
       const p = C.parse(g.board, g.cx), o = C.outcome(p, C.replay(g.ml).keys);
-      ui.resultModal({ title: g.winnerUid === 'draw' ? 'Draw' : me < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Resigned.' : g.endReason === 'timeout' ? 'Time ran out.' : o.over ? o.why + '.' : '', win,
+      ui.resultModal({ title: g.winnerUid === 'draw' ? 'Draw' : me < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Resigned.' : g.endReason === 'timeout' ? 'Time ran out.' : o.over ? o.why + '.' : '', win, vsBot: botGame,
         buttons: me >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
     }
     function scheduleClaim() {
@@ -209,15 +216,19 @@ export function createChess(ctx) {
       const me = side();
       if (g.status !== 'active' || me < 0 || g.turn === me) return;
       const other = g.players[1 - me];
-      const tTurn = timed() ? g.clk[g.turn] + 4000 - (Date.now() - turnSeen) : (TURN_SECONDS + 6) * 1000 - (Date.now() - turnSeen);
+      const tTurn = timed() ? g.clk[g.turn] + 4000 - elapsed() : (TURN_SECONDS + 6) * 1000 - elapsed();
       const hb = g.hb && g.hb[other] ? tsMs(g.hb[other]) : 0;
       const tHb = hb ? hb + 48000 - Date.now() : Infinity;
       claimT = setTimeout(() => net.update(gid, { status: 'done', winnerUid: ui.myUid(), endReason: 'timeout' }).catch(() => { claimT = setTimeout(scheduleClaim, 4000); }), Math.max(1500, Math.min(tTurn, tHb)));
     }
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
-      const prevMove = g.moveNo; g = ng;
-      const k = `${g.moveNo}|${g.status}`; if (k !== turnKey) { turnKey = k; turnSeen = Date.now(); }
+      serverG = ng;
+      const prevMove = g.moveNo;
+      const rec = net.reconcile(ng.moveNo, pendingNo);
+      pendingNo = rec.pending;
+      if (!rec.take) { scheduleClaim(); return; }
+      g = ng;
       if (g.moveNo !== prevMove && g.turn === side()) ui.sfx.play('place');
       if (g.status === 'active' && side() >= 0 && !stopHb) stopHb = net.heartbeat(gid);
       if (g.status === 'active' && g.moveNo === 0 && g.quick) net.leaveQueue('chess', g.mode, gid);

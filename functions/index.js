@@ -74,3 +74,19 @@ exports.sellHome = onCall({ enforceAppCheck: false }, async (req) => {
     return { ok: true, cur, n, price: base };
   });
 });
+
+// Web push: inbox invites and house visits, your-turn updates, the morning Star Coin reminder,
+// and an admin-only announcement callable. See functions/push.js. Written by Lone Keem.
+Object.assign(exports, require('./push'));
+// New Members back-fill, the left-Kemy note, and the live stats/members counter.
+// Only Cloud Functions are exported. signupOf and writeLeftMember stay on ./members for tests.
+const membersApi = require('./members');
+const memberStats = require('./member-stats');
+exports.backfillMembers = membersApi.backfillMembers;
+exports.recordLeftMember = membersApi.recordLeftMember;
+exports.countMemberCreated = membersApi.countMemberCreated;
+exports.recountMembers = memberStats.recountMembers;
+// Once-a-day admin digest of open Kemy Helper notes. Counts only.
+exports.pushHelperDigest = require('./helper-digest').pushHelperDigest;
+// Chat moderation: mask or remove, warn, then a 10-minute mute. Never a ban.
+Object.assign(exports, require('./moderate'));

@@ -18,7 +18,8 @@ const CSS = `.wchip{position:relative;display:inline-flex;align-items:center;gap
 body.wc-video .wchip:not(.bs-ov .wchip),body.feed-mode #wallet-fab,body.live-mode #wallet-fab{display:none!important}
 body.feed-mode #wallet-fab{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 12px);top:calc(env(safe-area-inset-top) + 92px)}
 body.wc-park #wallet-fab{left:auto;transform:none;right:calc(env(safe-area-inset-right) + 74px);top:calc(env(safe-area-inset-top) + 20px)}
-@media (orientation:landscape){body.wc-park #wallet-fab{right:auto;left:calc(env(safe-area-inset-left) + 14px);top:calc(env(safe-area-inset-top) + 64px)}}
+/* landscape used to pin this dark pill on the left edge, under the top buttons and over the walk area */
+@media (orientation:landscape) and (max-height:500px){body.wc-park #wallet-fab{left:auto;transform:none;top:calc(env(safe-area-inset-top) + 8px);right:calc(env(safe-area-inset-right) + 168px)}}
 .bs-ov .wchip{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);z-index:9001}
 @media (max-width:400px){.header-actions .wchip{font-size:12px;padding:3px 7px;gap:3px}.header-actions .don-pill{font-size:0;padding:5px 8px}.header-actions .don-pill::before{content:'💜';font-size:.85rem}.header-actions{gap:4px}}
 @media (prefers-reduced-motion:reduce){.wc-pop{animation-duration:.01s}}`;

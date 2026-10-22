@@ -8,6 +8,7 @@ import {
 import { ENGINES } from './boards.js';
 import { rack as poolRack, newState as poolState } from './pool-engine.js';
 import { START as CHESS_START, START_CX as CHESS_CX } from './chess-engine.js';
+import { createLink, reconcile, turnLeftMs } from './link.js';
 
 export const BOARD_TYPES = ['stardrop', 'klgrid', 'checkers'];
 export const ROOM_TYPES = ['trivia', 'starcards', 'ludo'];
@@ -22,7 +23,10 @@ export const isBot = (uid) => /^cpu\d$/.test(uid);
 export const tsMs = (t) => (t && t.toMillis ? t.toMillis() : 0);
 
 export function createNet({ db, S }) {
+  const link = createLink();
   const meSeat = () => ({ uid: S.user.uid, name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2' });
+  const serverNow = () => link.serverNow();
+  const turnLeft = (turnAt, seconds = TURN_SECONDS) => Math.ceil(turnLeftMs(serverNow(), tsMs(turnAt), seconds * 1000) / 1000);
 
   function baseGame(type, mode, extra = {}) {
     const m = meSeat();
@@ -105,9 +109,95 @@ export function createNet({ db, S }) {
       if (s.exists() && s.data().gid === gid) await setDoc(qref, { gid: '', uid: '', at: serverTimestamp() });
     } catch { /* ignore */ }
   }
-  const watchGame = (gid, cb, err) => onSnapshot(doc(db, 'games', gid), (s) => cb(s.exists() ? { id: s.id, ...s.data() } : null), err);
-  const update = (gid, data) => updateDoc(doc(db, 'games', gid), { ...data, updatedAt: serverTimestamp() });
-  const beat = (gid) => updateDoc(doc(db, 'games', gid), { [`hb.${S.user.uid}`]: serverTimestamp() }).catch(() => {});
+  // One listener per game. A dropped watch (tab freeze, packet loss, offline) is started
+  // again on resume, on coming back online, and if no snapshot lands for 12s.
+  function watchGame(gid, cb, err) {
+    let unsubSnap = () => {};
+    let stopped = false;
+    let told = false;
+    let last = Date.now();
+    let restartT = 0;
+    let gen = 0;
+    const arm = () => {
+      if (stopped) return;
+      clearTimeout(restartT);
+      const my = ++gen;
+      try { unsubSnap(); } catch { /* already stopped */ }
+      unsubSnap = onSnapshot(doc(db, 'games', gid), (s) => {
+        if (my !== gen) return;
+        last = Date.now();
+        told = false;
+        const pending = !!(s.metadata && s.metadata.hasPendingWrites);
+        if (s.exists() && !pending) {
+          const u = s.data().updatedAt;
+          if (u && u.toMillis) link.noteServer(u.toMillis());
+        }
+        link.noteSnap(pending);
+        try {
+          const see = window.__kemyHelperSee;
+          if (see && !pending) see({ id: gid, g: s.exists() ? s.data() : null, grade: link.grade(), resync: wake });
+        } catch { /* the helper watch is optional */ }
+        cb(s.exists() ? { id: s.id, ...s.data() } : null, { pending });
+      }, (e) => {
+        if (my !== gen || stopped) return;
+        link.fail();
+        if (err && !told) { told = true; err(e); }
+        const code = e && e.code;
+        if (code !== 'permission-denied' && code !== 'cancelled') restartT = setTimeout(arm, 1200);
+      });
+    };
+    const wake = () => {
+      if (stopped || document.visibilityState === 'hidden') return;
+      link.setDown(false);
+      last = 0;
+      arm();
+    };
+    const poke = () => {
+      if (stopped || document.visibilityState === 'hidden') return;
+      if (Date.now() - last < 28000) return;
+      link.fail();
+      arm();
+    };
+    arm();
+    const iv = setInterval(poke, 4000);
+    const onResume = () => { if (stopped) return; link.setDown(false); last = 0; arm(); };
+    document.addEventListener('visibilitychange', wake);
+    document.addEventListener('resume', onResume);
+    addEventListener('online', wake);
+    return () => {
+      stopped = true;
+      clearInterval(iv);
+      clearTimeout(restartT);
+      document.removeEventListener('visibilitychange', wake);
+      document.removeEventListener('resume', onResume);
+      removeEventListener('online', wake);
+      try { unsubSnap(); } catch { /* already stopped */ }
+    };
+  }
+  const update = (gid, data) => { link.markWrite(); return updateDoc(doc(db, 'games', gid), { ...data, updatedAt: serverTimestamp() }).catch((e) => { link.fail(); throw e; }); };
+  // One authoritative move. The transaction refuses a stale or duplicate sequence number,
+  // so two taps or two clients cannot both land the same moveNo.
+  async function commitMove(gid, expectNo, patch) {
+    const ref = doc(db, 'games', gid);
+    const t0 = performance.now();
+    link.markWrite();
+    try {
+      await runTransaction(db, async (tx) => {
+        const s = await tx.get(ref);
+        if (!s.exists()) { const e = new Error('That game is gone.'); e.code = 'over'; throw e; }
+        const g = s.data();
+        if (g.status !== 'active') { const e = new Error('This game already ended.'); e.code = 'over'; throw e; }
+        if ((g.moveNo || 0) !== expectNo) { const e = new Error('That move already happened.'); e.code = 'stale'; throw e; }
+        tx.update(ref, { ...patch, updatedAt: serverTimestamp() });
+      });
+      link.noteRtt(performance.now() - t0);
+    } catch (e) {
+      if (e && (e.code === 'stale' || e.code === 'over')) throw e;
+      link.fail();
+      throw e;
+    }
+  }
+  const beat = (gid) => { link.markWrite(); return updateDoc(doc(db, 'games', gid), { [`hb.${S.user.uid}`]: serverTimestamp() }).catch(() => { link.fail(); }); };
   function heartbeat(gid) {
     beat(gid);
     const t = setInterval(() => { if (document.visibilityState !== 'hidden') beat(gid); }, HB_MS);
@@ -124,6 +214,8 @@ export function createNet({ db, S }) {
   // `all` = write everyone's record (the client that ended the game); otherwise only our own.
   async function recordResult(g, all = false) {
     if (!S.user || g.status !== 'done' || !g.winnerUid) return;
+    const foes = (g.players || []).filter((u) => u !== S.user.uid);
+    if (foes.length && foes.every(isBot)) return;
     const left = g.left || [];
     if (!g.players.includes(S.user.uid) && !left.includes(S.user.uid)) return;
     const humans = [...g.players, ...left].filter((u, i, a) => !isBot(u) && a.indexOf(u) === i && (all || u === S.user.uid));
@@ -165,8 +257,8 @@ export function createNet({ db, S }) {
     return s.exists() ? s.data().uid : null;
   }
   return {
-    createGame, join, quickMatch, leaveQueue, watchGame, update, heartbeat, beat, sendEmote, watchChat, recordResult, getStats,
-    leaderboard, invite, uidForHandle, meSeat,
+    createGame, join, quickMatch, leaveQueue, watchGame, update, commitMove, heartbeat, beat, sendEmote, watchChat, recordResult, getStats,
+    leaderboard, invite, uidForHandle, meSeat, link, serverNow, turnLeft, reconcile,
     fs: { doc, getDoc, getDocs, setDoc, updateDoc, collection, onSnapshot, writeBatch, serverTimestamp, runTransaction, Timestamp, deleteField, query, orderBy, limit }
   };
 }

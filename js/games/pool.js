@@ -1,9 +1,12 @@
 // Star Pool UI: purple felt, wood and gold rails, aim guide, fine-aim wheel, side power bar, spin.
 // Portrait on phones, landscape on wide screens. Online, the shooter sends the shot plus the
-// authoritative end positions; the other client replays the same simulation and then snaps.
+// authoritative end positions; the other client replays the same simulation, then eases onto
+// those positions when a foul moved the cue ball.
 // Written by Lone Keem.
 import * as P from './pool-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
+import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
+import { syncPlates } from './plates.js';
 
 const COLORS = { 1: '#f2b31b', 2: '#3d7bff', 3: '#e2558f', 4: '#8a2be2', 5: '#ff7a2f', 6: '#2bb5a8', 7: '#9b1d3a' };
 const ballColor = (id) => COLORS[id > 8 ? id - 8 : id];
@@ -301,6 +304,27 @@ export function createPool(ctx) {
       };
       V.raf = requestAnimationFrame(step);
     }
+    // Ease from the simulated end onto the authoritative balls when a foul moved the cue ball.
+    function ease(balls, done) {
+      const from = V.balls.map((b) => (b.on ? [b.x, b.y] : null));
+      const to = balls.map((b) => (b && b.on ? [b.x, b.y] : null));
+      const same = from.length === to.length && from.every((p, i) => (!p && !to[i]) || (p && to[i] && Math.abs(p[0] - to[i][0]) < 0.002 && Math.abs(p[1] - to[i][1]) < 0.002));
+      if (same) { V.balls = balls; V.anim = false; done && done(); return; }
+      cancelAnimationFrame(V.raf); const t0 = performance.now(); V.anim = true;
+      const step = (now) => {
+        if (!cv.isConnected) return;
+        const u = Math.min(1, (now - t0) / 200);
+        const frame = to.map((p, i) => {
+          if (!p) return null;
+          const a = from[i] || p;
+          return [a[0] + (p[0] - a[0]) * u, a[1] + (p[1] - a[1]) * u];
+        });
+        draw(frame);
+        if (u < 1) V.raf = requestAnimationFrame(step);
+        else { V.balls = balls; V.anim = false; done && done(); }
+      };
+      V.raf = requestAnimationFrame(step);
+    }
     let dragging = null;
     const pt = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, t: Tinv(e.clientX - r.left, e.clientY - r.top) }; };
     cv.addEventListener('pointerdown', (e) => {
@@ -398,12 +422,13 @@ export function createPool(ctx) {
     logo.onload = () => { V.bg = null; draw(); };
     layout();
     const api = {
-      V, draw, play, layout,
+      V, draw, play, ease, layout,
       set(balls, o = {}) {
         V.balls = balls; Object.assign(V, o);
         if (!V.canShoot) V.pull = 0;
         host.querySelector('.pl-ctrl').classList.toggle('off', !V.canShoot);
-        host.querySelector('.pl-side').classList.toggle('off', !V.canShoot);
+        const side = host.querySelector('.pl-side');
+        if (side) side.classList.toggle('off', !V.canShoot);
         draw();
       },
       hint(t) { const h = host.querySelector('#pl-hint'); if (h) h.textContent = t; },
@@ -418,12 +443,23 @@ export function createPool(ctx) {
     const ids = gname === 'solid' ? [1, 2, 3, 4, 5, 6, 7] : gname === 'stripe' ? [9, 10, 11, 12, 13, 14, 15] : [];
     return ids.map((id) => `<i class="pl-mini ${balls[id] && balls[id].on ? '' : 'gone'} ${id > 8 ? 'st' : ''}" style="--bc:${ballColor(id)}">${id}</i>`).join('');
   }
-  function playersHtml(ps, st, turn, balls, timer, done) {
-    return ps.map((p, i) => {
-      const grp = st.groups[i] ? `<b>${groupLabel(st.groups[i])}</b><span class="pl-rack">${rackRow(balls, st.groups[i])}</span>` : '<span class="pl-open">Open table</span>';
-      const clock = !done && turn === i && timer != null ? `<span class="g-timer ${timer <= 10 ? 'low' : ''}">${timer}s</span>` : '';
-      return `<div class="g-pl ${!done && turn === i ? 'on' : ''}" data-side="${i}">${ui.chip(p)}${clock}<span class="pl-grp">${grp}</span></div>`;
-    }).join('<span class="g-vs">vs</span>');
+  function rackSig(balls, gname) {
+    if (!gname) return 'open';
+    const ids = gname === 'solid' ? [1, 2, 3, 4, 5, 6, 7] : [9, 10, 11, 12, 13, 14, 15];
+    return gname + ':' + ids.map((id) => (balls[id] && balls[id].on ? '1' : '0')).join('');
+  }
+  function paintPlayers(ps, st, turn, balls, timer, done) {
+    const parent = $('#g-players'); if (!parent) return;
+    syncPlates(parent, ps.map((p, i) => {
+      const on = !done && turn === i;
+      const gname = st.groups[i];
+      const bits = [{
+        key: 'grp', className: 'pl-grp', sig: rackSig(balls, gname),
+        html: gname ? `<b>${groupLabel(gname)}</b><span class="pl-rack">${rackRow(balls, gname)}</span>` : '<span class="pl-open">Open table</span>'
+      }];
+      if (on && timer != null) bits.push({ key: 'tm', className: 'g-timer' + (timer <= 10 ? ' low' : ''), text: timer + 's' });
+      return { key: 'p' + i, className: 'g-pl' + (on ? ' on' : ''), side: String(i), person: p, bits };
+    }), { sep: true });
   }
   function statusLine(st, seat, mine, left, otherName) {
     const grp = groupLabel(st.groups[seat]);
@@ -451,12 +487,13 @@ export function createPool(ctx) {
   let killLocal = () => {};
   function local(params) {
     killLocal();
-    const lvl = ['easy', 'medium', 'hard'].includes(params.lvl) ? params.lvl : 'medium';
+    const lvl = normLevel(params.lvl);
+    const pal = palByLevel(lvl);
     shell('Star Pool', '#/games/pool');
     ui.wireEmotes(main, '', () => '');
     const human = Math.random() < 0.5 ? 0 : 1;
     const me = { uid: ui.myUid(), name: 'You', uname: S.profile ? S.profile.username : '', color: S.profile ? S.profile.color : '' };
-    const cpu = { uid: 'cpu1', name: `CPU · ${lvl[0].toUpperCase() + lvl.slice(1)}` };
+    const cpu = { uid: 'cpu1', name: pal.name, bot: true };
     const ps = human === 0 ? [me, cpu] : [cpu, me];
     let balls = P.decode(P.rack()), st = P.newState(), turn = 0, alive = true, over = false, stamp = Date.now(), shown = -2, cpuT = 0;
     $('#g-actions').innerHTML = `<button class="btn btn-sm btn-ghost" id="pl-new">New game</button><a class="btn btn-sm btn-ghost" href="#/games/pool">Leave</a>`;
@@ -479,16 +516,15 @@ export function createPool(ctx) {
       if (turn !== shown) { shown = turn; stamp = Date.now(); }
       const mine = turn === human && !over;
       const left = Math.max(0, TURN_SECONDS - Math.floor((Date.now() - stamp) / 1000));
-      $('#g-players').innerHTML = playersHtml(ps, st, turn, balls, left, over);
+      paintPlayers(ps, st, turn, balls, over ? null : left, over);
       const status = $('#g-status');
-      status.textContent = over ? (st.msg || '') : statusLine(st, turn, mine, left, 'Computer');
+      status.textContent = over ? (st.msg || '') : statusLine(st, turn, mine, left, pal.name);
       status.className = 'g-status' + (over ? '' : st.foul ? ' foul' : mine ? ' you' : ' wait');
       const callMode = mine && P.needsCall(st, turn, balls);
       table.set(balls, { canShoot: mine, placing: mine && st.bih, kitchen: st.brk, callMode, call: callMode ? st.call : -1 });
       table.hint(turnHint(st, turn, balls, mine));
-      if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
-      clearTimeout(cpuT);
-      if (!over && turn !== human) cpuT = setTimeout(cpuTurn, 700);
+      if (mine && !st.bih && !st.brk) { /* keep aim */ } else if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
+      if (!over && turn !== human && !lining) { lining = true; cpuTurn(); }
     }
     function take(shot, cuePos) {
       const before = balls.map((b) => ({ ...b }));
@@ -504,15 +540,18 @@ export function createPool(ctx) {
         if (j.winner >= 0) {
           over = true; refresh();
           const win = j.winner === human; ui.addCpuResult('pool', win ? 'w' : 'l');
-          ui.resultModal({ title: win ? 'You win!' : 'The computer wins', sub: st.msg, win, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
+          ui.resultModal({ title: win ? 'You win!' : `${pal.name} wins`, sub: st.msg, win, vsBot: true, buttons: [{ label: 'Play again', onClick: () => local(params) }, { label: 'Back to games', href: '#/games' }] });
           return;
         }
         turn = j.next; refresh();
       });
     }
-    function cpuTurn() {
-      if (!alive || over || turn === human) return;
-      const shot = P.aiShot(st, turn, balls, lvl);
+    let lining = false;
+    async function cpuTurn() {
+      if (!alive || over || turn === human) { lining = false; return; }
+      const shot = await ask({ kind: 'pool', st, seat: turn, balls: balls.map((b) => ({ ...b })), level: lvl });
+      lining = false;
+      if (!alive || over || turn === human || !shot) return;
       if (shot.call >= 0 || P.needsCall(st, turn, balls)) st.call = shot.call >= 0 ? shot.call : 0;
       if (shot.place) { balls[0] = { ...balls[0], x: shot.place.x, y: shot.place.y, on: true }; }
       table.set(balls, { canShoot: false, call: st.call });
@@ -525,7 +564,7 @@ export function createPool(ctx) {
 
   async function online(g0, token) {
     const gid = g0.id;
-    let g = g0, ended = false, stopHb = null, claimT = 0, lastMove = g0.moveNo, playing = false, iEnded = false, joinTried = false;
+    let g = g0, serverG = g0, ended = false, stopHb = null, claimT = 0, lastMove = g0.moveNo, playing = false, iEnded = false, joinTried = false, pendingNo = null;
     shell('Star Pool', '#/games');
     const names = (uid) => { const i = g.players.indexOf(uid); return i >= 0 ? g.names[i] : 'A fan'; };
     ui.wireEmotes(main, gid, names);
@@ -540,8 +579,8 @@ export function createPool(ctx) {
       const st = stOf(), balls = P.decode(g.pos), side = mySide(), done = g.status !== 'active';
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
       while (ps.length < 2) ps.push({ uid: '', name: 'Waiting…' });
-      const left = g.status === 'active' ? Math.max(0, TURN_SECONDS - Math.floor((Date.now() - (tsMs(g.turnAt) || Date.now())) / 1000)) : null;
-      $('#g-players').innerHTML = playersHtml(ps, st, g.turn, balls, left, done);
+      const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
+      paintPlayers(ps, st, g.turn, balls, left, done);
       const status = $('#g-status');
       if (g.status === 'waiting') { status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players'; status.className = 'g-status wait'; }
       else if (g.status === 'done') { status.textContent = g.endReason === 'cancelled' ? 'Cancelled' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`; status.className = 'g-status'; }
@@ -562,8 +601,15 @@ export function createPool(ctx) {
       if (mine && st.brk) table.aimAt(balls[1].x, balls[1].y);
       header(); actions();
     }
+    function settle(simBalls, done) {
+      const end = () => { playing = false; pendingNo = null; localCall = -1; syncKey = ''; sync(); if (g.status === 'done') onEnd(); done && done(); };
+      if (P.encode(simBalls) === g.pos) end();
+      else table.ease(P.decode(g.pos), end);
+    }
     async function shootOnline(shot, cuePos) {
+      if (pendingNo != null || playing) return;
       const st = stOf(), side = mySide();
+      if (g.status !== 'active' || side !== g.turn) return;
       const before = P.decode(g.pos);
       if (st.bih && cuePos) { before[0].x = cuePos.x; before[0].y = cuePos.y; before[0].on = true; }
       const start = P.decode(P.encode(before));
@@ -571,15 +617,21 @@ export function createPool(ctx) {
       const r = P.simulate(start, shot);
       const j = P.judge(s0, side, start, r.balls, r.events);
       const pos = P.encode(j.balls);
-      const upd = { pos, ps: JSON.stringify(j.st), shot: { ...shot, from: P.encode(start), by: side }, turn: j.next, moveNo: g.moveNo + 1, turnAt: net.fs.serverTimestamp() };
+      const expect = g.moveNo || 0;
+      const upd = { pos, ps: JSON.stringify(j.st), shot: { ...shot, from: P.encode(start), by: side }, turn: j.next, moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
       if (j.winner >= 0) Object.assign(upd, { status: 'done', winnerUid: g.players[j.winner], endReason: j.winner === side ? 'win' : 'loss' });
-      playing = true; lastMove = g.moveNo + 1;
+      playing = true; pendingNo = upd.moveNo; lastMove = upd.moveNo;
+      g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } };
       table.set(start, { canShoot: false, placing: false, callMode: false });
       syncKey = '';
-      const wp = net.update(gid, upd).then(() => { if (j.winner >= 0) iEnded = true; }, (e) => { console.warn('pool: shot rejected', e.code || e.message, g.moveNo, upd.moveNo, g.turn, side); toast(friendlyError(e)); });
+      const wp = net.commitMove(gid, expect, upd).then(() => { if (j.winner >= 0) iEnded = true; }, (e) => {
+        pendingNo = null; iEnded = false; g = serverG; lastMove = serverG.moveNo || 0;
+        console.warn('pool: shot rejected', e.code || e.message);
+        toast(e && e.code === 'stale' ? 'That shot already happened.' : friendlyError(e));
+      });
       table.play(r.frames, () => {
         if (r.events.pocketed.length) ui.sfx.play('drop');
-        wp.finally(() => { playing = false; localCall = -1; syncKey = ''; sync(); if (g.status === 'done') onEnd(); });
+        wp.finally(() => settle(j.balls));
       });
     }
     function replay() {
@@ -589,19 +641,24 @@ export function createPool(ctx) {
       table.set(P.decode(sh.from), { canShoot: false, placing: false, callMode: false });
       ui.sfx.play('capture');
       table.play(r.frames, () => {
-        playing = false; syncKey = '';
         if (r.events.pocketed.length) ui.sfx.play('drop');
-        sync(); if (g.status === 'done') onEnd();
+        const simSum = P.encode(r.balls);
+        if (simSum === g.pos) { playing = false; syncKey = ''; sync(); if (g.status === 'done') onEnd(); }
+        else table.ease(P.decode(g.pos), () => { playing = false; syncKey = ''; sync(); if (g.status === 'done') onEnd(); });
       });
     }
     function actions() {
       const box = $('#g-actions'); if (!box) return;
       const side = mySide();
-      if (g.status === 'waiting') box.innerHTML = `${side === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}`;
+      if (g.status === 'waiting') {
+        const offer = side === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => actions());
+        box.innerHTML = `${side === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
+      }
       else if (g.status === 'active') box.innerHTML = side >= 0 ? '<button class="btn btn-sm btn-danger" id="g-forfeit">Forfeit</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>' : '<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>';
       else box.innerHTML = `${side >= 0 && g.endReason !== 'cancelled' ? (g.rematch ? `<a class="btn btn-sm" href="#/game/${esc(g.rematch)}">Go to rematch</a>` : '<button class="btn btn-sm" id="g-rematch">Rematch</button>') : ''}<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;
       const sh = $('#g-share'); if (sh) sh.onclick = async () => { try { await navigator.clipboard.writeText(ui.link(gid)); toast('Link copied'); } catch { prompt('Copy this link:', ui.link(gid)); } };
       const cn = $('#g-cancel'); if (cn) cn.onclick = async () => { try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('pool', '', gid); location.hash = '#/games'; } catch (e) { toast(friendlyError(e)); } };
+      const by = box.querySelector('[data-bot-yes]'); if (by) by.onclick = async () => { stopOffer(gid); try { await net.update(gid, { status: 'done', endReason: 'cancelled' }); net.leaveQueue('pool', '', gid); } catch { /* already gone */ } location.hash = `#/games/pool/cpu?lvl=${lastLevel()}`; };
       const ff = $('#g-forfeit'); if (ff) ff.onclick = () => { if (confirm('Forfeit this game? It counts as a loss.')) net.update(gid, { status: 'done', winnerUid: g.players[1 - mySide()], endReason: 'forfeit' }).catch((e) => toast(friendlyError(e))); };
       const rm = $('#g-rematch'); if (rm) rm.onclick = async () => {
         rm.disabled = true;
@@ -614,9 +671,11 @@ export function createPool(ctx) {
       if (stopHb) { stopHb(); stopHb = null; }
       if (g.endReason === 'cancelled') return;
       const side = mySide();
-      if (side >= 0) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      const botGame = onlyBots(g.players, ui.myUid());
+      if (side >= 0 && !botGame) setTimeout(() => net.recordResult(g, iEnded || g.endReason !== 'win'), iEnded ? 0 : 2500);
+      if (side >= 0 && botGame) ui.addCpuResult('pool', g.winnerUid === ui.myUid() ? 'w' : 'l');
       const win = side >= 0 && g.winnerUid === ui.myUid();
-      ui.resultModal({ title: side < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Forfeit.' : g.endReason === 'timeout' ? 'Time ran out.' : stOf().msg, win,
+      ui.resultModal({ title: side < 0 ? `${names(g.winnerUid)} wins` : win ? 'You win!' : 'You lost', sub: g.endReason === 'forfeit' ? 'Forfeit.' : g.endReason === 'timeout' ? 'Time ran out.' : stOf().msg, win, vsBot: botGame,
         buttons: side >= 0 ? [{ label: 'Rematch', onClick: () => $('#g-rematch')?.click() }, { label: 'Back to games', href: '#/games' }] : [{ label: 'Back to games', href: '#/games' }] });
     }
     function scheduleClaim() {
@@ -624,7 +683,7 @@ export function createPool(ctx) {
       const side = mySide();
       if (g.status !== 'active' || side < 0 || g.turn === side) return;
       const other = g.players[1 - side];
-      const tTurn = (tsMs(g.turnAt) || Date.now()) + (TURN_SECONDS + 6) * 1000 - Date.now();
+      const tTurn = (tsMs(g.turnAt) || net.serverNow()) + (TURN_SECONDS + 6) * 1000 - net.serverNow();
       const hb = g.hb && g.hb[other] ? tsMs(g.hb[other]) : 0;
       const tHb = hb ? hb + 48000 - Date.now() : Infinity;
       claimT = setTimeout(() => net.update(gid, { status: 'done', winnerUid: ui.myUid(), endReason: 'timeout' }).catch(() => {}), Math.max(1500, Math.min(tTurn, tHb)));
@@ -632,11 +691,14 @@ export function createPool(ctx) {
     let first = true;
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
-      const prevMove = g.moveNo; g = ng;
+      serverG = ng;
+      const rec = net.reconcile(ng.moveNo, pendingNo);
+      if (!rec.take) { header(); scheduleClaim(); return; }
+      const prevMove = g.moveNo; g = ng; pendingNo = rec.pending;
       if (g.status === 'active' && mySide() >= 0 && !stopHb) stopHb = net.heartbeat(gid);
       if (g.status === 'active' && first === false && g.moveNo === 0) net.leaveQueue('pool', '', gid);
       if (g.status === 'waiting' && ui.signedIn() && mySide() < 0 && !joinTried && (!g.invitee || g.invitee === ui.myUid())) { joinTried = true; net.join(gid).catch((e) => toast(friendlyError(e))); }
-      if (!first && g.moveNo > lastMove && !playing) { lastMove = g.moveNo; replay(prevMove); }
+      if (!first && g.moveNo > lastMove && !playing && g.shot && g.shot.by !== mySide()) { lastMove = g.moveNo; replay(); }
       else if (!playing) { lastMove = g.moveNo; sync(); }
       else header();
       first = false;

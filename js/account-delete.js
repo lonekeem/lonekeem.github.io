@@ -6,7 +6,7 @@ import {
   EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, deleteUser, signOut
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
-  doc, getDoc, getDocs, collection, collectionGroup, query, where, limit, writeBatch, increment, deleteDoc, deleteField
+  doc, getDoc, getDocs, collection, collectionGroup, query, where, limit, writeBatch, increment, deleteDoc, deleteField, setDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 
 const PAGE = 300;          // docs fetched per query page
@@ -138,14 +138,27 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
     });
     await step('Clearing saved posts, blocks and notifications…', async () => {
       sessionStorage.setItem('kemy-deleting', '1'); // devices.js: don't treat our own device cleanup as a "Remove"
-      await deleteRefs([doc(db, 'users', uid, 'prefs', 'security')]);
-      for (const c of ['saved', 'blocks', 'notifications', 'devices']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
+      await deleteRefs([doc(db, 'users', uid, 'prefs', 'security'), doc(db, 'users', uid, 'prefs', 'push'), doc(db, 'users', uid, 'prefs', 'updates'), doc(db, 'users', uid, 'prefs', 'chime')]);
+      for (const c of ['saved', 'blocks', 'notifications', 'devices', 'fcmTokens', 'pushQuota']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
     });
     // Profile + @handle together (the rules release the handle only with the profile).
+    // The left-note is its own step so a rules miss cannot block the deletion.
     let profileGone = false;
+    await step('Noting that you left…', async () => {
+      const mem = await getDoc(doc(db, 'members', uid));
+      if (!mem.exists() || !mem.get('createdAt') || !mem.get('displayName') || !mem.get('username')) return;
+      await setDoc(doc(db, 'leftMembers', uid), {
+        displayName: mem.get('displayName'),
+        username: mem.get('username'),
+        createdAt: mem.get('createdAt'),
+        deletedAt: serverTimestamp()
+      });
+    });
     await step('Deleting your profile…', async () => {
       const b = writeBatch(db);
       b.delete(doc(db, 'users', uid));
+      b.delete(doc(db, 'members', uid, 'secret', 'email'));
+      b.delete(doc(db, 'members', uid));
       if (username) b.delete(doc(db, 'usernames', username));
       await b.commit(); profileGone = true;
     });
@@ -173,10 +186,11 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
       <h2 class="del-title">Delete your account?</h2>
       <p class="muted small">This can’t be undone. We’ll permanently delete:</p>
       <ul class="del-list small">
-        <li>Your profile, <b>@${esc(handle)}</b> handle and photo link</li>
+        <li>Your profile, <b>@${esc(handle)}</b> handle, photo link, email and member record</li>
+        <li>A short note the owner keeps: your name, @username, and the dates you joined and left</li>
         <li>Your posts and stories, with their comments, stars and views</li>
         <li>Your comments on other people’s posts</li>
-        <li>Your follows and followers, saved posts, blocks and notifications</li>
+        <li>Your follows and followers, saved posts, blocks, notifications and push tokens</li>
         <li>Your Pals, their pats and play dates</li>
         <li>Your live sessions and your message threads</li>
         <li>Your login</li>
