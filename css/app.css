@@ -1671,6 +1671,42 @@ body.feed-mode #mod-fab { display: inline-flex; position: fixed; z-index: 60; to
 @keyframes skel{to{background-position:-200% 0}}
 .sec-this { font-size: .72rem; padding: 2px 8px; border-radius: 999px; background: rgba(77,163,255,.18); color: #9cc9ff; margin-left: 4px; white-space: nowrap; }
 
+/* Optional push (js/push.js). High contrast on the dark card, 44px+ targets, one column on a phone. */
+.push-card h2 { font-size: 1.05rem; }
+.push-lead { margin: 6px 0 8px; }
+.push-card .btn-block { margin-top: 12px; }
+.push-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 0; border-top: 1px solid var(--border); }
+.push-row span { flex: 1; min-width: 0; }
+.push-row b { display: block; color: var(--text); }
+.push-row small { display: block; color: var(--muted); font-size: .82rem; line-height: 1.35; }
+.push-row input[type=checkbox] {
+  appearance: none; -webkit-appearance: none; width: 48px; height: 28px; margin: 0; flex-shrink: 0; cursor: pointer;
+  background: #3a3350; border: 2px solid #d4c8ef; border-radius: 999px; position: relative;
+}
+.push-row input[type=checkbox]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  transition: transform .15s ease;
+}
+.push-row input[type=checkbox]:checked { background: #7c3aed; border-color: #e9d5ff; }
+.push-row input[type=checkbox]:checked::after { transform: translateX(20px); }
+.push-row input[type=checkbox]:focus { outline: none; box-shadow: none; }
+.push-row input[type=checkbox]:focus-visible { outline: 2px solid #9cc9ff; outline-offset: 3px; box-shadow: 0 0 0 3px rgba(156,201,255,.45); }
+.push-note { margin-top: 8px; }
+.push-nudge, .push-banner {
+  position: fixed; left: 12px; right: 12px; z-index: 70; max-width: 420px; margin: 0 auto;
+  background: #1a1030; color: #f4f1fa; border: 2px solid #c4b5fd; border-radius: 18px; padding: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5);
+}
+.push-nudge { bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom) + 12px); }
+.push-banner { top: calc(env(safe-area-inset-top, 0px) + 12px); display: flex; align-items: center; gap: 8px; }
+.push-nudge b, .push-banner b { display: block; font-size: 1.05rem; }
+.push-nudge p, .push-banner p { margin: 4px 0 10px; color: #f4f1fa; }
+.push-banner p { margin: 0; flex: 1; }
+.push-nudge-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.push-nudge-row .btn { min-height: 44px; }
+#push-admin input, #push-admin textarea { width: 100%; margin: 4px 0 8px; }
+#push-admin label { display: block; margin-top: 6px; font-weight: 600; }
+
 /* ===== 📱 No "blue screen" on taps (iPhone + Android): no tap flash, no accidental selection / long-press callout /
    image drag, no blue outline after a tap. Typing + selecting still work in inputs, textareas and contenteditable;
    keyboard users still get a visible (purple) focus ring. ===== */

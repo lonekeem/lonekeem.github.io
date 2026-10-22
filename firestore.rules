@@ -154,7 +154,15 @@ service cloud.firestore {
       allow create, update: if signedIn() && uid == me() && docId == 'feed'
         && request.resource.data.keys().hasOnly(['cats', 'creators', 'updatedAt'])
         && scoreMap(request.resource.data.cats, 20) && scoreMap(request.resource.data.creators, 60)
-        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      // Optional push switches (js/push.js). Owner only. Missing types stay on once they opt in.
+      allow create, update: if signedIn() && uid == me() && docId == 'push' && sessionOk(uid)
+        && request.resource.data.keys().hasOnly(['enabled', 'invite', 'turn', 'house', 'daily', 'announce', 'updatedAt'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.invite is bool && request.resource.data.turn is bool
+        && request.resource.data.house is bool && request.resource.data.daily is bool
+        && request.resource.data.announce is bool
+        && request.resource.data.updatedAt == request.time;
       // Private search history (Search > Recent), max 20 short strings. Deleted by "Clear all" and with the account.
       allow create, update: if signedIn() && uid == me() && docId == 'security'
         && request.resource.data.keys().hasOnly(['alerts', 'updatedAt']) && request.resource.data.alerts is bool
@@ -257,6 +265,24 @@ service cloud.firestore {
           && (!('ack' in changed()) || request.resource.data.ack == true);
       }
 
+      // FCM web push tokens. The id is this browser's device id. Only the owner can read or write it.
+      match /fcmTokens/{id} {
+        function validToken(d) {
+          return d.keys().hasOnly(['token', 'label', 'tz', 'tzOffset', 'local', 'updatedAt'])
+            && isStr(d.token, 10, 4096) && isStr(d.label, 1, 60) && isStr(d.tz, 0, 80)
+            && d.tzOffset is int && d.tzOffset >= -840 && d.tzOffset <= 840
+            && d.local is bool && d.updatedAt == request.time;
+        }
+        allow read, delete: if signedIn() && uid == me();
+        allow create, update: if signedIn() && uid == me() && exists(userPath(uid)) && sessionOk(uid)
+          && id.matches('^[A-Za-z0-9]{16,40}$') && validToken(request.resource.data);
+      }
+      // Daily send count. Cloud Functions (Admin SDK) write it. The owner may only read or delete it.
+      match /pushQuota/{qid} {
+        allow read, delete: if signedIn() && uid == me();
+        allow create, update: if false;
+      }
+
       match /notifications/{nid} {
         allow read, delete: if actingAs(uid);
         // "Kemy Security" new-device alert, written by the owner's own new device to their own inbox.
@@ -288,7 +314,7 @@ service cloud.firestore {
         allow create: if signedIn() && !isBlocked(uid, request.resource.data.fromUid)
           && exists(userPath(uid))
           && request.resource.data.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
-          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode']
+          && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode', 'house']
           && actingAs(request.resource.data.fromUid)
           && request.resource.data.fromUid != uid
           && request.resource.data.fromName == get(userPath(request.resource.data.fromUid)).data.displayName

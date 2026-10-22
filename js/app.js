@@ -1219,6 +1219,10 @@ async function pageSettings() {
       <label class="row" style="gap:10px;align-items:center;margin:6px 0"><input type="checkbox" id="s-autoplay-wifi" ${wifiOnly() ? 'checked' : ''} ${autoplayEnabled() ? '' : 'disabled'}> <span>Autoplay on Wi-Fi only</span></label>
       <p class="muted small" id="s-ap-note">Videos start muted as you scroll. ${saveData() ? 'Data Saver is on, so videos wait for a tap.' : ''}${canDetectWifi() ? '' : ' (This browser can’t tell Wi-Fi from mobile data, so Wi-Fi only has no effect here.)'}</p>
     </section>
+    <section class="card pad push-card" id="push-card" aria-labelledby="push-h" style="margin-top:16px" data-push-state="off">
+      <h2 id="push-h">Notifications</h2>
+      <div id="push-box"><p class="muted small">Loading notification settings…</p></div>
+    </section>
     <button type="button" class="card pad set-link" data-watch-intro style="margin-top:16px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">🎬</span><span><b>Watch intro</b><br><span class="muted small">Replay Kemy’s welcome video anytime.</span></span></button>
     <button type="button" class="card pad set-link" data-watch-howto style="margin-top:12px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer"><span style="font-size:1.4rem" aria-hidden="true">📱</span><span><b>How to save Kemy</b><br><span class="muted small">Add Kemy to your phone’s home screen (iPhone &amp; Android).</span></span></button>
     <a class="card pad set-link" href="#/settings/interests" style="margin-top:16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit"><span style="font-size:1.4rem" aria-hidden="true">✨</span><span><b>Your interests</b><br><span class="muted small">See and change what shapes your For You feed</span></span><span class="spacer"></span><span aria-hidden="true">›</span></a>
@@ -1255,6 +1259,7 @@ async function pageSettings() {
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete account</button>
     </section>`}`;
   donate.mountSettings($('#set-donate')); devices.wireSettings();
+  import('./push.js').then((m) => m.wireSettings(toast)).catch(() => { const b = document.getElementById('push-box'); if (b) b.textContent = 'Notifications aren’t available right now.'; });
   $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
   $('#s-autoplay-wifi').onchange = (e) => { setWifiOnly(e.target.checked); };
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
@@ -1418,11 +1423,11 @@ async function pageNotifications(asStudio, token) {
   const snap = await getDocs(query(collection(db, 'users', owner, 'notifications'), orderBy('createdAt', 'desc'), limit(60)));
   if (stale(token)) return;
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((n) => !S.blocked.has(n.fromUid));
-  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', mod: '', mod_invite: '' };
+  const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', house: '', daily: '', announce: '', mod: '', mod_invite: '' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
     if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
-    const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? `#/game/${esc(n.postId)}` : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
+    const href = n.type === 'message' ? `#/chat/${esc(n.fromUid)}${owner === STUDIO_UID ? '/studio' : ''}` : n.type === 'game' ? (String(n.text || '').includes('Pal Games') ? `#/games/pals/${esc(n.postId)}` : `#/game/${esc(n.postId)}`) : n.type === 'house' ? '#/street' : n.type === 'daily' ? '#/pals' : n.type === 'announce' ? (String(n.postId || '').startsWith('#/') ? esc(n.postId) : '#/feed') : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b>${esc(n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
   }).join('') : '<div class="empty">No notifications yet.</div>';
@@ -1477,6 +1482,7 @@ async function pageAdmin(token) {
     <div id="adm-mods"></div>
     ${big('mod', '🗑️', 'Delete posts, comments and lives', 'Any post or comment has “Delete” in its menu for you. On a live you can tap “End live (guidelines)”. Reports are listed below.')}
     ${big('media', '🧹', 'Media cleanup', 'After you delete a post, Kemy shows a command to erase its files from Cloudinary on your computer (the key never goes in the app). For a full sweep run <code>node scripts/cloudinary-cleanup.mjs</code> (dry run first).')}
+    <div id="push-admin-host"></div>
     <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports <a class="btn btn-sm" href="#/mod" style="margin-left:8px">Open Moderator Tools</a></h2>
     <div id="reports"></div>`;
   const founderSet = async (on) => { if (!isAdmin()) return toast('Admins only'); try { const m = await pals.myPals(true); const p = m && (m.list.find((x) => x.id === S.profile.activePet) || m.list[0]); if (!p) return toast('Hatch a Pal first');
@@ -1484,6 +1490,7 @@ async function pageAdmin(token) {
       await m.store.save(p, { species: sp }); dispatchEvent(new Event('kemy:pal-changed')); toast(on ? `${p.name} is now Kemy (Founder) 👑` : `${p.name} switched back`); } catch (e) { toast(friendlyError(e)); } };
   mod.adminSection($('#adm-mods'));
   donate.mountAdmin($('#adm-donate'));
+  import('./push.js').then((m) => { const h = document.getElementById('push-admin-host'); if (h) h.innerHTML = m.adminHtml(); m.wireAdmin(toast); }).catch(() => {});
   if ($('#adm-founder')) { $('#adm-founder').onclick = () => founderSet(true); $('#adm-founder-off').onclick = () => founderSet(false); }
   const st = $('#shop-status'), pub = $('#shop-pub');
   const showStatus = async () => {
@@ -1772,7 +1779,8 @@ onAuthStateChanged(auth, async (user) => {
     } catch (e) { console.error(e); }
   }
   await mod.rolesReady;
-  if (user && S.profile) devices.start(user); else devices.stop();
+  if (user && S.profile) { devices.start(user); import('./push.js').then((m) => m.start(user)).catch(() => {}); }
+  else { devices.stop(); import('./push.js').then((m) => m.stop()).catch(() => {}); }
   S.ready = true;
   if (user && !S.profile) return go('#/onboard');
   if (user && /^#\/(login|signup|onboard)/.test(location.hash)) { const n = pendingNext || nextHash(); pendingNext = null; return go(n); }

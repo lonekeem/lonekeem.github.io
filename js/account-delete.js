@@ -138,8 +138,8 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
     });
     await step('Clearing saved posts, blocks and notifications…', async () => {
       sessionStorage.setItem('kemy-deleting', '1'); // devices.js: don't treat our own device cleanup as a "Remove"
-      await deleteRefs([doc(db, 'users', uid, 'prefs', 'security')]);
-      for (const c of ['saved', 'blocks', 'notifications', 'devices']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
+      await deleteRefs([doc(db, 'users', uid, 'prefs', 'security'), doc(db, 'users', uid, 'prefs', 'push')]);
+      for (const c of ['saved', 'blocks', 'notifications', 'devices', 'fcmTokens', 'pushQuota']) await drain(collection(db, 'users', uid, c), (docs) => deleteRefs(docs.map((d) => d.ref)));
     });
     // Profile + @handle together (the rules release the handle only with the profile).
     let profileGone = false;
@@ -176,7 +176,7 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
         <li>Your profile, <b>@${esc(handle)}</b> handle and photo link</li>
         <li>Your posts and stories, with their comments, stars and views</li>
         <li>Your comments on other people’s posts</li>
-        <li>Your follows and followers, saved posts, blocks and notifications</li>
+        <li>Your follows and followers, saved posts, blocks, notifications and push tokens</li>
         <li>Your Pals, their pats and play dates</li>
         <li>Your live sessions and your message threads</li>
         <li>Your login</li>

@@ -74,3 +74,7 @@ exports.sellHome = onCall({ enforceAppCheck: false }, async (req) => {
     return { ok: true, cur, n, price: base };
   });
 });
+
+// Web push: inbox invites and house visits, your-turn updates, the morning Star Coin reminder,
+// and an admin-only announcement callable. See functions/push.js. Written by Lone Keem.
+Object.assign(exports, require('./push'));
