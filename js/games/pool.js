@@ -7,6 +7,7 @@ import * as P from './pool-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
 import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
 import { syncPlates } from './plates.js';
+import { onSample } from '../input.js';
 
 const COLORS = { 1: '#f2b31b', 2: '#3d7bff', 3: '#e2558f', 4: '#8a2be2', 5: '#ff7a2f', 6: '#2bb5a8', 7: '#9b1d3a' };
 const ballColor = (id) => COLORS[id > 8 ? id - 8 : id];
@@ -215,7 +216,7 @@ export function createPool(ctx) {
     }
     function paintPower() {
       const fill = host.querySelector('.pl-power-fill'), knob = host.querySelector('.pl-power-knob'), lab = host.querySelector('.pl-power-lab'), bar = host.querySelector('.pl-power');
-      const pct = Math.round((V.pull || 0) * 100);
+      const pct = Math.round((V.pull || V.power || 0) * 100);
       if (fill) fill.style.height = pct + '%';
       if (knob) knob.style.bottom = pct <= 0 ? '4px' : `calc(${pct}% - 16px)`;
       if (lab) lab.textContent = pct > 3 ? pct + '%' : 'Pull';
@@ -396,9 +397,17 @@ export function createPool(ctx) {
       if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-0.012); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(0.012); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); V.power = Math.min(1, (V.power || 0.4) + 0.06); paintPower(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); V.power = Math.max(0.08, (V.power || 0.4) - 0.06); paintPower(); }
       else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); V.power = V.power || 0.55; shoot(); }
     }
     window.addEventListener('keydown', onKey);
+    const offPad = onSample((s) => {
+      if (!cv.isConnected || !V.canShoot || V.anim || !s) return;
+      if (Math.abs(s.lookX) > 0.2) nudge(s.lookX * 0.02);
+      if (s.lookY < -0.35) { V.power = Math.min(1, (V.power || 0.4) + 0.02); paintPower(); }
+      if (s.pressed && (s.pressed.gas || s.pressed.confirm)) { V.power = V.power || 0.55; shoot(); }
+    });
     function shoot() {
       if (!V.canShoot || V.anim || !V.balls[0] || !V.balls[0].on) return;
       if (V.callMode && V.call < 0) { toast('Tap a pocket to call the 8 first'); return; }
@@ -433,7 +442,7 @@ export function createPool(ctx) {
       },
       hint(t) { const h = host.querySelector('#pl-hint'); if (h) h.textContent = t; },
       aimAt(x, y) { const c = V.balls[0]; if (!c) return; const dx = x - c.x, dy = y - c.y, n = Math.hypot(dx, dy) || 1; V.aim = { x: dx / n, y: dy / n }; draw(); },
-      stop() { ro.disconnect(); window.removeEventListener('resize', onResize); window.removeEventListener('keydown', onKey); stopNudge(); cancelAnimationFrame(V.raf); V.anim = false; }
+      stop() { offPad(); ro.disconnect(); window.removeEventListener('resize', onResize); window.removeEventListener('keydown', onKey); stopNudge(); cancelAnimationFrame(V.raf); V.anim = false; }
     };
     return api;
   }

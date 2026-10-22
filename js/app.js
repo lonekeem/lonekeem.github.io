@@ -1,4 +1,5 @@
 import { cachedQuery, cachedDoc, BUSY_MSG } from './fs-cache.js';
+import { startInput } from './input.js';
 import { initPolish } from './polish.js';
 // Lone Keem Studios community app (plain ES modules, no build step).
 import { autoplayEnabled, wifiOnly, setAutoplay, setWifiOnly, saveData, canDetectWifi } from './autoplay.js';
@@ -1793,6 +1794,7 @@ async function rebuildSearchIndex(onProgress) {
   return { posts: ps.size, users: us.size, updated: jobs.length };
 }
 
+startInput({ toast });
 getRedirectResult(auth).catch((e) => toast(friendlyError(e)));
 onAuthStateChanged(auth, async (user) => {
   S.ready = false;
