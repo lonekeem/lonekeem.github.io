@@ -203,23 +203,36 @@ service cloud.firestore {
               || (request.auth.token.email == null && d.email == ''));
       }
       function memberShape(d) {
-        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup'])
+        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive'])
           && cleanStr(d.displayName, 1, 50)
           && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
           && isStr(d.displayNameLower, 0, 100)
           && isStr(d.color, 1, 20)
           && (d.photoURL == '' || cloudinaryImageUrl(d.photoURL))
           && d.createdAt is timestamp
-          && d.signup in ['email', 'google', ''];
+          && d.signup in ['email', 'google', '']
+          && (!('lastActive' in d) || d.lastActive is timestamp);
+      }
+      // A visit can set lastActive to now. It cannot be moved to some other time.
+      function lastActiveOk() {
+        let next = request.resource.data;
+        let prev = resource.data;
+        let hasNext = 'lastActive' in next;
+        let hasPrev = 'lastActive' in prev;
+        return (!hasNext && !hasPrev)
+          || (hasNext && next.lastActive == request.time)
+          || (hasNext && hasPrev && next.lastActive == prev.lastActive);
       }
       allow get: if isAdmin() || (signedIn() && uid == me());
       allow list: if isAdmin();
       allow create: if signedIn() && uid == me() && memberShape(request.resource.data)
         && request.resource.data.createdAt == request.time
+        && request.resource.data.lastActive == request.time
         && request.resource.data.signup == memberSignup();
       allow update: if signedIn() && uid == me() && memberShape(request.resource.data)
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.signup == resource.data.signup;
+        && request.resource.data.signup == resource.data.signup
+        && lastActiveOk();
       allow delete: if isAdmin() || (signedIn() && uid == me());
       // The email is not on the member row. Only the admin can read it, and only when they tap.
       match /secret/{docId} {
@@ -229,6 +242,30 @@ service cloud.firestore {
           && memberEmailOk(request.resource.data);
         allow delete: if isAdmin() || (signedIn() && uid == me());
       }
+    }
+
+    // Someone who deleted their account. Name, @username, join date, and the day they left.
+    // No email and no other private fields. Only the admin can read the list. The person
+    // writes their own note while their member row still exists; it cannot be edited after.
+    match /leftMembers/{uid} {
+      function leftShape(d) {
+        return d.keys().hasOnly(['displayName', 'username', 'createdAt', 'deletedAt'])
+          && cleanStr(d.displayName, 1, 50)
+          && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
+          && d.createdAt is timestamp
+          && d.deletedAt is timestamp;
+      }
+      function memberRow() {
+        return get(/databases/$(database)/documents/members/$(uid)).data;
+      }
+      allow get, list: if isAdmin();
+      allow create: if signedIn() && uid == me() && leftShape(request.resource.data)
+        && request.resource.data.deletedAt == request.time
+        && exists(/databases/$(database)/documents/members/$(uid))
+        && request.resource.data.displayName == memberRow().displayName
+        && request.resource.data.username == memberRow().username
+        && request.resource.data.createdAt == memberRow().createdAt;
+      allow update, delete: if false;
     }
 
     // What's New entries (js/updates.js). Everyone can read. Only the verified admin can write.

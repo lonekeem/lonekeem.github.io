@@ -1708,7 +1708,7 @@ async function createProfile(displayName, username) {
   });
   b.set(doc(db, 'members', uid), {
     displayName: name, username, displayNameLower: name.toLowerCase().slice(0, 100), color, photoURL: '',
-    createdAt: serverTimestamp(), signup
+    createdAt: serverTimestamp(), lastActive: serverTimestamp(), signup
   });
   b.set(doc(db, 'members', uid, 'secret', 'email'), { email: String(S.user.email || '').slice(0, 200) });
   pendingBirthday = null;

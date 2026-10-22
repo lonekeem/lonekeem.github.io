@@ -1,5 +1,6 @@
 // New Members: an admin-only list of who joined Kemy, plus one member's detail.
 // The totals at the top are Firestore count() queries. Online is Pal Park presence.
+// Inactive is no visit for 30 days (members.lastActive). Left Kemy is leftMembers/{uid}.
 // The directory is members/{uid}. Public profiles stay on users/{uid}. Emails are not on the
 // public profile, and this page hides them until the admin taps Show email.
 // Detail reads that already exist for the app (wallet, games, homes, follows, Pals) and the
@@ -105,6 +106,26 @@ function periodStarts(now = new Date()) {
 
 const PARK_ROOMS = 20;
 const ONLINE_MS = 60000;
+const INACTIVE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function inactiveCutoff(now = Date.now()) {
+  return new Date(now - INACTIVE_MS);
+}
+
+function isInactiveMember(m, now = Date.now()) {
+  const t = millis(m.lastActive);
+  return t > 0 && now - t >= INACTIVE_MS;
+}
+
+async function countWhere(field, op, value) {
+  const snap = await getCountFromServer(query(collection(db, 'members'), where(field, op, value)));
+  return snap.data().count || 0;
+}
+
+async function countLeft() {
+  const snap = await getCountFromServer(query(collection(db, 'leftMembers')));
+  return snap.data().count || 0;
+}
 
 async function countMembersFrom(start) {
   const q = start
@@ -130,15 +151,26 @@ function countCell(value, label) {
 async function paintCounts(box, stale) {
   if (!box) return;
   const { today, week, month } = periodStarts();
+  const cutoff = inactiveCutoff();
   const settled = await Promise.all([
     countMembersFrom(null).then((n) => n, () => null),
     countMembersFrom(today).then((n) => n, () => null),
     countMembersFrom(week).then((n) => n, () => null),
     countMembersFrom(month).then((n) => n, () => null),
-    countOnline().then((n) => n, () => null)
+    countOnline().then((n) => n, () => null),
+    countWhere('lastActive', '>=', cutoff).then((n) => n, () => null),
+    countWhere('lastActive', '<', cutoff).then((n) => n, () => null),
+    countLeft().then((n) => n, () => null)
   ]);
   if (stale && stale()) return;
-  const [total, todayN, weekN, monthN, online] = settled;
+  const [total, todayN, weekN, monthN, online, activeN, inactiveN, leftN] = settled;
+  const setN = (id, n) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = n == null ? '—' : comma(n);
+  };
+  setN('nm-n-active', activeN);
+  setN('nm-n-inactive', inactiveN);
+  setN('nm-n-left', leftN);
   if (total == null) {
     box.innerHTML = '<p class="muted small nm-count-note">Couldn’t count members.</p>';
     return;
@@ -150,7 +182,7 @@ async function paintCounts(box, stale) {
       ${countCell(monthN, 'This month')}
       ${countCell(online, 'Online now')}
     </div>
-    <p class="muted small nm-count-note">Today, this week, and this month start at midnight in New York. Online is Pal Park in the last minute.</p>`;
+    <p class="muted small nm-count-note">Today, this week, and this month start at midnight in New York. Online is Pal Park in the last minute. Inactive means no visit for 30 days. Left Kemy is an account that was deleted.</p>`;
 }
 
 let fns = null;
@@ -309,15 +341,29 @@ async function loadDetail(uid) {
 }
 
 function rowHtml(m, fresh) {
-  const name = m.displayName || m.username || 'New member';
+  const name = m.displayName || m.username || (m.left ? 'Member' : 'New member');
   const handle = m.username ? '@' + m.username : '';
-  return `<article class="nm-row">
+  if (m.left) {
+    return `<article class="nm-row nm-left">
+      <div class="nm-line">
+        ${avatarHtml(m)}
+        <span class="nm-meta">
+          <span class="nm-name"><b>${esc(name)}</b><span class="nm-tag">Left Kemy</span></span>
+          ${handle ? `<span class="nm-handle">${esc(handle)}</span>` : ''}
+          <span class="nm-when">Joined ${esc(nyStamp(m.createdAt) || 'date not recorded')} · Left ${esc(nyStamp(m.deletedAt) || 'date not recorded')}</span>
+        </span>
+      </div>
+    </article>`;
+  }
+  const quiet = isInactiveMember(m);
+  const seen = nyStamp(m.lastActive);
+  return `<article class="nm-row${quiet ? ' nm-inactive' : ''}">
     <button type="button" class="nm-open" data-open="${esc(m.uid)}" aria-label="Open ${esc(name)}">
       ${avatarHtml(m)}
       <span class="nm-meta">
-        <span class="nm-name"><b>${esc(name)}</b>${fresh ? '<span class="nm-new">New</span>' : ''}</span>
+        <span class="nm-name"><b>${esc(name)}</b>${quiet ? '<span class="nm-tag">Inactive</span>' : ''}${fresh ? '<span class="nm-new">New</span>' : ''}</span>
         ${handle ? `<span class="nm-handle">${esc(handle)}</span>` : ''}
-        <span class="nm-when">${esc(nyTime(m.createdAt))}</span>
+        <span class="nm-when">${quiet ? 'Last seen ' + esc(seen || 'not recorded') + ' · ' : ''}${esc(nyTime(m.createdAt))}</span>
         <span class="nm-how">${esc(signupLine(m.signup))}</span>
       </span>
       <span class="nm-go" aria-hidden="true">›</span>
@@ -349,14 +395,21 @@ export async function page(main, { stale, toast, mod } = {}) {
     <a class="nm-back" href="#/admin">← Admin</a>
     <h1 class="page-title">New Members</h1>
     <div id="nm-counts" aria-live="polite"><p class="nm-total"><b>…</b><span>members</span></p></div>
-    <p class="muted small nm-lead">Newest first. Tap a member for their Pal, games, and home. Times are New York time. Emails stay hidden until you tap.</p>
-    <label class="check nm-push"><input type="checkbox" id="nm-push"> <span>Ping me when someone new joins<br><span class="muted small">Off during quiet hours (9pm–8am). Turn on notifications in Settings so your phone can get it. When Kemy is closed, the phone plays its own sound.</span></span></label>
+    <div class="nm-tabs" role="tablist" aria-label="Member lists">
+      <button type="button" role="tab" data-tab="all" aria-selected="true">All</button>
+      <button type="button" role="tab" data-tab="active" aria-selected="false">Active <b id="nm-n-active">…</b></button>
+      <button type="button" role="tab" data-tab="inactive" aria-selected="false">Inactive <b id="nm-n-inactive">…</b></button>
+      <button type="button" role="tab" data-tab="left" aria-selected="false">Left Kemy <b id="nm-n-left">…</b></button>
+    </div>
+    <h2 class="nm-list-title" id="nm-list-title">All members</h2>
+    <p class="muted small nm-lead">Tap a row for their Pal, games, and home. Quiet for 30 days is marked Inactive. Deleted accounts are red under Left Kemy. Times are New York time.</p>
     <label class="nm-search" for="nm-q">Search</label>
     <input id="nm-q" type="search" placeholder="Name or @username" autocomplete="off" enterkeyhint="search">
-    <p class="small" style="margin:0 0 8px"><button type="button" class="btn btn-sm btn-ghost" id="nm-fill">Fill in older join times</button></p>
-    <p class="small muted" id="nm-status"></p>
     <div id="nm-list" aria-live="polite"></div>
     <div id="nm-end"></div>
+    <label class="check nm-push"><input type="checkbox" id="nm-push"> <span>Ping me when someone new joins<br><span class="muted small">Off during quiet hours (9pm–8am). Turn on notifications in Settings so your phone can get it. When Kemy is closed, the phone plays its own sound.</span></span></label>
+    <p class="small" style="margin:0 0 8px"><button type="button" class="btn btn-sm btn-ghost" id="nm-fill">Fill in older join times</button></p>
+    <p class="small muted" id="nm-status"></p>
     </div>
     <div id="nm-detail" hidden></div>
   </section>`;
@@ -366,12 +419,21 @@ export async function page(main, { stale, toast, mod } = {}) {
   const push = main.querySelector('#nm-push');
   const seen = new Map();
   let mode = 'new';
+  let filter = 'all';
   let cursor = null;
+  let leftCursor = null;
   let nameCursor = null;
   let displayCursor = null;
   let busy = false;
   let done = false;
   let term = '';
+  const listTitle = { all: 'All members', active: 'Active', inactive: 'Inactive', left: 'Left Kemy' };
+  const emptyTitle = {
+    all: 'No members yet.',
+    active: 'No one has visited in the last 30 days.',
+    inactive: 'No one has been quiet for 30 days.',
+    left: 'No one has left Kemy.'
+  };
 
   const paint = (rows, reset) => {
     if (stale && stale()) return;
@@ -383,7 +445,7 @@ export async function page(main, { stale, toast, mod } = {}) {
       fresh.push(m);
     }
     if (!fresh.length && reset) {
-      list.innerHTML = `<div class="card empty">${term ? 'No one matches that search.' : 'No members yet.'}</div>`;
+      list.innerHTML = `<div class="card empty">${term ? 'No one matches that search.' : emptyTitle[filter] || 'No members yet.'}</div>`;
       return;
     }
     const html = fresh.map((m) => rowHtml(m, millis(m.createdAt) > seenMs)).join('');
@@ -392,12 +454,28 @@ export async function page(main, { stale, toast, mod } = {}) {
   };
 
   async function loadNew() {
-    const parts = [orderBy('createdAt', 'desc'), limit(PAGE)];
+    const cutoff = inactiveCutoff();
+    const parts = filter === 'active'
+      ? [where('lastActive', '>=', cutoff), orderBy('lastActive', 'desc'), limit(PAGE)]
+      : filter === 'inactive'
+        ? [where('lastActive', '<', cutoff), orderBy('lastActive', 'asc'), limit(PAGE)]
+        : [orderBy('createdAt', 'desc'), limit(PAGE)];
     if (cursor) parts.push(startAfter(cursor));
     const snap = await getDocs(query(collection(db, 'members'), ...parts));
     cursor = snap.docs.length ? snap.docs[snap.docs.length - 1] : cursor;
     done = snap.size < PAGE;
     return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  }
+
+  async function loadLeft(q) {
+    const parts = q
+      ? [where('username', '>=', q), where('username', '<=', q + '\uf8ff'), orderBy('username'), limit(PAGE)]
+      : [orderBy('deletedAt', 'desc'), limit(PAGE)];
+    if (leftCursor) parts.push(startAfter(leftCursor));
+    const snap = await getDocs(query(collection(db, 'leftMembers'), ...parts));
+    leftCursor = snap.docs.length ? snap.docs[snap.docs.length - 1] : leftCursor;
+    done = snap.size < PAGE;
+    return snap.docs.map((d) => ({ uid: d.id, left: true, ...d.data() }));
   }
 
   async function loadSearch(q) {
@@ -422,11 +500,15 @@ export async function page(main, { stale, toast, mod } = {}) {
     if (busy || (done && !reset)) return;
     busy = true;
     if (reset) {
-      cursor = null; nameCursor = null; displayCursor = null; done = false;
+      cursor = null; leftCursor = null; nameCursor = null; displayCursor = null; done = false;
       list.innerHTML = '<div class="spinner"></div>';
     }
     try {
-      const rows = mode === 'search' ? await loadSearch(term) : await loadNew();
+      let rows;
+      if (filter === 'left') rows = await loadLeft(mode === 'search' ? term : '');
+      else if (mode === 'search') {
+        rows = (await loadSearch(term)).filter((m) => filter === 'all' || (filter === 'inactive' ? isInactiveMember(m) : !isInactiveMember(m)));
+      } else rows = await loadNew();
       if (stale && stale()) return;
       paint(rows, reset);
       const end = main.querySelector('#nm-end');
@@ -477,7 +559,7 @@ export async function page(main, { stale, toast, mod } = {}) {
       <article class="nm-card-detail">
         <div class="nm-detail-head">${avatarHtml(m)}<div><h1>${esc(name)}</h1>${handle ? `<a class="nm-handle" href="#/u/${esc(m.username)}">${esc(handle)}</a>` : ''}<p class="nm-pal">${esc(palLine)}</p></div></div>
         <p class="nm-when">Joined ${esc(nyTime(m.createdAt))}</p>
-        <p class="nm-when">Last active ${esc(info.devicesOk ? (nyStamp(info.last) || 'Not recorded yet') : 'Not available')}</p>
+        <p class="nm-when">Last active ${esc(info.devicesOk ? (nyStamp(info.last) || nyStamp(m.lastActive) || 'Not recorded yet') : 'Not available')}</p>
         ${banNote ? `<p class="nm-ban">${esc(banNote)}</p>` : ''}
         <div class="nm-stats">
           <div class="nm-stat"><b>${esc(comma(info.coins))}</b><span>Star Coins</span></div>
@@ -552,6 +634,22 @@ export async function page(main, { stale, toast, mod } = {}) {
     }
   };
 
+  main.querySelector('.nm-tabs').onclick = (ev) => {
+    const btn = ev.target.closest('[data-tab]');
+    if (!btn || btn.dataset.tab === filter) return;
+    filter = btn.dataset.tab;
+    main.querySelectorAll('.nm-tabs [data-tab]').forEach((b) => {
+      const on = b === btn;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    const title = main.querySelector('#nm-list-title');
+    if (title) {
+      title.textContent = listTitle[filter] || 'All members';
+      title.classList.toggle('nm-list-left', filter === 'left');
+    }
+    more(true);
+  };
+
   list.onclick = (ev) => {
     if (!isAdmin()) return;
     const mail = ev.target.closest('[data-mail]');
@@ -607,9 +705,13 @@ export async function page(main, { stale, toast, mod } = {}) {
     try {
       const res = await httpsCallable(functionsApp(), 'backfillMembers')({});
       const n = res && res.data && res.data.filled;
+      const stamped = res && res.data && res.data.stamped;
       if (stale && stale()) return;
-      status.textContent = n ? `Filled in join times for ${n} ${n === 1 ? 'account' : 'accounts'}.` : 'Join times are up to date.';
-      if (n) more(true);
+      const bits = [];
+      if (n) bits.push(`Filled in join times for ${n} ${n === 1 ? 'account' : 'accounts'}.`);
+      if (stamped) bits.push(`Recorded last visits for ${stamped} ${stamped === 1 ? 'member' : 'members'}.`);
+      status.textContent = bits.length ? bits.join(' ') : 'Join times and last visits are up to date.';
+      if (n || stamped) more(true);
     } catch (e) {
       if (!(stale && stale())) status.textContent = /not-found|unavailable|internal|deadline/.test(String(e && e.code))
         ? 'That step needs the member function deployed.'

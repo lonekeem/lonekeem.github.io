@@ -70,6 +70,8 @@ export function createDevices({ auth, db, isPrivileged, toast }) {
       }
     } catch (e) { console.warn('device record failed', e); }
     if (st.uid !== uid) return;
+    // Opening Kemy counts as a visit, so the admin list can tell who has been quiet for 30 days.
+    updateDoc(doc(db, 'members', uid), { lastActive: serverTimestamp() }).catch(() => {});
     if (isNew && alertsOn()) {
       setDoc(doc(collection(db, 'users', uid, 'notifications')), { type: 'security', fromUid: uid, fromName: 'Kemy Security', fromUsername: '',
         postId: st.mine, text: alertText(label), createdAt: serverTimestamp(), read: false }).catch((e) => console.warn('security note failed', e));
