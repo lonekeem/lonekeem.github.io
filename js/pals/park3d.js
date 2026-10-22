@@ -76,8 +76,31 @@ export function createPark3D(ctx) {
     const scene = new THREE.Scene(); const SKY = new THREE.Color('#9fd3ff'), FOG = new THREE.Color('#bfe0fb'); void SKY;
     scene.fog = new THREE.Fog(FOG, Q.draw * 0.6, Q.draw * 1.15);   // light haze only far away
     const cam = new THREE.PerspectiveCamera(60, 1, 0.08, Math.min(420, Q.draw * 1.3 + 40)); // near 0.08 (was 0.05): better depth precision far away, no z-fighting
-    const size = () => { const w = view.clientWidth || innerWidth, h = view.clientHeight || innerHeight; R.setPixelRatio(DPR * dprK); R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
-    size(); addEventListener('resize', size);
+    // Size from the canvas box after layout, rotation, and the browser chrome settle. A 0×0 or pre-CSS
+    // reading (the in-flow column, before .p3-view is 100dvw×100dvh) must not stick, or the Pal stretches.
+    const viewInfo = { w: 0, h: 0, aspect: 1, dpr: 1, buf: [0, 0] };
+    let rafA = 0, rafB = 0;
+    const applySize = () => {
+      const r = cv.getBoundingClientRect();
+      const w = r.width, h = r.height;
+      if (w < 2 || h < 2) return false;
+      const pr = Math.min(devicePixelRatio || 1, Q.dpr) * dprK;
+      if (Math.abs(viewInfo.w - w) < 0.5 && Math.abs(viewInfo.h - h) < 0.5 && Math.abs(viewInfo.dpr - pr) < 0.01) return true;
+      viewInfo.w = w; viewInfo.h = h; viewInfo.dpr = pr;
+      R.setPixelRatio(pr); R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+      viewInfo.aspect = cam.aspect; viewInfo.buf = [cv.width, cv.height];
+      return true;
+    };
+    const follow = () => { cancelAnimationFrame(rafA); cancelAnimationFrame(rafB); rafA = requestAnimationFrame(() => { applySize(); rafB = requestAnimationFrame(applySize); }); };
+    const schedule = () => { applySize(); follow(); };
+    cv.style.width = '100%'; cv.style.height = '100%';
+    const ro = new ResizeObserver(applySize); ro.observe(cv);
+    const vv = window.visualViewport;
+    addEventListener('resize', schedule); addEventListener('orientationchange', schedule);
+    document.addEventListener('fullscreenchange', schedule); document.addEventListener('webkitfullscreenchange', schedule);
+    if (vv) { vv.addEventListener('resize', schedule); vv.addEventListener('scroll', schedule); }
+    const unhookSize = () => { removeEventListener('resize', schedule); removeEventListener('orientationchange', schedule); document.removeEventListener('fullscreenchange', schedule); document.removeEventListener('webkitfullscreenchange', schedule); if (vv) { vv.removeEventListener('resize', schedule); vv.removeEventListener('scroll', schedule); } cancelAnimationFrame(rafA); cancelAnimationFrame(rafB); ro.disconnect(); };
+    schedule();
     // lights
     const hemi = new THREE.HemisphereLight('#d6ecff', '#6c9a48', LOW ? 0.75 : 0.68); scene.add(hemi);
     const sun = new THREE.DirectionalLight('#fff1d6', 3.1); sun.position.set(40, 70, 25); scene.add(sun); scene.add(sun.target);
@@ -321,7 +344,7 @@ export function createPark3D(ctx) {
 
     // ---------------------------------------------------------------- my Pal
     const pal = await getActivePal(db, S.user.uid).catch(() => null);
-    if (!document.body.contains(cv)) { R.dispose(); return; }
+    if (!document.body.contains(cv)) { unhookSize(); R.dispose(); return; }
     const palSnap = pal ? { species: pal.species, name: pal.name, colors: pal.colors || {}, pattern: pal.pattern || '', acc: pal.acc || '', outfit: pal.outfit || {}, level: pal.level || 1, variant: pal.variant || '' } : { species: 'kemy', name: 'Kemy', level: 1, outfit: {} };
     const HEIGHT = 1.45;
     function palObj(ps, shadow) { const m = makePal3D(ps); const holder = new THREE.Group(); holder.add(m);
@@ -401,7 +424,7 @@ export function createPark3D(ctx) {
     // ---------------------------------------------------------------- multiplayer presence (Firestore)
     let room = 'r1', roomN = 0;
     for (let i = 1; i <= ROOMS; i++) { try { const s = await getCountFromServer(query(collection(db, 'parkRooms', 'r' + i, 'p'), where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS)))); const n = s.data().count; if (n < MAX_ROOM) { room = 'r' + i; roomN = n; break; } } catch { break; } }
-    if (!document.body.contains(cv)) { R.dispose(); return; }
+    if (!document.body.contains(cv)) { unhookSize(); R.dispose(); return; }
     $('#park-room').textContent = `Room ${room.slice(1)}`;
     const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid); let extras = true;
     const base = () => { const [x, y] = toP(P.x, P.z); const o = { x: Math.max(-21000, Math.min(10000, x)), y: Math.max(0, Math.min(60000, y)), /* big world: x -1300..385 m, z up to 3460 m (rules mirror this) */ d: P.d, e: P.e, eAt: P.eAt, say: P.say, sayAt: P.sayAt, tgt: P.tgt, c: cellOf(P.x, P.z), name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2', pal: palSnap, at: serverTimestamp() };
@@ -534,8 +557,8 @@ export function createPark3D(ctx) {
       const dt = Math.min(0.05, (now - last) / 1000); last = now; frames++; window.__p3.frame++; const c0 = performance.now();
       if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; fpsEl.textContent = fps.toFixed(0) + ' fps'; window.__p3.fps = fps;
         // auto quality from measured FPS: 1) pixel ratio down to 1.0, 2) shadows off, 3) shorter draw distance; climbs back when smooth
-        if (fps < 40 && now > 6000) { if (++slow >= 3) { slow = 0; fast = 0; if (DPR * dprK > 1.01) { dprK = Math.max(1 / DPR, dprK - 0.15); size(); } else if (sun.castShadow) { sun.castShadow = false; R.shadowMap.enabled = false; qStep = 2; } else if (Q.draw > 110) { Q.draw = Math.round(Q.draw * 0.8); applyDraw(); qStep = 3; } } }
-        else { slow = Math.max(0, slow - 1); if (fps > 56 && ++fast >= 8 && dprK < 1) { fast = 0; dprK = Math.min(1, dprK + 0.1); size(); } }
+        if (fps < 40 && now > 6000) { if (++slow >= 3) { slow = 0; fast = 0; if (DPR * dprK > 1.01) { dprK = Math.max(1 / DPR, dprK - 0.15); applySize(); } else if (sun.castShadow) { sun.castShadow = false; R.shadowMap.enabled = false; qStep = 2; } else if (Q.draw > 110) { Q.draw = Math.round(Q.draw * 0.8); applyDraw(); qStep = 3; } } }
+        else { slow = Math.max(0, slow - 1); if (fps > 56 && ++fast >= 8 && dprK < 1) { fast = 0; dprK = Math.min(1, dprK + 0.1); applySize(); } }
         window.__p3.q = { dpr: +(DPR * dprK).toFixed(2), shadows: sun.castShadow, draw: Q.draw, step: qStep, tier: Q.tier, phone: !!Q.phone }; }
       // input -> move relative to the camera
       const mv = W3.move(jv.test ? { x: jv.x, y: jv.y, run: false } : tc.move); if (W3.driving()) jumpQ = false; let ix = mv.x, iz = mv.y; const lk = tc.takeLook(); if (lk.dx || lk.dy) { C.yaw -= lk.dx * 0.008; C.pitch = Math.max(pov ? -0.6 : -0.15, Math.min(pov ? 1.2 : 1.25, C.pitch + lk.dy * 0.006)); }
@@ -602,11 +625,11 @@ export function createPark3D(ctx) {
       W3.update(dt, now); if (!R.shadowMap.autoUpdate) R.shadowMap.needsUpdate = (++shN & 1) === 0; R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
+    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
-    function cleanup() { if (!alive) return; alive = false; try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('resize', size); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
+    function cleanup() { if (!alive) return; alive = false; try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); unhookSize(); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
       document.body.classList.remove('p3-on', 'p3-drive'); tc?.destroy(); try { scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } delete window.__p3star; delete window.__p3play; }
     stop = cleanup;
   }
