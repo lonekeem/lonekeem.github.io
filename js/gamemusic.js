@@ -76,14 +76,14 @@ function startTrack() {
   const t = st && st.tracks[idx]; if (!t) { paint(); return; }
   const a = ensureAudio(); a.volume = playVol(); a.loop = st.tracks.length === 1 || (isRadio() && repeatMode() === 'one');
   if (isRadio()) { ls.set(RK.trk, String(idx)); ls.set(RK.off, '0'); if (lastToast !== t.url) { lastToast = t.url; toast(t); } }
-  if (a.dataset.url !== t.url) { a.src = t.url; a.dataset.url = t.url; }
+  if (a.dataset.url !== t.url) { a.preload = 'none'; a.src = t.url; a.dataset.url = t.url; }
   wantPlay = true; a.play().catch(() => { wantPlay = false; paint(); });
 }
 export async function play() { await load(); if (!st) await pick(ls.get(K.st) || 'chill'); closeEmbed(); startTrack(); }
 export function pause() { wantPlay = false; audio?.pause(); paint(); }
 export function next() { if (!st || !st.tracks.length) return; const n = st.tracks.length; if (isRadio() && shuffleOn() && n > 1) { let j; do j = Math.floor(Math.random() * n); while (j === idx); idx = j; } else idx = (idx + 1) % n; if (wantPlay || (audio && !audio.paused)) startTrack(); else paint(); }
 export function prev() { if (!st || !st.tracks.length) return; if (audio && !audio.paused && audio.currentTime > 3 && audio.dataset.url === st.tracks[idx]?.url) { audio.currentTime = 0; return; } idx = (idx - 1 + st.tracks.length) % st.tracks.length; if (wantPlay || (audio && !audio.paused)) startTrack(); else paint(); }
-async function loadTheme() { if (themeTracks.length) return; try { const th = await import('./theme.js'); themeTracks = th.TRACKS.map((t) => ({ title: t.title, artist: t.artist, url: t.src, dur: t.dur })); } catch { themeTracks = []; } }
+async function loadTheme() { if (themeTracks.length) return; try { const th = await import('./theme.js'); themeTracks = th.TRACKS.map((t) => ({ title: t.title, artist: t.artist, url: t.src, dur: t.dur, cover: t.cover || '', credit: t.credit || '' })); } catch { themeTracks = []; } }
 // Kemy Radio controls (also used by the pill / panel). i: track index in the theme playlist.
 export async function radioPlay(i = null) { await load(); closeEmbed(); if (!isRadio()) await pick('theme'); if (i != null && st.tracks[i]) idx = i; ls.set(RK.off, '0'); startTrack(); }
 export function radioToggle() { if (isPlaying()) pause(); else radioPlay(); }
@@ -176,7 +176,7 @@ export async function mountGameMusic(o = {}) {
       <div class="gmr-toast" role="status" hidden></div>
       <section class="gm-panel" id="gm-panel" role="region" aria-label="Game music" hidden>
         <div class="gm-top"><b>📻 Kemy Radio</b><button type="button" class="gm-x" aria-label="Collapse music player">▾</button></div>
-        <ol class="gmr-list">${themeTracks.map((t, i) => `<li><button type="button" data-rt="${i}"><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.dur ? ` · ${Math.floor(t.dur / 60)}:${String(Math.round(t.dur % 60)).padStart(2, '0')}` : ''}</small></button></li>`).join('')}</ol>
+        <ol class="gmr-list">${themeTracks.map((t, i) => `<li><button type="button" data-rt="${i}">${t.cover ? `<img class="gmr-cover" src="${esc(t.cover)}" alt="" width="44" height="44">` : ''}<span class="gmr-meta"><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.dur ? ` · ${Math.floor(t.dur / 60)}:${String(Math.round(t.dur % 60)).padStart(2, '0')}` : ''}</small>${t.credit ? `<small class="gmr-credit">${esc(t.credit)}</small>` : ''}</span></button></li>`).join('')}</ol>
         <div class="gmr-opts"><button type="button" class="gmr-shuf" aria-pressed="false">🔀 Shuffle</button><button type="button" class="gmr-rep">🔁 Repeat all</button><button type="button" class="gmr-off">⏻ Radio off</button></div>
         <label class="gm-vrow"><span aria-hidden="true">🔉</span><span class="sr-only">Music volume</span><input class="gm-vol" type="range" min="0" max="100" step="1"></label>
         <div class="gm-top gm-more"><b>🎧 My Playlist</b></div>
