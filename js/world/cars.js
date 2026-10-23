@@ -223,6 +223,13 @@ export function honk() { const a = ac(); if (!a) return; const t = a.currentTime
 
 // ---------------------------------------------------------------- 🔖 custom license plates (original designs; text is kid-safe filtered by the caller)
 // p = { t: 'ABC123' (1-7 A-Z/0-9), b: background idx, f: text idx, r: border idx, fr: frame idx }
+export const PLATE_PREVIEW = 'KEMY1';
+// Empty text matches the preview: the editor draws PLATE_PREVIEW until the player types.
+export function plateText(t) { const s = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7); return s || PLATE_PREVIEW; }
+// Validation errors used to land only in .kp-msg at the top of a scrolled sheet. Repeat them beside Save and scroll that copy into view.
+export function showPlateError(root, text) { if (!root) return; const top = root.querySelector('.kp-msg'), by = root.querySelector('.kp-by');
+  if (top) top.textContent = text; if (by) by.textContent = text; const opts = { block: 'nearest', inline: 'nearest' };
+  if (top && top.scrollIntoView) top.scrollIntoView(opts); if (by && by.scrollIntoView) by.scrollIntoView(opts); }
 export const PLATE_COLS = ['#ffffff', '#fef3c7', '#fde047', '#fb923c', '#ef4444', '#f9a8d4', '#c084fc', '#7c3aed', '#60a5fa', '#1d4ed8', '#5eead4', '#22c55e', '#166534', '#94a3b8', '#111827', '#7c2d12'];
 export const PLATE_FRAMES = ['Plain', 'Chrome', 'Gold', 'Stars', 'Hearts', 'Rainbow', 'Dots'];
 export function drawPlate(cv, p) { const x = cv.getContext('2d'), W = cv.width, H = cv.height, C = PLATE_COLS; const bg = C[p.b] || C[0], tx = C[p.f] ?? C[14], br = C[p.r] ?? C[14];
