@@ -627,78 +627,124 @@ function ready(){var m=document.getElementById('main');if(false){return m&&m.chi
                 </div>
                 <h3 class="sub-h">Lone Keem Studios Originals</h3>
 
-                <div class="card soon">
-                    <div class="soon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 9h20M7 5v4M12 5v4M17 5v4"/></svg>
+                <div class="song-list" style="display:grid;gap:14px;">
+                <article class="card soon" id="song-kemy-on-the-screen">
+                    <div style="width:100%;">
+                        <h3>Kemy on the Screen</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/kemy-theme.m4a?v=3" type="audio/mp4">
+                        </audio>
                     </div>
-                    <div>
-                        <h3>Coming soon</h3>
-                        <p>The first Lone Keem Studios AI movie is in the works. Check back soon.</p>
+                </article>
+                <article class="card soon" id="song-time">
+                    <div style="width:100%;">
+                        <h3>Time</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/kemy-theme3.m4a?v=1" type="audio/mp4">
+                        </audio>
                     </div>
-                </div>
-
-                <!--
-                    TO ADD A MOVIE: delete the "Coming soon" card above and paste one of these
-                    (wrapped in <div class="video-grid"> ... </div> if you add several).
-
-                    Option A: YouTube embed (replace VIDEO_ID with the part after "v=" in the YouTube link)
-                <div class="video-grid">
-                    <article class="card video-card" id="movie-title">
-                        <div style="aspect-ratio:16/9;">
-                            <iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID"
-                                    title="Movie Title" loading="lazy" allowfullscreen
-                                    allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-                                    style="width:100%;height:100%;border:0;border-radius:12px;"></iframe>
-                        </div>
-                        <div class="info">
-                            <span class="tag">Movie</span>
-                            <h3>Movie Title</h3>
-                            <p class="meta">Short description</p>
-                        </div>
-                    </article>
-                </div>
-
-                    Option B: local mp4 file in the videos/ folder
-                <div class="video-grid">
-                    <article class="card video-card" id="movie-title">
-                        <video controls playsinline preload="metadata" controlsList="nodownload"
-                               oncontextmenu="return false;" poster="videos/movie-title.jpg"
-                               style="aspect-ratio:16/9;" aria-label="Movie Title">
-                            <source src="videos/movie-title.mp4" type="video/mp4">
-                        </video>
-                        <div class="info">
-                            <span class="tag">Movie</span>
-                            <h3>Movie Title</h3>
-                            <p class="meta">Short description</p>
-                        </div>
-                    </article>
-                </div>
-                -->
-            <div class="community-row" data-kind="movie">
-                    <h3 class="sub-h">Community Movies</h3>
-                    <p class="intro-more clamp">Your film, your vision, made with AI. Share the short films, trailers and full-length movies you’ve created with AI tools, from sci-fi epics to five-minute comedies. Post it, collect gold stars, and get discovered by the Kemy community.</p><button class="more-btn" type="button" aria-expanded="false">more</button>
-                    <div class="crow" aria-live="polite"><p class="muted small">Loading…</p></div>
-                    <p class="crow-cta"><a href="app.html#/explore/movies">See all movies</a> · <a href="app.html#/new/movie">Share yours</a></p>
-                </div>
-            </div>
-        </section>
-
-        <section class="section" id="songs" aria-labelledby="songs-title">
-            <div class="container">
-                <div class="section-head">
-                    <h2 id="songs-title">Songs</h2>
-                    <p>Original AI music from Lone Keem, written and produced at the studio.</p>
-                </div>
-                <h3 class="sub-h">Lone Keem Studios Originals</h3>
-
-                <div class="card soon">
-                    <div class="soon-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                </article>
+                <article class="card soon" id="song-keep-me-alive">
+                    <div style="width:100%;">
+                        <h3>Keep Me Alive</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/kemy-theme4.m4a?v=1" type="audio/mp4">
+                        </audio>
                     </div>
-                    <div>
-                        <h3>Coming soon</h3>
-                        <p>New songs are on the way. Stay tuned.</p>
+                </article>
+                <article class="card soon" id="song-you-re-the-one">
+                    <div style="width:100%;">
+                        <h3>You&#39;re the One</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/kemy-theme5.m4a?v=1" type="audio/mp4">
+                        </audio>
                     </div>
+                </article>
+                <article class="card soon" id="song-another-week">
+                    <div style="width:100%;">
+                        <h3>Another Week</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/music/another-week.mp3" type="audio/mpeg">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-walked-away">
+                    <div style="width:100%;">
+                        <h3>Walked Away</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/walked-away.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-keep-going">
+                    <div style="width:100%;">
+                        <h3>Keep Going</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/keep-going.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-not-a-common-person">
+                    <div style="width:100%;">
+                        <h3>Not a Common Person</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/not-a-common-person.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-day-dreaming">
+                    <div style="width:100%;">
+                        <h3>Day Dreaming</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/day-dreaming.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-empty-home">
+                    <div style="width:100%;">
+                        <h3>Empty Home</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/empty-home.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-stand-tall">
+                    <div style="width:100%;">
+                        <h3>Stand Tall</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/stand-tall.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-stand-up-strong">
+                    <div style="width:100%;">
+                        <h3>Stand Up Strong</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/stand-up-strong.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
+                <article class="card soon" id="song-stand-up">
+                    <div style="width:100%;">
+                        <h3>Stand Up</h3>
+                        <p>Written by Lone Keem</p>
+                        <audio controls preload="none" controlsList="nodownload" style="width:100%;margin-top:14px;">
+                            <source src="assets/audio/stand-up.m4a?v=1" type="audio/mp4">
+                        </audio>
+                    </div>
+                </article>
                 </div>
 
                 <!--
