@@ -658,7 +658,7 @@ const routes = [
   [/^#\/live\/new$/, gated((t) => live.pageGoLive(t)), 'new'],
   [/^#\/live\/([\w-]+)$/, (id, t) => live.pageLive(id, t), ''],
   [/^#\/pals(?:\/(gallery|shop|store|store-bg))?$/, (sub, t) => pals.page(main, t, stale, sub), 'me'],
-  [/^#\/park$/, () => park.page(), 'me'],
+  [/^#\/park$/, () => park.page(), 'games'],
   [/^#\/street$/, () => park.page(), 'games'], // Kemy Street: the Halloween district of the Pal Park world (js/world/)
   [/^#\/arcade(?:\/([\w-]+))?(?:\?(.*))?$/, (id, q) => import('./pals/minigames.js').then((m) => (arcade = arcade || m.createArcade({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal, sendMessage, getProfile })).page(id, q)), 'games'],
   [/^#\/scores(?:\/([\w-]+))?(?:\?(.*))?$/, (g, q, t) => import('./leaderboard.js').then((m) => m.scoreboardPage(main, { game: g || 'all', tab: new URLSearchParams(q || '').get('tab') || 'all', S, stale: () => stale(t) })), 'games'],

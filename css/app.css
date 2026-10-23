@@ -237,7 +237,7 @@ textarea { resize: vertical; min-height: 96px; }
   .header-actions { margin-left: auto; }
   .app-main { padding-bottom: calc(var(--bottom-h) + 16px + env(safe-area-inset-bottom)); }
   .bottom-nav {
-    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    display: grid; grid-template-columns: repeat(6, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
     background: rgba(5,3,10,.92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     border-top: 1px solid rgba(255,255,255,.08); padding-bottom: env(safe-area-inset-bottom);
   }
@@ -248,7 +248,7 @@ textarea { resize: vertical; min-height: 96px; }
   .brand span { font-size: 1rem; }
   .app-main { padding-bottom: calc(var(--bottom-h) + 30px + env(safe-area-inset-bottom)); }
   .bottom-nav {
-    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    display: grid; grid-template-columns: repeat(6, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
     background: rgba(5,3,10,.92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     border-top: 1px solid rgba(255,255,255,.08); padding-bottom: env(safe-area-inset-bottom);
   }
@@ -393,7 +393,7 @@ body.feed-mode .app-main { max-width: none; padding: 0; min-height: 0; }
   body.feed-mode .vhome { display: flex; align-items: center; gap: 10px; position: fixed; top: 18px; left: 22px; z-index: 20; color: var(--text); text-decoration: none; font-family: "Space Grotesk", sans-serif; font-weight: 700; }
   body.feed-mode .vhome img { border-radius: 10px; }
   body.feed-mode .bottom-nav {
-    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 60;
+    display: grid; grid-template-columns: repeat(6, 1fr); position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 60;
     width: clamp(360px, calc((100dvh - var(--bottom-h)) * 0.5625), 500px); background: #07050c; border-top: 1px solid rgba(255,255,255,.08);
   }
 }
@@ -1885,3 +1885,5 @@ button.nm-back { background: none; border: 0; padding: 0; font: inherit; cursor:
 .nm-card-detail .nm-mail { margin-left: 0; }
 .nm-ban { margin: 8px 0 0; color: #ffd34d; font-weight: 700; }
 #nm-end { height: 1px; }
+
+.bottom-nav a { font-size: .66rem; }
