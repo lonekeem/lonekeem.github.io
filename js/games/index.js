@@ -44,8 +44,10 @@ export function createGames(ctx) {
   }
   function shell(title, body, back = '#/games') {
     main.innerHTML = `<section class="gm-wrap">
+      <nav class="g-top-pick" aria-label="Where to play" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 12px"><a class="g-qbtn" href="#/park" style="flex-direction:column;padding:12px 6px;font-weight:700">🌳<span>Pal Park</span></a><a class="g-qbtn" href="#/arcade" style="flex-direction:column;padding:12px 6px;font-weight:700">🕹️<span>Arcade</span></a><a class="g-qbtn" href="#g-all" data-jump-all style="flex-direction:column;padding:12px 6px;font-weight:700">🎲<span>All games</span></a></nav>
       <div class="gm-bar"><a class="g-icon" href="${back}" aria-label="Back">←</a><h1>${title}</h1><div class="g-tools"><span class="k-link-slot"></span>${muteBtn()}${gearBtn()}</div></div>${body}</section>`;
     wireMute(main);
+    main.querySelector('[data-jump-all]')?.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('g-all')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     net.link.mount(main.querySelector('.k-link-slot'));
   }
   function burst(host, n = 14) {
@@ -118,6 +120,7 @@ export function createGames(ctx) {
       <a class="g-scores" href="#/scores">🏆 <span><b>Scoreboards</b><small>Every game, every player, with their Pal</small></span></a>
       <form class="g-code" id="g-code"><label for="g-code-in" class="sr-only">Room code</label><input id="g-code-in" maxlength="6" placeholder="Have a room code?" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Join</button></form>
       <a class="g-palgames" href="#/games/pals"><span>🐾</span><div><b>Pal Games</b><small>Your Pal vs friends in real time: Pal Race, Bubble Pop Battle, Star Catch and Dance-Off</small></div><span class="g-tag">New</span></a>
+      <h2 class="g-h2" id="g-all">All games</h2>
       <div class="g-cards">${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}<a class="g-card" href="kemy-quest.html" data-game="kemy-quest"><img src="assets/kemy-quest/cover.svg" alt="" width="120" height="90" style="width:100%;height:auto;border-radius:14px"><div class="g-card-t"><b>Kemy's Bubble Quest</b><span class="muted small">Hop, swim and blow bubbles with Kemy the axolotl.</span><span class="g-tag">1 player</span></div></a></div>
       <h2 class="g-h2">Your record</h2>
       <div class="card g-record" id="g-record">${signedIn() ? '<div class="spinner"></div>' : '<p class="muted small" style="margin:0">Your vs-computer record is saved on this device. <a href="#/login?next=%23%2Fgames">Sign in</a> to play online and get on the leaderboard.</p>'}</div>
