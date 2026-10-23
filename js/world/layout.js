@@ -110,13 +110,13 @@ export const ROADS4 = [
   St('c1', [-442, 100], [-442, 194]), St('c2', [-520, 260], [-442, 260]), St('c3', [-1042, 100], [-1042, 194]), St('c4', [-520, 1000], [-442, 1000]),
   St('c5', [-1240, 1000], [-1042, 1000]), St('c6', [62, 1000], [91, 1000]), St('c7', [-318, 1066], [-318, 1400]), St('c8', [-918, 1066], [-918, 1400]), St('c9', [312, 1026], [312, 1400]),
   // private estate roads (the old palace drive is gone; that hillside is ordinary country now)
-  St('e1', [-300, 100], [-300, 52], 6), St('e2', [-820, 100], [-820, 52], 6), St('e3', [-520, 560], [-200, 560], 6), St('e5', [-1240, 1180], [-1100, 1180], 6), St('e6', [312, 894], [372, 894], 6)];
+  St('e1', [-300, 100], [-300, 55.2], 6), St('e2', [-820, 100], [-820, 52], 6), St('e3', [-520, 560], [-200, 560], 6), St('e5', [-1240, 1180], [-1100, 1180], 6), St('e6', [312, 894], [372, 894], 6)];
 for (const c of CITIES) { for (let j = 0; j < 4; j++) ROADS4.push(St(c.id + 's' + j, [c.x - 62, c.z - 66 + 44 * j], [c.x + 62, c.z - 66 + 44 * j]));
   for (const s of [-1, 1]) ROADS4.push(St(c.id + 'v' + (s > 0 ? 'e' : 'w'), [c.x + s * 62, c.z - 66], [c.x + s * 62, c.z + 66])); }
 // 👑 the palace sits on the old Maple Heights pad (mansion size). No private lot and no second house.
 export const ADMIN_HOME = { x: -300, z: 18, name: '👑 Kemy Palace' };
 export const PALACE_SIGN = '👑 Kemy Palace';
-export const PALACE_SIGN_AT = { x: 0, z: 32.2 }; // local: above the gate, on the clear drive
+export const PALACE_SIGN_AT = { x: 0, z: 32.6 }; // local: over the gate, on the clear centre drive
 export const ESTATES = [ // big private plots: hillside (north), waterfront (river), end of a private road, seaside
   { x: -300, z: 18, face: 1, style: 4, spot: '⛰️ Maple Heights', skip: 1 }, { x: -820, z: 18, face: 1, style: 5, spot: '⛰️ Bubble Bluff' },
   { x: -440, z: 604, face: -1, style: 4, spot: '🌊 Riverside Lane' }, { x: -280, z: 604, face: -1, style: 5, spot: '🌊 Riverside Lane' },
@@ -155,16 +155,17 @@ export const GARAGES = [{ tier: 1, cap: 1, name: 'Garage · 1 car', item: 'gr_on
   { tier: 6, cap: 10, name: 'Mansion Car Gallery · 10 cars', item: 'z_gr_six', d: 2400, productId: 'kemy_garage_six', big: 1 }, { tier: 7, cap: 15, name: 'Mansion Car Gallery · 15 cars', item: 'z_gr_seven', d: 3200, productId: 'kemy_garage_seven', big: 1 }];
 export const maxTier = (h) => (h && h.admin ? 0 : h && h.estate ? 7 : 5);
 export const ADMIN_CAP = 50;
-// Front-yard bays on the Maple Heights pad (local metres, +z toward the road). Noses point at the
-// centre drive so every car can pull out. The fountain and the house stay clear. 50 = ADMIN_CAP.
+// Front-yard bays on the Maple Heights pad (local metres, +z toward the road).
+// Two columns each side. Noses point into an aisle about 8 m wide, and that aisle runs straight to the gate.
+// A 5 m car can pull into the aisle and turn without touching the car across from it. 6 rows. The centre |x| < 12 stays empty.
 export function palaceBays() {
-  const bays = []; const fountain = { x: -14, z: 20.5, r: 3.6 };
-  for (let z = 13; z <= 29.2; z += 2.55) for (const side of [-1, 1]) for (let i = 0; i < 5; i++) {
-    const x = side * (8 + i * 5.15), zz = Math.round(z * 10) / 10;
-    if (Math.hypot(x - fountain.x, zz - fountain.z) < fountain.r + 2.2) continue;
-    bays.push({ x, z: zz, yaw: side < 0 ? Math.PI / 2 : -Math.PI / 2 });
-  }
-  return bays.slice(0, ADMIN_CAP);
+  const cols = [
+    { x: -27.5, yaw: Math.PI / 2 }, { x: -14.5, yaw: -Math.PI / 2 },
+    { x: 14.5, yaw: Math.PI / 2 }, { x: 27.5, yaw: -Math.PI / 2 }
+  ];
+  const bays = [];
+  for (let i = 0; i < 6; i++) { const z = Math.round((12.8 + i * 3.45) * 10) / 10; for (const c of cols) bays.push({ x: c.x, z, yaw: c.yaw }); }
+  return bays;
 }
 export const garageCap = (t) => (GARAGES[t - 1] ? GARAGES[t - 1].cap : 0);
 HOUSES.forEach((h, i) => { h.i = i; h.sale = h.admin ? false : h.estate ? true : h.city ? h.cs : i % 3 === 1; });
