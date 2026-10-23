@@ -4,7 +4,7 @@ import { heard } from './volume.js';
 // iPhone (iOS ignores audio.volume), fades in/out over ~1.5 s, never plays over videos, lives, songs, Movie Maker
 // previews or games (kemy:media-play / any other unmuted media stops it), pauses while the tab is hidden.
 // The user picks Play / Mute / Off (one-time prompt, floating 🎵 button, Settings > Sound); stored on this device.
-export const THEME_FILE = 'kemy-theme.m4a?v=2'; // "Kemy on the Screen" by Keem, audio extracted unchanged from Keem's video (AAC stream copy, 127.6 s)
+export const THEME_FILE = 'kemy-theme.m4a?v=3'; // "Kemy on the Screen" by Keem, Suno remaster, audio extracted unchanged from Keem's video (AAC stream copy, 127.6 s)
 export const THEME_TITLE = 'Kemy on the Screen';
 export const THEME_ARTIST = 'Keem';
 export const THEME_CREDIT = `Theme song: ${THEME_TITLE} by ${THEME_ARTIST} — Lone Keem Studios`;
