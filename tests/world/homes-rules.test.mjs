@@ -50,6 +50,9 @@ await ok('presence far south (z 3400) allowed', assertSucceeds((async () => { aw
 await ok('presence inside hm1003 (cell 103) allowed', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); const c = 1003 % 180; const xm = 400 + 10 + (c % 6) * 20, zm = -70 + 10 + Math.floor(c / 6) * 20; await pres(PAL, 'pal', { x: Math.round(xm * 16 + 1600), y: Math.round(zm * 16 + 1200), in: 'hm1003' }); })()));
 await ok('presence with cell + velocity + client time + anim', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { c: '0_0', vx: 14, vz: -600, ct: Date.now(), an: 'walk', h: 0, r: 90, dn: '', v: 3 }); })()));
 await ok('bad anim rejected', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { c: '0_0', vx: 14, vz: 0, ct: Date.now(), an: 'fly' }); })()));
+await ok('car code, drive anim, and plate allowed', assertSucceeds((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { c: '1_2', vx: 480, vz: -30, ct: Date.now(), an: 'drive', h: 0, r: 180, dn: '~c501oabcdefgh', v: 3, pl: '5KEMY10e91' }); })()));
+await ok('presence faster than 70ms is rejected', assertFails(pres(PAL, 'pal', { x: 140 })));
+await ok('a plate with a space is rejected', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { pl: '5KE MY0e91' }); })()));
 await ok('wrong house id for the cell rejected', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await pres(PAL, 'pal', { x: Math.round(420 * 16 + 1600), y: Math.round(660 * 16 + 1200), in: 'h488' }); })()));
 await ok('world save in the far south', assertSucceeds(setDoc(doc(PAL, 'users/pal/pal/world'), { x: -900, z: 1300, yaw: 0, cars: [], street: null, at: serverTimestamp() })));
 console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);
