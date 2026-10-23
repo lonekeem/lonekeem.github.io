@@ -47,6 +47,8 @@ export function attachHomes(api, W, K) {
   const { THREE, scene, Q, LOW, box, P, S, db, view } = api; const ground = api.ground; const { put, flush, G, std } = K;
   const uid = S.user && S.user.uid; const amAdmin = !!(S.user && S.user.email === ADMIN_EMAIL && S.user.emailVerified !== false); const root = new THREE.Group(); root.name = 'kemy-homes'; scene.add(root); const D = W.drive;
   const owners = new Map(); let myPlot = null, myTier = 0, inside = null, econ = null, dia = null, snapOk = false;
+  const paintsOutside = (h) => !!(h && (h.sale || h.estate));
+  W.recolorHouse = (id) => { const h = HOUSE_BY_ID[id]; if (!paintsOutside(h) || !W.paintHouse) return; const o = owners.get(id); W.paintHouse(id, (o && o.decor && o.decor.ext) || null); };
   const LS = 'kemy-world-save-' + (uid || 'anon'); let save = (() => { try { return JSON.parse(lsg(LS) || 'null') || {}; } catch { return {}; } })(); save.cars = save.cars || [];
   const say = (t) => (W.say ? W.say(t) : api.toast && api.toast(t));
   async function shop() { if (!econ) { const [{ createEconomy }, { createDiamonds }] = await Promise.all([import('../pals/economy.js'), import('../pals/armory.js')]); await registerHomeItems(); econ = createEconomy(db, uid); dia = createDiamonds(db, uid); } return { econ, dia }; }
@@ -143,7 +145,7 @@ export function attachHomes(api, W, K) {
   const rooms = new Map(); let roomLight = null, roomLight2 = null, deco = null, radioOff = null;
   function buildRoom(h) { if (rooms.has(h.id)) return rooms.get(h.id); const { cx, cz } = roomCell(h); const o = owners.get(h.id); const dec = (o && o.decor) || {};
     const I = buildInterior(api, { put, flush, G, y: FLAT }, h, cx, cz, dec); root.add(I.g); const r0 = { g: I.g, cx, cz, I, h, dk: JSON.stringify(dec) }; rooms.set(h.id, r0); return r0; }
-  function applyDecor(id) { const o = owners.get(id); const dec = (o && o.decor) || {}; if (W.paintHouse && HOUSE_BY_ID[id] && HOUSE_BY_ID[id].sale) W.paintHouse(id, dec.ext || null); const r = rooms.get(id); const k = JSON.stringify(dec);
+  function applyDecor(id) { const o = owners.get(id); const dec = (o && o.decor) || {}; if (W.paintHouse && paintsOutside(HOUSE_BY_ID[id])) W.paintHouse(id, dec.ext || null); const r = rooms.get(id); const k = JSON.stringify(dec);
     if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall, dec.walls); r.I.setFloor(dec.floor || r.I.S.floor); r.I.setItems(placedItems(dec, r.h, r.I.two)); } }
   const canEnter = (h) => { if (!h.sale) return true; const o = owners.get(h.id); if (!o) return false; return o.owner === uid || o.open === true || (Array.isArray(o.inv) && o.inv.includes(uid)); };
   // A doorbell or a visit on someone else's Kemy Street home. One note per owner per kind per half hour.
@@ -655,7 +657,7 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     }, () => {})); } catch { /* */ } }
   function onOwners() { if (!parts.has('old')) return; const prev = new Map(owners); owners.clear(); for (const m of parts.values()) for (const [id, v] of m) owners.set(id, v); myPlot = null; myTier = 0;
       for (const [id, o] of owners) if (o.owner === uid && !HOUSE_BY_ID[id]?.admin) { myPlot = id; myTier = o.garage || 0; } if (amAdmin && owners.get(ADMIN_PLOT)?.owner === uid && !myPlot) { myPlot = ADMIN_PLOT; myTier = 0; }
-      for (const id of new Set([...prev.keys(), ...owners.keys()])) { const h = HOUSE_BY_ID[id]; if (!h || !h.sale) continue; const a = prev.get(id), b = owners.get(id); if (JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); if (JSON.stringify((a || {}).decor) !== JSON.stringify((b || {}).decor)) applyDecor(id); }
+      for (const id of new Set([...prev.keys(), ...owners.keys()])) { const h = HOUSE_BY_ID[id]; if (!h) continue; const a = prev.get(id), b = owners.get(id); if (h.sale && JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); if (paintsOutside(h) && JSON.stringify((a || {}).decor) !== JSON.stringify((b || {}).decor)) applyDecor(id); }
       if (inside && !canEnter(inside)) { goOut(); say('🚪 The owner closed this home'); } else if (inside && radioKey(prev.get(inside.id)) !== radioKey(owners.get(inside.id))) { radioOff = null; startRadio(); }
       syncCars(); ensurePalace(); if (!snapOk) { snapOk = true; firstSpawn(); } }
   async function buyHome(h, btn) { try { if (myPlot) throw new Error('You already own a home (one per player). Move out first to buy another.'); if (owners.has(h.id)) throw new Error('Someone just bought this one!');
