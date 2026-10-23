@@ -252,7 +252,7 @@ export function createWatch(ctx) {
     }
 
     main.innerHTML = `
-      <a class="vhome" href="index.html" aria-label="Lone Keem Studios home page"><img src="logo.png" alt="" width="34" height="34"><span>Lone Keem Studios</span></a>
+      <a class="vhome" href="index.html?home" aria-label="Lone Keem Studios home page"><img src="logo.png" alt="" width="34" height="34"><span>Lone Keem Studios</span></a>
       <div class="vwrap" id="vwrap">
         <div class="vtop ${S.user && S.profile ? 'has-story' : ''}">
           ${S.user && S.profile ? `<button class="vstory" id="vstory" aria-label="Add to your story">${avatar({ ...S.profile, uid: S.user.uid }, 'sm', false)}<span class="vplus" aria-hidden="true">+</span></button>` : ''}
