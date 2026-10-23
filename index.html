@@ -627,6 +627,70 @@ function ready(){var m=document.getElementById('main');if(false){return m&&m.chi
                 </div>
                 <h3 class="sub-h">Lone Keem Studios Originals</h3>
 
+                <div class="card soon">
+                    <div class="soon-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 9h20M7 5v4M12 5v4M17 5v4"/></svg>
+                    </div>
+                    <div>
+                        <h3>Coming soon</h3>
+                        <p>The first Lone Keem Studios AI movie is in the works. Check back soon.</p>
+                    </div>
+                </div>
+
+                <!--
+                    TO ADD A MOVIE: delete the "Coming soon" card above and paste one of these
+                    (wrapped in <div class="video-grid"> ... </div> if you add several).
+
+                    Option A: YouTube embed (replace VIDEO_ID with the part after "v=" in the YouTube link)
+                <div class="video-grid">
+                    <article class="card video-card" id="movie-title">
+                        <div style="aspect-ratio:16/9;">
+                            <iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID"
+                                    title="Movie Title" loading="lazy" allowfullscreen
+                                    allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
+                                    style="width:100%;height:100%;border:0;border-radius:12px;"></iframe>
+                        </div>
+                        <div class="info">
+                            <span class="tag">Movie</span>
+                            <h3>Movie Title</h3>
+                            <p class="meta">Short description</p>
+                        </div>
+                    </article>
+                </div>
+
+                    Option B: local mp4 file in the videos/ folder
+                <div class="video-grid">
+                    <article class="card video-card" id="movie-title">
+                        <video controls playsinline preload="metadata" controlsList="nodownload"
+                               oncontextmenu="return false;" poster="videos/movie-title.jpg"
+                               style="aspect-ratio:16/9;" aria-label="Movie Title">
+                            <source src="videos/movie-title.mp4" type="video/mp4">
+                        </video>
+                        <div class="info">
+                            <span class="tag">Movie</span>
+                            <h3>Movie Title</h3>
+                            <p class="meta">Short description</p>
+                        </div>
+                    </article>
+                </div>
+                -->
+            <div class="community-row" data-kind="movie">
+                    <h3 class="sub-h">Community Movies</h3>
+                    <p class="intro-more clamp">Your film, your vision, made with AI. Share the short films, trailers and full-length movies you’ve created with AI tools, from sci-fi epics to five-minute comedies. Post it, collect gold stars, and get discovered by the Kemy community.</p><button class="more-btn" type="button" aria-expanded="false">more</button>
+                    <div class="crow" aria-live="polite"><p class="muted small">Loading…</p></div>
+                    <p class="crow-cta"><a href="app.html#/explore/movies">See all movies</a> · <a href="app.html#/new/movie">Share yours</a></p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="songs" aria-labelledby="songs-title">
+            <div class="container">
+                <div class="section-head">
+                    <h2 id="songs-title">Songs</h2>
+                    <p>Original AI music from Lone Keem, written and produced at the studio.</p>
+                </div>
+                <h3 class="sub-h">Lone Keem Studios Originals</h3>
+
                 <div class="song-list" style="display:grid;gap:14px;">
                 <article class="card soon" id="song-kemy-on-the-screen">
                     <div style="width:100%;">
