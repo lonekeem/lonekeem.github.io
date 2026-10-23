@@ -30,6 +30,7 @@ export const TRACKS = [
   { title: 'Not a Common Person', artist: 'Keem', src: new URL('../assets/audio/not-a-common-person.m4a?v=1', import.meta.url).href, dur: 134.4, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Day Dreaming', artist: 'Keem', src: new URL('../assets/audio/day-dreaming.m4a?v=1', import.meta.url).href, dur: 182.4, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Empty Home', artist: 'Keem', src: new URL('../assets/audio/empty-home.m4a?v=1', import.meta.url).href, dur: 189.2, credit: 'Produced by Lone Keem · Made with Suno' },
+  { title: 'Stand Tall', artist: 'Keem', src: new URL('../assets/audio/stand-tall.m4a?v=1', import.meta.url).href, dur: 129.6, credit: 'Produced by Lone Keem · Made with Suno' },
 ];
 export const PLAYLIST_CREDIT = TRACKS.map((t) => `${t.title} — ${t.credit}`).join('. ');
 const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)
