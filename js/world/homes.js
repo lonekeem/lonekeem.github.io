@@ -120,9 +120,17 @@ export function attachHomes(api, W, K) {
   function paintSign(text) { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128; const x2 = cv.getContext('2d'); const gr = x2.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#fff4c2'); gr.addColorStop(1, '#d4a017'); x2.fillStyle = '#1f1300'; x2.fillRect(0, 0, 512, 128); x2.strokeStyle = gr; x2.lineWidth = 8; x2.strokeRect(6, 6, 500, 116); x2.fillStyle = gr; x2.textAlign = 'center'; x2.textBaseline = 'middle'; const label = text || PALACE_SIGN; x2.font = 'bold ' + (label.length > 16 ? 36 : 48) + 'px Georgia, serif'; x2.fillText(label, 256, 64); return cv; }
   function buildPalaceYard(h, o, cars) { const g = new THREE.Group(); g.name = 'garage-' + h.id; root.add(g); const ry = ry0(h);
     const slots = palaceBays().map((b) => { const [x, z] = Lw(h, b.x, b.z); return { x, y: FLAT + 0.06, z, yaw: ry + b.yaw, show: 1 }; });
-    const t = new THREE.CanvasTexture(paintSign(signOf(o))); t.colorSpace = THREE.SRGBColorSpace; const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide })); const [sx, sz] = Lw(h, PALACE_SIGN_AT.x, PALACE_SIGN_AT.z); sign.position.set(sx, FLAT + 3.6, sz); sign.rotation.y = ry; sign.userData.tex = t; g.add(sign);
-    for (const s2 of [-1, 1]) { const [qx, qz] = Lw(h, PALACE_SIGN_AT.x + s2 * 4.2, PALACE_SIGN_AT.z); const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 4.2, 0.22), goldM); post.position.set(qx, FLAT + 2.1, qz); g.add(post); }
-    const G0 = { g, slots, cars, carMs: [], cols: [], h, key: (o.cars || '') + '|' + capOf(h, o) + '|' + signOf(o), hide: '' }; garages.set(h.id, G0); placeCars(G0); }
+    const t = new THREE.CanvasTexture(paintSign(signOf(o))); t.colorSpace = THREE.SRGBColorSpace; g.userData.tex = t;
+    const boardY = FLAT + 3.235; const [sx, sz] = Lw(h, PALACE_SIGN_AT.x, PALACE_SIGN_AT.z);
+    // Two thin boards, a finger-width apart, so the two sides never share a face and sparkle.
+    for (const side of [1, -1]) { const mat = new THREE.MeshBasicMaterial({ map: t, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }); const board = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 1.55), mat);
+      const [bx, bz] = Lw(h, PALACE_SIGN_AT.x, PALACE_SIGN_AT.z + side * 0.03); board.position.set(bx, boardY, bz); board.rotation.y = ry + (side < 0 ? Math.PI : 0); g.add(board); }
+    const cols = [];
+    // Posts start above the paving and stop short of the board. Slim colliders sit beside the centre drive, not under it.
+    for (const s2 of [-1, 1]) { const lx = PALACE_SIGN_AT.x + s2 * 4.05; const [qx, qz] = Lw(h, lx, PALACE_SIGN_AT.z); const post = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.36, 0.28), goldM); post.position.set(qx, FLAT + 1.26, qz); g.add(post);
+      cols.push({ x0: qx - 0.14, x1: qx + 0.14, z0: qz - 0.14, z1: qz + 0.14, top: FLAT + 2.44, bot: -99 }); }
+    for (const c of cols) box.push(c);
+    const G0 = { g, slots, cars, carMs: [], cols, h, key: (o.cars || '') + '|' + capOf(h, o) + '|' + signOf(o), hide: '' }; garages.set(h.id, G0); placeCars(G0); }
   function hiddenModel(h) { const o = owners.get(h.id); if (!o) return ''; if (o.owner === uid) { const m = D && D.mine && D.mine(); return m ? m.id : ''; } // the owner's active car is out on the road, not parked
     if (api.others) for (const p of api.others.values()) if (p.uid === o.owner || p.id === o.owner) { const c = parseCar(p.dn); if (c) return c.id; } return ''; }
   function placeCars(G0) { for (const m of G0.carMs) { root.remove(m); m.traverse((q) => { if (q.userData && q.userData.plateTex) q.userData.plateTex.dispose(); }); } for (const c of G0.carCols || []) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } G0.carMs = []; G0.carCols = [];

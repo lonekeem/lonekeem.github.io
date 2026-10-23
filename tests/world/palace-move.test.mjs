@@ -48,17 +48,38 @@ assert.equal(areaAt(-300, 18), '👑 Kemy Palace');
 assert.equal(areaAt(-190, 1220), '🌲 Countryside');
 
 const bays = palaceBays();
-assert.equal(bays.length, 50);
-const fountain = { x: -14, z: 20.5, r: 3 };
+assert.equal(bays.length, 24);
+const e1 = ROADS4.find((r) => r.id === 'e1');
+assert.equal(e1.b[1], 55.2, 'estate road stops where the palace lip starts');
+assert.equal(e1.w, 6);
+const HALF_L = 2.5, HALF_W = 1.05;
+const extOf = (b) => { const s = Math.abs(Math.sin(b.yaw)), c = Math.abs(Math.cos(b.yaw)); return { hx: s * HALF_L + c * HALF_W, hz: c * HALF_L + s * HALF_W }; };
+const bodyOf = (b) => { const e = extOf(b); return { x0: b.x - e.hx, x1: b.x + e.hx, z0: b.z - e.hz, z1: b.z + e.hz }; };
 for (const b of bays) {
-  assert.ok(Math.abs(b.x) + 2.4 < 33, 'inside the fence');
-  assert.ok(b.z > 12 && b.z < 31, 'on the front pad');
-  assert.ok(Math.hypot(b.x - fountain.x, b.z - fountain.z) > fountain.r + 2.2, 'clear of the fountain');
-  assert.ok(!(Math.abs(b.x) < 6 && b.z < 12), 'clear of the porch');
+  assert.ok(Math.abs(b.x) + 2.5 < 33.2, 'inside the fence');
+  assert.ok(b.z > 12 && b.z + 1.1 < 32.2, 'on the front pad, clear of the gate');
+  assert.ok(Math.abs(b.x) >= 12, 'centre lane stays empty');
+  assert.ok(Math.abs(Math.abs(b.yaw) - Math.PI / 2) < 1e-9, 'nose points across an aisle');
+  assert.ok(bays.some((o) => o !== b && o.x === -b.x && o.z === b.z && o.yaw === -b.yaw), 'layout is symmetric');
 }
-assert.equal(bays.some((b) => Math.abs(b.x) < 4), false, 'centre aisle stays empty');
+assert.equal(bays.some((b) => Math.abs(b.x) < 12), false, 'centre lane stays empty');
 assert.ok(Math.abs(PALACE_SIGN_AT.x) < 1 && PALACE_SIGN_AT.z > 31 && PALACE_SIGN_AT.z < 33);
 assert.ok(bays.every((b) => Math.hypot(b.x - PALACE_SIGN_AT.x, b.z - PALACE_SIGN_AT.z) > 2.5));
+for (let i = 0; i < bays.length; i++) {
+  const a = bodyOf(bays[i]);
+  const dir = bays[i].yaw > 0 ? 1 : -1;
+  const noseX = bays[i].x + dir * (HALF_L + 2.2);
+  for (let j = 0; j < bays.length; j++) {
+    if (i === j) continue;
+    const o = bodyOf(bays[j]);
+    const overlap = Math.min(a.x1, o.x1) > Math.max(a.x0, o.x0) && Math.min(a.z1, o.z1) > Math.max(a.z0, o.z0);
+    assert.equal(overlap, false, 'parked bodies overlap');
+    const probeIn = noseX > o.x0 && noseX < o.x1 && bays[i].z > o.z0 && bays[i].z < o.z1;
+    assert.equal(probeIn, false, 'the pull-out in front of the nose hits another car');
+    const aisle = Math.min(noseX + 1.3, o.x1) > Math.max(noseX - 1.3, o.x0) && Math.min(34, o.z1) > Math.max(bays[i].z, o.z0);
+    assert.equal(aisle, false, 'the aisle to the gate is blocked');
+  }
+}
 
 assert.equal(scOf(palace), 2.1);
 const items = placedItems({ items: 'bd,12,12,0' }, palace, true);

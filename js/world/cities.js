@@ -1,7 +1,7 @@
 // Kemy World big map: six new cities, long highways, bridges over the rivers + the Sparkle Sea, private estates.
 // Everything here streams in 100 m chunks around the player (built a chunk at a time, dropped when far away),
 // so phones only ever hold the few chunks nearby. No database reads at all (pure layout data). Written by Lone Keem.
-import { HOUSES, ROADS4, CITIES, ESTATES, WATER, WATER_Y, BRIDGES, FLAT, OLD, BOUNDS, bigGround, waterD, roadD, isBig } from './layout.js';
+import { HOUSES, ROADS4, CITIES, ESTATES, WATER, WATER_Y, BRIDGES, FLAT, OLD, BOUNDS, bigGround, waterD, roadD, isBig, palaceBays } from './layout.js';
 const CH = 100, GX0 = -1300, GZ0 = -160;
 export const chunkKey = (x, z) => Math.floor((x - GX0) / CH) + ',' + Math.floor((z - GZ0) / CH);
 export const Lh = (h, lx, lz) => [h.x + (h.face > 0 ? lx : -lx), h.z + (h.face > 0 ? lz : -lz)];
@@ -96,11 +96,15 @@ export function attachCities(api, W, K) {
   function buildEstate(k, h, r, cols) { const ry = h.face > 0 ? 0 : Math.PI; const Lp = (lx, lz) => Lh(h, lx, lz); const big = h.style === 5; const rd = estateRoadD(h);
     const wc = big ? '#fdf6e3' : '#ede9fe', rc = big ? '#1e3a8a' : '#4c1d95', tc = big ? '#d4a017' : '#f8fafc';
     const P = (key, geo, c, lx, yy, lz, sx, sy, sz, rx = 0) => { const [x, z] = Lp(lx, lz); put(k + key, geo, c, x, FLAT + yy, z, ry, sx, sy, sz, rx); };
-    P('road', G.plane, '#7ccf6b', -2, 0.012, (rd - 26) / 2, 68, 1, rd + 26); // lawn
-    if (h.admin) { // car pad inside the fence, then a short lip through the gate (the two planes do not overlap)
-      P('road', G.plane, '#d6cfc2', 0, 0.032, 20.5, 66, 1, 20.6); // local z 10.2 .. 30.8
-      P('road', G.plane, '#cbbfa8', 0, 0.035, 32.3, 8, 1, 3); // local z 30.8 .. 33.8, onto the road
-    } else { P('road', G.plane, '#d6cfc2', 10, 0.03, (7 + rd) / 2, 44, 1, rd - 7); P('road', G.plane, '#cbbfa8', 0, 0.035, rd - 2, 8, 1, 4); } // forecourt + driveway
+    if (h.admin) {
+      // Lawn stops at the pad. Pad and lip share an edge and sit above the road, so nothing stacks under the sign.
+      P('road', G.plane, '#7ccf6b', 0, 0.02, -7.8, 68, 1, 36.4); // local z -26 .. 10.4
+      P('road', G.plane, '#d6cfc2', 0, 0.05, 20.5, 66, 1, 20.2); // local z 10.4 .. 30.6
+      P('road', G.plane, '#cbbfa8', 0, 0.05, 32.4, 66, 1, 3.6); // local z 30.6 .. 34.2, meets the road tip
+    } else {
+      P('road', G.plane, '#7ccf6b', -2, 0.012, (rd - 26) / 2, 68, 1, rd + 26); // lawn
+      P('road', G.plane, '#d6cfc2', 10, 0.03, (7 + rd) / 2, 44, 1, rd - 7); P('road', G.plane, '#cbbfa8', 0, 0.035, rd - 2, 8, 1, 4); // forecourt + driveway
+    }
     const geoOf = { box: G.box, gable: G.gable, cyl: G.cyl, cone: G.cone };
     tagEstateShell(h, wc, rc, tc, (part, key, c, lx, yy, lz, sx, sy, sz, shape) => { if (K.tag) K.tag(h.id + '|' + part); try { const [x, z] = Lp(lx, lz); put(k + key, geoOf[shape], c, x, FLAT + yy, z, ry, sx, sy, sz); } finally { if (K.tag) K.tag(null); } });
     P('trim', G.box, '#ffffff', 0, 0.15, h.d / 2 + 2, 12, 0.3, 4.4);
@@ -108,17 +112,26 @@ export function attachCities(api, W, K) {
     for (const lx of [-6.5, -3.6, 3.6, 6.5]) for (const fy of [1.8, 5.4]) { P('glow', G.box, '#fff1c2', lx, fy, h.d / 2 + 0.05, 1.6, 1.6, 0.06); P('trim', G.box, '#ffffff', lx, fy - 0.9, h.d / 2 + 0.08, 1.9, 0.14, 0.18); }
     for (const s of [-1, 1]) for (const fy of [1.8]) P('glow', G.box, '#fff1c2', s * (h.w / 2 + 3), fy, h.d / 2 - 1.45, 2.4, 1.4, 0.06);
     // fountain (front lawn) + pool (back yard) + loungers
-    { const fx = -14, fz = (7 + rd) / 2; P('trim', G.cyl, '#e7e5e4', fx, 0.35, fz, 6, 0.7, 6); P('glow', G.cyl, '#7dd3fc', fx, 0.72, fz, 5.2, 0.05, 5.2); P('trim', G.cyl, '#e7e5e4', fx, 1.3, fz, 0.6, 1.6, 0.6); P('trim', G.cyl, '#e7e5e4', fx, 2.1, fz, 2, 0.25, 2); P('glow', G.sph, '#bae6fd', fx, 2.6, fz, 0.7, 1, 0.7);
+    { const fx = h.admin ? 22 : -14, fz = h.admin ? -16 : (7 + rd) / 2; P('trim', G.cyl, '#e7e5e4', fx, 0.35, fz, 6, 0.7, 6); P('glow', G.cyl, '#7dd3fc', fx, 0.72, fz, 5.2, 0.05, 5.2); P('trim', G.cyl, '#e7e5e4', fx, 1.3, fz, 0.6, 1.6, 0.6); P('trim', G.cyl, '#e7e5e4', fx, 2.1, fz, 2, 0.25, 2); P('glow', G.sph, '#bae6fd', fx, 2.6, fz, 0.7, 1, 0.7);
       const [x, z] = Lp(fx, fz); cols.push({ x0: x - 3, x1: x + 3, z0: z - 3, z1: z + 3, top: FLAT + 0.7, bot: -99 }); }
     { P('trim', G.box, '#f5f5f4', -12, 0.1, -16, 14, 0.2, 7.5); P('glow', G.box, '#38bdf8', -12, 0.22, -16, 12, 0.05, 5.8); for (const lx of [-17, -14, -11]) P('trim', G.box, ['#f472b6', '#facc15', '#34d399'][Math.floor(r() * 3)], lx + 1, 0.3, -20.6, 1, 0.25, 2.2); }
     // fence around the lot with a big gate gap at the drive
     const fz0 = -25, fz1 = rd - 1.2, fx = 34; const fence = (ax, az, bx, bz) => { const len = Math.hypot(bx - ax, bz - az); const [x0, z0] = Lp(ax, az), [x1, z1] = Lp(bx, bz); const ang = Math.atan2(x1 - x0, z1 - z0); put(k + 'trim', G.box, '#f8fafc', (x0 + x1) / 2, FLAT + 0.9, (z0 + z1) / 2, ang, 0.08, 0.12, len); put(k + 'trim', G.box, '#f8fafc', (x0 + x1) / 2, FLAT + 0.5, (z0 + z1) / 2, ang, 0.08, 0.12, len);
       for (let t = 0; t <= len; t += 2) put(k + 'trim', G.box, '#f8fafc', x0 + (x1 - x0) * t / len, FLAT + 0.6, z0 + (z1 - z0) * t / len, ang, 0.14, 1.2, 0.14); cols.push({ x0: Math.min(x0, x1) - 0.12, x1: Math.max(x0, x1) + 0.12, z0: Math.min(z0, z1) - 0.12, z1: Math.max(z0, z1) + 0.12, top: FLAT + 1.05, bot: -99 }); };
-    fence(-fx, fz0, fx, fz0); fence(-fx, fz0, -fx, fz1); fence(fx, fz0, fx, fz1); fence(-fx, fz1, -6, fz1); fence(28, fz1, fx, fz1); // gate gap -6..28 (drive + gallery)
-    for (const s of [-6, 28]) { P('trim', G.box, tc, s, 1.1, fz1, 0.6, 2.2, 0.6); P('glow', G.sph, '#fef3c7', s, 2.4, fz1, 0.4, 0.4, 0.4); }
-    // hedges + trees
-    for (let lx = -30; lx <= -20; lx += 2.5) P('leaf', G.box, '#166534', lx, 0.6, h.d / 2 + 4, 2.4, 1.2, 1.2);
-    for (const [lx, lz] of [[-30, -20], [-30, 0], [30, -20], [-24, 18], [-30, 26]]) { if (lz > fz1 - 2) continue; const [x, z] = Lp(lx, lz); tree(k, x, z, 1 + r() * 0.4, r); }
+    fence(-fx, fz0, fx, fz0); fence(-fx, fz0, -fx, fz1); fence(fx, fz0, fx, fz1);
+    const gateL = h.admin ? -32 : -6, gateR = h.admin ? 32 : 28; // palace gate is centred so every aisle runs straight out
+    fence(-fx, fz1, gateL, fz1); fence(gateR, fz1, fx, fz1);
+    for (const s of [gateL, gateR]) { P('trim', G.box, tc, s, 1.1, fz1, 0.6, 2.2, 0.6); P('glow', G.sph, '#fef3c7', s, 2.4, fz1, 0.4, 0.4, 0.4); }
+    if (h.admin) {
+      for (const b of palaceBays()) { const dir = b.yaw > 0 ? 1 : -1;
+        P('trim', G.box, '#f8fafc', b.x - dir * 2.65, 0.07, b.z, 0.08, 0.025, 3.05);
+        for (const dz of [-1.55, 1.55]) P('trim', G.box, '#f8fafc', b.x - dir * 0.2, 0.07, b.z + dz, 4.7, 0.025, 0.08); }
+      for (const [lx, lz] of [[-33.15, 12.4], [33.15, 12.4], [-33.15, 32.5], [33.15, 32.5]]) { P('trim', G.cyl, '#334155', lx, 1.35, lz, 0.22, 2.6, 0.22); P('glow', G.sph, '#fde68a', lx, 2.75, lz, 0.42, 0.42, 0.42); }
+      for (const s of [-1, 1]) { P('trim', G.cyl, '#e7e5e4', s * 7.6, 0.28, 33.3, 0.9, 0.46, 0.9); P('leaf', G.sph, '#166534', s * 7.6, 0.66, 33.3, 0.7, 0.55, 0.7); }
+    }
+    // hedges + trees (kept off the palace forecourt so the aisles stay open)
+    if (!h.admin) for (let lx = -30; lx <= -20; lx += 2.5) P('leaf', G.box, '#166534', lx, 0.6, h.d / 2 + 4, 2.4, 1.2, 1.2);
+    for (const [lx, lz] of [[-30, -20], [-30, 0], [30, -20], [-24, 18], [-30, 26]]) { if (lz > fz1 - 2 || (h.admin && lz > 8)) continue; const [x, z] = Lp(lx, lz); tree(k, x, z, 1 + r() * 0.4, r); }
     const [cx, cz] = Lp(0, -1); const ex = (Math.abs(Math.sin(ry)) > 0.5 ? h.d : h.w + 12) / 2, ez = (Math.abs(Math.sin(ry)) > 0.5 ? h.w + 12 : h.d) / 2; cols.push({ x0: cx - ex, x1: cx + ex, z0: cz - ez, z1: cz + ez, top: 99, bot: -99 }); }
   function dropChunk(key) { const C = chunks.get(key); if (!C) return; if (K.forget) K.forget(C.g); root.remove(C.g); C.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.userData.tex) o.userData.tex.dispose(); }); for (const c of C.cols) { const i = box.indexOf(c); if (i >= 0) box.splice(i, 1); } chunks.delete(key); }
   // ------------------------------------------------ streaming: build the nearest missing chunk (one per frame), drop far ones
