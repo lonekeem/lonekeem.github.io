@@ -100,8 +100,11 @@ export function askAgeHonest() {
 }
 export function ageHonestPatch() {
   const S = C && C.S;
-  if (!ageHonestAck || (S && S.profile && S.profile.ageHonestAt)) return {};
-  return { ageHonestAt: serverTimestamp() };
+  // The live Firestore rules don't allow ageHonestAt on a new profile yet, so sending it
+  // blocked sign-up with permission-denied. The note is still shown; it just isn't saved
+  // with the profile until the new rules are deployed.
+  void S;
+  return {};
 }
 export function ageHonestSaved() { ageHonestAck = false; }
 export function readBirthday(id = 'bd') {
