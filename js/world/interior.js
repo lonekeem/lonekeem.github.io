@@ -57,8 +57,8 @@ export const DECOR = {
 // interiors are laid out in 'plan units' (the old 12 m house) and scaled up SC x on the ground plane: bigger rooms,
 // wider halls; fixtures + furniture keep their real size (only their positions spread out). Decor saves stay in plan units.
 export const SC = 1.4;
-// mansions are much bigger (rooms 1.5x wider, two floors, tall upper hall); the admin palace is the biggest of all
-export const scOf = (h) => (h && h.admin ? 2.6 : h && h.estate ? 2.1 : SC);
+// mansions (and the palace, now the same size) are bigger: rooms 1.5x wider, two floors, a tall upper hall
+export const scOf = (h) => (h && h.estate ? 2.1 : SC);
 // seats [x, seatTop, z, yawOffset] in a piece's local frame (front = +z)
 export const SEATS = { bd: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bc: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bk: [[0, .51, .5, 0]], br: [[-.5, .62, .6, 0], [.5, .62, .6, 0]],
   cs: [[-1, .55, .05, 0], [0, .55, .05, 0], [1, .55, .05, 0]], cl: [[-1, .55, -.5, 0], [0, .55, -.5, 0], [1, .55, .5, Math.PI / 2]], ch: [[0, .55, .05, 0]], cr: [[0, .48, .02, 0]] };
@@ -67,7 +67,7 @@ export const decorItem = (code) => { const d = DECOR[code]; return d ? (d.d ? 'z
 export function parseItems(s) { const out = []; for (const t of String(s || '').split(';')) { const [c, x, z, r, f] = t.split(','); if (!DECOR[c]) continue; const X = +x / 2, Z = +z / 2; if (!isFinite(X) || !isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) continue; out.push({ c, x: X, z: Z, r: (+r || 0) & 3, f: f === '1' ? 1 : 0 }); if (out.length >= 80) break; } return out; }
 export const serItems = (L) => L.map((i) => [i.c, Math.round(i.x * 2), Math.round(i.z * 2), i.r & 3].join(',') + (i.f ? ',1' : '')).join(';');
 // A saved items string is the whole layout, even when it is empty. No items key means the house still has its starter set.
-export function placedItems(decor, h, two) { if (decor && Object.prototype.hasOwnProperty.call(decor, 'items')) return parseItems(decor.items); return parseItems(defaultItems(two, h && h.num ? h.seed : 0)); }
+export function placedItems(decor, h, two) { const items = decor && Object.prototype.hasOwnProperty.call(decor, 'items') ? parseItems(decor.items) : parseItems(defaultItems(two, h && h.num ? h.seed : 0)); if (h && h.admin) for (const it of items) { it.x = Math.max(-5.4, Math.min(5.4, it.x)); it.z = Math.max(-5.4, Math.min(5.4, it.z)); } return items; }
 export function parseStash(s) { const out = []; for (const c of String(s || '').split(';')) { if (!DECOR[c]) continue; out.push(c); if (out.length >= 80) break; } return out; }
 export const serStash = (list) => (list || []).filter((c) => DECOR[c]).slice(0, 80).join(';');
 // Stored starter pieces ride in the same items string (~cs) so a save stays valid on the current rules. Placed layout ignores those tokens.
@@ -93,7 +93,7 @@ function viewTex(THREE, kind) { if (views[kind]) return views[kind]; const cv = 
 export function buildInterior(api, K, h, cx, cz, decor) {
   const { THREE, box, LOW } = api; const { put, flush, G } = K; const y = K.y ?? 0; const SC = scOf(h); const two = h.style === 1 || h.style === 3 || !!h.estate; const S = palOf(h);
   const g = new THREE.Group(); g.name = 'interior-' + h.id; const vc = (o = {}) => (LOW ? new THREE.MeshLambertMaterial({ color: '#fff', vertexColors: true, ...o }) : new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.8, vertexColors: true, ...o }));
-  const k = 'in' + h.id; const cols = []; const HR = two ? (h.admin ? 8.8 : h.estate ? 7.6 : 6.55) : 3.2; const T = S.trim, A = S.acc;
+  const k = 'in' + h.id; const cols = []; const HR = two ? (h.estate ? 7.6 : 6.55) : 3.2; const T = S.trim, A = S.acc;
   const B = (key, c, x, yy, z, sx, sy, sz, solid = 0, sh = 'box', ry = 0, fs = 0) => { x *= SC; z *= SC; if (fs) { sx *= SC; sz *= SC; } put(key, G[sh], c, cx + x, y + yy, cz + z, ry, sx, sy, sz); if (solid) { const b = { x0: cx + x - sx / 2, x1: cx + x + sx / 2, z0: cz + z - sz / 2, z1: cz + z + sz / 2, top: solid === 2 ? y + yy + sy / 2 : solid === 3 ? y + 3.2 : 99, bot: solid === 4 ? y + 3.2 : -99 }; box.push(b); cols.push(b); } };
   const roomAt = (x, z, h0) => (h0 >= 3.1 ? 'U' : x < -0.95 ? (z < -1 ? 'K' : 'L') : x > 0.95 ? (z < 0 ? 'B' : 'T') : 'H');
   const Wl = (x0, x1, z0, z1, h0, h1, solid = 1) => { const lx = x1 - x0 > z1 - z0; const cuts = lx ? [-1, 1] : ((x0 + x1) / 2 < 0 ? [-1] : [0]); for (const c of cuts) { const a = lx ? x0 : z0, b = lx ? x1 : z1; if (c > a + 0.3 && c < b - 0.3) { if (lx) { Wl(x0, c, z0, z1, h0, h1, solid); Wl(c, x1, z0, z1, h0, h1, solid); } else { Wl(x0, x1, z0, c, h0, h1, solid); Wl(x0, x1, c, z1, h0, h1, solid); } return; } }
@@ -155,7 +155,7 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   const at = (x, z) => [cx + x * SC, cz + z * SC];
   const spots = [{ k: 'fridge', s: at(-5.6, -4.45), o: at(-5.6, -5.5), yaw: Math.PI }, { k: 'stove', s: at(-2.0, -4.6), o: at(-2.0, -5.6), yaw: Math.PI }, { k: 'sink', s: at(-3.8, -4.6), o: at(-3.8, -5.55), yaw: Math.PI },
     { k: 'shower', s: at(4.55, 2.3), o: at(5.5, 2.3), yaw: Math.PI / 2 }].map((q) => ({ ...q, y, top: q.k === 'stove' ? y + 0.97 : y + 1 }));
-  if (h.estate) for (const [sx, sz] of h.admin ? [[5.3, -5.3], [1.8, -5.3]] : [[5.3, -5.3]]) { // mansions: more showers upstairs (glass stalls)
+  if (h.estate) for (const [sx, sz] of [[5.3, -5.3]]) { // mansions: a shower upstairs (glass stall)
     const sh = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 1.1), new THREE.MeshStandardMaterial({ color: '#e2e8f0' })); sh.position.set(cx + sx * SC, y + 3.41, cz + sz * SC); g.add(sh); const hd = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12), new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.6 })); hd.position.set(cx + sx * SC, y + 5.55, cz + sz * SC); g.add(hd);
     spots.push({ k: 'shower', s: at(sx, sz + 0.95), o: at(sx, sz), yaw: Math.PI, y: y + 3.35, top: y + 4.3 }); }
   // fridge door (own mesh, hinged on the right) so it can swing open

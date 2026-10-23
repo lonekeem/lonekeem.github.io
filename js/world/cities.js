@@ -6,7 +6,7 @@ const CH = 100, GX0 = -1300, GZ0 = -160;
 export const chunkKey = (x, z) => Math.floor((x - GX0) / CH) + ',' + Math.floor((z - GZ0) / CH);
 export const Lh = (h, lx, lz) => [h.x + (h.face > 0 ? lx : -lx), h.z + (h.face > 0 ? lz : -lz)];
 // Paintable shell of a mansion (body, wings, tower on the big style, columns, trim, roof, front door).
-// emit(part, batch, color, lx, yy, lz, sx, sy, sz, shape). part is w/r/t/d so paintHouse can find it. The admin palace is style 5.
+// emit(part, batch, color, lx, yy, lz, sx, sy, sz, shape). part is w/r/t/d so paintHouse can find it. Style 5 adds the tower.
 export function tagEstateShell(h, wc, rc, tc, emit) {
   const big = h.style === 5;
   emit('w', 'wall', wc, 0, 4, 0, h.w, 8, h.d, 'box');
@@ -97,8 +97,10 @@ export function attachCities(api, W, K) {
     const wc = big ? '#fdf6e3' : '#ede9fe', rc = big ? '#1e3a8a' : '#4c1d95', tc = big ? '#d4a017' : '#f8fafc';
     const P = (key, geo, c, lx, yy, lz, sx, sy, sz, rx = 0) => { const [x, z] = Lp(lx, lz); put(k + key, geo, c, x, FLAT + yy, z, ry, sx, sy, sz, rx); };
     P('road', G.plane, '#7ccf6b', -2, 0.012, (rd - 26) / 2, 68, 1, rd + 26); // lawn
-    P('road', G.plane, '#d6cfc2', 10, 0.03, (7 + rd) / 2, 44, 1, rd - 7); // forecourt + driveway
-    P('road', G.plane, '#cbbfa8', 0, 0.035, rd - 2, 8, 1, 4);
+    if (h.admin) { // car pad inside the fence, then a short lip through the gate (the two planes do not overlap)
+      P('road', G.plane, '#d6cfc2', 0, 0.032, 20.5, 66, 1, 20.6); // local z 10.2 .. 30.8
+      P('road', G.plane, '#cbbfa8', 0, 0.035, 32.3, 8, 1, 3); // local z 30.8 .. 33.8, onto the road
+    } else { P('road', G.plane, '#d6cfc2', 10, 0.03, (7 + rd) / 2, 44, 1, rd - 7); P('road', G.plane, '#cbbfa8', 0, 0.035, rd - 2, 8, 1, 4); } // forecourt + driveway
     const geoOf = { box: G.box, gable: G.gable, cyl: G.cyl, cone: G.cone };
     tagEstateShell(h, wc, rc, tc, (part, key, c, lx, yy, lz, sx, sy, sz, shape) => { if (K.tag) K.tag(h.id + '|' + part); try { const [x, z] = Lp(lx, lz); put(k + key, geoOf[shape], c, x, FLAT + yy, z, ry, sx, sy, sz); } finally { if (K.tag) K.tag(null); } });
     P('trim', G.box, '#ffffff', 0, 0.15, h.d / 2 + 2, 12, 0.3, 4.4);

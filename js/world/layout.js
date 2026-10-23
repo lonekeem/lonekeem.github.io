@@ -109,21 +109,23 @@ export const ROADS4 = [
   HWy('W5', [91, 440], [91, 1400]), HWy('W6', [188, 490], [188, 894]),
   St('c1', [-442, 100], [-442, 194]), St('c2', [-520, 260], [-442, 260]), St('c3', [-1042, 100], [-1042, 194]), St('c4', [-520, 1000], [-442, 1000]),
   St('c5', [-1240, 1000], [-1042, 1000]), St('c6', [62, 1000], [91, 1000]), St('c7', [-318, 1066], [-318, 1400]), St('c8', [-918, 1066], [-918, 1400]), St('c9', [312, 1026], [312, 1400]),
-  // private estate roads
-  St('a1', [-190, 1400], [-190, 1268], 8), // the admin estate's long gated drive
+  // private estate roads (the old palace drive is gone; that hillside is ordinary country now)
   St('e1', [-300, 100], [-300, 52], 6), St('e2', [-820, 100], [-820, 52], 6), St('e3', [-520, 560], [-200, 560], 6), St('e5', [-1240, 1180], [-1100, 1180], 6), St('e6', [312, 894], [372, 894], 6)];
 for (const c of CITIES) { for (let j = 0; j < 4; j++) ROADS4.push(St(c.id + 's' + j, [c.x - 62, c.z - 66 + 44 * j], [c.x + 62, c.z - 66 + 44 * j]));
   for (const s of [-1, 1]) ROADS4.push(St(c.id + 'v' + (s > 0 ? 'e' : 'w'), [c.x + s * 62, c.z - 66], [c.x + s * 62, c.z + 66])); }
-export const ADMIN_HOME = { x: -190, z: 1220, name: '👑 Kemy Palace', lot: [-112, 112, -96, 46] }; // lot = local x0,x1,z0,z1 (z toward the drive)
+// 👑 the palace sits on the old Maple Heights pad (mansion size). No private lot and no second house.
+export const ADMIN_HOME = { x: -300, z: 18, name: '👑 Kemy Palace' };
+export const PALACE_SIGN = '👑 Kemy Palace';
+export const PALACE_SIGN_AT = { x: 0, z: 32.2 }; // local: above the gate, on the clear drive
 export const ESTATES = [ // big private plots: hillside (north), waterfront (river), end of a private road, seaside
-  { x: -300, z: 18, face: 1, style: 4, spot: '⛰️ Maple Heights' }, { x: -820, z: 18, face: 1, style: 5, spot: '⛰️ Bubble Bluff' },
+  { x: -300, z: 18, face: 1, style: 4, spot: '⛰️ Maple Heights', skip: 1 }, { x: -820, z: 18, face: 1, style: 5, spot: '⛰️ Bubble Bluff' },
   { x: -440, z: 604, face: -1, style: 4, spot: '🌊 Riverside Lane' }, { x: -280, z: 604, face: -1, style: 5, spot: '🌊 Riverside Lane' },
   { x: -1100, z: 1222, face: -1, style: 4, spot: '🌲 Hidden Pines Road' }, { x: 342, z: 852, face: 1, style: 5, spot: '🏖️ Cloudport Cliffs' }];
 { let n = HOUSES.length; for (const c of CITIES) for (let j = 0; j < 4; j++) for (const s of [-1, 1]) for (let k = 0; k < 8; k++) { const z = c.z - 66 + 44 * j + s * 16, x = c.x - 49 + 14 * k, face = -s; const num = ++n;
     HOUSES.push({ id: 'hm' + num, num, x, z, face, style: num % 4, seed: (num * 13 + k * 7) % 97, town: c.id, city: c.id, door: { x, z: z + face * 4.02 }, w: 9, d: 8, cs: [0, 3, 5, 6].includes(num % 8) }); /* half for sale, every style (rules: n % 8 in [0, 3, 5, 6]) */ }
-  for (const e of ESTATES) { const num = ++n; HOUSES.push({ id: 'h' + num, x: e.x, z: e.z, face: e.face, style: e.style, seed: num % 97, town: 'estate', estate: 1, spot: e.spot, door: { x: e.x, z: e.z + e.face * 7.02 }, w: 18, d: 14 }); e.id = 'h' + num; }
-  // 👑 the admin's private palace (never for sale; firestore.rules: only the admin can write homes/h489)
-  HOUSES.push({ id: 'h' + (++n), x: ADMIN_HOME.x, z: ADMIN_HOME.z, face: 1, style: 5, seed: 7, town: 'estate', estate: 1, admin: 1, spot: '👑 Kemy Palace', door: { x: ADMIN_HOME.x, z: ADMIN_HOME.z + 12.02 }, w: 34, d: 24 }); }
+  for (const e of ESTATES) { const num = ++n; if (e.skip) continue; /* h483 stays unused so h484..h489 do not move */ HOUSES.push({ id: 'h' + num, x: e.x, z: e.z, face: e.face, style: e.style, seed: num % 97, town: 'estate', estate: 1, spot: e.spot, door: { x: e.x, z: e.z + e.face * 7.02 }, w: 18, d: 14 }); e.id = 'h' + num; }
+  // 👑 the admin's palace, mansion-sized on the Maple Heights pad (never for sale; only the admin writes homes/h489)
+  HOUSES.push({ id: 'h' + (++n), x: ADMIN_HOME.x, z: ADMIN_HOME.z, face: 1, style: 4, seed: 7, town: 'estate', estate: 1, admin: 1, spot: ADMIN_HOME.name, door: { x: ADMIN_HOME.x, z: ADMIN_HOME.z + 7.02 }, w: 18, d: 14 }); }
 export const ADMIN_PLOT = 'h489';
 // 🏙️ the Far South (stage 4): 12 big metro cities, every house for sale (h1000 .. h3591, style = number % 4).
 // 6 streets x 2 sides x 18 houses each; highways between the rows, two rivers with bridges. Built only near the player (cities.js chunks).
@@ -153,9 +155,20 @@ export const GARAGES = [{ tier: 1, cap: 1, name: 'Garage · 1 car', item: 'gr_on
   { tier: 6, cap: 10, name: 'Mansion Car Gallery · 10 cars', item: 'z_gr_six', d: 2400, productId: 'kemy_garage_six', big: 1 }, { tier: 7, cap: 15, name: 'Mansion Car Gallery · 15 cars', item: 'z_gr_seven', d: 3200, productId: 'kemy_garage_seven', big: 1 }];
 export const maxTier = (h) => (h && h.admin ? 0 : h && h.estate ? 7 : 5);
 export const ADMIN_CAP = 50;
+// Front-yard bays on the Maple Heights pad (local metres, +z toward the road). Noses point at the
+// centre drive so every car can pull out. The fountain and the house stay clear. 50 = ADMIN_CAP.
+export function palaceBays() {
+  const bays = []; const fountain = { x: -14, z: 20.5, r: 3.6 };
+  for (let z = 13; z <= 29.2; z += 2.55) for (const side of [-1, 1]) for (let i = 0; i < 5; i++) {
+    const x = side * (8 + i * 5.15), zz = Math.round(z * 10) / 10;
+    if (Math.hypot(x - fountain.x, zz - fountain.z) < fountain.r + 2.2) continue;
+    bays.push({ x, z: zz, yaw: side < 0 ? Math.PI / 2 : -Math.PI / 2 });
+  }
+  return bays.slice(0, ADMIN_CAP);
+}
 export const garageCap = (t) => (GARAGES[t - 1] ? GARAGES[t - 1].cap : 0);
 HOUSES.forEach((h, i) => { h.i = i; h.sale = h.admin ? false : h.estate ? true : h.city ? h.cs : i % 3 === 1; });
-export const ESTATE_IDS = HOUSES.filter((h) => h.estate).map((h) => h.id); // mansion cells (incl. the palace, last)
+export const ESTATE_IDS = ['h483', 'h484', 'h485', 'h486', 'h487', 'h488', 'h489']; // h483 has no house; cells stay put (rules inCellOk)
 export const roomOf = (h) => { if (h.estate) { const k = ESTATE_IDS.indexOf(h.id); return { cx: MROOMS.x0 + MROOMS.cell / 2 + (k % MROOMS.per) * MROOMS.cell, cz: MROOMS.z0 + MROOMS.cell / 2 + Math.floor(k / MROOMS.per) * MROOMS.cell }; } const c = (h.num || h.i) % ROOMS.n; return { cx: ROOMS.x0 + ROOMS.cell / 2 + (c % ROOMS.per) * ROOMS.cell, cz: ROOMS.z0 + ROOMS.cell / 2 + Math.floor(c / ROOMS.per) * ROOMS.cell }; };
 export const HOUSE_BY_ID = Object.fromEntries(HOUSES.map((h) => [h.id, h]));
 const sstep = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -217,7 +230,7 @@ export function worldClamp(x, z) { const { W, H } = PARK; void SNOW; void DESERT
   void W; void H; return [x, z]; }
 export const inStreet = (x, z) => z > PARK.H - 4 && x < 100;
 export function areaAt(x, z) { if (x > ROMS_X) return '🏠 Inside';
-  if (isBig(x, z)) { for (const c of CITIES) if (Math.abs(x - c.x) < c.hx + 10 && Math.abs(z - c.z) < c.hz + 4) return c.name; for (const e of ESTATES) if (Math.hypot(x - e.x, z - e.z) < 45) return e.spot; const b = onBridge(x, z); if (b) return '🌉 ' + (WATER.find((w) => rectD(w, x, z) < 10) || { name: 'Bridge' }).name + ' Bridge';
+  if (isBig(x, z)) { for (const c of CITIES) if (Math.abs(x - c.x) < c.hx + 10 && Math.abs(z - c.z) < c.hz + 4) return c.name; if (Math.hypot(x - ADMIN_HOME.x, z - ADMIN_HOME.z) < 45) return ADMIN_HOME.name; for (const e of ESTATES) if (!e.skip && Math.hypot(x - e.x, z - e.z) < 45) return e.spot; const b = onBridge(x, z); if (b) return '🌉 ' + (WATER.find((w) => rectD(w, x, z) < 10) || { name: 'Bridge' }).name + ' Bridge';
     if (ROADS4.some((r) => r.hw && segD(x, z, r) < 9)) return '🛣️ Kemy Highway'; return '🌲 Countryside'; } if (z > SHORE.z0 - 30 && x > 100) return '🏖️ Sunny Shore';
   if (x > 100 && z > 330) return '🛶 Willow Lake'; if (x > 100 && z > 222) return x < 244 ? '❄️ Frostberry Village' : '🌵 Sunstone Canyon'; if (x > 100 && ROADS2.some((r) => r.hw && segD(x, z, r) < 9)) return '🛣️ Loop Highway'; if (x > 100 && z < 206 && x < 244 && z > -52) return '🏙️ Kemy Downtown'; if (x >= FIELDS.x0 - 6 && x < 380 && z < FIELDS.z1 + 6) return '🌾 Clover Fields';
   if (x < PLAINS.x1 + 2 && z > PLAINS.z0 - 4) return '🌾 Open Plains';
