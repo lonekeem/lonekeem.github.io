@@ -25,8 +25,11 @@ for (const h of [palace, manor, big]) {
   assert.equal(count(p, 'd'), 1, h.id + ' has one front door');
   assert.ok(!p.some((s) => s.endsWith(':road') || s.endsWith(':leaf')), h.id + ' lawn and hedges stay untagged');
 }
-assert.ok(count(parts(palace), 'w') > count(parts(manor), 'w'), 'the palace tower is paintable');
-assert.equal(count(parts(palace), 'w'), count(parts(big), 'w'), 'every big mansion includes the tower');
+assert.equal(palace.style, 4, 'the palace is the mansion mesh');
+assert.equal(palace.w, 18);
+assert.equal(palace.d, 14);
+assert.equal(count(parts(palace), 'w'), count(parts(manor), 'w'), 'the palace uses the mansion shell');
+assert.ok(count(parts(big), 'w') > count(parts(manor), 'w'), 'style 5 still has the tower');
 
 const mesh = { id: 'shell' };
 const tagged = new Map([

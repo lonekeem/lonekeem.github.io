@@ -2349,10 +2349,10 @@ service cloud.firestore {
     match /homes/{plot} {
       function hd() { return request.resource.data; }
       function plotNum() { return int(plot.replace('[hm]', '')); }
-      // h01..h98: the original plots (fixed map); h99..h482: city plots (style = number % 4, only the For Sale half); h483..h488 estates; h489 = admin palace
+      // h01..h98: the original plots (fixed map); h99..h482: city plots (style = number % 4, only the For Sale half); h484..h488 estates; h483 is the palace pad (not for sale); h489 = admin palace
       function citySale(n) { return n % 8 in [0, 3, 5, 6]; } // = layout.js city plots: half for sale, every style
       function plotStyle() { let n = plotNum(); return n <= 98 ? {'h02': 'manor', 'h05': 'cottage', 'h08': 'cottage', 'h11': 'twostory', 'h14': 'ranch', 'h17': 'twostory', 'h20': 'ranch', 'h23': 'manor', 'h26': 'cottage', 'h29': 'twostory', 'h32': 'ranch', 'h35': 'manor', 'h38': 'manor', 'h41': 'cottage', 'h44': 'twostory', 'h47': 'ranch', 'h50': 'manor', 'h53': 'cottage', 'h56': 'twostory', 'h59': 'ranch', 'h62': 'manor', 'h65': 'cottage', 'h68': 'twostory', 'h71': 'ranch', 'h74': 'manor', 'h77': 'cottage', 'h80': 'twostory', 'h83': 'ranch', 'h86': 'manor', 'h89': 'cottage', 'h92': 'twostory', 'h95': 'ranch', 'h98': 'manor'}[plot] : n <= 482 ? (citySale(n) ? ['cottage', 'twostory', 'ranch', 'manor'][n % 4] : null) : n >= 1000 ? ['cottage', 'twostory', 'ranch', 'manor'][n % 4]
-        : {'h483': 'mansion', 'h484': 'estate', 'h485': 'mansion', 'h486': 'estate', 'h487': 'mansion', 'h488': 'estate'}[plot]; }
+        : {'h484': 'estate', 'h485': 'mansion', 'h486': 'estate', 'h487': 'mansion', 'h488': 'estate'}[plot]; }
       function isEstate() { let n = plotNum(); return n >= 483 && n <= 489; } // hm1000..hm3591 = the far-south metro cities (all for sale, style = number % 4)
       function deed() { return {'cottage': 'hs_cottage', 'twostory': 'hs_twostory', 'ranch': 'hs_ranch', 'manor': 'z_hs_manor', 'mansion': 'z_hs_mansion', 'estate': 'z_hs_estate'}[plotStyle()]; }
       function inv(it) { return exists(/databases/$(database)/documents/users/$(me())/inv/$(it)); }
@@ -2371,7 +2371,9 @@ service cloud.firestore {
       // open house / invites (uids + usernames for display), house radio, decor: owner-only, size-limited
       function extrasOk() { return (!('open' in hd()) || hd().open is bool) && (!('inv' in hd()) || (hd().inv is list && hd().inv.size() <= 50)) && (!('invN' in hd()) || (hd().invN is list && hd().invN.size() <= 50))
         && (!('radio' in hd()) || radioOk(hd().radio)) && (!('decor' in hd()) || decorOk(hd().decor)) && (!('cars' in hd()) || carsOk(hd().cars)); }
-      function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor', 'cars']) && extrasOk() && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 7
+      // Gold palace sign. Only homes/h489, admin writes (update already requires isAdmin there). 24 letters on the client; 48 covers emoji.
+      function signOk() { return !('sign' in hd()) || (plot == 'h489' && cleanStr(hd().sign, 1, 48) && kidSafe(hd().sign)); }
+      function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor', 'cars', 'sign']) && extrasOk() && signOk() && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 7
         && hd().name == get(/databases/$(database)/documents/users/$(me())).data.displayName && hd().at == request.time; }
       allow read: if signedIn();
       // 👑 h489 = the admin's palace: never for sale, only the admin account can create / change / remove it
