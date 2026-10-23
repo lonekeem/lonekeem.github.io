@@ -2416,7 +2416,7 @@ service cloud.firestore {
       function homeOk(id) { return id == 'h489' || !exists(hp(id)) || get(hp(id)).data.owner == me() || get(hp(id)).data.get('open', false) == true || me() in get(hp(id)).data.get('inv', []); }
       allow read: if signedIn();
       allow create, update: if signedIn() && notBanned() && uid == me() && room.matches('^r[0-9]{1,2}$')
-        && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at', 'h', 'r', 'dn', 'v', 'in', 'c', 'vx', 'vz', 'ct', 'an'])
+        && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at', 'h', 'r', 'dn', 'v', 'in', 'c', 'vx', 'vz', 'ct', 'an', 'pl'])
         && (!('vx' in pp()) || (pp().vx is int && pp().vz is int && pp().vx >= -600 && pp().vx <= 600 && pp().vz >= -600 && pp().vz <= 600 && pp().ct is int && pp().an in ['idle', 'walk', 'run', 'drive', 'sit']))
         && (!('c' in pp()) || (pp().c is string && pp().c.matches('^-?[0-9]{1,3}_-?[0-9]{1,3}$')))
         // inside a house (interior strip x >= 8000): 'in' must be that cell's house and I need access (owner, open house, invited, or an unowned/NPC house)
@@ -2425,6 +2425,8 @@ service cloud.firestore {
         && (!('h' in pp()) || (pp().h is int && pp().h >= 0 && pp().h <= 2000))
         && (!('r' in pp()) || (pp().r is int && pp().r >= 0 && pp().r < 360))
         && (!('dn' in pp()) || isStr(pp().dn, 0, 20)) && (!('v' in pp()) || (pp().v is int && pp().v >= 0 && pp().v <= 99))
+        // live license plate (length digit + text + 4 hex nibbles). Same write as the pose, no extra rate.
+        && (!('pl' in pp()) || (isStr(pp().pl, 0, 12) && pp().pl.matches('^$|^[1-7][A-Z0-9]{1,7}[0-9a-f]{4}$')))
         // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
         && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= -21000 && pp().x <= 10000 && pp().y is int && pp().y >= 0 && pp().y <= 60000

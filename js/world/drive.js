@@ -9,6 +9,7 @@ import { createDriveHud } from './drivehud.js';
 import { getCfg, onCfg, buzz, linkAccount } from './drivecfg.js';
 import { createCarFx } from './carfx.js';
 import { onSample } from '../input.js';
+import { plateCode, parsePlate, carWorldVel, followGain } from '../pals/presence-sync.js';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)); const lsg = (k) => { try { return localStorage.getItem(k); } catch { return null; } }, lss = (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } };
 export const CAMS = ['chase', 'far', 'pov']; const CAM_NAME = { chase: 'Chase', far: 'Far chase', pov: 'Cockpit view' };
 export const carCode = (id, color, door) => '~c' + CAR_IDX.indexOf(id).toString(36) + (color | 0).toString(36) + (door ? '1' : '0');
@@ -125,12 +126,13 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   function remoteCars(dt, nowMs) { const seen = new Set();
     for (const o of api.others.values()) { const pc = parseCar(o.dn); if (!pc) continue; seen.add(o.uid); let R = remote.get(o.uid);
       if (R && (R.id !== pc.id || R.color !== pc.color)) { scene.remove(R.m); remote.delete(o.uid); R = null; }
-      if (!R) { const m = buildCar(pc.id, pc.color, { lite: true, noShadow: true }); scene.add(m); { const pl = world.plateFor && world.plateFor(o.uid, pc.id); if (pl) addPlate(m, pl); } R = { m, id: pc.id, color: pc.color, s: { x: o.tx, z: o.tz, yaw: o.tr || 0 }, v: { x: 0, z: 0, w: 0 }, last: { x: o.tx, z: o.tz, yaw: o.tr || 0, t: nowMs }, door: 0, spin: 0 }; remote.set(o.uid, R); }
+      if (!R) { const m = buildCar(pc.id, pc.color, { lite: true, noShadow: true }); scene.add(m); R = { m, id: pc.id, color: pc.color, s: { x: o.tx, z: o.tz, yaw: o.tr || 0 }, v: { x: 0, z: 0, w: 0 }, last: { x: o.tx, z: o.tz, yaw: o.tr || 0, t: nowMs }, door: 0, spin: 0, pl: null }; remote.set(o.uid, R); }
+      { let pl = o.pl ? parsePlate(o.pl) : null; if (!pl && world.plateFor) pl = world.plateFor(o.uid, pc.id); const pk = pl && pl.t ? [pl.t, pl.b | 0, pl.f | 0, pl.r | 0, pl.fr | 0].join('.') : ''; if (pk !== R.pl) { R.pl = pk; addPlate(R.m, pl && pl.t ? pl : null); } }
       if (o.tx !== R.last.x || o.tz !== R.last.z || (o.tr ?? R.last.yaw) !== R.last.yaw) { const dtS = Math.max(0.08, (nowMs - R.last.t) / 1000); let dy = (o.tr ?? R.last.yaw) - R.last.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
         R.v = { x: (o.tx - R.last.x) / dtS, z: (o.tz - R.last.z) / dtS, w: dy / dtS }; R.last = { x: o.tx, z: o.tz, yaw: o.tr ?? R.last.yaw, t: nowMs }; }
       let px, pz, pyaw; if (o.ix != null && o.buf && o.buf.length) { /* park3d buffers poses ~100 ms back and extrapolates short gaps */ px = o.ix; pz = o.iz; pyaw = o.iyaw ?? R.s.yaw; let dw = pyaw - (R.py ?? pyaw); dw = Math.atan2(Math.sin(dw), Math.cos(dw)); R.py = pyaw; R.v.x = o.ivx; R.v.z = o.ivz; R.v.w += (dw / Math.max(dt, 1e-3) - R.v.w) * Math.min(1, dt * 8); }
       else { const ahead = Math.min(0.6, (nowMs - R.last.t) / 1000); px = R.last.x + R.v.x * ahead; pz = R.last.z + R.v.z * ahead; pyaw = R.last.yaw + R.v.w * ahead; } // predicted
-      const k = o.buf && o.buf.length ? Math.min(1, dt * 24) : Math.min(1, dt * 12); R.s.x += (px - R.s.x) * k; R.s.z += (pz - R.s.z) * k; let dy = pyaw - R.s.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); R.s.yaw += dy * k;
+      const drive = o.an === 'drive' || (o.dn && o.dn.slice(0, 2) === '~c'); const k = followGain(dt, drive, !!(o.buf && o.buf.length)); R.s.x += (px - R.s.x) * k; R.s.z += (pz - R.s.z) * k; let dy = pyaw - R.s.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); R.s.yaw += dy * k;
       const spd = Math.hypot(R.v.x, R.v.z); R.spin += spd / R.m.userData.def.wr * dt; R.door += ((pc.door ? 1 : 0) - R.door) * Math.min(1, dt * 4); setDoors(R.m, R.door);
       const d = Math.hypot(R.s.x - P.x, R.s.z - P.z); R.m.visible = d < (LOW ? 90 : 160); poseCar(R.m, { x: R.s.x, y: ground(R.s.x, R.s.z), z: R.s.z, yaw: R.s.yaw, roll: clamp(-R.v.w * spd * 0.004, -0.06, 0.06) }, clamp(R.v.w * 0.3, -0.5, 0.5), R.spin);
       if (o.obj) { seatWorld(R.m, sv); o.obj.position.copy(sv); o.obj.rotation.y = R.s.yaw; o.obj.scale.setScalar(0.6); sitPose(o.obj, dt); }
@@ -154,7 +156,8 @@ export function attachDrive(api, world) { const W_EXTRA = {};
       if (++CK2.n % 3 === 0) { rearCam.position.set(camP.x, camP.y + 0.15, camP.z); rearCam.lookAt(camP.x - fx * 20, camP.y - 0.6, camP.z - fz * 20); const R0 = api.R, prevT = R0.getRenderTarget(); M2.m.visible = false; R0.setRenderTarget(M2.rt); R0.render(scene, rearCam); R0.setRenderTarget(prevT); M2.m.visible = true; } }
     window.__kd = Object.assign(window.__kd || {}, { cockpit: { fov: +CK2.fov.toFixed(1), lean: +CK2.lean.toFixed(3), mirror: !!M2 } }); }
   const mirrorOff = () => { if (mirror) mirror.m.visible = false; CK2.yaw0 = null; };
-  function update(dt, now) { const nowMs = performance.now(); remoteCars(dt, nowMs); rideTick(dt, nowMs); if (!my) return;
+  function publishSync() { if (!api.sync) return; if (my && my.state !== 'parked') { api.sync.vel = carWorldVel(my.V.yaw, my.V.vf, my.V.vl); const p = (pref.plates || {})[my.id]; api.sync.plate = p && p.t ? plateCode(p) : ''; } else if (ride && ride.st === 'on') { const R = remote.get(ride.drv); api.sync.vel = R ? { x: R.v.x, z: R.v.z } : null; api.sync.plate = ''; } else { api.sync.vel = null; api.sync.plate = ''; } }
+  function update(dt, now) { const nowMs = performance.now(); remoteCars(dt, nowMs); rideTick(dt, nowMs); if (!my) { publishSync(); return; }
     const c = my.m.userData.def; my.door += (my.doorWant - my.door) * Math.min(1, dt * 5);
     if (my.state === 'enter' || my.state === 'exit') { my.t += dt; const t = my.state === 'enter' ? my.t : 1.3 - my.t; my.doorWant = t < 0.95 ? 1 : 0; if (my.state === 'exit' && my.t < 0.4) my.doorWant = 1;
       seatWorld(my.m, sv); const s = Math.sin(my.V.yaw), co = Math.cos(my.V.yaw); sv2.set(my.V.x + co * (c.Wd / 2 + 0.8), ground(my.V.x, my.V.z), my.V.z - s * (c.Wd / 2 + 0.8)); const k = clamp((t - 0.3) / 0.6, 0, 1);
@@ -190,6 +193,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
         else { mirrorOff(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = new THREE.Vector3(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
           if (!camInit) { camP.copy(want); camInit = true; } else camP.lerp(want, Math.min(1, dt * 5)); camL.set(rs.x + fx * 2, rs.y + 1.0, rs.z + fz * 2); cam.position.copy(camP); if (getCfg().shake && Math.abs(my.V.vf) > 14) { const k = Math.min(1, (Math.abs(my.V.vf) - 14) / 20) * 0.035, t = nowMs / 1000; camP.x += Math.sin(t * 37) * k; camP.y += Math.sin(t * 43 + 1) * k; } cam.position.copy(camP); cam.lookAt(camL); const fv = getCfg().fov + Math.min(8, Math.abs(my.V.vf) * 0.2); if (Math.abs(cam.fov - fv) > 0.3) { cam.fov = fv; cam.updateProjectionMatrix(); } } } }
     else { poseCar(my.m, my.rs, 0, my.V.spin); setDoors(my.m, my.door); FX.update(dt, null); H.blur.style.opacity = 0; }
+    publishSync();
     window.__kd = Object.assign(window.__kd || {}, { state: my.state, kmh: Math.round(Math.abs(my.V.vf) * 3.6), gear: my.V.gear, rpm: Math.round(my.V.rpm), x: my.V.x, z: my.V.z, yaw: my.V.yaw, pitch: my.rs.pitch, roll: my.rs.roll, heave: my.rs.heave, cam: camMode, remote: remote.size }); }
   // ---------------------------------------------------------------- 🧑‍🤝‍🧑 Ride along: passenger seat (synced through the presence 'dn' code, no extra writes)
   // passenger asks '~q'+driver8 -> driver accepts (auto for mutual follows, else a popup) by adding 'o'+passenger8 to its car code -> passenger shows '~r'+driver8
