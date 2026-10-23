@@ -4,7 +4,7 @@
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
 import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear } from './layout.js';
-import { attachCities } from './cities.js';
+import { attachCities, applyExt, forgetTagged } from './cities.js';
 import { attachMap } from './map.js';
 const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
 import { attachEast } from './east.js';
@@ -124,8 +124,8 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   function poseDoor(i) { const d = doors[i]; tq.setFromAxisAngle(UP, d.ry - d.a * 1.6); tmpM.compose(tv.set(d.hx, FLAT + 0.42, d.hz), tq, ts.set(1, 1, 1)); doorM.setMatrixAt(i, tmpM); }
   doors.forEach((d, i) => poseDoor(i)); doorM.castShadow = !LOW; root.add(doorM);
   // owner paint (homes/{plot}.decor.ext): recolour the tagged vertex ranges + the instanced front door; null restores
-  const paintHouse = (id, ext) => { const c2 = new THREE.Color(); for (const part of ['w', 'r', 't']) for (const R of tagged.get(id + '|' + part) || []) { const a = R.m.geometry.attributes.color; const want = ext && ext[part];
-      if (want) c2.set(want); else c2.setRGB(R.orig[0], R.orig[1], R.orig[2]); for (let i = R.s; i < R.s + R.n; i++) a.setXYZ(i, c2.r, c2.g, c2.b); a.needsUpdate = true; }
+  const paintHouse = (id, ext) => { const c2 = new THREE.Color(); applyExt(tagged, id, ext, (R, want) => { const a = R.m && R.m.geometry && R.m.geometry.attributes && R.m.geometry.attributes.color; if (!a) return;
+      if (want) c2.set(want); else c2.setRGB(R.orig[0], R.orig[1], R.orig[2]); for (let i = R.s; i < R.s + R.n; i++) a.setXYZ(i, c2.r, c2.g, c2.b); a.needsUpdate = true; });
     const di = doors.findIndex((d) => d.h.id === id); if (di >= 0) { doorM.setColorAt(di, col.set((ext && ext.d) || DCOL[di % DCOL.length])); doorM.instanceColor.needsUpdate = true; } };
 
   // ---------------------------------------------------------------- jack-o'-lanterns (friendly faces), ghosts, lights, hay, bats
@@ -398,14 +398,15 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     window.__kw = Object.assign(window.__kw || {}, { season: SEA.id, night: nk, bots: bots.length, cars: cars.length, houses: HOUSES.length, candy: candyTotal(), coinKnocks: kn.n, nearDoor: best }); }
   function spawnStreet() { P.x = GATE.x + (Math.random() - 0.5) * 3; P.z = GATE.z + 6 + Math.random() * 3; P.yaw = 0; P.y = ground(P.x, P.z); }
   function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
-  window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })) };
+  window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })), paintHouse: (id, ext) => paintHouse(id, ext) };
   const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, loopAt, move: (m) => m, driving: () => false };
   const D = attachDrive(api, W); W.drive = D;
   const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
   const Rs = attachRespawn(api, W);
   const Kh = attachHelper(api, W);
-  const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat }); const Mp = attachMap(api, W);
+  const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat, tag: (t) => { ptag = t; }, forget: (group) => { const meshes = []; group.traverse((o) => { if (o.isMesh) meshes.push(o); }); forgetTagged(tagged, meshes); } }); const Mp = attachMap(api, W);
+  window.__kwApi.buildAround = (x, z) => W.buildAround && W.buildAround(x, z);
   W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
   W.destroy = () => { for (const x of [D, E, Ci, Hm, Mp, Rs, Kh]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;

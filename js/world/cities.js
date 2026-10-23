@@ -5,6 +5,30 @@ import { HOUSES, ROADS4, CITIES, ESTATES, WATER, WATER_Y, BRIDGES, FLAT, OLD, BO
 const CH = 100, GX0 = -1300, GZ0 = -160;
 export const chunkKey = (x, z) => Math.floor((x - GX0) / CH) + ',' + Math.floor((z - GZ0) / CH);
 export const Lh = (h, lx, lz) => [h.x + (h.face > 0 ? lx : -lx), h.z + (h.face > 0 ? lz : -lz)];
+// Paintable shell of a mansion (body, wings, tower on the big style, columns, trim, roof, front door).
+// emit(part, batch, color, lx, yy, lz, sx, sy, sz, shape). part is w/r/t/d so paintHouse can find it. The admin palace is style 5.
+export function tagEstateShell(h, wc, rc, tc, emit) {
+  const big = h.style === 5;
+  emit('w', 'wall', wc, 0, 4, 0, h.w, 8, h.d, 'box');
+  emit('r', 'roof', rc, 0, 7.95, 0, h.w + 1.2, 3.6, h.d + 1.2, 'gable');
+  for (const s of [-1, 1]) {
+    emit('w', 'wall', wc, s * (h.w / 2 + 3), 2.8, -1, 6, 5.6, h.d - 3, 'box');
+    emit('r', 'roof', rc, s * (h.w / 2 + 3), 5.75, -1, 6.4, 0.3, h.d - 2.6, 'box');
+    emit('t', 'trim', tc, s * (h.w / 2 + 3), 5.95, -1, 6.5, 0.12, h.d - 2.4, 'box');
+  }
+  if (big) { emit('w', 'wall', wc, 0, 9.5, 0, 4, 3, 4, 'cyl'); emit('r', 'roof', rc, 0, 12, 0, 4.6, 2.4, 4.6, 'cone'); }
+  for (let i = -2; i <= 2; i++) emit('t', 'trim', '#ffffff', i * 2.2, 3.3, h.d / 2 + 2.4, 0.5, 6.6, 0.5, 'cyl');
+  emit('t', 'trim', tc, 0, 6.75, h.d / 2 + 2.4, 11, 0.35, 3.2, 'box');
+  emit('d', 'trim', '#7c2d12', 0, 1.4, h.d / 2 + 0.06, 2.2, 2.8, 0.12, 'box');
+}
+// Recolor tagged ranges. A blank part restores the colour the mesh was built with.
+export function applyExt(tagged, id, ext, write) {
+  for (const part of ['w', 'r', 't', 'd']) for (const R of tagged.get(id + '|' + part) || []) write(R, (ext && ext[part]) || null);
+}
+export function forgetTagged(tagged, meshes) {
+  const drop = meshes instanceof Set ? meshes : new Set(meshes);
+  for (const [k, L] of [...tagged]) { const n = L.filter((R) => !drop.has(R.m)); if (n.length !== L.length) { if (n.length) tagged.set(k, n); else tagged.delete(k); } }
+}
 // estate layout (local frame, +z = toward the road): mansion body, car gallery, forecourt, pool, lot fence
 export const estateRoadD = (h) => ({ '-300,18': 34, '-820,18': 34, '-440,604': 44, '-280,604': 44, '-1100,1222': 42, '342,852': 42 }[h.x + ',' + h.z] || 36);
 export const GALLERY = { lx: 22, lz: 0, w: 20, dep: 6.6 };
@@ -64,7 +88,8 @@ export function attachCities(api, W, K) {
     // countryside trees (seeded per chunk, away from roads, lots and water)
     if (big) { const r = rng(ci * 977 + cj * 131 + 5); const n = LOW ? 8 : 18; for (let i = 0; i < n; i++) { const x = x0 + r() * CH, z = z0 + r() * CH; if (x < BOUNDS.x0 + 6 || z > BOUNDS.z1 || roadD(x, z) < 7 || waterD(x, z) < 6 || lotOf(x, z)) continue; tree(k, x, z, 0.8 + r() * 0.9, r); cols.push({ x0: x - 0.3, x1: x + 0.3, z0: z - 0.3, z1: z + 0.3, top: 99, bot: -99 }); } }
     for (const [n2, m] of [['road', M.road], ['wall', M.wall], ['roof', M.roof], ['trim', M.trim], ['leaf', M.leaf], ['glow', M.glow]]) flush(k + n2, m, !LOW && n2 !== 'road' && n2 !== 'glow', g);
-    for (const c of cols) box.push(c); root.add(g); chunks.set(key, { g, cols }); }
+    for (const c of cols) box.push(c); root.add(g); chunks.set(key, { g, cols });
+    for (const { h } of P.houses) if (h.estate && W.recolorHouse) W.recolorHouse(h.id); }
   function tree(k, x, z, s, r) { const y0 = bigGround(x, z); put(k + 'trim', G.cyl6, '#7c4a2a', x, y0 + 1.1 * s, z, 0, 0.32 * s, 2.2 * s, 0.32 * s); if (r() < 0.5) { put(k + 'leaf', G.cone, ['#2f7d32', '#3f8f3a', '#1f6b3a'][Math.floor(r() * 3)], x, y0 + 3.4 * s, z, 0, 2.6 * s, 3.6 * s, 2.6 * s); }
     else put(k + 'leaf', G.sph, ['#4caf50', '#65a30d', '#f9a8d4', '#fbbf24'][Math.floor(r() * (r() < 0.8 ? 2 : 4))], x, y0 + 3 * s, z, 0, 2.8 * s, 2.4 * s, 2.8 * s); }
   // 🏰 estates: mansion, wings, columns, balcony, lawn, fence + gate, forecourt driveway, fountain, pool, hedges, trees
@@ -74,11 +99,10 @@ export function attachCities(api, W, K) {
     P('road', G.plane, '#7ccf6b', -2, 0.012, (rd - 26) / 2, 68, 1, rd + 26); // lawn
     P('road', G.plane, '#d6cfc2', 10, 0.03, (7 + rd) / 2, 44, 1, rd - 7); // forecourt + driveway
     P('road', G.plane, '#cbbfa8', 0, 0.035, rd - 2, 8, 1, 4);
-    P('wall', G.box, wc, 0, 4, 0, h.w, 8, h.d); P('roof', G.gable, rc, 0, 7.95, 0, h.w + 1.2, 3.6, h.d + 1.2);
-    for (const s of [-1, 1]) { P('wall', G.box, wc, s * (h.w / 2 + 3), 2.8, -1, 6, 5.6, h.d - 3); P('roof', G.box, rc, s * (h.w / 2 + 3), 5.75, -1, 6.4, 0.3, h.d - 2.6); P('trim', G.box, tc, s * (h.w / 2 + 3), 5.95, -1, 6.5, 0.12, h.d - 2.4); }
-    if (big) { P('wall', G.cyl, wc, 0, 9.5, 0, 4, 3, 4); P('roof', G.cone, rc, 0, 12, 0, 4.6, 2.4, 4.6); }
-    for (let i = -2; i <= 2; i++) P('trim', G.cyl, '#ffffff', i * 2.2, 3.3, h.d / 2 + 2.4, 0.5, 6.6, 0.5); P('trim', G.box, tc, 0, 6.75, h.d / 2 + 2.4, 11, 0.35, 3.2); P('trim', G.box, '#ffffff', 0, 0.15, h.d / 2 + 2, 12, 0.3, 4.4);
-    P('trim', G.box, '#7c2d12', 0, 1.4, h.d / 2 + 0.06, 2.2, 2.8, 0.12); P('glow', G.box, '#fde68a', 0, 3.1, h.d / 2 + 0.07, 2.2, 0.4, 0.06);
+    const geoOf = { box: G.box, gable: G.gable, cyl: G.cyl, cone: G.cone };
+    tagEstateShell(h, wc, rc, tc, (part, key, c, lx, yy, lz, sx, sy, sz, shape) => { if (K.tag) K.tag(h.id + '|' + part); try { const [x, z] = Lp(lx, lz); put(k + key, geoOf[shape], c, x, FLAT + yy, z, ry, sx, sy, sz); } finally { if (K.tag) K.tag(null); } });
+    P('trim', G.box, '#ffffff', 0, 0.15, h.d / 2 + 2, 12, 0.3, 4.4);
+    P('glow', G.box, '#fde68a', 0, 3.1, h.d / 2 + 0.07, 2.2, 0.4, 0.06);
     for (const lx of [-6.5, -3.6, 3.6, 6.5]) for (const fy of [1.8, 5.4]) { P('glow', G.box, '#fff1c2', lx, fy, h.d / 2 + 0.05, 1.6, 1.6, 0.06); P('trim', G.box, '#ffffff', lx, fy - 0.9, h.d / 2 + 0.08, 1.9, 0.14, 0.18); }
     for (const s of [-1, 1]) for (const fy of [1.8]) P('glow', G.box, '#fff1c2', s * (h.w / 2 + 3), fy, h.d / 2 - 1.45, 2.4, 1.4, 0.06);
     // fountain (front lawn) + pool (back yard) + loungers
@@ -94,7 +118,7 @@ export function attachCities(api, W, K) {
     for (let lx = -30; lx <= -20; lx += 2.5) P('leaf', G.box, '#166534', lx, 0.6, h.d / 2 + 4, 2.4, 1.2, 1.2);
     for (const [lx, lz] of [[-30, -20], [-30, 0], [30, -20], [-24, 18], [-30, 26]]) { if (lz > fz1 - 2) continue; const [x, z] = Lp(lx, lz); tree(k, x, z, 1 + r() * 0.4, r); }
     const [cx, cz] = Lp(0, -1); const ex = (Math.abs(Math.sin(ry)) > 0.5 ? h.d : h.w + 12) / 2, ez = (Math.abs(Math.sin(ry)) > 0.5 ? h.w + 12 : h.d) / 2; cols.push({ x0: cx - ex, x1: cx + ex, z0: cz - ez, z1: cz + ez, top: 99, bot: -99 }); }
-  function dropChunk(key) { const C = chunks.get(key); if (!C) return; root.remove(C.g); C.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.userData.tex) o.userData.tex.dispose(); }); for (const c of C.cols) { const i = box.indexOf(c); if (i >= 0) box.splice(i, 1); } chunks.delete(key); }
+  function dropChunk(key) { const C = chunks.get(key); if (!C) return; if (K.forget) K.forget(C.g); root.remove(C.g); C.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.userData.tex) o.userData.tex.dispose(); }); for (const c of C.cols) { const i = box.indexOf(c); if (i >= 0) box.splice(i, 1); } chunks.delete(key); }
   // ------------------------------------------------ streaming: build the nearest missing chunk (one per frame), drop far ones
   let t = 0; const want = new Set(); let queue = [];
   function plan() { const P = api.P; const R = Math.min(Q.draw + 70, LOW ? 220 : 330); want.clear(); queue = [];
