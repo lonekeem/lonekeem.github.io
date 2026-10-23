@@ -25,6 +25,7 @@ export const TRACKS = [
   { title: THEME4_TITLE, artist: THEME4_ARTIST, src: new URL('../assets/audio/kemy-theme4.m4a?v=1', import.meta.url).href, dur: 186.8, credit: PRODUCED },
   { title: THEME5_TITLE, artist: THEME5_ARTIST, src: new URL('../assets/audio/kemy-theme5.m4a?v=1', import.meta.url).href, dur: 229.2, credit: PRODUCED },
   { title: 'Another Week', artist: 'Lone Keem', src: new URL('../assets/music/another-week.mp3', import.meta.url).href, cover: new URL('../assets/music/another-week-cover.jpg', import.meta.url).href, dur: 129.24, credit: 'Produced by Lone Keem · Made with Suno', lazy: true },
+  { title: 'Walked Away', artist: 'Keem', src: new URL('../assets/audio/walked-away.m4a?v=1', import.meta.url).href, dur: 159.6, credit: 'Produced by Lone Keem · Made with Suno' },
 ];
 export const PLAYLIST_CREDIT = TRACKS.map((t) => `${t.title} — ${t.credit}`).join('. ');
 const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)
