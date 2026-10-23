@@ -24,10 +24,10 @@ assert.equal(nearestReach(items, box.x0 - 6, beside.z, aabb, 1.25), -1, 'too far
 
 const bed = { c: 'bd', x: 5.4, z: -5.4, r: 0 };
 nudgePlan(bed, 0.5, -0.5);
-assert.equal(bed.x, 5.5);
-assert.equal(bed.z, -5.5);
+assert.equal(bed.x, 4.5);
+assert.equal(bed.z, -4.05);
 nudgePlan(bed, 0.5, 0);
-assert.equal(bed.x, 5.5, 'nudge stays inside the room');
+assert.equal(bed.x, 4.5, 'a bed foot stays inside the room');
 
 const step = screenStep(1, 0, { fx: 0, fz: 1, rx: 1, rz: 0 });
 assert.deepEqual(step, { dx: 0.5, dz: 0 });

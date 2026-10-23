@@ -51,6 +51,11 @@ body.p3-on .gm.top-right { z-index: 95; }
 @media (max-width: 420px) { .p3-view .kc { --kc-bottom: 62px; } }
 .p3-view .kc-btns { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 58px); }
 .p3-view .kc-b.lock { background: #f59e0b; } .p3-view .kc-b[data-b=cam].on { background: #7c3aed; }
+.p3-view .p3-dances { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.p3-view .p3-dances button { min-height: 68px; border-radius: 14px; border: 2px solid #e4d7ff; background: #fff; color: #2a1458; font: 700 12px/1.15 Inter, system-ui, sans-serif; padding: 6px 4px; }
+.p3-view .p3-dances button .ic { display: block; font-size: 22px; margin-bottom: 2px; }
+.p3-view .p3-dances button.on { border-color: #7c3aed; background: #f4ecff; }
+.p3-view .p3-dances button.stop { grid-column: 1 / -1; min-height: 48px; background: #2a1458; color: #fff; border-color: #2a1458; font-size: 15px; }
 .p3-view .kc-hint { bottom: calc(16% + 30px); }
 .p3-top { padding-right: 64px; }
 .p3-view .kc-gear { display: none; }

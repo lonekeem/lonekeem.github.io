@@ -66,8 +66,53 @@ export const SCREENS = { tv: [0, 1.25, .02, 2, .95], tg: [0, 1.5, .02, 3, 1.5] }
 export const decorItem = (code) => { const d = DECOR[code]; return d ? (d.d ? 'z_hd_' + code : 'hd_' + code) : null; };
 export function parseItems(s) { const out = []; for (const t of String(s || '').split(';')) { const [c, x, z, r, f] = t.split(','); if (!DECOR[c]) continue; const X = +x / 2, Z = +z / 2; if (!isFinite(X) || !isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) continue; out.push({ c, x: X, z: Z, r: (+r || 0) & 3, f: f === '1' ? 1 : 0 }); if (out.length >= 80) break; } return out; }
 export const serItems = (L) => L.map((i) => [i.c, Math.round(i.x * 2), Math.round(i.z * 2), i.r & 3].join(',') + (i.f ? ',1' : '')).join(';');
+// Snap onto the 0.5 grid and keep the piece's footprint inside the room.
+// There is no under-floor height: f is only "upstairs" (1) or the ground floor (0).
+export function placeItem(it) {
+  const D = it && DECOR[it.c];
+  if (!D || !Number.isFinite(+it.x) || !Number.isFinite(+it.z)) return null;
+  let limX = 5.5, limZ = 5.5;
+  if (D.foot) {
+    const [w, d] = ((it.r | 0) & 1) ? [D.foot[1], D.foot[0]] : D.foot;
+    limX = Math.max(0.5, 5.5 - w / 2);
+    limZ = Math.max(0.5, 5.5 - d / 2);
+  }
+  const snap = (v, lim) => Math.max(-lim, Math.min(lim, Math.round(v * 2) / 2));
+  it.x = snap(+it.x, limX);
+  it.z = snap(+it.z, limZ);
+  it.r = (it.r | 0) & 3;
+  it.f = it.f === 1 ? 1 : 0;
+  return it;
+}
+function spills(it) {
+  const D = DECOR[it.c];
+  if (!D || !D.foot) return false;
+  const [w, d] = ((it.r | 0) & 1) ? [D.foot[1], D.foot[0]] : D.foot;
+  return Math.abs(it.x) + w / 2 > 6.02 || Math.abs(it.z) + d / 2 > 6.02;
+}
+// Repair a saved items string. Unknown ids, NaN, and coords outside the room are
+// dropped. A piece whose body crosses the wall is pulled back in. Wall art that
+// came with the house (no foot, still within ±6) is left where it was.
+export function healItems(raw, two) {
+  const items = [], stash = [];
+  let changed = false;
+  for (const t of String(raw || '').split(';')) {
+    if (!t) continue;
+    if (t[0] === '~') { const c = t.slice(1); if (!DECOR[c]) { changed = true; continue; } stash.push(c); continue; }
+    const [c, xs, zs, rs, fs] = t.split(',');
+    if (!DECOR[c]) { changed = true; continue; }
+    const X = +xs / 2, Z = +zs / 2;
+    if (!Number.isFinite(X) || !Number.isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) { changed = true; continue; }
+    const draft = { c, x: X, z: Z, r: (+rs || 0) & 3, f: fs === '1' ? 1 : 0 };
+    if (!two && draft.f) { draft.f = 0; changed = true; }
+    if (spills(draft)) { const before = draft.x + ',' + draft.z; placeItem(draft); if (draft.x + ',' + draft.z !== before) changed = true; }
+    items.push(draft);
+    if (items.length >= 80) break;
+  }
+  return { items, stash, changed, packed: packLayout(items, stash) };
+}
 // A saved items string is the whole layout, even when it is empty. No items key means the house still has its starter set.
-export function placedItems(decor, h, two) { const items = decor && Object.prototype.hasOwnProperty.call(decor, 'items') ? parseItems(decor.items) : parseItems(defaultItems(two, h && h.num ? h.seed : 0)); if (h && h.admin) for (const it of items) { it.x = Math.max(-5.4, Math.min(5.4, it.x)); it.z = Math.max(-5.4, Math.min(5.4, it.z)); } return items; }
+export function placedItems(decor, h, two) { const items = decor && Object.prototype.hasOwnProperty.call(decor, 'items') ? healItems(decor.items, !!two).items : parseItems(defaultItems(two, h && h.num ? h.seed : 0)); if (h && h.admin) for (const it of items) { it.x = Math.max(-5.4, Math.min(5.4, it.x)); it.z = Math.max(-5.4, Math.min(5.4, it.z)); } return items; }
 export function parseStash(s) { const out = []; for (const c of String(s || '').split(';')) { if (!DECOR[c]) continue; out.push(c); if (out.length >= 80) break; } return out; }
 export const serStash = (list) => (list || []).filter((c) => DECOR[c]).slice(0, 80).join(';');
 // Stored starter pieces ride in the same items string (~cs) so a save stays valid on the current rules. Placed layout ignores those tokens.
@@ -143,7 +188,7 @@ export function buildInterior(api, K, h, cx, cz, decor) {
     else if (F.l) for (let i = -5; i <= 5; i++) put(fk, G.box, F.l, cx + i * 1.1 * SC, y + 0.002, cz, 0, 0.03, 0.004, 12.2 * SC);
     floorM = flush(fk, vc({ roughness: t === 'carpet' ? 1 : 0.6 }), false, g); }
   function setItems(L) { items = L; if (decG) { g.remove(decG); decG.traverse((o) => o.geometry && o.geometry.dispose()); } for (const b of decCols) { const i = box.indexOf(b); if (i >= 0) box.splice(i, 1); } decCols = []; decG = new THREE.Group(); g.add(decG);
-    const dk = k + 'd', gk = k + 'dg'; seats = []; screens = []; for (const it of L) { const D = DECOR[it.c]; if (!D) continue; const th = it.r * Math.PI / 2, c = Math.cos(th), s = Math.sin(th), yb = it.f && two ? 3.35 : 0; const ix = it.x * SC, iz = it.z * SC;
+    const dk = k + 'd', gk = k + 'dg'; seats = []; screens = []; for (const it of L) { const D = DECOR[it.c]; if (!D || !Number.isFinite(it.x) || !Number.isFinite(it.z) || Math.abs(it.x) > 6 || Math.abs(it.z) > 6) continue; const th = it.r * Math.PI / 2, c = Math.cos(th), s = Math.sin(th), yb = it.f === 1 && two ? 3.35 : 0; const ix = it.x * SC, iz = it.z * SC;
       for (const [x, sy, z, dy] of SEATS[it.c] || []) seats.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th + dy, fx: Math.sin(th + dy), fz: Math.cos(th + dy), fl: y + yb, c: it.c });
       if (SCREENS[it.c]) { const [x, sy, z, w, hh] = SCREENS[it.c]; screens.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th, w, h: hh, fl: y + yb }); }
       for (const [sh, col, x, yy, z, sx, sy, sz, gl] of D.p) { const wx = x * c + z * s, wz = -x * s + z * c; put(gl ? gk : dk, G[sh], col === 'A' ? A : col === 'T' ? T : col, cx + ix + wx, y + yb + yy, cz + iz + wz, th, sx, sy, sz); }

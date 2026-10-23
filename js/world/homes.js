@@ -12,8 +12,9 @@ import { checkInput, clean } from '../pals/talk.js';
 import { ADMIN_EMAIL, EMU } from '../firebase-init.js';
 import { attachHomeLife } from './homelife.js';
 export const plateBad = (t) => { const s = String(t || ''); return !!(checkInput(s) || checkInput(s.toLowerCase()) || checkInput(s.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').toLowerCase())); };
-import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, defaultItems, placedItems, packLayout, unpackStash, WALL_SW, WALL_ROOMS, parseWalls, EXT_SW, FLOORS } from './interior.js';
-import { itemAabb, pickIndex, nearestReach, nudgePlan, screenStep, clampPlan, xzGap, stashOnRemove } from './decorate.js';
+import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, defaultItems, placedItems, packLayout, unpackStash, WALL_SW, WALL_ROOMS, parseWalls, EXT_SW, FLOORS, healItems, placeItem } from './interior.js';
+import { itemAabb, pickIndex, nearestReach, nudgePlan, screenStep, xzGap, stashOnRemove } from './decorate.js';
+import { doorSpot, positionBad, standY } from './safe-spot.js';
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const RADIO_RE = /^https:\/\/(?:open\.spotify\.com|embed\.music\.apple\.com|music\.apple\.com|(?:www\.|m\.)?youtube\.com|(?:www\.)?youtube-nocookie\.com|(?:www\.)?youtu\.be)\//;
 // House TV accepts the same YouTube links as the rest of Kemy. The id is checked again before an iframe is created.
@@ -179,10 +180,11 @@ export function attachHomes(api, W, K) {
   if (window.__kemyHouseRing) removeEventListener('kemy:house-ring', window.__kemyHouseRing);
   window.__kemyHouseRing = (e) => { const plot = e.detail && e.detail.plot; const o = plot && owners.get(plot); if (o && o.owner) noteHouse(o.owner, plot, 'ring'); };
   addEventListener('kemy:house-ring', window.__kemyHouseRing);
-  function goIn(h) { SC = scOf(h); if (!canEnter(h)) { say('🔒 Only the owner and invited friends can go inside'); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') return; const r = buildRoom(h); inside = h; roomState.box = { x0: r.cx - 5.6 * SC, x1: r.cx + 5.6 * SC, z0: r.cz - 5.6 * SC, z1: r.cz + 5.5 * SC };
-    standUp(true); P.x = r.cx; P.z = r.cz + 4.6 * SC; P.yaw = Math.PI; P.y = FLAT; if (!roomLight) { roomLight = new THREE.PointLight('#fff1d6', LOW ? 22 : 32, 22, 1.6); scene.add(roomLight); } roomLight.position.set(r.cx - 3 * SC, FLAT + 2.7, r.cz + 1.5); roomLight.visible = true; if (!LOW) { if (!roomLight2) { roomLight2 = new THREE.PointLight('#fff1d6', 24, 20, 1.6); scene.add(roomLight2); } roomLight2.position.set(r.cx + 3.5 * SC, FLAT + 2.7, r.cz - 2); roomLight2.visible = true; }
-    roomState.inId = h.id; const ow = owners.get(h.id); if (ow && ow.owner && ow.owner !== uid) noteHouse(ow.owner, h.id, 'visit'); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); api.markDirty && api.markDirty(); }
-  function goOut() { const h = inside; if (!h) return; standUp(true); tvHide(); if (deco) endDeco(false); inside = null; roomState.box = null; roomState.inId = null; decB.hidden = true; if (rad && !radioBox.hidden) minimizeRadio(); if (roomLight2) roomLight2.visible = false; const [x, z] = Lw(h, 0, h.d / 2 + 3.2); P.x = x; P.z = z; P.yaw = h.face > 0 ? 0 : Math.PI; P.y = ground(x, z); if (roomLight) roomLight.visible = false; api.markDirty && api.markDirty(); }
+  function placeAt(p) { if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return; P.sit = null; P.x = p.x; P.z = p.z; if (p.yaw != null) P.yaw = p.yaw; P.vy = 0; P.onGround = true; const gy = ground(p.x, p.z); let y = standY(Number.isFinite(gy) ? gy : FLAT, p.x, p.z); if (!Number.isFinite(y)) y = FLAT; P.y = y; try { if (p.cam != null && window.__p3 && window.__p3.setYaw) window.__p3.setYaw(((p.cam % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)); } catch { /* */ } api.markDirty && api.markDirty(); }
+  function goIn(h) { if (!h) return; if (deco && deco.out) { say('Tap Done or Exit first. Outside decorating stays in the yard.'); return; } SC = scOf(h); if (!canEnter(h)) { say('🔒 Only the owner and invited friends can go inside'); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') return; const r = buildRoom(h); if (deco) endDeco(false); inside = h; roomState.box = { x0: r.cx - 5.6 * SC, x1: r.cx + 5.6 * SC, z0: r.cz - 5.6 * SC, z1: r.cz + 5.5 * SC };
+    standUp(true); P.x = r.cx; P.z = r.cz + 4.6 * SC; P.yaw = Math.PI; P.y = FLAT; P.vy = 0; P.onGround = true; try { if (window.__p3 && window.__p3.setYaw) window.__p3.setYaw(0); } catch { /* */ } if (!roomLight) { roomLight = new THREE.PointLight('#fff1d6', LOW ? 22 : 32, 22, 1.6); scene.add(roomLight); } roomLight.position.set(r.cx - 3 * SC, FLAT + 2.7, r.cz + 1.5); roomLight.visible = true; if (!LOW) { if (!roomLight2) { roomLight2 = new THREE.PointLight('#fff1d6', 24, 20, 1.6); scene.add(roomLight2); } roomLight2.position.set(r.cx + 3.5 * SC, FLAT + 2.7, r.cz - 2); roomLight2.visible = true; }
+    roomState.inId = h.id; const ow = owners.get(h.id); if (ow && ow.owner && ow.owner !== uid) noteHouse(ow.owner, h.id, 'visit'); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); yardB.hidden = true; api.markDirty && api.markDirty(); }
+  function goOut(spot) { const h = inside; if (!h) { if (spot) placeAt(spot); return; } standUp(true); tvHide(); if (deco && !deco.out) endDeco(false); inside = null; roomState.box = null; roomState.inId = null; decB.hidden = true; if (rad && !radioBox.hidden) minimizeRadio(); if (roomLight2) roomLight2.visible = false; placeAt(spot || doorSpot(h)); if (roomLight) roomLight.visible = false; }
 
   // ---------------------------------------------------------------- house radio (homes/{plot}.radio: Spotify/Apple/YouTube embed or Kemy Radio synced by startedAt)
   const css2 = document.createElement('style'); css2.textContent = `.kh-radio{position:absolute;left:50%;transform:translateX(-50%);top:calc(max(8px,env(safe-area-inset-top)) + 54px);width:min(92vw,340px);background:rgba(20,12,45,.88);color:#fff;border-radius:14px;padding:8px 10px;pointer-events:auto;z-index:9;font:600 13px Inter,sans-serif}.kh-radio[hidden],.kh-dbar[hidden],.kh-dec[hidden]{display:none}
@@ -203,7 +205,9 @@ export function attachHomes(api, W, K) {
 @media (prefers-reduced-motion:reduce){.kh-note-btn.on,.kh-note-btn.on .kh-eq i{animation:none}.kh-note-btn.on .kh-eq i{height:70%}}
 .kh-note-btn:focus-visible,.kh-radio button:focus-visible{outline:3px solid #ffd34d;outline-offset:3px}
 .kh-now,.kh-pick{display:flex;gap:8px;align-items:center}.kh-now img,.kh-pick img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none}.kh-pick small{display:block;opacity:.75;font-size:11px;font-weight:600}
-.kh-dec{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 226px);pointer-events:auto;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(15,118,110,.85);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
+.kh-dec,.kh-yard{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 226px);pointer-events:auto;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(15,118,110,.85);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
+.kh-stuck{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 108px);z-index:28;pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;background:#c2410c;color:#fff;font:800 14px Inter,sans-serif;padding:0 12px;box-shadow:0 4px 12px rgba(0,0,0,.35)}
+.kh-yard[hidden],.kh-dec[hidden]{display:none}
 .kh-dbar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(8px,env(safe-area-inset-bottom)) + 150px);width:min(94vw,520px);display:flex;flex-direction:column;gap:6px;background:transparent;color:#111;pointer-events:none;z-index:12;font:600 13px Inter,sans-serif}
 .kh-dbar .kh-handle,.kh-dbar .kh-tools,.kh-dbar .kh-body{pointer-events:auto;background:rgba(255,255,255,.96);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
 .kh-dbar .kh-handle{display:flex;gap:6px;align-items:center;overflow-x:auto;touch-action:pan-x;padding:6px 8px}
@@ -211,6 +215,8 @@ export function attachHomes(api, W, K) {
 .kh-dbar.open .kh-body{max-height:200px;overflow:auto}
 .kh-dbar button{border:0;border-radius:10px;padding:7px 10px;font:800 13px Inter,sans-serif;background:#e5e7eb;color:#111;min-height:40px;flex:none}
 .kh-dbar button.on,.kh-dbar button.p{background:#6d28d9;color:#fff}
+.kh-dbar button.x{background:#fee2e2;color:#991b1b}
+.kh-dbar .kh-tip{margin:0;padding:2px 10px 0;color:#3f3f46;font:600 12px/1.35 Inter,sans-serif}
 .kh-dbar .kh-grip{background:transparent;color:#111;padding-left:4px}
 .kh-dbar .kh-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px}
 .kh-dbar .kh-tools b,.kh-dbar .kh-tools small{flex:1 1 100%;color:#333;font-weight:700}
@@ -219,13 +225,16 @@ export function attachHomes(api, W, K) {
 .kh-dbar .it{flex:0 0 78px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;min-height:68px;text-align:center;line-height:1.15}
 .kh-dbar .it i{font-style:normal;font-size:20px}.kh-dbar .it em{font-style:normal;font-size:10px;color:#6d28d9}
 .kh-dbar label{display:block;margin:6px 0 2px;font-weight:800}
-body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my,body.kh-decorating .p3-chat,body.kh-decorating .p3-log,body.kh-decorating #ks-bag,body.kh-decorating .p3-top,body.kh-decorating #p3-set,body.kh-decorating .kc-gear{display:none!important}
+body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kh-yard,body.kh-decorating .kd-my,body.kh-decorating .p3-chat,body.kh-decorating .p3-log,body.kh-decorating #ks-bag,body.kh-decorating .p3-top,body.kh-decorating #p3-set,body.kh-decorating .kc-gear{display:none!important}
+body.kh-decorating .kh-stuck{display:inline-block!important}
 @media (min-width:900px) and (pointer:fine){.kh-dbar{bottom:12px}}
-@media (orientation:landscape) and (max-height:500px){.kh-dec{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 400px)}.kh-dbar{width:min(58vw,460px);left:auto;right:8px;bottom:8px;transform:none}.kh-dbar .kh-body,.kh-dbar.open .kh-body{max-height:28vh}.kh-radio:not(.min):not(.dock){top:calc(max(8px,env(safe-area-inset-top)) + 4px)}}`; document.head.appendChild(css2);
+@media (orientation:landscape) and (max-height:500px){.kh-dec,.kh-yard{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 400px)}.kh-stuck{top:calc(max(8px,env(safe-area-inset-top)) + 4px);right:calc(max(8px,env(safe-area-inset-right)) + 56px)}.kh-dbar{width:min(58vw,460px);left:auto;right:8px;bottom:8px;transform:none}.kh-dbar .kh-body,.kh-dbar.open .kh-body{max-height:28vh}.kh-radio:not(.min):not(.dock){top:calc(max(8px,env(safe-area-inset-top)) + 4px)}}`; document.head.appendChild(css2);
   const radioBox = document.createElement('div'); radioBox.className = 'kh-radio'; radioBox.hidden = true; const decB = document.createElement('button'); decB.className = 'kh-dec'; decB.textContent = '🛠️ Decorate'; decB.hidden = true;
+  const yardB = document.createElement('button'); yardB.type = 'button'; yardB.className = 'kh-yard'; yardB.textContent = '🎨 Outside'; yardB.hidden = true; yardB.setAttribute('aria-label', 'Decorate the outside of your house');
+  const stuckB = document.createElement('button'); stuckB.type = 'button'; stuckB.className = 'kh-stuck'; stuckB.textContent = 'Stuck? 🔄'; stuckB.setAttribute('aria-label', 'Stuck? Go back to your front door');
   const noteBtn = document.createElement('button'); noteBtn.type = 'button'; noteBtn.className = 'kh-note-btn'; noteBtn.hidden = true; noteBtn.setAttribute('aria-label', 'House music. Show player');
   noteBtn.innerHTML = '<span class="kh-note-glyph" aria-hidden="true">♪</span><span class="kh-eq" aria-hidden="true"><i></i><i></i><i></i></span>';
-  const dbar = document.createElement('div'); dbar.className = 'kh-dbar'; dbar.hidden = true; host.append(radioBox, noteBtn, decB, dbar);
+  const dbar = document.createElement('div'); dbar.className = 'kh-dbar'; dbar.hidden = true; host.append(radioBox, noteBtn, decB, yardB, stuckB, dbar);
   const radioKey = (o) => (o && o.radio ? JSON.stringify(o.radio) : '');
   let rad = null, miniAt = null, drag = null;
   const linkLabel = (url) => (ytRadioId(url) ? 'YouTube' : /apple/.test(url || '') ? 'Apple Music' : 'Spotify');
@@ -490,7 +499,7 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
   const hi = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#fde047', transparent: true, opacity: 0.32, depthTest: false })); hi.renderOrder = 8; hi.visible = false; root.add(hi);
   const hiEdge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: '#facc15', depthTest: false })); hiEdge.renderOrder = 9; hiEdge.visible = false; root.add(hiEdge);
   const passMove = W.move || ((m) => m);
-  W.move = (m) => { if (deco && deco.moving && deco.sel >= 0 && m && m.mag > 0.2) { deco.stick = m; return { x: 0, y: 0, mag: 0, run: false }; } if (deco) deco.stick = null; return passMove(m); };
+  W.move = (m) => { if (deco && deco.out) return passMove(m); if (deco && deco.moving && deco.sel >= 0 && m && m.mag > 0.2) { deco.stick = m; return { x: 0, y: 0, mag: 0, run: false }; } if (deco) deco.stick = null; return passMove(m); };
   function itemBaseY(it) { return FLAT + (it.f && deco.r.I.two ? 3.35 : 0); }
   function aabbOf(it) { return itemAabb(it, SC, deco.r.cx, deco.r.cz, itemBaseY(it)); }
   function sameFloor(it) { if (!deco.r.I.two) return true; return (it.f || 0) === (P.y > FLAT + 2.5 ? 1 : 0); }
@@ -510,31 +519,64 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     hi.position.set(cx, cy, cz); hi.scale.set(sx, sy, sz); hiEdge.position.copy(hi.position); hiEdge.scale.copy(hi.scale);
     ring.position.set(cx, b.y0 + 0.05, cz); ring.scale.setScalar(Math.max(0.8, Math.max(sx, sz) * 0.55));
   }
-  function nudgeScreen(sx, sy) {
-    const it = deco && deco.items[deco.sel]; if (!it) return;
-    const step = screenStep(sx, sy, camBasis()); nudgePlan(it, step.dx, step.dz); relItems(); placeHi();
+  function snapDeco() { return { items: deco.items.map((i) => ({ ...i })), stash: deco.stash.slice(), wall: deco.wall, walls: deco.walls, floor: deco.floor, ext: { ...deco.ext }, sel: deco.sel }; }
+  function remember() { if (!deco) return; deco.hist = deco.hist || []; deco.hist.push(snapDeco()); if (deco.hist.length > 25) deco.hist.shift(); }
+  function undoDeco() {
+    if (!deco || !deco.hist || !deco.hist.length) { say('Nothing to undo'); return; }
+    const s = deco.hist.pop();
+    deco.items = s.items; deco.stash = s.stash; deco.wall = s.wall; deco.walls = s.walls; deco.floor = s.floor; deco.ext = s.ext; deco.sel = s.sel; deco.moving = false;
+    if (!deco.out && deco.r) { relItems(); deco.r.I.setWall(deco.wall, deco.walls); deco.r.I.setFloor(deco.floor); }
+    else if (W.paintHouse) W.paintHouse(myPlot, deco.ext);
+    drawDeco();
   }
-  function rotateSel() { const it = deco && deco.items[deco.sel]; if (!it) return; it.r = (it.r + 1) & 3; relItems(); placeHi(); }
+  function nudgeScreen(sx, sy) {
+    const it = deco && !deco.out && deco.items[deco.sel]; if (!it) return;
+    remember(); const step = screenStep(sx, sy, camBasis()); nudgePlan(it, step.dx, step.dz); relItems(); placeHi();
+  }
+  function rotateSel() { const it = deco && !deco.out && deco.items[deco.sel]; if (!it) return; remember(); it.r = (it.r + 1) & 3; placeItem(it); relItems(); placeHi(); }
   function starterOf(r) { return parseItems(defaultItems(r.I.two, r.h && r.h.num ? r.h.seed : 0)); }
   function removeSel() {
-    if (!deco || deco.sel < 0) return; const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece'; const code = it.c;
+    if (!deco || deco.out || deco.sel < 0) return; remember(); const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece'; const code = it.c;
     const before = deco.stash.length; deco.items.splice(deco.sel, 1); stashOnRemove(code, deco.base, deco.items.filter((q) => q.c === code).length, deco.stash);
     deco.sel = -1; deco.moving = false; relItems(); drawDeco();
     say(deco.stash.length > before ? name + ' is in your furniture. Place it again any time, free.' : name + ' put away. You can place it again.');
   }
-  function selectItem(i) { if (!deco || i < 0 || i >= deco.items.length) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; deco.resetSure = false; placeHi(); paintTools(); markMine(); }
-  function startDeco() { if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
+  function selectItem(i) { if (!deco || deco.out || i < 0 || i >= deco.items.length) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; deco.resetSure = false; placeHi(); paintTools(); markMine(); }
+  function beginOutside() {
+    const h = HOUSE_BY_ID[myPlot]; if (!h || inside || deco) return;
+    if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
+    const near = Math.hypot(P.x - h.x, P.z - h.z) < (h.estate ? 55 : 28);
+    if (!near || positionBad(P.x, P.z) || !Number.isFinite(P.y)) placeAt(doorSpot(h));
+    else { const y = standY(ground(P.x, P.z), P.x, P.z); if (P.y < y - 0.2) { P.y = y; P.vy = 0; P.onGround = true; } }
+    const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
+    deco = { out: true, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r: null, wall: d0.wall || '', walls: d0.walls || '', wroom: '', floor: d0.floor || '', ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: [], stash: [], base: {}, sel: -1, tab: 'p', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false };
+    document.body.classList.add('kh-decorating'); yardB.hidden = true; decB.hidden = true;
+    if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
+    drawDeco(); window.__kh && (window.__kh.deco = true); say('Decorating the outside. You stay in the yard.');
+  }
+  function startDeco(mode) {
+    if (deco) return;
+    if (mode === 'out' || (mode !== 'in' && !inside)) { beginOutside(); return; }
+    if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
     const base = {}; for (const it of starterOf(r)) base[it.c] = (base[it.c] || 0) + 1;
-    deco = { r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, ext: { ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'f', t: 0, open: false, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false };
+    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'f', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false };
     document.body.classList.add('kh-decorating');
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
-    loadOwned().then(() => deco && drawDeco()); drawDeco(); decB.hidden = true; window.__kh && (window.__kh.deco = true); }
-  function endDeco(save) { const d = deco; if (!d) return; document.body.classList.remove('kh-decorating'); const parked = d.parkedRadio; deco = null; dbar.hidden = true; ring.visible = false; hi.visible = false; hiEdge.visible = false; decB.hidden = !(inside && inside.id === myPlot); window.__kh && (window.__kh.deco = false);
+    loadOwned().then(() => deco && drawDeco()); drawDeco(); decB.hidden = true; yardB.hidden = true; window.__kh && (window.__kh.deco = true); }
+  function endDeco(save) { const d = deco; if (!d) return; document.body.classList.remove('kh-decorating'); const parked = d.parkedRadio; const spot = d.spot; deco = null; dbar.hidden = true; ring.visible = false; hi.visible = false; hiEdge.visible = false; decB.hidden = !(inside && inside.id === myPlot); window.__kh && (window.__kh.deco = false);
     if (parked && rad && !radioBox.hidden) restoreCard();
+    if (d.out) {
+      if (save) { const prev = (owners.get(myPlot) || {}).decor || {}; const dec = { ext: d.ext, v: 2 }; if (typeof prev.items === 'string') dec.items = prev.items; if (prev.wall) dec.wall = prev.wall; if (prev.walls) dec.walls = prev.walls; if (prev.floor) dec.floor = prev.floor; homeW({ decor: dec }).then(() => say('💾 Outside colours saved. You are still in the yard.')).catch((e) => { wErr(e); applyDecor(myPlot); }); }
+      else { applyDecor(myPlot); say('Old outside colours are back. You stayed in the yard.'); }
+      const y = standY(ground(P.x, P.z), P.x, P.z);
+      if (inside || positionBad(P.x, P.z) || !Number.isFinite(P.y) || P.y < y - 0.4) placeAt(spot);
+      return;
+    }
     if (save) { const dec = { wall: d.wall, ...(d.walls ? { walls: d.walls } : {}), floor: d.floor, ext: d.ext, items: packLayout(d.items, d.stash), v: 2 }; homeW({ decor: dec }).then(() => say('💾 Home saved! Visitors see your new look.')).catch((e) => { wErr(e); applyDecor(myPlot); }); const r = rooms.get(myPlot); if (r) r.dk = JSON.stringify(dec); }
     else { const r = rooms.get(myPlot); if (r) r.dk = ''; applyDecor(myPlot); } }
-  const relItems = () => { if (deco) deco.r.I.setItems(deco.items); };
+  const relItems = () => { if (deco && !deco.out && deco.r) deco.r.I.setItems(deco.items); };
   function decoTick(dt) {
+    if (!deco || deco.out || !deco.r) return;
     if (!deco.drag) { const n = nearest(); if (n >= 0 && n !== deco.sel) { const b = aabbOf(deco.items[n]); if (deco.sel < 0 || xzGap(P.x, P.z, b) < 0.75) selectItem(n); } }
     placeHi();
     const s = deco.stick; if (deco.moving && s && deco.sel >= 0 && s.mag > 0.45) { deco.stickT += dt; if (deco.stickT >= 0.28) { deco.stickT = 0; if (Math.abs(s.x) >= Math.abs(s.y)) nudgeScreen(Math.sign(s.x), 0); else nudgeScreen(0, Math.sign(s.y)); } }
@@ -544,7 +586,8 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
   function mineName(it, i) { const D = DECOR[it.c]; const n = deco.items.slice(0, i + 1).filter((q) => q.c === it.c).length; const many = deco.items.filter((q) => q.c === it.c).length > 1; return `${D.e} ${D.n}${many ? ' ' + n : ''}${it.f ? ' · Up' : ''}`; }
   function paintTools() {
     const box = dbar.querySelector('.kh-tools'); if (!box || !deco) return; const it = deco.items[deco.sel];
-    box.innerHTML = it ? `<b>${DECOR[it.c].e} ${DECOR[it.c].n}${it.f ? ' · Upstairs' : ''}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-del>Remove</button>` : '<small>Tap a piece, walk up to it, or pick it from Mine.</small>';
+    if (deco.out) { box.innerHTML = '<small>Walk around your yard. The colours update on the house while you watch.</small>'; return; }
+    box.innerHTML = it ? `<b>${DECOR[it.c].e} ${DECOR[it.c].n}${it.f ? ' · Upstairs' : ''}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-del>Delete</button>` : '<small>Tap a piece, walk up to it, or pick it from Mine. It snaps to the grid.</small>';
     const mv = box.querySelector('[data-move]'); if (mv) mv.onclick = () => { deco.moving = !deco.moving; paintTools(); };
     box.querySelectorAll('[data-nudge]').forEach((b) => (b.onclick = () => { const [sx, sy] = b.dataset.nudge.split(',').map(Number); nudgeScreen(sx, sy); }));
     const rb = box.querySelector('[data-rot]'); if (rb) rb.onclick = () => rotateSel();
@@ -553,29 +596,34 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
   function markMine() { dbar.querySelectorAll('[data-mine]').forEach((b) => b.classList.toggle('on', +b.dataset.mine === deco.sel)); }
   function paintBody() {
     const body = dbar.querySelector('.kh-body'); if (!body || !deco) return; const t = deco.tab;
-    if (t === 'p') body.innerHTML = `<div class="kh-strip" aria-label="Wall colours">${WALL_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}</div><div class="kh-strip">${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button type="button" data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join('')}${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join('')}</div>${deco.open ? [['w', 'Walls'], ['r', 'Roof'], ['d', 'Door'], ['t', 'Trim']].map(([k, n]) => `<label>${n}</label><div class="kh-strip">${EXT_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-e="${k}:${c}" aria-label="${n} ${c}"></button>`).join('')}</div>`).join('') + '<button type="button" data-e="reset">Reset outside colours</button>' : ''}`;
+    const extRows = [['w', 'Walls'], ['r', 'Roof'], ['d', 'Door'], ['t', 'Trim']].map(([k, n]) => `<label>${n}</label><div class="kh-strip">${EXT_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-e="${k}:${c}" aria-label="${n} ${c}"></button>`).join('')}</div>`).join('') + '<button type="button" data-e="reset">Reset outside colours</button>';
+    if (deco.out) body.innerHTML = extRows;
+    else if (t === 'p') body.innerHTML = `<div class="kh-strip" aria-label="Wall colours">${WALL_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}</div><div class="kh-strip">${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button type="button" data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join('')}${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join('')}</div>${deco.open ? extRows : ''}`;
     else if (t === 'm') body.innerHTML = `<div class="kh-strip" aria-label="My furniture">${deco.items.map((it, i) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing placed yet.</small>'}</div>`;
     else { const stored = (c) => deco.stash.filter((q) => q === c).length; const entries = Object.entries(DECOR).sort((a, b) => stored(b[0]) - stored(a[0]));
       body.innerHTML = `<div class="kh-strip" aria-label="Add furniture">${entries.map(([c, D]) => { const n = stored(c); const em = n ? 'Stored' + (n > 1 ? ' ' + n : '') : have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D); return `<button type="button" class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${em}</em></button>`; }).join('')}</div>`; }
     body.querySelectorAll('[data-mine]').forEach((b) => (b.onclick = () => selectItem(+b.dataset.mine)));
     body.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; paintBody(); }));
-    body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
-    body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { deco.floor = b.dataset.fl; deco.r.I.setFloor(deco.floor); paintBody(); }));
-    body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say('🎨 Outside colour set (see it when you go out)'); }));
-    body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
+    body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
+    body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); deco.floor = b.dataset.fl; deco.r.I.setFloor(deco.floor); paintBody(); }));
+    body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { remember(); if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say(deco.out ? '🎨 That colour is on the house.' : '🎨 Outside colour set. Step out to see it, or use Decorate outside from the yard.'); }));
+    body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { if (deco.out || !deco.r) return; const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
       const si = deco.stash.indexOf(c); if (si >= 0) deco.stash.splice(si, 1);
       else if (!have(c)) { if (!b.dataset.sure) { b.dataset.sure = 1; b.querySelector('em').textContent = 'Tap to buy ' + priceOf(D); return; } try { b.disabled = true; const { econ: e, dia: d } = await shop(); if (D.d) await d.buy(decorItem(c)); else await e.buy(decorItem(c)); owned = owned || {}; owned[decorItem(c)] = 1; say('🛍️ Bought ' + D.n); }
         catch (e) { b.disabled = false; say(e.code === 'permission-denied' ? 'The shop isn’t selling decor yet (prices not published).' : /Diamond|reading 'd'/.test(e.message || '') ? 'You need more 💎 Diamonds' : e.message || 'Could not buy'); return; } }
       const r = deco.r; const fx = Math.sin(P.yaw || 0), fz = Math.cos(P.yaw || 0);
-      deco.items.push({ c, x: clampPlan((P.x - r.cx + fx * 1.6) / SC), z: clampPlan((P.z - r.cz + fz * 1.6) / SC), r: (Math.round(((P.yaw || 0) + Math.PI) / (Math.PI / 2)) % 4 + 4) % 4, f: r.I.two && P.y > FLAT + 2.5 ? 1 : 0 }); deco.sel = deco.items.length - 1; relItems(); drawDeco(); }));
+      remember(); const it = placeItem({ c, x: (P.x - r.cx + fx * 1.6) / SC, z: (P.z - r.cz + fz * 1.6) / SC, r: (Math.round(((P.yaw || 0) + Math.PI) / (Math.PI / 2)) % 4 + 4) % 4, f: r.I.two && P.y > FLAT + 2.5 ? 1 : 0 }); if (!it) return; deco.items.push(it); deco.sel = deco.items.length - 1; relItems(); drawDeco(); }));
   }
   function drawDeco() { if (!deco) return; const t = deco.tab;
     dbar.classList.toggle('open', !!deco.open); dbar.hidden = false;
-    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} Decorate</button><button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${deco.items.length}</button><button type="button" data-tab="p" class="${t === 'p' ? 'on' : ''}">Paint</button><button type="button" class="g" data-reset aria-label="Reset to default furniture">${deco.resetSure ? 'Sure?' : 'Reset'}</button><button type="button" class="g" data-x>Cancel</button><button type="button" class="p" data-sv>Done</button></div><div class="kh-tools"></div><div class="kh-body"></div>`;
+    const tip = deco.out ? 'You stay in the yard. Tap a colour. Done saves. Exit puts the old colours back.' : 'Drag a piece. Arrows nudge. Rotate turns it. Delete puts it away. It stays inside the room, on the floor. Done saves. Exit cancels.';
+    const tabs = deco.out ? '' : `<button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${deco.items.length}</button><button type="button" data-tab="p" class="${t === 'p' ? 'on' : ''}">Paint</button><button type="button" class="g" data-reset aria-label="Reset to default furniture">${deco.resetSure ? 'Sure?' : 'Reset'}</button>`;
+    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} ${deco.out ? 'Outside' : 'Decorate'}</button>${tabs}<button type="button" data-undo>Undo</button><button type="button" class="x" data-x>Exit</button><button type="button" class="p" data-sv>Done</button></div><p class="kh-tip">${tip}</p><div class="kh-tools"></div><div class="kh-body"></div>`;
     dbar.querySelector('[data-handle]').onclick = () => { deco.open = !deco.open; drawDeco(); };
     dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; deco.resetSure = false; drawDeco(); }));
-    dbar.querySelector('[data-reset]').onclick = () => { if (!deco.resetSure) { deco.resetSure = true; drawDeco(); say('Tap Sure to put back the furniture that came with the house. Paint stays.'); return; }
-      deco.items = starterOf(deco.r).map((i) => ({ ...i })); deco.stash = []; deco.sel = -1; deco.moving = false; deco.resetSure = false; relItems(); drawDeco(); say('Starter furniture is back. Pieces you bought are still yours.'); };
+    const resetB = dbar.querySelector('[data-reset]'); if (resetB) resetB.onclick = () => { if (!deco.resetSure) { deco.resetSure = true; drawDeco(); say('Tap Sure to put back the furniture that came with the house. Paint stays.'); return; }
+      remember(); deco.items = starterOf(deco.r).map((i) => ({ ...i })); deco.stash = []; deco.sel = -1; deco.moving = false; deco.resetSure = false; relItems(); drawDeco(); say('Starter furniture is back. Pieces you bought are still yours.'); };
+    const undoB = dbar.querySelector('[data-undo]'); if (undoB) undoB.onclick = () => undoDeco();
     dbar.querySelector('[data-x]').onclick = () => endDeco(false); dbar.querySelector('[data-sv]').onclick = () => endDeco(true);
     paintTools(); paintBody(); }
   function rayAt(clientX, clientY) {
@@ -586,7 +634,7 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     return { origin, dir };
   }
   function onDecoDown(e) {
-    if (!deco || e.button > 0) return;
+    if (!deco || deco.out || e.button > 0) return;
     if (e.target.closest && e.target.closest('button, a, input, textarea, select, .kh-dbar, .kh-radio, .kh-note-btn, .kc-b, .kc-gear, .kh-p, .ks-panel')) return;
     const ray = rayAt(e.clientX, e.clientY); if (!ray) return;
     const hit = pickIndex(deco.items, ray.origin, ray.dir, aabbOf);
@@ -605,8 +653,9 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     const ray = rayAt(e.clientX, e.clientY); if (!ray || Math.abs(ray.dir.y) < 1e-5) return;
     const y = itemBaseY(it) + 0.02, t = (y - ray.origin.y) / ray.dir.y; if (t < 0) return;
     const wx = ray.origin.x + ray.dir.x * t, wz = ray.origin.z + ray.dir.z * t;
-    const nx = clampPlan(d.ox + (wx - d.wx) / SC), nz = clampPlan(d.oz + (wz - d.wz) / SC);
-    if (nx === it.x && nz === it.z) return; it.x = nx; it.z = nz; relItems(); placeHi();
+    if (!d.noted) { remember(); d.noted = true; }
+    it.x = d.ox + (wx - d.wx) / SC; it.z = d.oz + (wz - d.wz) / SC; placeItem(it);
+    relItems(); placeHi();
   }
   function onDecoUp(e) { if (deco && deco.drag && e.pointerId === deco.drag.id) deco.drag = null; }
   function onDecoKey(e) {
@@ -616,26 +665,30 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     else if (deco.sel >= 0 && e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); nudgeScreen(0, -1); }
     else if (deco.sel >= 0 && e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); nudgeScreen(0, 1); }
     else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); e.stopPropagation(); rotateSel(); }
-    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); removeSel(); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endDeco(true); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && !deco.out) { e.preventDefault(); e.stopPropagation(); removeSel(); }
+    else if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.stopPropagation(); undoDeco(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endDeco(false); }
   }
   function decoratePad(pressed) {
     if (!deco || !pressed) return false;
-    if (pressed.back) { endDeco(true); return true; }
+    if (pressed.back) { endDeco(false); return true; }
     if (deco.sel < 0 && (pressed.confirm || pressed.use)) { const n = nearest(); if (n >= 0) selectItem(n); return true; }
     if (pressed.left) nudgeScreen(-1, 0); if (pressed.right) nudgeScreen(1, 0); if (pressed.up) nudgeScreen(0, -1); if (pressed.down) nudgeScreen(0, 1);
     if (pressed.use) rotateSel(); if (pressed.menu) removeSel();
     if (pressed.confirm) { deco.moving = !deco.moving; paintTools(); }
     return true;
   }
-  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, name: it ? DECOR[it.c].n : '', code: it ? it.c : '', x: it ? it.x : null, z: it ? it.z : null, stash: deco.stash.slice(), hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden }; }
+  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, out: !!deco.out, name: it ? DECOR[it.c].n : '', code: it ? it.c : '', x: it ? it.x : null, z: it ? it.z : null, stash: deco.stash.slice(), hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden, spot: deco.spot }; }
   function screenOf(i) {
     if (!deco || !deco.items[i] || !api.cam) return null; const b = aabbOf(deco.items[i]); api.cam.updateMatrixWorld(); const v = new THREE.Vector3((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2); v.project(api.cam);
     const rect = view.querySelector('canvas').getBoundingClientRect(); return { x: (v.x + 1) / 2 * rect.width + rect.left, y: (1 - v.y) / 2 * rect.height + rect.top, behind: v.z > 1 };
   }
   view.addEventListener('pointerdown', onDecoDown, true); view.addEventListener('pointermove', onDecoMove, true); view.addEventListener('pointerup', onDecoUp, true); view.addEventListener('pointercancel', onDecoUp, true);
   addEventListener('keydown', onDecoKey, true);
-  decB.onclick = () => startDeco();
+  decB.onclick = () => startDeco('in');
+  yardB.onclick = () => startDeco('out');
+  function unstick() { const own = myPlot && HOUSE_BY_ID[myPlot]; const h = own || inside; if (deco) endDeco(false); const spot = h ? doorSpot(h) : { x: 0, z: 82, yaw: Math.PI, cam: 0 }; if (inside) goOut(own ? spot : undefined); else placeAt(spot); document.body.classList.remove('kh-decorating'); if (!inside) { roomState.box = null; roomState.inId = null; } say('Back at the front door. You can look around and move.'); }
+  stuckB.onclick = () => unstick();
   // ---------------------------------------------------------------- owners (live) + buying
   // reads stay per-area: one listener for the classic world (ids < 'hm'), one for my own homes, and one per far-south metro city,
   // opened the first time you get near it (or open its Find-a-home tab) and then kept (cached) for the session
@@ -653,7 +706,13 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
       for (const [id, o] of owners) if (o.owner === uid && !HOUSE_BY_ID[id]?.admin) { myPlot = id; myTier = o.garage || 0; } if (amAdmin && owners.get(ADMIN_PLOT)?.owner === uid && !myPlot) { myPlot = ADMIN_PLOT; myTier = 0; }
       for (const id of new Set([...prev.keys(), ...owners.keys()])) { const h = HOUSE_BY_ID[id]; if (!h) continue; const a = prev.get(id), b = owners.get(id); if (h.sale && JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); if (paintsOutside(h) && JSON.stringify((a || {}).decor) !== JSON.stringify((b || {}).decor)) applyDecor(id); }
       if (inside && !canEnter(inside)) { goOut(); say('🚪 The owner closed this home'); } else if (inside && radioKey(prev.get(inside.id)) !== radioKey(owners.get(inside.id))) { radioOff = null; startRadio(); }
-      syncCars(); ensurePalace(); if (!snapOk) { snapOk = true; firstSpawn(); } }
+      syncCars(); ensurePalace(); healDecor(); if (!snapOk) { snapOk = true; firstSpawn(); } }
+  let decorHealed = false;
+  function healDecor() { if (decorHealed || !myPlot || !uid || !db || deco) return; const o = owners.get(myPlot); const h = HOUSE_BY_ID[myPlot]; if (!o || !h || !o.decor || typeof o.decor.items !== 'string') { decorHealed = true; return; }
+    const heal = healItems(o.decor.items, h.style === 1 || h.style === 3 || !!h.estate); decorHealed = true; if (!heal.changed) return;
+    const ext0 = o.decor.ext && typeof o.decor.ext === 'object' ? o.decor.ext : {}; const decor = { ext: { w: ext0.w || '', r: ext0.r || '', d: ext0.d || '', t: ext0.t || '' }, items: heal.packed, v: 2 };
+    if (o.decor.wall) decor.wall = o.decor.wall; if (o.decor.walls) decor.walls = o.decor.walls; if (o.decor.floor) decor.floor = o.decor.floor;
+    homeW({ decor }).then(() => { const r = rooms.get(myPlot); if (r) { r.dk = ''; applyDecor(myPlot); } }).catch(() => {}); }
   async function buyHome(h, btn) { try { if (myPlot) throw new Error('You already own a home (one per player). Move out first to buy another.'); if (owners.has(h.id)) throw new Error('Someone just bought this one!');
       busy(btn, 'Buying…'); const st = HOME_STYLES[h.style]; const { econ: e, dia: d } = await shop(); const inv = await e.inventory(true); if (!inv[st.item]) { if (st.d) await d.buy(st.item); else await e.buy(st.item); }
       const b = writeBatch(db); b.set(doc(db, 'homes', h.id), { owner: uid, name: S.profile.displayName, style: st.key, garage: 0, at: serverTimestamp() }); b.set(doc(db, 'users', uid, 'pal', 'home'), { plot: h.id, at: serverTimestamp() }); await b.commit();
@@ -664,8 +723,8 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     catch (e) { btn.disabled = false; btn.textContent = 'Try again'; say(e.code === 'permission-denied' ? 'The shop isn’t open for garages yet (prices not published).' : e.message || 'Could not build'); } }
   async function moveOut(btn) { try { busy(btn, 'Moving out…'); const b = writeBatch(db); b.delete(doc(db, 'homes', myPlot)); b.delete(doc(db, 'users', uid, 'pal', 'home')); await b.commit(); save.cars = []; persist(true); pan.hidden = true; say('📦 Moved out. Your deed stays, so you can claim another house of that style for free.'); } catch (e) { btn.disabled = false; say(e.message || 'Could not move out'); } }
   function salePanel(h) { const st = HOME_STYLES[h.style]; panel(`<h3>🏷️ ${st.name}</h3><div class="row"><span>Plot ${h.id} · ${(h.town ? h.town : 'Kemy Street')}</span><b>${price(st)}</b></div><p><small>Living room, kitchen and bedroom inside. One home per player. Add a garage later.</small></p>${myPlot ? `<p><b>You already own ${myPlot}.</b></p>` : '<button data-b>Buy for ' + price(st) + '</button>'}`, (c) => { const b = c.querySelector('[data-b]'); if (b) b.onclick = () => buyHome(h, b); }); }
-  function myPanel() { const h = HOUSE_BY_ID[myPlot]; const st = HOME_STYLES[h.style]; const carNote = (() => { const G0 = garages.get(myPlot); const n = G0 ? G0.cars.length : 0; const ov = G0 ? G0.overflow : 0; if (h.admin) return `🚗 ${n} car${n === 1 ? '' : 's'} parked in the front yard for everyone to see. Walk up to one to drive it.`; return `🚗 ${n} car${n === 1 ? '' : 's'} parked here for everyone to see (garage holds ${garageCap(myTier)}, plus driveway${h.estate ? '' : ' + curb'} spots).${ov ? ` <b>${ov} more need a bigger garage.</b>` : ''} Walk up to a parked car to drive it; drive home and tap 🅿️ Park at home.`; })(); panel(`<h3>🏠 My ${h.admin ? h.spot : st.name}</h3>${h.admin ? '' : `<div class="row"><span>Garage</span><b>${myTier ? myTier + ' bay' + (myTier > 1 ? 's' : '') : 'none'}</b></div>`}` + GARAGES.filter((g) => g.tier > myTier && g.tier <= maxTier(h)).map((g) => `<div class="row"><span>${g.name}</span><button data-g="${g.tier}">${price(g)}</button></div>`).join('') + `<p><small>${carNote}</small></p><div><button data-gu>🚪 Open house & invites</button><button data-rd>📻 House radio</button><button data-dc>🛠️ Decorate</button>${h.admin ? '<button data-sign>✏️ Edit sign</button>' : ''}</div><button class="g" data-m>Move out</button>${h.admin ? '' : ' <button class="g" data-sell>🏷️ Sell house</button>'}`,
-    (c) => { c.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => buyGarage(+b.dataset.g, b))); c.querySelector('[data-gu]').onclick = () => guestPanel(); c.querySelector('[data-rd]').onclick = () => radioPanel(); c.querySelector('[data-dc]').onclick = () => { pan.hidden = true; if (inside && inside.id === myPlot) startDeco(); else { goIn(HOUSE_BY_ID[myPlot]); setTimeout(startDeco, 50); } }; const sg = c.querySelector('[data-sign]'); if (sg) sg.onclick = () => signPanel(); c.querySelector('[data-m]').onclick = (e) => { if (e.target.dataset.sure) moveOut(e.target); else { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to move out'; } }; const sb = c.querySelector('[data-sell]'); if (sb) sb.onclick = () => sellPanel(); }); }
+  function myPanel() { const h = HOUSE_BY_ID[myPlot]; const st = HOME_STYLES[h.style]; const carNote = (() => { const G0 = garages.get(myPlot); const n = G0 ? G0.cars.length : 0; const ov = G0 ? G0.overflow : 0; if (h.admin) return `🚗 ${n} car${n === 1 ? '' : 's'} parked in the front yard for everyone to see. Walk up to one to drive it.`; return `🚗 ${n} car${n === 1 ? '' : 's'} parked here for everyone to see (garage holds ${garageCap(myTier)}, plus driveway${h.estate ? '' : ' + curb'} spots).${ov ? ` <b>${ov} more need a bigger garage.</b>` : ''} Walk up to a parked car to drive it; drive home and tap 🅿️ Park at home.`; })(); panel(`<h3>🏠 My ${h.admin ? h.spot : st.name}</h3>${h.admin ? '' : `<div class="row"><span>Garage</span><b>${myTier ? myTier + ' bay' + (myTier > 1 ? 's' : '') : 'none'}</b></div>`}` + GARAGES.filter((g) => g.tier > myTier && g.tier <= maxTier(h)).map((g) => `<div class="row"><span>${g.name}</span><button data-g="${g.tier}">${price(g)}</button></div>`).join('') + `<p><small>${carNote}</small></p><div><button data-gu>🚪 Open house & invites</button><button data-rd>📻 House radio</button><button data-dc>🛠️ Decorate inside</button><button data-yd>🎨 Decorate outside</button>${h.admin ? '<button data-sign>✏️ Edit sign</button>' : ''}</div><button class="g" data-m>Move out</button>${h.admin ? '' : ' <button class="g" data-sell>🏷️ Sell house</button>'}`,
+    (c) => { c.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => buyGarage(+b.dataset.g, b))); c.querySelector('[data-gu]').onclick = () => guestPanel(); c.querySelector('[data-rd]').onclick = () => radioPanel(); c.querySelector('[data-dc]').onclick = () => { pan.hidden = true; if (deco && deco.out) { say('Exit outside decorating first.'); return; } if (inside && inside.id === myPlot) startDeco('in'); else { goIn(HOUSE_BY_ID[myPlot]); setTimeout(() => startDeco('in'), 50); } }; const yd = c.querySelector('[data-yd]'); if (yd) yd.onclick = () => { pan.hidden = true; if (deco && !deco.out) endDeco(false); if (inside) goOut(); startDeco('out'); }; const sg = c.querySelector('[data-sign]'); if (sg) sg.onclick = () => signPanel(); c.querySelector('[data-m]').onclick = (e) => { if (e.target.dataset.sure) moveOut(e.target); else { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to move out'; } }; const sb = c.querySelector('[data-sell]'); if (sb) sb.onclick = () => sellPanel(); }); }
   async function signAllowed(s) { if (!s || checkInput(s) || checkInput(s.toLowerCase()) || clean(s) !== s) return false; try { const { autoFlag } = await import('../moderation.js'); if (autoFlag(s)) return false; } catch { /* the word lists are the backup */ } return true; }
   function signPanel() { if (!amAdmin) return; const cur = signOf(owners.get(ADMIN_PLOT)); panel(`<h3>👑 Palace sign</h3><p><small>This is the gold sign out front. Everyone sees the same words. Up to 24 characters.</small></p><input id="kh-sign" maxlength="24" value="${esc(cur)}" style="width:100%;box-sizing:border-box;font:700 16px Inter,sans-serif;padding:8px;border-radius:10px;border:1px solid #ccc">`, (c) => { const b = document.createElement('button'); b.textContent = 'Save sign'; b.onclick = async () => { const raw = Array.from(c.querySelector('#kh-sign').value.replace(/\s+/g, ' ').trim()).slice(0, 24).join(''); const sign = raw || PALACE_SIGN; if (!(await signAllowed(sign))) { say('Let’s keep the sign friendly.'); return; } const o = owners.get(ADMIN_PLOT) || {}; try { await setDoc(doc(db, 'homes', ADMIN_PLOT), { owner: uid, name: S.profile.displayName, style: 'estate', garage: o.garage || 0, sign, at: serverTimestamp() }, { merge: true }); pan.hidden = true; say('👑 Sign updated'); } catch (e) { say(e && e.code === 'permission-denied' ? 'Only the admin can change this sign.' : 'Could not save the sign'); } }; c.insertBefore(b, c.querySelector('[data-x]').parentElement); }); }
   // 🏷️ sell back: a server function (sellHome) checks ownership + the deed and credits 60% in the same currency, once
@@ -680,8 +739,8 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
       const res = (await F.httpsCallable(fns, 'sellHome')({ plot })).data; if (inside && inside.id === plot) goOut(); save.cars = []; persist(true); pan.hidden = true;
       say(`🏷️ Sold! ${res.cur === 'star' ? '⭐' : '💎'}${res.n} added to your wallet.`); try { api.sfx && api.sfx('coin'); } catch { /* */ } }
     catch (e) { btn.disabled = false; btn.textContent = 'Try again'; say((e && e.message) || 'Could not sell'); } }
-  function homeFront(h) { const [x, z] = Lw(h, 0, h.d / 2 + 3.2); return { x, z, yaw: h.face > 0 ? 0 : Math.PI }; }
-  function teleport(p) { if (inside) goOut(); P.x = p.x; P.z = p.z; P.yaw = p.yaw || 0; P.y = ground(p.x, p.z); api.markDirty && api.markDirty(); }
+  function homeFront(h) { return h ? doorSpot(h) : null; }
+  function teleport(p) { if (deco && deco.out) endDeco(false); if (inside) goOut(p); else placeAt(p); }
   homeB.onclick = () => { if (homeB.dataset.ring) { inviteRinger(); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
     if (myPlot) { teleport(homeFront(HOUSE_BY_ID[myPlot])); say('🏠 Home sweet home'); return; }
     findHome('all', 0); };
@@ -757,7 +816,7 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
 
   // ---------------------------------------------------------------- save / restore location (+ street car)
   let lastLS = 0, lastFS = 0, lastSent = null;
-  function snapshot() { let x = P.x, z = P.z, yaw = P.yaw || 0; if (inside) { const f = homeFront(inside); x = f.x; z = f.z; yaw = f.yaw; } const m = D && D.mine && D.mine(); let street = null;
+  function snapshot() { let x = P.x, z = P.z, yaw = P.yaw || 0; if (inside) { const f = homeFront(inside); x = f.x; z = f.z; yaw = f.yaw; } else if (positionBad(x, z)) { const f = (deco && deco.out && deco.spot && !positionBad(deco.spot.x, deco.spot.z)) ? deco.spot : (myPlot && homeFront(HOUSE_BY_ID[myPlot])); if (f) { x = f.x; z = f.z; yaw = f.yaw || yaw; } } const m = D && D.mine && D.mine(); let street = null;
     if (m) { street = { id: m.id, c: m.color, x: Math.round(m.x * 10) / 10, z: Math.round(m.z * 10) / 10, yaw: Math.round(m.yaw * 100) / 100 }; }
     return { x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10, yaw: Math.round(yaw * 100) / 100, cars: [], street }; }
   function persist(force) { const now = Date.now(); const s = snapshot(); Object.assign(save, s); if (force || now - lastLS > 3000) { lastLS = now; lss(LS, JSON.stringify(save)); }
@@ -765,25 +824,33 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
     if (moved && (now - lastFS > (force ? 6000 : 30000))) { lastFS = now; lastSent = s; setDoc(doc(db, 'users', uid, 'pal', 'world'), { ...s, at: serverTimestamp() }).catch((e) => console.warn('world save', e.code || e)); } }
   const onHide = () => persist(true); addEventListener('pagehide', onHide); document.addEventListener('visibilitychange', onHide);
   let spawned = false; const startAt = { x: P.x, z: P.z };
-  async function firstSpawn() { if (spawned) return; spawned = true; let fs = null; if (uid && db) try { const d = await getDoc(doc(db, 'users', uid, 'pal', 'world')); if (d.exists()) fs = d.data(); } catch { /* */ }
+  async function firstSpawn() { if (spawned) return; spawned = true; document.body.classList.remove('kh-decorating'); deco = null; dbar.hidden = true; let fs = null; if (uid && db) try { const d = await getDoc(doc(db, 'users', uid, 'pal', 'world')); if (d.exists()) fs = d.data(); } catch { /* */ }
     if (fs) { if ('street' in fs) save.street = fs.street; }
     const loc = fs || (save.x != null ? save : null); if (Math.hypot(P.x - startAt.x, P.z - startAt.z) > 4) return; // already walking: don't yank
-    if (myPlot) teleport(homeFront(HOUSE_BY_ID[myPlot])); else if (loc && loc.x != null) { const [x, z] = worldClamp(loc.x, loc.z); teleport({ x, z, yaw: loc.yaw }); }
-    if (save.street && CAR[save.street.id] && D && D.place && !D.mine()) D.place(save.street.id, save.street.c || 0, { x: save.street.x, z: save.street.z, yaw: save.street.yaw }, false);
-    showParked(); window.__kh && (window.__kh.spawned = myPlot ? 'home' : loc ? 'saved' : 'default'); }
+    const home = myPlot && HOUSE_BY_ID[myPlot];
+    const savedBad = !!(loc && loc.x != null && positionBad(+loc.x, +loc.z));
+    if (home) teleport(homeFront(home));
+    else if (loc && loc.x != null && !positionBad(+loc.x, +loc.z)) teleport({ x: +loc.x, z: +loc.z, yaw: +loc.yaw || 0, cam: (+loc.yaw || 0) + Math.PI });
+    else teleport({ x: 0, z: 82, yaw: Math.PI, cam: 0 });
+    if (savedBad) persist(true); // rewrite a broken saved spot so the next visit does not restore it
+    if (save.street && CAR[save.street.id] && D && D.place && !D.mine() && !positionBad(+save.street.x, +save.street.z)) D.place(save.street.id, save.street.c || 0, { x: save.street.x, z: save.street.z, yaw: save.street.yaw }, false);
+    showParked(); window.__kh && (window.__kh.spawned = home ? 'home' : loc && !savedBad ? 'saved' : 'default'); }
   if (!uid) setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 50); setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 6000);
 
   // ---------------------------------------------------------------- per-frame: prompts, garage doors, light
   function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * 8); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
+    if (inside && (!Number.isFinite(P.y) || P.y < FLAT - 0.25)) { const r = rooms.get(inside.id); if (r) { P.x = r.cx; P.z = r.cz + 4.6 * SC; } P.y = FLAT; P.vy = 0; P.onGround = true; }
+    if (deco && deco.out) { const y = standY(ground(P.x, P.z), P.x, P.z); if (inside || positionBad(P.x, P.z) || !Number.isFinite(P.y) || P.y < y - 0.45) placeAt(deco.spot); }
     if (driving && rad && !radioBox.hidden) { if (radioBox.classList.contains('dock')) placeNote(); else if (!radioBox.classList.contains('min')) dockRadio(); else { const rr = radioBox.getBoundingClientRect(); if (hitsPad({ l: rr.left, t: rr.top, r: rr.right, b: rr.bottom })) dockRadio(); } }
-    if (inside) { const { cx, cz } = roomCell(inside); if (Math.hypot(P.x - cx, P.z - (cz + 5.4 * SC)) < 1.8) promptNow = { id: 'kh:out', label: '🚪 Go outside' }; else if (!deco) promptNow = roomPrompt(); }
-    else if (!driving) { let best = null, bd = 2.8; for (const h of housesNear(P.x, P.z, 12)) { const d = Math.hypot(h.door.x - P.x, h.door.z - P.z); if (d < bd) { bd = d; best = h; } }
+    if (inside) { const { cx, cz } = roomCell(inside); if (Math.hypot(P.x - cx, P.z - (cz + 5.4 * SC)) < 1.8 && !(deco && deco.out)) promptNow = { id: 'kh:out', label: '🚪 Go outside' }; else if (!deco) promptNow = roomPrompt(); }
+    else if (!driving && !(deco && deco.out)) { let best = null, bd = 2.8; for (const h of housesNear(P.x, P.z, 12)) { const d = Math.hypot(h.door.x - P.x, h.door.z - P.z); if (d < bd) { bd = d; best = h; } }
       if (best) { const o = owners.get(best.id); if (best.sale) { if (!o) promptNow = { id: 'kh:sale:' + best.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[best.style]) }; else if (o.owner === uid) { promptNow = { id: 'kh:mine:' + best.id, label: '🏠 My home' }; showIn = best; } else if (canEnter(best)) showIn = best; else promptNow = { id: 'kh:ring:' + best.id, label: '🚪 Ring doorbell' }; } else showIn = best; }
       else for (const h of housesNear(P.x, P.z, 20)) if (h.sale && !owners.has(h.id)) { const [sx, sz] = Lw(h, -6.3, h.d / 2 + 4.6); if (Math.hypot(sx - P.x, sz - P.z) < 2.4) { promptNow = { id: 'kh:sale:' + h.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[h.style]) }; break; } } }
     garageTick(dt); signTick(dt); metroTick(dt);
     if (!inside && !promptNow) { if (driving) { if (Math.abs(m.speed) < 2 && ownHomes().some((q) => Math.hypot(q.x - m.x, q.z - m.z) < (q.estate ? 70 : 32))) promptNow = { id: 'kh:park', label: '🅿️ Park at home' }; }
       else { const n = nearMyCar(); if (n) { pendingTake = n; promptNow = { id: 'kh:take', label: '🚗 Drive ' + CAR[n.car.m].name }; } if (!promptNow && amAdmin) { const [sx, sz] = Lw(HOUSE_BY_ID[ADMIN_PLOT], PALACE_SIGN_AT.x, PALACE_SIGN_AT.z); if (Math.hypot(P.x - sx, P.z - sz) < 4.5) promptNow = { id: 'kh:sign', label: '✏️ Edit sign' }; } } }
     inB.hidden = !showIn; if (showIn) { inB.dataset.h = showIn.id; const ow = owners.get(showIn.id); inB.textContent = ow && ow.owner !== uid ? '🏠 Visit ' + String(ow.name || 'Pal').slice(0, 12) : '🏠 Go in'; }
+    const mineH = myPlot && HOUSE_BY_ID[myPlot]; yardB.hidden = !!(inside || deco || driving || !mineH || Math.hypot(P.x - mineH.x, P.z - mineH.z) > (mineH.estate ? 55 : 28));
     if (inside && roomLight) { roomLight.intensity = (LOW ? 18 : 26); const r = rooms.get(inside.id); if (r) { r.I.update(dt, P); if (roomLight2) { const up = P.y > FLAT + 2.5; roomLight2.position.set(r.cx + 3.4, FLAT + (up ? 5.9 : 2.7), r.cz + (up ? -2.5 : -1)); } if (deco) decoTick(dt); } }
     const inviteLab = paintInvite(); if (inviteLab && !promptNow && !deco) promptNow = { id: 'kh:invite', label: inviteLab };
     persist(false);
@@ -794,8 +861,8 @@ body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kd-my
   const life = attachHomeLife(api, { inside: () => inside, room: () => (inside && rooms.get(inside.id)) || null, say,
     sitAt: (o) => { P.sit = { x: o.x, z: o.z, y: o.y, yaw: o.yaw, seat: o.seat || null, back: o.back, off: () => (o.dn === 'sleep' ? life.act('wake') : null) }; P.x = o.x; P.z = o.z; P.yaw = o.yaw; api.markDirty && api.markDirty(); },
     unsit: () => { const st = P.sit; if (!st) return; P.sit = null; P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; api.markDirty && api.markDirty(); } });
-  window.__khApi = { life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
-  function destroy() { try { life.destroy(); } catch { /* */ } document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); pan.remove(); css.remove(); css2.remove(); }
+  window.__khApi = { life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
+  function destroy() { try { life.destroy(); } catch { /* */ } document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); pan.remove(); css.remove(); css2.remove(); }
   void Q; void K;
   return { update, destroy };
 }

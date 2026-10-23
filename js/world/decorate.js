@@ -1,7 +1,7 @@
 // Furniture picking for Decorate mode. Pure math so a tap, a walk-up, and a test
 // all use the same boxes. Piece positions stay in plan units; the room scale
 // turns them into world metres. Written by Lone Keem.
-import { DECOR } from './interior.js';
+import { DECOR, placeItem } from './interior.js';
 
 const PAD = 0.28;
 
@@ -71,6 +71,8 @@ export function nearestReach(items, px, pz, aabbOf, reach = 1.25) {
   return best;
 }
 
+// 0.5 grid, kept inside the room. Large pieces are pulled in again by placeItem
+// so a sofa foot cannot stick through the wall.
 export function clampPlan(v) { return Math.max(-5.5, Math.min(5.5, Math.round(v * 2) / 2)); }
 
 // A removed piece goes into house storage when the room now has fewer of that
@@ -83,9 +85,9 @@ export function stashOnRemove(code, base, placedAfter, stash) {
 }
 
 export function nudgePlan(it, dx, dz) {
-  it.x = clampPlan(it.x + dx);
-  it.z = clampPlan(it.z + dz);
-  return it;
+  it.x += dx;
+  it.z += dz;
+  return placeItem(it);
 }
 
 // sx/sy are screen steps: +sx right, +sy down. Forward on screen is away from the camera.

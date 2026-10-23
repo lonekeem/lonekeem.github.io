@@ -64,8 +64,11 @@ assert.equal(scOf(palace), 2.1);
 const items = placedItems({ items: 'bd,12,12,0' }, palace, true);
 assert.equal(items.length, 1);
 assert.ok(Math.abs(items[0].x) <= 5.4 && Math.abs(items[0].z) <= 5.4);
+const wall = placedItems({ items: 'ar,12,0,0' }, palace, true);
+assert.equal(wall.length, 1);
+assert.equal(wall[0].x, 5.4, 'palace wall art is pulled inside the room');
 const street = HOUSES.find((h) => !h.admin && !h.estate);
-const loose = placedItems({ items: 'bd,12,0,0' }, street, false);
-assert.equal(loose[0].x, 6, 'other houses keep a saved spot at the wall');
+const loose = placedItems({ items: 'ar,12,0,0' }, street, false);
+assert.equal(loose[0].x, 6, 'other houses keep wall art at the wall');
 
 console.log('palace move tests ok', bays.length, 'bays');
