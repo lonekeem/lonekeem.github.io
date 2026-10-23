@@ -9,6 +9,7 @@ import { getActivePal } from './core.js';
 import { createControls, buzz } from '../controls.js';
 import { ARM, createDiamonds, equippedArmor, RUN_CAP } from './armory.js';
 import { WEAPONS, SFX, loadProgress, saveProgress, acknowledge, ownedIds, isOwned, levelOf, usableLoadout, combatMods, addCoins, killCoins, waveCoins, buildGun } from './zombie-weapons.js';
+import { FX_SHAPES, fxIndex, paintFxCell, shotColors, shotFx } from './shot-fx.js';
 export { WEAPONS };
 import { createEconomy } from './economy.js';
 import { ZTABS, zSayIdx, zEmoteIdx, zEmoteOf, zText } from './zombie-net.js';
@@ -25,7 +26,7 @@ const ZT = { // zombie types
   chonk: { hp: 90, spd: 1.1, sc: 1.45, col: 0x4fb59a, pts: 30, dia: 2 },
   boss: { hp: 420, spd: 1.3, sc: 2.6, col: 0x9a6bd6, pts: 300, dia: 15 }
 };
-const ARENA = 27, MAXZ = 40, MAXP = 90, MAXFX = 700;
+const ARENA = 27, MAXZ = 40, MAXP = 90;
 let audioCtx = null; const LOD = new Map();
 function snd(kind) { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); const a = audioCtx, t = a.currentTime, o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
   o.connect(f); f.connect(g); g.connect(a.destination); f.type = 'lowpass'; f.frequency.value = kind === 'groan' ? 700 : 2400;
@@ -171,14 +172,19 @@ export function createZombieGame(ctx) {
     function showBeam(x, y, z, ax, az, len, col, wide) { const m = beamPool[beamN = (beamN + 1) % beamPool.length]; m.visible = true; m.material.color.setHex(col || 0xffffff); m.material.opacity = 0.85; const Lth = Math.max(0.4, len); m.scale.set(wide || 1, Lth, wide || 1); m.position.set(x + ax * Lth * 0.5, y, z + az * Lth * 0.5); dirVec.set(ax, 0, az); if (dirVec.lengthSq() < 1e-6) dirVec.set(0, 1, 0); else dirVec.normalize(); m.quaternion.setFromUnitVectors(upVec, dirVec); m.userData.t = flameWide(wide); }
     function flameWide(wide) { return (wide || 1) > 1.5 ? 0.09 : 0.12; }
     const bombM = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), new THREE.MeshBasicMaterial({ color: 0xffe14a })); bombM.visible = false; scene.add(bombM);
-    // sparkle / goo particles
-    const fxPos = new Float32Array(MAXFX * 3).fill(-999), fxCol = new Float32Array(MAXFX * 3), fxV = new Float32Array(MAXFX * 3), fxL = new Float32Array(MAXFX); let fxI = 0;
-    const fxG = new THREE.BufferGeometry(); fxG.setAttribute('position', new THREE.BufferAttribute(fxPos, 3)); fxG.setAttribute('color', new THREE.BufferAttribute(fxCol, 3));
-    const starTex = canvasTex(64, 64, (c) => { c.translate(32, 32); c.fillStyle = '#fff'; c.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 11 : 30, a = (i / 10) * TAU - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.fill(); });
-    const fx = new THREE.Points(fxG, new THREE.PointsMaterial({ size: 0.42, map: starTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); fx.frustumCulled = false; scene.add(fx);
+    // One small point cloud per picture, so a goo drop never shares the star stamp.
+    const FXN = 140;
+    const fxPools = FX_SHAPES.map((name) => {
+      const pos = new Float32Array(FXN * 3).fill(-999), col = new Float32Array(FXN * 3), vel = new Float32Array(FXN * 3), life = new Float32Array(FXN);
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      const tex = canvasTex(64, 64, (c) => paintFxCell(c, name, 64)); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+      const mat = new THREE.PointsMaterial({ size: name === 'drop' || name === 'star' ? 0.55 : 0.4, map: tex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, alphaTest: 0.2 });
+      const pts = new THREE.Points(g, mat); pts.frustumCulled = false; scene.add(pts);
+      return { pos, col, vel, life, g, i: 0 };
+    });
     const tmpC = new THREE.Color(), skinC = new THREE.Color(), clothC = new THREE.Color();
-    function burst(x, y, z, n, cols, sp = 4) { for (let i = 0; i < n; i++) { const k = fxI = (fxI + 1) % MAXFX; fxPos[k * 3] = x; fxPos[k * 3 + 1] = y; fxPos[k * 3 + 2] = z; const a = Math.random() * TAU, u = rnd(-1, 1), s = rnd(0.4, 1) * sp;
-      fxV[k * 3] = Math.cos(a) * Math.sqrt(1 - u * u) * s; fxV[k * 3 + 1] = Math.abs(u) * s + 1.5; fxV[k * 3 + 2] = Math.sin(a) * Math.sqrt(1 - u * u) * s; fxL[k] = rnd(0.5, 1.1); tmpC.set(cols[i % cols.length]); fxCol[k * 3] = tmpC.r; fxCol[k * 3 + 1] = tmpC.g; fxCol[k * 3 + 2] = tmpC.b; } }
+    function burst(x, y, z, n, cols, sp = 4, shape = 'blob') { const pool = fxPools[fxIndex(shape)]; for (let i = 0; i < n; i++) { const k = pool.i = (pool.i + 1) % FXN; pool.pos[k * 3] = x; pool.pos[k * 3 + 1] = y; pool.pos[k * 3 + 2] = z; const a = Math.random() * TAU, u = rnd(-1, 1), s = rnd(0.4, 1) * sp;
+      pool.vel[k * 3] = Math.cos(a) * Math.sqrt(1 - u * u) * s; pool.vel[k * 3 + 1] = Math.abs(u) * s + 1.2; pool.vel[k * 3 + 2] = Math.sin(a) * Math.sqrt(1 - u * u) * s; pool.life[k] = rnd(0.45, 0.95); tmpC.set(cols[i % cols.length]); pool.col[k * 3] = tmpC.r; pool.col[k * 3 + 1] = tmpC.g; pool.col[k * 3 + 2] = tmpC.b; } }
     // power-ups
     const PU = { heart: ['💖', 0xff6b9a], ammo: ['🔋', 0x6dff5a], zoom: ['👟', 0x8fd8ff], shield: ['🛡️', 0xffd23f], dia2: ['💎', 0x7fe3ff] };
     const puMeshes = Object.fromEntries(Object.entries(PU).map(([k, [, c]]) => { const m = new THREE.Mesh(k === 'dia2' ? new THREE.OctahedronGeometry(0.35) : k === 'heart' ? new THREE.SphereGeometry(0.3, 10, 8) : new THREE.BoxGeometry(0.45, 0.45, 0.45), new THREE.MeshBasicMaterial({ color: c })); return [k, m]; }));
@@ -225,16 +231,16 @@ export function createZombieGame(ctx) {
       if (!best) return [fx0, fz0, null]; const dx = best.x - me.x, dz = best.z - me.z, d = Math.hypot(dx, dz); { let dy = Math.atan2(dx, dz) - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += dy * 0.06; } /* gently turn toward the target */ const k = 0.65; const ax = fx0 + (dx / d - fx0) * k, az = fz0 + (dz / d - fz0) * k, l = Math.hypot(ax, az); return [ax / l, az / l, best];
     }
     function spawnPellet(ax, az, w, dmg) { if (projs.length >= MAXP) projs.shift(); const sp = w.spd || 24; projs.push({ x: me.x + ax * 0.7, y: me.y + (w.pattern === 'lob' ? 1.15 : 0.95), z: me.z + az * 0.7, vx: ax * sp, vy: w.pattern === 'lob' ? 8 : 0, vz: az * sp, grav: w.pattern === 'lob' ? 16 : 0, life: (w.range || 24) / sp, w, dmg, bounce: w.bounce || 0, homing: w.homing || 0, hitSet: null, boomed: 0 }); }
-    function muzzle(ax, az, w) { burst(me.x + ax * 0.9, me.y + 1, me.z + az * 0.9, w.pattern === 'rocket' ? 10 : 5, [w.hex || '#fff', '#ffffff'], 2.4); }
-    function fireCone(ax, az, w, dmg) { const len = w.range || 16; const flame = w.pattern === 'flame'; showBeam(me.x, me.y + 0.95, me.z, ax, az, len, w.col, flame ? 2.6 : 1); for (const z of zs) { if (z.dead || z.rise > 0) continue; const dx = z.x - me.x, dz = z.z - me.z, along = dx * ax + dz * az; if (along < 0.3 || along > len) continue; const px = dx - ax * along, pz = dz - az * along, wide = flame ? 0.45 + along * 0.18 : 0.7; if (px * px + pz * pz > wide * wide) continue; hit(z, dmg, ax * 3, az * 3, w); } if (flame) burst(me.x + ax * 1.4, me.y + 0.9, me.z + az * 1.4, 8, ['#ffb347', '#ff6a3d', '#ffe14a'], 3); }
-    function explodeAt(x, z, w, dmg, skip) { const rad = w.explode || 2; burst(x, 0.7, z, w.pattern === 'rocket' ? 34 : 14, ['#ffe14a', '#ff9ad5', '#ffffff', '#b48cff', w.hex || '#fff'], w.pattern === 'rocket' ? 7 : 4); snd(w.pattern === 'rocket' || w.pattern === 'lob' ? 'popboom' : 'plip'); for (const zo of zs) { if (zo.dead || (skip && skip.has(zo))) continue; const d = Math.hypot(zo.x - x, zo.z - z); if (d < rad) hit(zo, dmg * (1 - d / rad * 0.45), (zo.x - x) * 2.2, (zo.z - z) * 2.2, w); } }
+    function muzzle(ax, az, w) { const shape = shotFx(w); burst(me.x + ax * 0.9, me.y + 1, me.z + az * 0.9, w.pattern === 'rocket' ? 10 : shape === 'drop' ? 7 : 5, shotColors(w) || [w.hex || '#fff', '#ffffff'], shape === 'drop' ? 1.5 : 2.4, shape); }
+    function fireCone(ax, az, w, dmg) { const len = w.range || 16; const flame = w.pattern === 'flame'; showBeam(me.x, me.y + 0.95, me.z, ax, az, len, w.col, flame ? 2.6 : 1); for (const z of zs) { if (z.dead || z.rise > 0) continue; const dx = z.x - me.x, dz = z.z - me.z, along = dx * ax + dz * az; if (along < 0.3 || along > len) continue; const px = dx - ax * along, pz = dz - az * along, wide = flame ? 0.45 + along * 0.18 : 0.7; if (px * px + pz * pz > wide * wide) continue; hit(z, dmg, ax * 3, az * 3, w); } if (flame) burst(me.x + ax * 1.4, me.y + 0.9, me.z + az * 1.4, 8, ['#ffb347', '#ff6a3d', '#ffe14a'], 3, 'flame'); }
+    function explodeAt(x, z, w, dmg, skip) { const rad = w.explode || 2; const shape = shotFx(w); const cols = shotColors(w) || (shape === 'star' ? ['#ffe14a', '#ff9ad5', '#ffffff', '#b48cff', w.hex || '#fff'] : [w.hex || '#fff', '#ffffff', '#ffe9a8']); burst(x, 0.7, z, w.pattern === 'rocket' ? 34 : 14, cols, w.pattern === 'rocket' ? 7 : 4, shape); snd(w.pattern === 'rocket' || w.pattern === 'lob' ? 'popboom' : 'plip'); for (const zo of zs) { if (zo.dead || (skip && skip.has(zo))) continue; const d = Math.hypot(zo.x - x, zo.z - z); if (d < rad) hit(zo, dmg * (1 - d / rad * 0.45), (zo.x - x) * 2.2, (zo.z - z) * 2.2, w); } }
     function nearestZ(x, z, max, skip) { let best = null, bd = max * max; for (const o of zs) { if (o.dead || o === skip || o.rise > 0) continue; const d = (o.x - x) ** 2 + (o.z - z) ** 2; if (d < bd) { bd = d; best = o; } } return best; }
-    function chainFrom(z, w, jumps, dmg, seen) { if (jumps <= 0) return; let best = null, bd = (w.chainRange || 5.5) ** 2; for (const o of zs) { if (o.dead || seen.has(o) || o.rise > 0) continue; const d = (o.x - z.x) ** 2 + (o.z - z.z) ** 2; if (d < bd) { bd = d; best = o; } } if (!best) return; seen.add(best); burst((z.x + best.x) / 2, 1.3, (z.z + best.z) / 2, 6, ['#fff4a8', '#d7b3ff', w.hex || '#fff'], 3); hit(best, dmg, 0, 0, w); chainFrom(best, w, jumps - 1, dmg * 0.75, seen); }
+    function chainFrom(z, w, jumps, dmg, seen) { if (jumps <= 0) return; let best = null, bd = (w.chainRange || 5.5) ** 2; for (const o of zs) { if (o.dead || seen.has(o) || o.rise > 0) continue; const d = (o.x - z.x) ** 2 + (o.z - z.z) ** 2; if (d < bd) { bd = d; best = o; } } if (!best) return; seen.add(best); burst((z.x + best.x) / 2, 1.3, (z.z + best.z) / 2, 6, shotColors(w) || ['#fff4a8', '#d7b3ff', w.hex || '#fff'], 3, shotFx(w)); hit(best, dmg, 0, 0, w); chainFrom(best, w, jumps - 1, dmg * 0.75, seen); }
     function fire() {
       const w = WEAPONS[cur]; if (!w || me.down || shopEl || me.fireCd > 0 || me.reload > 0) return;
       const m = modsOf(cur); let rate = m.rate; if (w.spin) rate = m.rate / (0.28 + 0.72 * (me.spin || 0)); me.fireCd = rate;
       const [ax, az] = aimDir(); me.face = Math.atan2(ax, az);
-      if (w.melee) { me.swing = 0.3; snd(w.snd || 'bonk'); buzz(18); for (const z of zs) { const dx = z.x - me.x, dz = z.z - me.z, d = Math.hypot(dx, dz); if (d < 2.4 + z.t.sc * 0.4 && (dx * ax + dz * az) / (d || 1) > 0.3) hit(z, m.dmg, ax * 9, az * 9, w); } burst(me.x + ax * 1.4, 1, me.z + az * 1.4, 8, ['#ffc7e6', '#ffffff'], 3); return; }
+      if (w.melee) { me.swing = 0.3; snd(w.snd || 'bonk'); buzz(18); for (const z of zs) { const dx = z.x - me.x, dz = z.z - me.z, d = Math.hypot(dx, dz); if (d < 2.4 + z.t.sc * 0.4 && (dx * ax + dz * az) / (d || 1) > 0.3) hit(z, m.dmg, ax * 9, az * 9, w); } burst(me.x + ax * 1.4, 1, me.z + az * 1.4, 8, ['#ffc7e6', '#ffffff'], 3, 'puff'); return; }
       if ((ammo[cur] || 0) <= 0) { startReload(); return; }
       const use = w.pattern === 'burst' ? Math.min(ammo[cur], w.burst || 3) : 1; ammo[cur] -= use;
       snd(w.snd || 'pew'); if (w.pattern !== 'beam' && w.pattern !== 'flame') buzz(w.pattern === 'rocket' ? 16 : 8); muzzle(ax, az, w);
@@ -248,7 +254,7 @@ export function createZombieGame(ctx) {
     function onProjHit(p, z) {
       const w = p.w;
       if (splashOnly(w)) { if (!p.boomed) { p.boomed = 1; explodeAt(p.x, p.z, w, p.dmg, null); } p.life = 0; return; }
-      hit(z, p.dmg, p.vx * 0.12, p.vz * 0.12, w); burst(p.x, p.y || 1, p.z, 4, [w.hex || '#fff', '#ffffff'], 2);
+      hit(z, p.dmg, p.vx * 0.12, p.vz * 0.12, w); { const shape = shotFx(w); burst(p.x, p.y || 1, p.z, shape === 'drop' ? 8 : 4, shotColors(w) || [w.hex || '#fff', '#ffffff'], shape === 'drop' ? 1.6 : 2, shape); }
       if (w.explode) explodeAt(p.x, p.z, w, p.dmg * (w.explodeMul || 0.4), new Set([z]));
       if (w.chain) chainFrom(z, w, w.chain, p.dmg * 0.8, new Set([z]));
       if (w.pierce) { p.hitSet = p.hitSet || new Set(); p.hitSet.add(z); if (p.hitSet.size > w.pierce) p.life = 0; return; }
@@ -259,7 +265,7 @@ export function createZombieGame(ctx) {
       if (p.homing) { const tgt = nearestZ(p.x, p.z, 14, null); if (tgt) { const dx = tgt.x - p.x, dz = tgt.z - p.z, d = Math.hypot(dx, dz) || 1, sp = Math.hypot(p.vx, p.vz) || p.w.spd || 20, k = Math.min(1, dt * p.homing); p.vx += (dx / d * sp - p.vx) * k; p.vz += (dz / d * sp - p.vz) * k; } }
       if (p.grav) { p.vy -= p.grav * dt; p.y += p.vy * dt; }
       p.x += p.vx * dt; p.z += p.vz * dt; p.life -= dt;
-      if ((p.w.skin === 'mythic' || p.w.skin === 'legend') && Math.random() < dt * 12) burst(p.x, p.y, p.z, 1, [p.w.hex || '#ffd23f', '#ffd23f'], 1);
+      { const shape = shotFx(p.w); if (shape === 'drop' && Math.random() < dt * 16) burst(p.x, p.y, p.z, 1, shotColors(p.w), 0.7, 'drop'); else if (shape === 'star' && Math.random() < dt * 12) burst(p.x, p.y, p.z, 1, [p.w.hex || '#ffd23f', '#ffe14a'], 1, 'star'); else if ((p.w.skin === 'mythic' || p.w.skin === 'legend') && Math.random() < dt * 12) burst(p.x, p.y, p.z, 1, [p.w.hex || '#ffd23f'], 1, shape); }
       if (p.vis) return;
       if (p.w.pattern === 'lob' && p.y <= 0.35) { if (!p.boomed) { p.boomed = 1; explodeAt(p.x, p.z, p.w, p.dmg, null); } p.life = 0; return; }
       if (p.life <= 0 && splashOnly(p.w) && !p.boomed) { p.boomed = 1; explodeAt(p.x, p.z, p.w, p.dmg, null); return; }
@@ -383,7 +389,7 @@ export function createZombieGame(ctx) {
       if (me.t - lastGroan > 2.2 && zs.length) { lastGroan = me.t + rnd(0, 2); snd('groan'); }
       const tg = players().filter((q) => !q.down);
       for (const z of zs) {
-        if (z.rise > 0) { z.rise -= dt; continue; } z.flash -= dt; z.frozen -= dt; z.lift -= dt; if (z.burn > 0) { z.burn -= dt; if (isHost() && !z.dead) { z.hp -= (z.burnDps || 6) * dt; if (Math.random() < dt * 4) burst(z.x, 1.1, z.z, 1, ['#ffb347', '#ffe14a'], 1.2); if (z.hp <= 0) kill(z); } }
+        if (z.rise > 0) { z.rise -= dt; continue; } z.flash -= dt; z.frozen -= dt; z.lift -= dt; if (z.burn > 0) { z.burn -= dt; if (isHost() && !z.dead) { z.hp -= (z.burnDps || 6) * dt; if (Math.random() < dt * 4) burst(z.x, 1.1, z.z, 1, ['#ffb347', '#ffe14a'], 1.2, 'flame'); if (z.hp <= 0) kill(z); } }
         { const ex = me.x - z.x, ez = me.z - z.z, ed = Math.hypot(ex, ez); if (ed < 0.9 * z.t.sc + 0.3 && me.y < 1.2 * z.t.sc) hurt((z.t === ZT.boss ? 22 : 10) * dt * 2.5); }
         if (!isHost()) { const k = Math.min(1, dt * 8); const ox = z.x, oz = z.z; z.x += (z.tx - z.x) * k; z.z += (z.tz - z.z) * k; const mv = Math.hypot(z.x - ox, z.z - oz); if (mv > 1e-3) z.yaw = Math.atan2(z.x - ox, z.z - oz); z.ph += mv * 2.2; continue; }
         let near = tg[0] || me, nd = 1e9; for (const q of tg) { const dd = (q.x - z.x) ** 2 + (q.z - z.z) ** 2; if (dd < nd) { nd = dd; near = q; } }
@@ -391,7 +397,7 @@ export function createZombieGame(ctx) {
         let s = z.spd * (z.frozen > 0 ? 0.3 : 1) * (z.lift > 0 ? 0 : 1); let sx = (dx / d) * s, sz = (dz / d) * s;
         for (const o of zs) { if (o === z) continue; const ox = z.x - o.x, oz = z.z - o.z, od = ox * ox + oz * oz, rr = (z.t.sc + o.t.sc) * 0.55; if (od < rr * rr && od > 1e-4) { const k = (rr - Math.sqrt(od)) * 4; sx += ox * k; sz += oz * k; } }
         z.x += (sx + z.kx) * dt; z.z += (sz + z.kz) * dt; z.kx *= 0.86; z.kz *= 0.86; z.ph += dt * s * 2.2;
-        if (z === boss) { z.slam -= dt; if (z.slam <= 0) { z.slam = Math.max(2.4, 4.5 - wave * 0.08); slamRing.visible = true; slamRing.userData = { x: z.x, z: z.z, r: 1, hitDone: false }; slamSeq++; snd('boom'); buzz(30); burst(z.x, 0.3, z.z, 20, ['#9dff6a', '#6dff5a'], 5); } }
+        if (z === boss) { z.slam -= dt; if (z.slam <= 0) { z.slam = Math.max(2.4, 4.5 - wave * 0.08); slamRing.visible = true; slamRing.userData = { x: z.x, z: z.z, r: 1, hitDone: false }; slamSeq++; snd('boom'); buzz(30); burst(z.x, 0.3, z.z, 20, ['#9dff6a', '#6dff5a'], 5, 'drop'); } }
       }
       if (slamRing.visible) { const u = slamRing.userData; u.r += dt * 9; slamRing.position.set(u.x, 0.05, u.z); slamRing.scale.setScalar(u.r); slamRing.material.opacity = Math.max(0, 0.85 - u.r / 16); const dd = Math.hypot(me.x - u.x, me.z - u.z); if (!u.hitDone && Math.abs(dd - u.r) < 0.7 && me.y < 0.4) { u.hitDone = true; hurt(18); } if (u.r > 14) slamRing.visible = false; }
       zs = zs.filter((z) => !z.dead);
@@ -400,14 +406,13 @@ export function createZombieGame(ctx) {
       projs = projs.filter((p) => p.life > 0);
       for (const bm of beamPool) { if (!bm.visible) continue; bm.userData.t -= dt; bm.material.opacity = Math.max(0, bm.userData.t * 7); if (bm.userData.t <= 0) bm.visible = false; }
       if (bomb) { bomb.vy -= 18 * dt; bomb.x += bomb.vx * dt; bomb.y += bomb.vy * dt; bomb.z += bomb.vz * dt; bombM.position.set(bomb.x, bomb.y, bomb.z); bombM.rotation.y += dt * 8;
-        if (bomb.y <= 0.2) { for (const z of zs) { const d = Math.hypot(z.x - bomb.x, z.z - bomb.z); if (d < 4.5) hit(z, 90 * up.dmg, (z.x - bomb.x) * 3, (z.z - bomb.z) * 3); } burst(bomb.x, 0.6, bomb.z, 60, ['#ffe14a', '#ffffff', '#ffb3c9'], 8); snd('boom'); buzz(50); bomb = null; bombM.visible = false; hud(); } }
+        if (bomb.y <= 0.2) { for (const z of zs) { const d = Math.hypot(z.x - bomb.x, z.z - bomb.z); if (d < 4.5) hit(z, 90 * up.dmg, (z.x - bomb.x) * 3, (z.z - bomb.z) * 3); } burst(bomb.x, 0.6, bomb.z, 60, ['#ffe14a', '#ffffff', '#ffb3c9'], 8, 'star'); snd('boom'); buzz(50); bomb = null; bombM.visible = false; hud(); } }
       // pickups
       for (const p of pickups) { p.life -= dt; p.m.rotation.y += dt * 2; p.m.position.y = 0.6 + Math.sin(me.t * 3 + p.x) * 0.15; if (!me.down && Math.hypot(p.x - me.x, p.z - me.z) < 1.2) { p.life = 0; snd('pick'); buzz(15);
         if (p.k === 'heart') me.hp = Math.min(up.hp, me.hp + 30); else if (p.k === 'ammo') refill(); else buffs[p.k] = p.k === 'dia2' ? 10 : 7; msg(PU[p.k][0], 0.8); hud(); } if (p.life <= 0) scene.remove(p.m); }
       pickups = pickups.filter((p) => p.life > 0);
       // fx
-      for (let i = 0; i < MAXFX; i++) { if (fxL[i] <= 0) continue; fxL[i] -= dt; if (fxL[i] <= 0) { fxPos[i * 3 + 1] = -999; continue; } fxV[i * 3 + 1] -= 6 * dt; fxPos[i * 3] += fxV[i * 3] * dt; fxPos[i * 3 + 1] = Math.max(0.05, fxPos[i * 3 + 1] + fxV[i * 3 + 1] * dt); fxPos[i * 3 + 2] += fxV[i * 3 + 2] * dt; }
-      fxG.attributes.position.needsUpdate = true; fxG.attributes.color.needsUpdate = true;
+      for (const pool of fxPools) { let live = false; for (let i = 0; i < FXN; i++) { if (pool.life[i] <= 0) continue; live = true; pool.life[i] -= dt; if (pool.life[i] <= 0) { pool.pos[i * 3 + 1] = -999; continue; } pool.vel[i * 3 + 1] -= 6 * dt; pool.pos[i * 3] += pool.vel[i * 3] * dt; pool.pos[i * 3 + 1] = Math.max(0.05, pool.pos[i * 3 + 1] + pool.vel[i * 3 + 1] * dt); pool.pos[i * 3 + 2] += pool.vel[i * 3 + 2] * dt; } if (live) { pool.g.attributes.position.needsUpdate = true; pool.g.attributes.color.needsUpdate = true; } }
       if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('.zg-msg').style.opacity = 0; }
       if (boss) $('.zg-boss i').style.width = (100 * Math.max(0, boss.hp)) / boss.max + '%';
       if ((me.t * 10 | 0) % 3 === 0) hud();
