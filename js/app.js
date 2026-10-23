@@ -754,6 +754,7 @@ async function route() {
     }
   }
   document.body.classList.remove('feed-mode', 'game-mode');
+  gameChip(false);
   main.innerHTML = '<div class="empty">Page not found. <a href="#/watch">Go home</a></div>';
 }
 initInterests({ S, db, fs: { doc, getDoc, setDoc, serverTimestamp } });
