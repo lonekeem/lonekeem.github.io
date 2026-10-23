@@ -22,6 +22,7 @@ import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-
 import { hideKey, isHidden } from '../chat-hide.js';
 import { KEMY_NAME, faceName, isAdminUid, noteAdminUid } from '../kemy-name.js';
 import { emoteMs, EMOTE_BY_ID } from './emotes.js';
+import { WORLD_DANCES, WORLD_DANCE_BY_ID } from './dance-menu.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
 import { addParkHD } from './park-hd.js';
@@ -414,9 +415,9 @@ export function createPark3D(ctx) {
     tc = createControls(view, { tutorialKey: 'park', tutorialTitle: '🌳 Welcome to Pal Park!', keys: { ' ': 'jump', v: 'cam' },
       onZoom: (z) => { C.dist = Math.max(2.5, Math.min(16, C.dist * z)); },
       tips: ['🕹️ Put your thumb down anywhere on the left and slide to walk. Slide all the way to run.', '👆 Drag to look. Two-finger drag looks. Pinch or scroll zooms. Q and E turn.', '⤒ Jump. E or Space enters a door or car when the button is showing. F talks to Kemy Patrol.', '😊 Emote or dance (with music on, everyone dances to the beat!)', '👁 Switch between behind-your-Pal and through-your-Pal’s eyes.', 'A controller walks with the left stick and looks with the right stick.'],
-      buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'run', icon: '🏃', label: 'Run' }, { id: 'emote', icon: '😊', label: 'Emote' }, { id: 'cam', icon: '👁', label: 'Camera' }] });
+      buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'run', icon: '🏃', label: 'Run' }, { id: 'emote', icon: '😊', label: 'Emote' }, { id: 'dance', icon: '🕺', label: 'Dance' }, { id: 'cam', icon: '👁', label: 'Camera' }] });
     tc.on('jump', () => { jumpQ = true; }); tc.on('run', () => { runT = !runT; tc.root.querySelector('[data-b=run]')?.classList.toggle('lock', runT); hint(runT ? 'Running 🏃' : 'Walking'); });
-    tc.on('emote', () => openEmotes()); tc.on('cam', () => toggleCam());
+    tc.on('emote', () => openEmotes()); tc.on('dance', () => openDances()); tc.on('cam', () => toggleCam());
     paintCam(); setTimeout(() => tc.tutorial(), 600); $('#p3-set').onclick = () => tc.settings();
     attachGfxSettings(tc, (e) => { if (e.fps) { fpsEl.hidden = !(gfxShowFps() || dbgFps); return; } if (e.changed) { tc.root.querySelector('.kc-set')?.remove(); setTimeout(() => page(), 50); } }); // Graphics tier: rebuild the scene with the new tier
     { // tap a Pal. Two-finger look, pinch, and scroll zoom live in the shared controls.
@@ -649,8 +650,12 @@ export function createPark3D(ctx) {
     loadOwnedEmotes(db, S.user.uid);
     function openEmotes() { panel.hidden = true; loadOwnedEmotes(db, S.user.uid).then(() => openWheel({ onEmote: emoteDance, reactions: EMOTES, onReact: (x) => emote(x), onShop: () => dispatchEvent(new Event('kemy:dance-shop')), onLocked: (d) => { toast(`🔒 ${d.name} is in the Dance Shop`); dispatchEvent(new Event('kemy:dance-shop')); } })); }
     // a wheel emote/dance: synced to everyone through the existing dance-name field (dn), cleared when it ends
-    function emoteDance(id) { const d = EMOTE_BY_ID[id]; P.dance = id; P.danceUntil = Date.now() + emoteMs(id); P.tgt = ''; dirty = true; send(true); hint(`${(d && d.icon) || '💃'} ${(d && d.name) || 'Dance!'}`); }
-    panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
+    function emoteDance(id) { const d = EMOTE_BY_ID[id]; P.dance = id; P.danceUntil = Date.now() + emoteMs(id); P.tgt = ''; dirty = true; send(true); hint(`${(d && d.icon) || '💃'} ${(d && d.name) || 'Dance!'}`); paintDanceBtn(); }
+    function paintDanceBtn() { const b = tc.root.querySelector('[data-b=dance]'); if (b) b.classList.toggle('lock', !!(P.dance && WORLD_DANCE_BY_ID[P.dance] && Date.now() < P.danceUntil)); }
+    function stopWorldDance() { if (P.dance === 'sit') return; P.dance = ''; P.danceUntil = 0; dirty = true; send(true); paintDanceBtn(); }
+    function startWorldDance(id) { const d = WORLD_DANCE_BY_ID[id]; if (!d) return; P.dance = d.id; P.danceUntil = Date.now() + 864e5; P.tgt = ''; dirty = true; send(true); hint(`${d.icon} ${d.name}`); paintDanceBtn(); import('../gamemusic.js').then((gm) => { if (!gm.isPlaying()) gm.playStation('theme', { volume: 0.14 }); }).catch(() => {}); }
+    function openDances() { if (!toggle('d')) return; const cur = P.dance; panel.innerHTML = `<div class="p3-dances">${WORLD_DANCES.map((d) => `<button type="button" data-wd="${d.id}" class="${cur === d.id ? 'on' : ''}"><span class="ic" aria-hidden="true">${d.icon}</span>${d.name}</button>`).join('')}<button type="button" data-wd-stop class="stop">Stop</button></div>`; }
+    panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.wd) { startWorldDance(b.dataset.wd); panel.hidden = true; } if (b.dataset.wdStop != null) { stopWorldDance(); panel.hidden = true; hint('Dance stopped'); } if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
     function emote(x, tgt = '') { P.e = x; P.eAt = Date.now(); P.tgt = tgt; if (EMO_DANCE[x]) { P.dance = EMO_DANCE[x]; P.danceUntil = Date.now() + 6000; } dirty = true; send(true); }
     function playerCard(o) {
       const isM = muted.has(o.uid);
@@ -739,7 +744,7 @@ export function createPark3D(ctx) {
       const im = Math.min(1, Math.hypot(ix, iz)); const running = runT || mv.run || keys.shift; const sp = (running ? RUN_V : WALK_W) * im;
       if (im > 0.08) { const a = Math.atan2(ix, iz) + C.yaw - Math.PI; const want = Math.atan2(-Math.sin(a), -Math.cos(a)); const mx = Math.sin(want), mz = Math.cos(want);
         let nx = P.x + mx * sp * dt, nz = P.z + mz * sp * dt; [nx, nz] = collide(nx, nz, P.y); P.x = nx; P.z = nz;
-        if (!pov) { let dy = want - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); P.yaw += dy * Math.min(1, 12 * dt); } else P.yaw = C.yaw + Math.PI; P.d = mx >= 0 ? 1 : -1; dirty = true; P.danceUntil = 0; }
+        if (!pov) { let dy = want - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); P.yaw += dy * Math.min(1, 12 * dt); } else P.yaw = C.yaw + Math.PI; P.d = mx >= 0 ? 1 : -1; dirty = true; if (P.dance !== 'sit') { P.dance = ''; P.danceUntil = 0; paintDanceBtn(); } }
       else if (pov) P.yaw = C.yaw + Math.PI;
       // gravity, ground, stairs and slopes
       const fl = floorAt(P.x, P.z, P.y);
@@ -798,7 +803,7 @@ export function createPark3D(ctx) {
       W3.update(dt, now); if (!R.shadowMap.autoUpdate) R.shadowMap.needsUpdate = (++shN & 1) === 0; R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, camState: () => ({ yaw: C.yaw, pitch: C.pitch, dist: C.dist }), gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; } };
+    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, camState: () => ({ yaw: C.yaw, pitch: C.pitch, dist: C.dist }), gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; }, dance: () => P.dance };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
