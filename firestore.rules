@@ -1945,9 +1945,12 @@ service cloud.firestore {
           && stat(pd().stats.happy) && stat(pd().stats.hunger) && stat(pd().stats.energy) && stat(pd().stats.clean)
           && pd().at == request.time && pd().updatedAt == request.time;
       }
+      function plain(id) { return id == '' || (id is string && id.matches('^f_[a-z0-9_]{1,13}$')); }
+      // Diff once per slot. Indexing a missing key throws and blows the expression cap, so a new
+      // slot is recognized by the key list and only then checked against the closet.
       function owns(o, k) {
-        return o.get(k, '') == '' || (o.get(k, '') is string && o.get(k, '').matches('^f_[a-z0-9_]{1,13}$'))
-          || (resource != null && 'outfit' in resource.data && resource.data.outfit.keys().hasAny([k]) && resource.data.outfit[k] == o[k])
+        return plain(o.get(k, ''))
+          || (resource != null && 'outfit' in resource.data && !o.diff(resource.data.outfit).affectedKeys().hasAny([k]))
           || held(o.get(k, ''));
       }
       function outfitOk(o) {
