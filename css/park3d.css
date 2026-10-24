@@ -57,10 +57,15 @@ body.p3-on .gm.top-right { z-index: 95; }
 .p3-view .p3-dances button.on { border-color: #7c3aed; background: #f4ecff; }
 .p3-view .p3-dances button.stop { grid-column: 1 / -1; min-height: 48px; background: #2a1458; color: #fff; border-color: #2a1458; font-size: 15px; }
 .p3-view .kc-hint { bottom: calc(16% + 30px); }
-.p3-top { padding-right: 64px; }
+.p3-top { padding-right: 118px; }
 .p3-view .kc-gear { display: none; }
 /* settings sits on its own just under the top-right music button so it never collides with the top bar chips on phones */
-#p3-set { position: absolute; top: calc(max(8px, env(safe-area-inset-top)) + 54px); right: max(10px, env(safe-area-inset-right)); width: 44px; height: 44px; z-index: 6; }
+#p3-set, #p3-rot { position: absolute; top: calc(max(8px, env(safe-area-inset-top)) + 54px); width: 44px; height: 44px; z-index: 7; }
+#p3-set { right: max(10px, env(safe-area-inset-right)); }
+#p3-rot { right: calc(max(10px, env(safe-area-inset-right)) + 50px); }
+#p3-rot.on { background: #7c3aed; }
+.p3-rotip { position: absolute; left: 50%; top: 48%; transform: translateX(-50%); z-index: 8; max-width: min(340px, calc(100vw - 150px)); margin: 0; border: 2px solid #ffd23f; border-radius: 16px; background: rgba(43,29,85,.94); color: #fff; padding: 10px 14px; font: 800 14px/1.35 Inter, system-ui, sans-serif; text-align: center; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.p3-rotip[hidden] { display: none; }
 .p3-top { min-width: 0; overflow: hidden; } .p3-top > span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 400px) { .p3-top b { display: none; } }
 
@@ -82,8 +87,26 @@ body.p3-on .pal-pop, body.p3-on .pal-float, body.p3-on .ge-btn { display: none !
 body.p3-on .rs-q { left: auto !important; right: max(10px, env(safe-area-inset-right)); top: calc(max(8px, env(safe-area-inset-top)) + 104px) !important; transform: none !important; width: 40px; height: 40px !important; padding: 0 !important; font-size: 0 !important; border-width: 1px !important; display: grid; place-items: center; }
 body.p3-on .rs-q::before { content: '↩️'; font-size: 18px; }
 body.p3-on .rs-q[hidden], body.p3-drive .rs-q { display: none !important; }
-@media (max-height: 500px) {
-  /* landscape: minimap top-right, left of ⚙️, out of the joystick/left-edge area */
-  body.p3-on .ks-map { left: auto !important; right: calc(max(8px, env(safe-area-inset-right)) + 56px) !important; top: calc(max(8px, env(safe-area-inset-top)) + 54px) !important; width: 56px !important; height: 56px !important; }
-  body.p3-on .kh-home, body.p3-on .ks-bagb { font-size: 13px !important; height: 34px !important; padding: 0 10px !important; }
+/* Short landscape: one top-right row (music, rotate, settings), minimap top-left, pills beside it, chat in the bottom channel. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.p3-on .p3-top { padding-right: 168px; }
+  body.p3-on #p3-set, body.p3-on #p3-rot { top: max(6px, env(safe-area-inset-top)); width: 40px; height: 40px; }
+  body.p3-on #p3-set { right: max(8px, env(safe-area-inset-right)); }
+  body.p3-on #p3-rot { right: calc(max(8px, env(safe-area-inset-right)) + 46px); }
+  body.p3-on .gm.top-right { top: max(6px, env(safe-area-inset-top)) !important; right: calc(max(8px, env(safe-area-inset-right)) + 92px) !important; }
+  body.p3-on .ks-map { left: max(8px, env(safe-area-inset-left)) !important; right: auto !important; top: calc(max(6px, env(safe-area-inset-top)) + 46px) !important; width: 64px !important; height: 64px !important; }
+  body.p3-on .ks-bagb, body.p3-on .kd-my, body.p3-on .kh-home, body.p3-on .kh-dec, body.p3-on .kh-yard { height: 32px !important; font-size: 13px !important; padding: 0 10px !important; right: auto !important; }
+  body.p3-on .ks-bagb, body.p3-on .kd-my, body.p3-on .kh-home { top: calc(max(6px, env(safe-area-inset-top)) + 50px) !important; }
+  body.p3-on .ks-bagb { left: calc(max(8px, env(safe-area-inset-left)) + 80px) !important; }
+  body.p3-on .kd-my { left: calc(max(8px, env(safe-area-inset-left)) + 158px) !important; }
+  body.p3-on .kh-home { left: calc(max(8px, env(safe-area-inset-left)) + 276px) !important; }
+  body.p3-on .kh-dec, body.p3-on .kh-yard { top: calc(max(6px, env(safe-area-inset-top)) + 88px) !important; left: calc(max(8px, env(safe-area-inset-left)) + 80px) !important; }
+  body.p3-on .kh-stuck { top: calc(max(6px, env(safe-area-inset-top)) + 118px) !important; left: max(8px, env(safe-area-inset-left)) !important; right: auto !important; height: 32px !important; font-size: 12px !important; padding: 0 10px !important; }
+  body.p3-on .rs-q { top: calc(max(6px, env(safe-area-inset-top)) + 50px) !important; right: max(8px, env(safe-area-inset-right)) !important; }
+  body.p3-on .p3-log { left: 50%; transform: translateX(-50%); top: calc(max(6px, env(safe-area-inset-top)) + 88px); width: min(240px, 32vw); max-height: 40px; }
+  body.p3-on .p3-chat { left: 128px !important; right: 206px !important; width: auto !important; max-width: 420px; min-width: 0; transform: none !important; margin-left: auto; margin-right: auto; bottom: max(6px, env(safe-area-inset-bottom)); }
+  body.p3-on .p3-view .kc { --kc: 52px !important; }
+  body.p3-on .p3-view .kc-btns { bottom: max(8px, env(safe-area-inset-bottom)) !important; right: max(8px, env(safe-area-inset-right)); gap: 6px; }
+  body.p3-on .p3-view .kc-b small { font-size: 9px; }
+  body.p3-on .p3-rotip { top: 42%; max-width: min(420px, calc(100vw - 300px)); }
 }

@@ -69,11 +69,11 @@ export function createPark3D(ctx) {
     const Q = gfxPreset(); const ULTRA = Q.tier === 'ultra', LOW = Q.tier === 'low'; void gfxLevel; // shared Graphics setting (js/gfx.js)
     main.innerHTML = `<section class="p3"><div class="p3-view" id="p3-view">
       <canvas id="park-cv" class="p3-cv" tabindex="0" aria-label="Pal Park 3D. WASD or arrows to walk, Q and E to turn, Space to jump, E or Space to enter, F to report. Drag or two-finger scroll to look."></canvas>
-      <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span class="k-link-slot"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div><button class="p3-b" id="p3-set" aria-label="Control settings">⚙️</button>
+      <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span class="k-link-slot"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div><button class="p3-b" id="p3-rot" type="button" aria-label="Rotate. Tap for landscape">🔄</button><button class="p3-b" id="p3-set" aria-label="Control settings">⚙️</button>
       <div class="p3-log" id="p3-log" aria-live="polite"></div>
       <div class="p3-tags" id="p3-tags"></div>
       <form class="p3-chat" id="p3-chat"><input id="p3-t" maxlength="60" placeholder="Say something nice…" autocomplete="off" enterkeyhint="send" aria-label="Chat message"><button class="p3-send" aria-label="Send">➤</button><button type="button" class="p3-b" id="p3-quick" aria-label="Quick phrases">💬</button></form>
-      <div class="p3-panel" id="park-panel" hidden></div><div class="p3-hint" id="p3-hint"></div><div class="p3-load" id="p3-load">Building the park…</div></div></section>`;
+      <div class="p3-panel" id="park-panel" hidden></div><div class="p3-hint" id="p3-hint"></div><button type="button" class="p3-rotip" id="p3-rotip" hidden>📱 Tip: Turn your phone sideways for a bigger view, or tap 🔄 to rotate!</button><div class="p3-load" id="p3-load">Building the park…</div></div></section>`;
     document.body.classList.add('p3-on');
     const view = main.querySelector('#p3-view'), cv = main.querySelector('#park-cv');
     const $ = (s) => main.querySelector(s);
@@ -414,11 +414,11 @@ export function createPark3D(ctx) {
     let runT = false;
     tc = createControls(view, { tutorialKey: 'park', tutorialTitle: '🌳 Welcome to Pal Park!', keys: { ' ': 'jump', v: 'cam' },
       onZoom: (z) => { C.dist = Math.max(2.5, Math.min(16, C.dist * z)); },
-      tips: ['🕹️ Put your thumb down anywhere on the left and slide to walk. Slide all the way to run.', '👆 Drag to look. Two-finger drag looks. Pinch or scroll zooms. Q and E turn.', '⤒ Jump. E or Space enters a door or car when the button is showing. F talks to Kemy Patrol.', '😊 Emote or dance (with music on, everyone dances to the beat!)', '👁 Switch between behind-your-Pal and through-your-Pal’s eyes.', 'A controller walks with the left stick and looks with the right stick.'],
+      tips: ['🕹️ Put your thumb down anywhere on the left and slide to walk. Slide all the way to run.', '👆 Drag to look. Two-finger drag looks. Pinch or scroll zooms. Q and E turn.', '⤒ Jump. E or Space enters a door or car when the button is showing. F talks to Kemy Patrol.', '😊 Emote or dance (with music on, everyone dances to the beat!)', '👁 Switch between behind-your-Pal and through-your-Pal’s eyes.', '📱 Turn your phone sideways for a bigger view, or tap 🔄 to rotate.', 'A controller walks with the left stick and looks with the right stick.'],
       buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'run', icon: '🏃', label: 'Run' }, { id: 'emote', icon: '😊', label: 'Emote' }, { id: 'dance', icon: '🕺', label: 'Dance' }, { id: 'cam', icon: '👁', label: 'Camera' }] });
     tc.on('jump', () => { jumpQ = true; }); tc.on('run', () => { runT = !runT; tc.root.querySelector('[data-b=run]')?.classList.toggle('lock', runT); hint(runT ? 'Running 🏃' : 'Walking'); });
     tc.on('emote', () => openEmotes()); tc.on('dance', () => openDances()); tc.on('cam', () => toggleCam());
-    paintCam(); setTimeout(() => tc.tutorial(), 600); $('#p3-set').onclick = () => tc.settings();
+    paintCam(); $('#p3-set').onclick = () => tc.settings();
     attachGfxSettings(tc, (e) => { if (e.fps) { fpsEl.hidden = !(gfxShowFps() || dbgFps); return; } if (e.changed) { tc.root.querySelector('.kc-set')?.remove(); setTimeout(() => page(), 50); } }); // Graphics tier: rebuild the scene with the new tier
     { // tap a Pal. Two-finger look, pinch, and scroll zoom live in the shared controls.
       const rz = tc.root.querySelector('.kc-r'); let ts = null;
@@ -669,6 +669,42 @@ export function createPark3D(ctx) {
       openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="park-card" id="pr-f"><h2>Report @${esc(o.uname)}</h2><select id="pr-r"><option>Mean or rude chat</option><option>Inappropriate name or Pal</option><option>Spam</option><option>Something else</option></select><textarea id="pr-t" maxlength="300" placeholder="What happened? (optional)"></textarea><button class="btn">Send report</button></form>`);
       document.getElementById('pr-f').onsubmit = async (e) => { e.preventDefault(); try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: o.uid, postId: '', reason: ('Pal Park: ' + document.getElementById('pr-r').value + '. ' + document.getElementById('pr-t').value).slice(0, 500), excerpt: String(o.say || '').slice(0, 300), createdAt: serverTimestamp() }); closeModal(); toast('Thanks. The report was sent.'); } catch (er) { toast(friendlyError(er)); } }; }
     const hintEl = $('#p3-hint'); function hint(t) { hintEl.textContent = t; hintEl.classList.add('on'); clearTimeout(hintEl._t); hintEl._t = setTimeout(() => hintEl.classList.remove('on'), 2200); }
+    const rotBtn = $('#p3-rot'); let rotWant = 'auto';
+    const rotLabel = () => { if (!rotBtn) return; rotBtn.classList.toggle('on', rotWant !== 'auto'); rotBtn.setAttribute('aria-label', rotWant === 'landscape' ? 'Landscape. Tap for portrait' : rotWant === 'portrait' ? 'Portrait. Tap for auto rotate' : 'Rotate. Tap for landscape'); };
+    const rotFriendly = 'Turn your phone sideways to rotate';
+    async function cycleRotate() {
+      const ori = screen.orientation;
+      if (!ori || typeof ori.lock !== 'function') { hint(rotFriendly); return; }
+      const next = rotWant === 'auto' ? 'landscape' : rotWant === 'landscape' ? 'portrait' : 'auto';
+      try {
+        if (next === 'auto') { try { ori.unlock(); } catch { /* already free */ } rotWant = 'auto'; rotLabel(); hint('Auto rotate'); return; }
+        const hadFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        if (!hadFs) {
+          const el = document.documentElement; const req = el.requestFullscreen || el.webkitRequestFullscreen;
+          if (req) { try { await req.call(el); } catch { /* a home-screen or Play app may already be full screen */ } }
+        }
+        try { await ori.lock(next); }
+        catch (err) {
+          if (!hadFs && (document.fullscreenElement || document.webkitFullscreenElement)) {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen;
+            if (exit) { try { await exit.call(document); } catch { /* leave the page as it was */ } }
+          }
+          throw err;
+        }
+        rotWant = next; rotLabel(); hint(next === 'landscape' ? 'Landscape' : 'Portrait');
+      } catch { hint(rotFriendly); }
+    }
+    if (rotBtn) rotBtn.onclick = () => { cycleRotate(); }; rotLabel();
+    function showRotTip() {
+      if (!document.body.contains(view)) return;
+      const KEY = 'kemy-rot-tip'; let n = 0;
+      try { n = parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch { return; }
+      if (n >= 3) return;
+      const el = $('#p3-rotip'); if (!el) return;
+      try { localStorage.setItem(KEY, String(n + 1)); } catch { /* still show it this time */ }
+      el.hidden = false; el.onclick = () => { el.hidden = true; };
+    }
+    setTimeout(() => { const p = tc.tutorial(); if (p && p.then) p.then(showRotTip); else showRotTip(); }, 600);
 
     // ---------------------------------------------------------------- music: the theme playlist, softly, looping (🎵 player stays available)
     let gm = null; import('../gamemusic.js').then(async (m) => { gm = m; await m.mountGameMusic({ corner: 'top-right' }); if (!m.isPlaying() && document.body.contains(cv)) m.playStation('theme', { volume: 0.18 }); }).catch(() => {});

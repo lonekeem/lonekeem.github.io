@@ -52,7 +52,8 @@ const CSS = `.zg{position:fixed;inset:0;z-index:900;background:#140f2e;overflow:
 .zg-team{position:absolute;left:10px;top:calc(max(8px,env(safe-area-inset-top)) + 150px);z-index:6;display:flex;flex-direction:column;gap:4px;pointer-events:none;font-size:13px;font-weight:800}.zg-team div{background:rgba(0,0,0,.45);border-radius:10px;padding:3px 8px;min-width:120px}.zg-team i{display:block;height:6px;border-radius:9px;background:#7ee08a;margin-top:2px}.zg-team .dn{color:#ffb3c9}
 .zg-emo{position:absolute;right:62px;top:calc(max(8px,env(safe-area-inset-top)) + 56px);z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:6px}.zg-emo button{min-height:48px;padding:0 12px;border-radius:14px;border:0;background:rgba(43,29,85,.92);color:#fff;font-weight:800;font-size:15px}.zg-emo{display:block;width:min(340px,80vw);background:rgba(27,18,51,.94);padding:8px;border-radius:16px}.zg-emo .qc-list button{min-height:42px;background:#fff;color:#2b1d55}
 .zg-rev{position:absolute;left:50%;top:58%;width:160px;height:14px;margin-left:-80px;border-radius:99px;background:rgba(0,0,0,.5);border:2px solid #fff;z-index:6;overflow:hidden}.zg-rev i{display:block;height:100%;width:0;background:#7ee08a}
-.zg-dmg{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 80px rgba(255,80,160,.0);transition:box-shadow .2s;z-index:5}`;
+.zg-dmg{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 80px rgba(255,80,160,.0);transition:box-shadow .2s;z-index:5}
+@media (orientation:landscape) and (max-height:500px){.zg-tb{top:max(6px,env(safe-area-inset-top));right:8px;flex-direction:row}.zg-tb button{width:42px;height:42px}.zg-hud{right:230px}.zg-team{top:calc(max(6px,env(safe-area-inset-top))+52px)}.zg .kc{--kc:52px!important}.zg .kc-btns{bottom:max(8px,env(safe-area-inset-bottom))}}`;
 export function createZombieGame(ctx) {
   const { S, db, toast } = ctx;
   let G = null;
@@ -199,7 +200,7 @@ export function createZombieGame(ctx) {
     const msg = (t, s = 1.6) => { const m = $('.zg-msg'); m.innerHTML = t; m.style.opacity = 1; msgT = s; };
     // ------------------------------------------------------------ controls
     const C = createControls(el, { tutorialKey: 'zombie', tutorialTitle: '🧟 Pal Zombie Survival',
-      tips: ['👈 Thumb anywhere on the left: walk (push far to run)', '👉 Drag on the right: look & aim (gentle aim assist helps)', '🎯 Hold <b>Fire</b> to keep shooting', '🦘 Jump over the boss’s goo wave · 💨 Dodge to zip away', '🔁 Swap your 3 loadout guns · 🛒 Weapon Shop spends splat coins', 'Zombies are just silly. Splat them into sparkles!'],
+      tips: ['👈 Thumb anywhere on the left: walk (push far to run)', '👉 Drag on the right: look & aim (gentle aim assist helps)', '🎯 Hold <b>Fire</b> to keep shooting', '🦘 Jump over the boss’s goo wave · 💨 Dodge to zip away', '🔁 Swap your 3 loadout guns · 🛒 Weapon Shop spends splat coins', '📱 Turn your phone sideways for a bigger view.', 'Zombies are just silly. Splat them into sparkles!'],
       buttons: [{ id: 'fire', icon: '🎯', label: 'Fire', big: 1 }, { id: 'jump', icon: '🦘', label: 'Jump' }, { id: 'dodge', icon: '💨', label: 'Dodge' }, { id: 'switch', icon: '🔁', label: 'Swap' }, { id: 'special', icon: starBomb ? '⭐' : '🔄', label: starBomb ? 'Bomb' : 'Reload' }],
       keys: { ' ': 'jump', f: 'fire', Enter: 'fire', q: 'switch', e: 'special', r: 'special', c: 'dodge', Control: 'dodge' } });
     C.on('jump', () => { if (me.y <= 0.001 && !over && !me.down) { me.vy = 7.2; } });

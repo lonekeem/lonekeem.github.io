@@ -463,3 +463,29 @@
 @keyframes pkFly{50%{transform:translate(-14px,-6px) scale(.9)}}
 @media (prefers-reduced-motion:reduce){.pk-bf{animation:none}}
 @media (max-width:380px){.pk-hero .pk-art{width:40%}.pk-hero .zf-txt small{font-size:.76rem}}
+/* Phone landscape: keep boards and shoot buttons on screen. The site bar would eat the short height. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body:has(.gm-wrap) .app-header, body:has(.gm-wrap) .bottom-nav, body:has(.gm-wrap) .site-footer { display: none !important; }
+  body:has(.gm-wrap) .app-main { padding: 4px 8px 6px; max-width: none; }
+  .g-top-pick { display: none !important; }
+  .gm-bar { margin-bottom: 2px; }
+  .gm-bar h1 { font-size: 1rem; }
+  .ch-board, .lu-board { min-width: 0; width: min(100%, calc(100dvh - 168px)); }
+  .ch-moves { margin-top: 2px; padding: 2px 4px; }
+  .tv-q { font-size: .95rem; min-height: 0; margin-bottom: 4px; }
+  .tv-c { min-height: 36px; padding: 4px 10px; font-size: .9rem; }
+  .tv-bar { margin: 2px 0 4px; }
+  .tv-choices { gap: 4px; }
+  .g-players { margin-bottom: 2px; }
+  .g-status { margin: 2px 0 4px; padding: 4px 8px; }
+  .pl-power-track { min-height: 48px; }
+  .pl-side { flex-basis: 44px; }
+  .pl-spin { width: 44px; height: 44px; }
+  .pl-nudge { width: 36px; height: 36px; }
+  .pl-wheel { height: 36px; }
+  .pl-aim { grid-template-columns: 36px 1fr 36px; grid-template-rows: auto 36px; padding: 2px; }
+  .pl-ctrl { margin-top: 4px; }
+  .pool-mode .g-status, .pool-mode .gm-bar { margin-bottom: 2px; }
+  .g-actions { margin-top: 4px; }
+  .g-actions .btn, .g-actions button, .g-actions a { min-height: 36px; }
+}
