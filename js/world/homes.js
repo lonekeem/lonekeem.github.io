@@ -228,7 +228,14 @@ export function attachHomes(api, W, K) {
 .kh-dbar .kh-acts button{flex:1}
 .kh-dbar .kh-tabs{display:flex;gap:6px;flex:1 0 100%}
 .kh-dbar .kh-tabs button{flex:1}
-.kh-dbar.rooms .kh-body,.kh-dbar.tall .kh-body,.kh-dbar.tall.open .kh-body{max-height:48vh;overflow:auto}
+.kh-dbar.rooms .kh-body,.kh-dbar.tall .kh-body,.kh-dbar.tall.open .kh-body{max-height:46vh;overflow:auto}
+.kh-dbar .kh-add{flex:1 0 100%;background:#15803d;color:#fff;min-height:52px;font-size:18px}
+.kh-dbar .kh-cats{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 0}
+.kh-dbar .kh-cats button{flex:none;min-height:40px;font-size:13px;padding:6px 8px}
+.kh-dbar .kh-grid{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 8px}
+.kh-dbar .kh-grid .it{flex:1 1 86px;max-width:112px}
+.kh-dbar .kh-parts{display:flex;gap:6px;position:sticky;top:46px;z-index:2;background:#fff;padding:4px 0}
+.kh-dbar .kh-parts button{flex:1;min-height:44px;font-size:14px}
 .kh-rooms{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 0}
 .kh-rooms button{min-height:64px;font-size:16px}
 .kh-swatches{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0 8px}
@@ -531,7 +538,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   let roomEditP = null;
   const loadRoomEdit = () => (roomEditP || (roomEditP = import('./roomedit.js')));
   function inRoom(it) { if (!deco.room) return true; if (!deco.edit) return false; return deco.edit.itemRoom(it.x, it.z, it.f) === deco.room; }
-  function keepInRoom(it) { return deco.room && deco.edit ? deco.edit.clampToRoom(it, deco.room) : it; }
+  function keepInRoom(it, keepRot) { if (!(deco.room && deco.edit && it)) return it; return deco.edit.isWall(it.c) ? deco.edit.snapWall(it, deco.room, !!keepRot) : deco.edit.clampToRoom(it, deco.room); }
   function aabbWalk(it) { if (deco.room && !inRoom(it)) return null; return sameFloor(it) ? aabbOf(it) : null; }
   function nearest() { return nearestReach(deco.items, P.x, P.z, aabbWalk, 1.35); }
   function focusRoom(id) {
@@ -555,7 +562,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     hi.position.set(cx, cy, cz); hi.scale.set(sx, sy, sz); hiEdge.position.copy(hi.position); hiEdge.scale.copy(hi.scale);
     ring.position.set(cx, b.y0 + 0.05, cz); ring.scale.setScalar(Math.max(0.8, Math.max(sx, sz) * 0.55));
   }
-  function snapDeco() { return { items: deco.items.map((i) => ({ ...i })), stash: deco.stash.slice(), wall: deco.wall, walls: deco.walls, floor: deco.floor, surf: { ...(deco.surf || {}) }, ext: { ...deco.ext }, sel: deco.sel, room: deco.room || '' }; }
+  function snapDeco() { return { items: deco.items.map((i) => ({ ...i, ...(i.parts ? { parts: { ...i.parts } } : {}) })), stash: deco.stash.slice(), wall: deco.wall, walls: deco.walls, floor: deco.floor, surf: { ...(deco.surf || {}) }, ext: { ...deco.ext }, sel: deco.sel, room: deco.room || '' }; }
   function remember() { if (!deco) return; deco.hist = deco.hist || []; deco.hist.push(snapDeco()); if (deco.hist.length > 25) deco.hist.shift(); }
   function undoDeco() {
     if (!deco || !deco.hist || !deco.hist.length) { say('Nothing to undo'); return; }
@@ -569,7 +576,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     const it = deco && !deco.out && deco.items[deco.sel]; if (!it || !inRoom(it)) return;
     remember(); const step = screenStep(sx, sy, camBasis()); nudgePlan(it, step.dx, step.dz); keepInRoom(it); relItems(); placeHi();
   }
-  function rotateSel() { const it = deco && !deco.out && deco.items[deco.sel]; if (!it || !inRoom(it)) return; remember(); it.r = (it.r + 1) & 3; placeItem(it); keepInRoom(it); relItems(); placeHi(); }
+  function rotateSel() { const it = deco && !deco.out && deco.items[deco.sel]; if (!it || !inRoom(it)) return; remember(); it.r = (it.r + 1) & 3; if (deco.edit && deco.edit.isWall(it.c)) keepInRoom(it, true); else { placeItem(it); keepInRoom(it); } relItems(); placeHi(); }
   function starterOf(r) { return parseItems(defaultItems(r.I.two, r.h && r.h.num ? r.h.seed : 0)); }
   function removeSel() {
     if (!deco || deco.out || deco.sel < 0 || !inRoom(deco.items[deco.sel])) return; remember(); const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece'; const code = it.c;
@@ -577,7 +584,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     deco.sel = -1; deco.moving = false; relItems(); drawDeco();
     say(deco.stash.length > before ? name + ' is in your furniture. Place it again any time, free.' : name + ' put away. You can place it again.');
   }
-  function selectItem(i) { if (!deco || deco.out || i < 0 || i >= deco.items.length || !inRoom(deco.items[i])) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; deco.resetSure = false; placeHi(); paintTools(); markMine(); }
+  function selectItem(i) { if (!deco || deco.out || i < 0 || i >= deco.items.length || !inRoom(deco.items[i])) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; deco.resetSure = false; const spec = deco.edit && deco.edit.partsFor(deco.items[i].c); if (spec) { deco.paintTarget = 'item'; if (!spec.some(([k]) => k === deco.part)) deco.part = spec[0][0]; } placeHi(); paintTools(); markMine(); if (deco.tab === 'c') paintBody(); }
   function beginOutside() {
     const h = HOUSE_BY_ID[myPlot]; if (!h || inside || deco) return;
     if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
@@ -595,7 +602,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (mode === 'out' || (mode !== 'in' && !inside)) { beginOutside(); return; }
     if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
     const base = {}; for (const it of starterOf(r)) base[it.c] = (base[it.c] || 0) + 1;
-    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'c', room: '', edit: null, editState: 'loading', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false, paintNoted: false, paintTarget: 'wall' };
+    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i, ...(i.parts ? { parts: { ...i.parts } } : {}) })), stash: unpackStash(d0.items), base, sel: -1, tab: 'c', cat: 'plant', part: 'f', room: '', edit: null, editState: 'loading', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false, paintNoted: false, paintTarget: 'wall' };
     document.body.classList.add('kh-decorating');
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
     loadOwned().then(() => deco && drawDeco());
@@ -629,7 +636,9 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (deco.out) { box.innerHTML = '<small>Walk around your yard. The colours update on the house while you watch.</small>'; return; }
     if (!deco.room) { box.innerHTML = '<small>Pick a room. You edit one room at a time.</small>'; return; }
     const here = it && inRoom(it) ? it : null;
-    box.innerHTML = here ? `<b>${DECOR[here.c].e} ${DECOR[here.c].n}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-color>Color</button><button type="button" data-del>Delete</button>` : '<small>Tap a piece in this room. Colour, move, and delete stay in this room.</small>';
+    const add = '<button type="button" class="kh-add" data-addopen>Add item</button>';
+    box.innerHTML = add + (here ? `<b>${DECOR[here.c].e} ${DECOR[here.c].n}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-color>Color</button><button type="button" data-del>Delete</button>` : '<small>Tap Add item for plants, pictures, and furniture. Tap a piece to move, colour, or remove it.</small>');
+    const addB = box.querySelector('[data-addopen]'); if (addB) addB.onclick = () => { deco.tab = 'f'; deco.open = true; drawDeco(); };
     const mv = box.querySelector('[data-move]'); if (mv) mv.onclick = () => { deco.moving = !deco.moving; paintTools(); };
     const cb = box.querySelector('[data-color]'); if (cb) cb.onclick = () => { deco.paintTarget = 'item'; deco.tab = 'c'; deco.open = true; drawDeco(); };
     box.querySelectorAll('[data-nudge]').forEach((b) => (b.onclick = () => { const [sx, sy] = b.dataset.nudge.split(',').map(Number); nudgeScreen(sx, sy); }));
@@ -645,7 +654,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (kind === 'wall') { const m = parseWalls(deco.walls); if (c) m[deco.room] = c; else delete m[deco.room]; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); }
     else if (kind === 'floor') { if (c) deco.surf[deco.room] = c; else delete deco.surf[deco.room]; }
     else if (kind === 'curtain') { const k = 'c' + deco.room; if (c) deco.surf[k] = c; else delete deco.surf[k]; }
-    else if (kind === 'item') { const it = deco.items[deco.sel]; if (!it || !inRoom(it)) return; if (c) it.col = c; else delete it.col; relItems(); }
+    else if (kind === 'item') { const it = deco.items[deco.sel]; if (!it || !inRoom(it)) return; const spec = deco.edit && deco.edit.partsFor(it.c); const key = spec ? (spec.some(([k]) => k === deco.part) ? deco.part : spec[0][0]) : ''; const prevCol = it.col, prevParts = it.parts ? { ...it.parts } : null; if (key) { const parts = { ...(it.parts || {}) }; if (c) parts[key] = c; else delete parts[key]; if (Object.keys(parts).length) it.parts = parts; else delete it.parts; } else if (c) it.col = c; else delete it.col; if (packLayout(deco.items, deco.stash).length > 2000) { if (prevParts) it.parts = prevParts; else delete it.parts; if (prevCol) it.col = prevCol; else delete it.col; say('Too many colours to save. Remove a piece first.'); return; } relItems(); }
     if (kind !== 'item') surfNow();
     if (!live) { if (c && deco.edit && deco.edit.rememberColor) deco.edit.rememberColor(uid, c); deco.paintNoted = false; paintBody(); }
   }
@@ -658,18 +667,22 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     else if (!deco.edit) oldPaint();
     else if (!deco.room) body.innerHTML = deco.edit.roomPickerHtml(!!deco.r.I.two) + `<button type="button" data-reset>${deco.resetSure ? 'Tap again to reset the whole home' : 'Reset whole home'}</button>`;
     else if (t === 'm') { const mine = deco.items.map((it, i) => ({ it, i })).filter(({ it }) => inRoom(it)); body.innerHTML = `<div class="kh-strip" aria-label="Furniture in this room">${mine.map(({ it, i }) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing in this room yet. Use Add.</small>'}</div>`; }
-    else if (t === 'f') { const stored = (c) => deco.stash.filter((q) => q === c).length; const entries = Object.entries(DECOR).sort((a, b) => stored(b[0]) - stored(a[0]));
-      body.innerHTML = `<div class="kh-strip" aria-label="Add furniture">${entries.map(([c, D]) => { const n = stored(c); const em = n ? 'Stored' + (n > 1 ? ' ' + n : '') : have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D); return `<button type="button" class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${em}</em></button>`; }).join('')}</div>`; }
+    else if (t === 'f') { const stored = (c) => deco.stash.filter((q) => q === c).length; const cat = deco.edit.CATS.some((c) => c.id === deco.cat) ? deco.cat : 'plant'; deco.cat = cat;
+      const rows = Object.entries(DECOR).filter(([c]) => deco.edit.catOf(c) === cat).map(([c, D]) => { const n = stored(c); const em = n ? 'Stored' + (n > 1 ? ' ' + n : '') : have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D); return { c, e: D.e, n: D.n, em, rank: n ? 0 : have(c) ? 1 : 2 }; }).sort((a, b) => a.rank - b.rank || a.n.localeCompare(b.n));
+      body.innerHTML = deco.edit.addHtml(cat, rows); }
     else { const walls = parseWalls(deco.walls); const it = deco.items[deco.sel]; const here = it && inRoom(it) ? it : null; const R = deco.edit.roomById(deco.room);
       let kind = deco.paintTarget || 'wall'; if (!['wall', 'floor', 'curtain', 'item'].includes(kind) || (kind === 'item' && !here)) kind = 'wall'; deco.paintTarget = kind;
-      const surf = deco.surf || {}; const current = kind === 'floor' ? (surf[deco.room] || '') : kind === 'curtain' ? (surf['c' + deco.room] || '') : kind === 'item' ? (here.col || '') : (walls[deco.room] || '');
-      body.innerHTML = deco.edit.colorHtml({ roomName: R.name, target: kind, current, recent: deco.edit.recentColors(uid), itemName: here ? `${DECOR[here.c].e} ${DECOR[here.c].n}` : '' });
+      const spec = here && kind === 'item' ? deco.edit.partsFor(here.c) : null; if (spec && !spec.some(([k]) => k === deco.part)) deco.part = spec[0][0];
+      const surf = deco.surf || {}; const current = kind === 'floor' ? (surf[deco.room] || '') : kind === 'curtain' ? (surf['c' + deco.room] || '') : kind === 'item' ? (spec ? ((here.parts && here.parts[deco.part]) || '') : (here.col || '')) : (walls[deco.room] || '');
+      body.innerHTML = deco.edit.colorHtml({ roomName: R.name, target: kind, current, recent: deco.edit.recentColors(uid), itemName: here ? `${DECOR[here.c].e} ${DECOR[here.c].n}` : '', partList: spec, part: deco.part });
       body.querySelectorAll('[data-fl]').forEach((b) => b.classList.toggle('on', b.dataset.fl === deco.floor)); }
     body.querySelectorAll('[data-room]').forEach((b) => (b.onclick = () => { const id = b.dataset.room; if (!deco.edit.roomById(id)) return; deco.room = id; deco.sel = -1; deco.moving = false; deco.tab = 'c'; deco.open = true; focusRoom(id); placeHi(); drawDeco(); say(deco.edit.roomById(id).name + '. Only this room can be edited.'); }));
     body.querySelectorAll('[data-mine]').forEach((b) => (b.onclick = () => selectItem(+b.dataset.mine)));
     body.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; paintBody(); }));
     body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
     body.querySelectorAll('[data-target]').forEach((b) => (b.onclick = () => { const k = b.dataset.target; if (k === 'item') { const it = deco.items[deco.sel]; if (!it || !inRoom(it)) return; } deco.paintTarget = k; paintBody(); }));
+    body.querySelectorAll('[data-part]').forEach((b) => (b.onclick = () => { deco.part = b.dataset.part; paintBody(); }));
+    body.querySelectorAll('[data-cat]').forEach((b) => (b.onclick = () => { deco.cat = b.dataset.cat; paintBody(); }));
     body.querySelectorAll('[data-hex]').forEach((b) => (b.onclick = () => paintKind(deco.paintTarget || 'wall', b.dataset.hex, false)));
     body.querySelectorAll('[data-custom]').forEach((el) => { const apply = (live) => { const c = hex6(el.value); if (c) paintKind(deco.paintTarget || 'wall', c, live); }; el.oninput = () => apply(true); el.onchange = () => apply(false); });
     body.querySelectorAll('[data-clear]').forEach((b) => (b.onclick = () => paintKind(b.dataset.clear, '', false)));
@@ -677,18 +690,21 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { remember(); if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say(deco.out ? '🎨 That colour is on the house.' : '🎨 Outside colour set. Step out to see it, or use Decorate outside from the yard.'); }));
     const resetB = body.querySelector('[data-reset]'); if (resetB) resetB.onclick = () => { if (!deco.resetSure) { deco.resetSure = true; paintBody(); say('Tap again to put back the furniture that came with the house. Colours stay.'); return; }
       remember(); deco.items = starterOf(deco.r).map((i) => ({ ...i })); deco.stash = []; deco.sel = -1; deco.moving = false; deco.resetSure = false; relItems(); drawDeco(); say('Starter furniture is back. Pieces you bought are still yours.'); };
-    body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { if (deco.out || !deco.r || !deco.room) return; const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
-      const si = deco.stash.indexOf(c); if (si >= 0) deco.stash.splice(si, 1);
-      else if (!have(c)) { if (!b.dataset.sure) { b.dataset.sure = 1; b.querySelector('em').textContent = 'Tap to buy ' + priceOf(D); return; } try { b.disabled = true; const { econ: e, dia: d } = await shop(); if (D.d) await d.buy(decorItem(c)); else await e.buy(decorItem(c)); owned = owned || {}; owned[decorItem(c)] = 1; say('🛍️ Bought ' + D.n); }
+    body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { if (deco.out || !deco.r || !deco.room || !deco.edit) return; const c = b.dataset.add, D = DECOR[c]; if (!D) return; const cap = deco.edit.ROOM_CAP || 12; const inThis = deco.items.reduce((n, q) => n + (inRoom(q) ? 1 : 0), 0); if (inThis >= cap) { say('This room is full (' + cap + '). Remove one, then add another.'); return; }
+      const si = deco.stash.indexOf(c);
+      if (si < 0 && !have(c)) { if (!b.dataset.sure) { b.dataset.sure = 1; b.querySelector('em').textContent = 'Tap to buy ' + priceOf(D); return; } try { b.disabled = true; const { econ: e, dia: d } = await shop(); if (D.d) await d.buy(decorItem(c)); else await e.buy(decorItem(c)); owned = owned || {}; owned[decorItem(c)] = 1; say('🛍️ Bought ' + D.n); }
         catch (e) { b.disabled = false; say(e.code === 'permission-denied' ? 'The shop isn’t selling decor yet (prices not published).' : /Diamond|reading 'd'/.test(e.message || '') ? 'You need more 💎 Diamonds' : e.message || 'Could not buy'); return; } }
       const r = deco.r; const fx = Math.sin(P.yaw || 0), fz = Math.cos(P.yaw || 0);
-      remember(); const draft = { c, x: (P.x - r.cx + fx * 1.2) / scOf(r.h), z: (P.z - r.cz + fz * 1.2) / scOf(r.h), r: 0, f: deco.room === 'U' ? 1 : 0 };
-      const it = keepInRoom(placeItem(draft) || draft); if (!it) return; deco.items.push(it); deco.sel = deco.items.length - 1; relItems(); drawDeco(); }));
+      const draft = { c, x: (P.x - r.cx + fx * 1.2) / scOf(r.h), z: (P.z - r.cz + fz * 1.2) / scOf(r.h), r: 0, f: deco.room === 'U' ? 1 : 0 };
+      const it = keepInRoom(placeItem(draft) || draft); if (!it || deco.edit.itemRoom(it.x, it.z, it.f) !== deco.room) { say('That piece does not fit in this room.'); return; }
+      const stash2 = deco.stash.slice(); if (si >= 0) stash2.splice(si, 1);
+      const next = deco.items.concat([it]); if (packLayout(next, stash2).length > 2000 || next.length > 72) { say('Too many pieces to save. Remove one, then tap Done.'); return; }
+      remember(); if (si >= 0) deco.stash.splice(si, 1); deco.items.push(it); deco.sel = deco.items.length - 1; const spec = deco.edit.partsFor(c); if (spec) { deco.paintTarget = 'item'; deco.part = spec[0][0]; } relItems(); drawDeco(); }));
   }
   function drawDeco() { if (!deco) return; const t = deco.tab; const roomed = !deco.out && deco.editState === 'ready' && deco.edit;
-    dbar.classList.toggle('open', !!deco.open); dbar.classList.toggle('rooms', !!(roomed && !deco.room)); dbar.classList.toggle('tall', !!(roomed && deco.room && t === 'c')); dbar.hidden = false;
+    dbar.classList.toggle('open', !!deco.open); dbar.classList.toggle('rooms', !!(roomed && !deco.room)); dbar.classList.toggle('tall', !!(roomed && deco.room && (t === 'c' || t === 'f'))); dbar.hidden = false;
     const R = roomed && deco.room ? deco.edit.roomById(deco.room) : null;
-    const tip = deco.out ? 'You stay in the yard. Tap a colour. Done saves. Exit puts the old colours back.' : !roomed ? 'Opening the room editor…' : !deco.room ? 'Tap a room. The camera moves there. Only that room can be edited. Done saves. Exit cancels.' : `${R.name}. Tap a piece, then Color. Other rooms stay put. Done saves every room. Exit cancels.`;
+    const tip = deco.out ? 'You stay in the yard. Tap a colour. Done saves. Exit puts the old colours back.' : !roomed ? 'Opening the room editor…' : !deco.room ? 'Tap a room. The camera moves there. Only that room can be edited. Done saves. Exit cancels.' : `${R.name}. Tap Add item for plants, pictures, and furniture. Wall art snaps to a wall. Done saves every room. Exit cancels.`;
     const count = roomed && deco.room ? deco.items.filter((it) => inRoom(it)).length : deco.items.length;
     const acts = `<div class="kh-acts">${roomed && deco.room ? '<button type="button" data-rooms>Rooms</button>' : ''}<button type="button" data-undo>Undo</button><button type="button" class="x" data-x>Exit</button><button type="button" class="p" data-sv>Done</button></div>`;
     const tabs = roomed && deco.room ? `<div class="kh-tabs"><button type="button" data-tab="c" class="${t === 'c' ? 'on' : ''}">Color</button><button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${count}</button></div>` : '';
@@ -751,7 +767,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (pressed.confirm) { deco.moving = !deco.moving; paintTools(); }
     return true;
   }
-  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, out: !!deco.out, room: deco.room || '', floors: serFloors(deco.surf || {}), col: it && it.col || '', name: it ? DECOR[it.c].n : '', code: it ? it.c : '', x: it ? it.x : null, z: it ? it.z : null, stash: deco.stash.slice(), hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden, spot: deco.spot }; }
+  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, out: !!deco.out, room: deco.room || '', floors: serFloors(deco.surf || {}), col: it && it.col || '', parts: it && it.parts ? { ...it.parts } : null, name: it ? DECOR[it.c].n : '', code: it ? it.c : '', x: it ? it.x : null, z: it ? it.z : null, r: it ? it.r : null, f: it ? it.f || 0 : 0, stash: deco.stash.slice(), hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden, spot: deco.spot }; }
   function screenOf(i) {
     if (!deco || !deco.items[i] || !api.cam) return null; const b = aabbOf(deco.items[i]); api.cam.updateMatrixWorld(); const v = new THREE.Vector3((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2); v.project(api.cam);
     const rect = view.querySelector('canvas').getBoundingClientRect(); return { x: (v.x + 1) / 2 * rect.width + rect.left, y: (1 - v.y) / 2 * rect.height + rect.top, behind: v.z > 1 };

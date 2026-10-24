@@ -146,6 +146,8 @@ startMod();
 let busyAt = 0; window.kemyBusy = () => { if (Date.now() - busyAt > 60e3) { busyAt = Date.now(); toast(BUSY_MSG + ' (showing saved posts)'); } };
 function friendlyError(e) {
   const c = e && (e.code || '');
+  const raw = e && (e.message || '');
+  if (c || raw) console.warn('Kemy error', c || '(no code)', String(raw).replace(/\s+/g, ' ').slice(0, 500));
   const map = {
     'auth/email-already-in-use': 'That email already has an account. Try logging in.',
     'auth/invalid-email': 'That email address doesn’t look right.',
