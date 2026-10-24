@@ -29,7 +29,8 @@ export function createPalStore(ctx) {
     if (!requireAuth()) return; const m = await myPals(true); const p = m && activeOf(m);
     if (!p) { main.innerHTML = `<section class="card"><h2>Pal Store</h2><p>Hatch a Pal first, then come back to dress it up!</p><a class="btn" href="#pals">Go to my Pals</a></section>`; return; }
     const e = econ(); let inv = {}; try { await e.wallet(); inv = await e.inventory(true); } catch {}
-    const own = (id) => !id || id.startsWith('f_') || id.startsWith('b_') || ['none', 'spots', 'stripes', 'sparkle'].includes(id) || !!inv[id];
+    // b_ is free. bp_ is a paid background and only starts with those letters, so it still has to be owned.
+    const own = (id) => !id || id.startsWith('f_') || (id.startsWith('b_') && !id.startsWith('bp_')) || ['none', 'spots', 'stripes', 'sparkle'].includes(id) || !!inv[id];
     const saved = () => ({ outfit: { ...(p.outfit || {}) }, bg: p.bg || '', variant: p.variant || '', pattern: p.pattern || 'none' });
     let D = saved(); const hist = []; let tab = 'outfits', slot = 'all', gf = 'a', yaw = 0, zoom = 1;
     const snap = () => { hist.push(JSON.stringify(D)); if (hist.length > 30) hist.shift(); };
@@ -108,7 +109,7 @@ export function createPalStore(ctx) {
     $('#ps-rand').onclick = () => { snap(); const o = {}; for (const s of ['head', 'hair', 'face', 'neck', 'feet', 'held']) if (Math.random() < 0.6) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
       const fl = WEAR.filter((w) => w.slot === 'full' && w.free); if (Math.random() < 0.5) o.full = fl[Math.floor(Math.random() * fl.length)].id; else for (const s of ['body', 'bottom']) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
       D.outfit = o; const fb = BGS.filter((b) => !b.p); D.bg = fb[Math.floor(Math.random() * fb.length)].id; refresh(); };
-    const commitLook = async () => { const ok = await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); if (ok === false) throw new Error('Couldn’t save the look. Try again.'); dispatchEvent(new Event('kemy:pal-changed')); };
+    const commitLook = async () => { const ok = await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); if (ok === false) return false; dispatchEvent(new Event('kemy:pal-changed')); return true; };
     async function save() {
       const ud = unowned().filter((x) => x.d); // 👑 Diamond items (Halloween premium) first, on their own sheet
       if (ud.length) { const { createDiamonds } = await import('./armory.js'); const dia = createDiamonds(ctx.db, S.user.uid); let gems = 0; try { gems = (await dia.get(true)).d || 0; } catch { /* */ }
@@ -122,7 +123,7 @@ export function createPalStore(ctx) {
           buy: async () => { for (const x of u) { if (inv[x.id]) continue; try { await e.buy(x.id); inv[x.id] = 1; } catch (er) { throw new Error(er.code ? friendlyError(er) : er.message || 'Purchase failed'); } } $('#ps-c').textContent = e.w.coins.toLocaleString(); return e.w.coins; },
           onSuccess: commitLook });
         refresh(); return; }
-      try { await commitLook(); toast(`${p.name}'s look is saved ✨`); refresh(); } catch (er) { toast(friendlyError(er)); }
+      try { if (await commitLook()) { toast(`${p.name}'s look is saved ✨`); refresh(); } } catch (er) { toast(friendlyError(er)); }
     }
     $('#ps-save').onclick = save;
     // 3 saved look slots

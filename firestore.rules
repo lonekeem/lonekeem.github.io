@@ -1911,23 +1911,32 @@ service cloud.firestore {
       allow delete: if signedIn() && uid == me();
     }
       // Kemy Pals: up to 6 virtual pets per user (ids p1..p6), owner-written; visitors add one pat a day.
+    // Read is its own match. A get() of a pet (achievement checks, play dates) must not also count
+    // palValid, or a Save Look hits the 1000-expression cap and comes back permission-denied.
+    match /users/{uid}/pets/{pid} {
+      allow read: if true;
+    }
     match /users/{uid}/pets/{pid} {
       function pd() { return request.resource.data; }
       function hex(v) { return v is string && v.matches('^#[0-9a-fA-F]{6}$'); }
       function stat(v) { return v is int && v >= 0 && v <= 100; }
+      // Closet check for a paid id. Unchanged values are accepted above this and never call it:
+      // each call counts the purchase rules, and more than a few in one write exceed 1000 expressions.
+      function held(id) { return exists(/databases/$(database)/documents/users/$(uid)/inv/$(id)); }
+      function same(k) { return resource != null && resource.data.keys().hasAny([k]) && pd().keys().hasAny([k]) && resource.data[k] == pd()[k]; }
       function palValid() {
         return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt', 'outfit', 'voice', 'bg', 'variant'])
-          && (!('variant' in pd()) || pd().variant == '' || (pd().variant is string && pd().variant.matches('^rare_[a-z]{2,11}$') && exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().variant))))
-          && (!('bg' in pd()) || (pd().bg is string && (pd().bg.matches('^b_[a-z0-9_]{1,13}$')
-               || (pd().bg.matches('^bp_[a-z0-9_]{1,13}$') && exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().bg))))))
-          && (!('voice' in pd()) || (pd().voice is string && pd().voice.matches('^[a-z_]{2,16}$') && (!pd().voice.matches('^vx_.*') || exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().voice)))))
+          && (!('variant' in pd()) || pd().variant == '' || same('variant') || (pd().variant is string && pd().variant.matches('^rare_[a-z]{2,11}$') && held(pd().variant)))
+          && (!('bg' in pd()) || (pd().bg is string && (pd().bg.matches('^b_[a-z0-9_]{1,13}$') || same('bg')
+               || (pd().bg.matches('^bp_[a-z0-9_]{1,13}$') && held(pd().bg)))))
+          && (!('voice' in pd()) || (pd().voice is string && pd().voice.matches('^[a-z_]{2,16}$') && (!pd().voice.matches('^vx_.*') || same('voice') || held(pd().voice))))
           && (!('outfit' in pd()) || outfitOk(pd().outfit))
           && pd().species is string && pd().species.matches('^[a-z]{2,16}$')
           && (pd().species != 'founder' || isAdmin())
-          && (!pd().species.matches('^rx[a-z]+$') || exists(/databases/$(database)/documents/users/$(uid)/inv/$('sp_' + pd().species)))
+          && (!pd().species.matches('^rx[a-z]+$') || (resource != null && resource.data.species == pd().species) || held('sp_' + pd().species))
           && isStr(pd().name, 1, 20)
           && pd().colors is map && pd().colors.keys().hasOnly(['body', 'accent', 'eye']) && hex(pd().colors.body) && hex(pd().colors.accent) && hex(pd().colors.eye)
-          && (pd().pattern in ['none', 'spots', 'stripes', 'sparkle'] || (pd().pattern is string && pd().pattern.matches('^pt_[a-z]{2,13}$') && exists(/databases/$(database)/documents/users/$(uid)/inv/$(pd().pattern))))
+          && (pd().pattern in ['none', 'spots', 'stripes', 'sparkle'] || same('pattern') || (pd().pattern is string && pd().pattern.matches('^pt_[a-z]{2,13}$') && held(pd().pattern)))
           && pd().acc in ['none', 'bow', 'crown', 'shades', 'scarf', 'hat', 'badge']
           && pd().xp is int && pd().xp >= 0 && pd().xp <= 4900
           && pd().level == math.floor(pd().xp / 100) + 1
@@ -1936,19 +1945,40 @@ service cloud.firestore {
           && stat(pd().stats.happy) && stat(pd().stats.hunger) && stat(pd().stats.energy) && stat(pd().stats.clean)
           && pd().at == request.time && pd().updatedAt == request.time;
       }
-      function owns(o, k) {
-        return o.get(k, '') == '' || (o.get(k, '') is string && o.get(k, '').matches('^f_[a-z0-9_]{1,13}$'))
-          || (resource != null && 'outfit' in resource.data && resource.data.outfit.get(k, '') == o.get(k, ''))
-          || exists(/databases/$(database)/documents/users/$(uid)/inv/$(o.get(k, '')));
+      function plain(id) { return id == '' || (id is string && id.matches('^f_[a-z0-9_]{1,13}$')); }
+      // Empty or free ids skip the closet. A paid id is one exists() of inv/{id}.
+      function pay(o, k) { return plain(o.get(k, '')) || held(o.get(k, '')); }
+      // First outfit (nothing saved yet): every filled slot is checked. Later saves diff once.
+      function eachPay(o) {
+        return pay(o, 'head') && pay(o, 'face') && pay(o, 'neck') && pay(o, 'body') && pay(o, 'feet') && pay(o, 'back')
+          && pay(o, 'hair') && pay(o, 'bottom') && pay(o, 'full') && pay(o, 'bag') && pay(o, 'held')
+          && pay(o, 'ears') && pay(o, 'wrist') && pay(o, 'hand') && pay(o, 'nose');
+      }
+      // Unchanged slots are not indexed and do not call exists(). Only a changed paid id hits the closet.
+      function changedPay(o, ch) {
+        return (!ch.hasAny(['head']) || pay(o, 'head'))
+          && (!ch.hasAny(['face']) || pay(o, 'face'))
+          && (!ch.hasAny(['neck']) || pay(o, 'neck'))
+          && (!ch.hasAny(['body']) || pay(o, 'body'))
+          && (!ch.hasAny(['feet']) || pay(o, 'feet'))
+          && (!ch.hasAny(['back']) || pay(o, 'back'))
+          && (!ch.hasAny(['hair']) || pay(o, 'hair'))
+          && (!ch.hasAny(['bottom']) || pay(o, 'bottom'))
+          && (!ch.hasAny(['full']) || pay(o, 'full'))
+          && (!ch.hasAny(['bag']) || pay(o, 'bag'))
+          && (!ch.hasAny(['held']) || pay(o, 'held'))
+          && (!ch.hasAny(['ears']) || pay(o, 'ears'))
+          && (!ch.hasAny(['wrist']) || pay(o, 'wrist'))
+          && (!ch.hasAny(['hand']) || pay(o, 'hand'))
+          && (!ch.hasAny(['nose']) || pay(o, 'nose'));
       }
       function outfitOk(o) {
         return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand', 'nose'])
-          && owns(o, 'head') && owns(o, 'face') && owns(o, 'neck') && owns(o, 'body') && owns(o, 'feet') && owns(o, 'back')
-          && owns(o, 'hair') && owns(o, 'bottom') && owns(o, 'full') && owns(o, 'bag') && owns(o, 'held')
-          && owns(o, 'ears') && owns(o, 'wrist') && owns(o, 'hand') && owns(o, 'nose');
+          && (resource != null && 'outfit' in resource.data
+            ? changedPay(o, o.diff(resource.data.outfit).affectedKeys())
+            : eachPay(o));
       }
       function patPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid)/pats/$(me()); }
-      allow read: if true;
       allow create: if signedIn() && uid == me() && pid.matches('^p[1-6]$') && palValid()
         && pd().xp == 0 && pd().pats == 0 && pd().createdAt == request.time;
       allow update: if signedIn() && uid == me() && palValid()
@@ -2251,6 +2281,11 @@ service cloud.firestore {
         && request.resource.data.visitorChat is bool && request.resource.data.updatedAt == request.time;
       allow delete: if signedIn() && uid == me();
     }
+    // Read lives in its own match so a closet check does not also count every purchase rule below
+    // (that pushed Save Look over the 1000-expression cap).
+    match /users/{uid}/inv/{item} {
+      allow read: if true;
+    }
     match /users/{uid}/inv/{item} {
       function v() { return request.resource.data; }
       function walletPath() { return /databases/$(database)/documents/users/$(uid)/pal/wallet; }
@@ -2270,7 +2305,6 @@ service cloud.firestore {
              && exists(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof[2])))
           || (item == 'ach_champ' && get(/databases/$(database)/documents/palStats/$(uid)).data.wins >= 5));
       }
-      allow read: if true;
       allow create, update: if signedIn() && uid == me() && item.matches('^[a-z_]{2,16}$')
         && v().keys().hasOnly(['n', 'at', 'proof']) && v().n is int && v().at == request.time && (
           // bought: +1 together with the wallet purchase (wearables, decor and toys are one each)

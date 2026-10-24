@@ -24,12 +24,12 @@ export const EXT_SW = ['#f6e7c8', '#ffffff', '#cfe3f0', '#f3d1dc', '#d8ecd0', '#
 export const FLOORS = { wood: { n: 'Wood', c: '#b07a4a', l: '#8a5a34' }, dark: { n: 'Dark wood', c: '#6b4423', l: '#4a2e17' }, tile: { n: 'Tile', c: '#e5e7eb', l: '#cbd5e1' }, carpet: { n: 'Carpet', c: '#a78bfa', l: null }, marble: { n: 'Marble', c: '#f1f5f9', l: '#e2e8f0' }, mint: { n: 'Mint tile', c: '#a7f3d0', l: '#6ee7b7' }, rose: { n: 'Rose wood', c: '#c2847a', l: '#9f5f56' }, night: { n: 'Night sky', c: '#312e81', l: '#1e1b4b' }, gold: { n: 'Gold tile', c: '#fcd34d', l: '#d97706' } };
 // furniture: parts [shape, colour ('A' accent, 'T' trim), x, y, z, sx, sy, sz, glow?]; foot = collider [w, d] or null
 export const DECOR = {
-  bd: { n: 'Cozy Bed', e: '🛏️', foot: [2, 2.9], p: [['box', 'T', 0, .25, 0, 2, .5, 2.9], ['box', '#f8fafc', 0, .56, 0, 1.9, .14, 2.8], ['box', 'A', 0, .65, .4, 1.95, .08, 1.9], ['box', '#fff', 0, .7, -1.05, 1.3, .14, .45], ['box', 'T', 0, .8, -1.4, 2, 1.1, .12]] },
-  bc: { n: 'Canopy Bed', e: '👑', c: 300, foot: [2.1, 3], p: [['box', 'T', 0, .25, 0, 2, .5, 2.9], ['box', '#f8fafc', 0, .56, 0, 1.9, .14, 2.8], ['box', '#f9a8d4', 0, .65, .4, 1.95, .08, 1.9], ['box', '#fff', 0, .7, -1.05, 1.3, .14, .45], ['box', 'T', .95, 1.2, 1.4, .1, 2.4, .1], ['box', 'T', -.95, 1.2, 1.4, .1, 2.4, .1], ['box', 'T', .95, 1.2, -1.4, .1, 2.4, .1], ['box', 'T', -.95, 1.2, -1.4, .1, 2.4, .1], ['box', '#fbcfe8', 0, 2.42, 0, 2.1, .06, 3]] },
-  bk: { n: 'Bunk Bed', e: '🪜', c: 450, foot: [1.4, 2.4], p: [['box', 'T', 0, .25, 0, 1.3, .3, 2.3], ['box', 'A', 0, .45, 0, 1.25, .12, 2.2], ['box', 'T', 0, 1.45, 0, 1.3, .3, 2.3], ['box', '#38bdf8', 0, 1.65, 0, 1.25, .12, 2.2], ['box', 'T', .62, 1, 1.12, .08, 2, .08], ['box', 'T', -.62, 1, 1.12, .08, 2, .08], ['box', 'T', .62, 1, -1.12, .08, 2, .08], ['box', 'T', -.62, 1, -1.12, .08, 2, .08], ['box', '#fbbf24', .7, .9, 0, .05, 1.2, .5]] },
-  br: { n: 'Round Star Bed', e: '🌟', d: 60, foot: [2.6, 2.6], p: [['cyl', '#fde68a', 0, .25, 0, 2.8, .5, 2.8], ['cyl', 'A', 0, .56, 0, 2.6, .12, 2.6], ['sph', '#fff', 0, .7, -.8, .9, .3, .5], ['cyl', '#facc15', 0, .63, .5, .9, .02, .9, 1]] },
-  cs: { n: 'Sofa', e: '🛋️', foot: [3.2, 1], p: [['box', 'A', 0, .3, 0, 3.2, .5, 1], ['box', 'A', 0, .8, -.38, 3.2, .7, .25], ['box', 'T', 1.55, .55, 0, .22, .6, 1], ['box', 'T', -1.55, .55, 0, .22, .6, 1], ['box', '#fff', .8, .65, -.15, .5, .4, .15], ['box', '#fff', -.8, .65, -.15, .5, .4, .15]] },
-  cl: { n: 'Corner Sofa', e: '🛋️', c: 350, foot: [3.2, 2.2], p: [['box', 'A', 0, .3, -.6, 3.2, .5, 1], ['box', 'A', 0, .8, -.98, 3.2, .7, .25], ['box', 'A', 1.1, .3, .5, 1, .5, 1.3], ['box', 'A', 1.48, .8, .2, .25, .7, 1.9], ['box', '#fff', -.8, .65, -.75, .5, .4, .15]] },
+  bd: { n: 'Cozy Bed', e: '🛏️', foot: [2, 2.9], p: [['box', 'T', 0, .25, 0, 2, .5, 2.9, 0, 'f'], ['box', '#f8fafc', 0, .56, 0, 1.9, .14, 2.8, 0, 's'], ['box', 'A', 0, .65, .4, 1.95, .08, 1.9, 0, 's'], ['box', '#fff', 0, .7, -1.05, 1.3, .14, .45, 0, 'p'], ['box', 'T', 0, .8, -1.4, 2, 1.1, .12, 0, 'f']] },
+  bc: { n: 'Canopy Bed', e: '👑', c: 300, foot: [2.1, 3], p: [['box', 'T', 0, .25, 0, 2, .5, 2.9, 0, 'f'], ['box', '#f8fafc', 0, .56, 0, 1.9, .14, 2.8, 0, 's'], ['box', '#f9a8d4', 0, .65, .4, 1.95, .08, 1.9, 0, 's'], ['box', '#fff', 0, .7, -1.05, 1.3, .14, .45, 0, 'p'], ['box', 'T', .95, 1.2, 1.4, .1, 2.4, .1, 0, 'f'], ['box', 'T', -.95, 1.2, 1.4, .1, 2.4, .1, 0, 'f'], ['box', 'T', .95, 1.2, -1.4, .1, 2.4, .1, 0, 'f'], ['box', 'T', -.95, 1.2, -1.4, .1, 2.4, .1, 0, 'f'], ['box', '#fbcfe8', 0, 2.42, 0, 2.1, .06, 3, 0, 's']] },
+  bk: { n: 'Bunk Bed', e: '🪜', c: 450, foot: [1.4, 2.4], p: [['box', 'T', 0, .25, 0, 1.3, .3, 2.3, 0, 'f'], ['box', 'A', 0, .45, 0, 1.25, .12, 2.2, 0, 's'], ['box', 'T', 0, 1.45, 0, 1.3, .3, 2.3, 0, 'f'], ['box', '#38bdf8', 0, 1.65, 0, 1.25, .12, 2.2, 0, 's'], ['box', 'T', .62, 1, 1.12, .08, 2, .08, 0, 'f'], ['box', 'T', -.62, 1, 1.12, .08, 2, .08, 0, 'f'], ['box', 'T', .62, 1, -1.12, .08, 2, .08, 0, 'f'], ['box', 'T', -.62, 1, -1.12, .08, 2, .08, 0, 'f'], ['box', '#fbbf24', .7, .9, 0, .05, 1.2, .5, 0, 'f']] },
+  br: { n: 'Round Star Bed', e: '🌟', d: 60, foot: [2.6, 2.6], p: [['cyl', '#fde68a', 0, .25, 0, 2.8, .5, 2.8, 0, 'f'], ['cyl', 'A', 0, .56, 0, 2.6, .12, 2.6, 0, 's'], ['sph', '#fff', 0, .7, -.8, .9, .3, .5, 0, 'p'], ['cyl', '#facc15', 0, .63, .5, .9, .02, .9, 1]] },
+  cs: { n: 'Sofa', e: '🛋️', foot: [3.2, 1], p: [['box', 'A', 0, .3, 0, 3.2, .5, 1, 0, 'f'], ['box', 'A', 0, .8, -.38, 3.2, .7, .25, 0, 'f'], ['box', 'T', 1.55, .55, 0, .22, .6, 1, 0, 'f'], ['box', 'T', -1.55, .55, 0, .22, .6, 1, 0, 'f'], ['box', '#fff', .8, .65, -.15, .5, .4, .15, 0, 'c'], ['box', '#fff', -.8, .65, -.15, .5, .4, .15, 0, 'c']] },
+  cl: { n: 'Corner Sofa', e: '🛋️', c: 350, foot: [3.2, 2.2], p: [['box', 'A', 0, .3, -.6, 3.2, .5, 1, 0, 'f'], ['box', 'A', 0, .8, -.98, 3.2, .7, .25, 0, 'f'], ['box', 'A', 1.1, .3, .5, 1, .5, 1.3, 0, 'f'], ['box', 'A', 1.48, .8, .2, .25, .7, 1.9, 0, 'f'], ['box', '#fff', -.8, .65, -.75, .5, .4, .15, 0, 'c']] },
   ch: { n: 'Armchair', e: '🪑', foot: [1, 1], p: [['box', 'A', 0, .3, 0, 1, .5, 1], ['box', 'A', 0, .8, -.38, 1, .7, .25], ['box', 'T', .45, .55, 0, .14, .5, 1], ['box', 'T', -.45, .55, 0, .14, .5, 1]] },
   tv: { n: 'TV + Stand', e: '📺', foot: [2.4, .5], p: [['box', '#3f3f46', 0, .35, 0, 2.4, .7, .5], ['box', '#111827', 0, 1.25, -.05, 2.2, 1.1, .08], ['box', '#60a5fa', 0, 1.25, 0, 2, .95, .01, 1]] },
   tg: { n: 'Big Screen TV', e: '🎬', c: 400, foot: [3.4, .5], p: [['box', '#27272a', 0, .3, 0, 3.4, .6, .5], ['box', '#09090b', 0, 1.5, -.05, 3.2, 1.7, .08], ['box', '#a78bfa', 0, 1.5, 0, 3, 1.5, .01, 1]] },
@@ -44,52 +44,69 @@ export const DECOR = {
   pt: { n: 'Indoor Tree', e: '🌳', c: 180, foot: [.7, .7], p: [['cyl', '#a16207', 0, .3, 0, .6, .6, .6], ['cyl', '#78350f', 0, 1.2, 0, .15, 1.6, .15], ['sph', '#22c55e', 0, 2.1, 0, 1.4, 1.2, 1.4]] },
   bb: { n: 'Bean Bag', e: '🫘', c: 120, foot: [1, 1], p: [['sph', 'A', 0, .3, 0, 1.1, .6, 1.1], ['sph', 'A', 0, .55, -.25, .8, .5, .5]] },
   bp: { n: 'Pink Bean Bag', e: '🩷', c: 120, foot: [1, 1], p: [['sph', '#f9a8d4', 0, .3, 0, 1.1, .6, 1.1], ['sph', '#f472b6', 0, .55, -.25, .8, .5, .5]] },
-  ws: { n: 'Wall Shelf', e: '🗄️', c: 100, foot: null, p: [['box', 'T', 0, 1.5, 0, 1.4, .06, .35], ['box', '#f59e0b', -.4, 1.65, 0, .2, .25, .2], ['sph', '#22c55e', .1, 1.66, 0, .25, .25, .25], ['box', '#3b82f6', .45, 1.62, 0, .3, .18, .25]] },
+  ws: { n: 'Wall Shelf', e: '🗄️', c: 100, wall: 1, foot: null, p: [['box', 'T', 0, 1.5, 0, 1.4, .06, .35], ['box', '#f59e0b', -.4, 1.65, 0, .2, .25, .2], ['sph', '#22c55e', .1, 1.66, 0, .25, .25, .25], ['box', '#3b82f6', .45, 1.62, 0, .3, .18, .25]] },
   pm: { n: 'Monstera', e: '🌿', c: 90, foot: [.7, .7], p: [['cyl', '#f8fafc', 0, .25, 0, .55, .5, .55], ['sph', '#15803d', -.15, .9, 0, .7, .6, .5], ['sph', '#16a34a', .2, 1.1, .1, .6, .6, .5]] },
   ps: { n: 'Sunflower Pot', e: '🌻', c: 80, foot: [.5, .5], p: [['cyl', '#b45309', 0, .2, 0, .45, .4, .45], ['cyl', '#15803d', 0, .7, 0, .05, .8, .05], ['cyl', '#facc15', 0, 1.15, .05, .45, .05, .45, 1], ['cyl', '#78350f', 0, 1.15, .08, .2, .06, .2]] },
   lt: { n: 'Table Lamp', e: '🛋️', c: 90, foot: [.6, .6], p: [['box', 'T', 0, .35, 0, .6, .7, .6], ['cyl', '#94a3b8', 0, .85, 0, .06, .3, .06], ['cone4', '#fde68a', 0, 1.1, 0, .45, .35, .45, 1]] },
   rh: { n: 'Heart Rug', e: '💗', c: 120, foot: null, p: [['cyl6', '#f9a8d4', -.45, .012, -.2, 1.5, .02, 1.5], ['cyl6', '#f9a8d4', .45, .012, -.2, 1.5, .02, 1.5], ['cone4', '#f9a8d4', 0, .012, .45, 1.9, .02, 1.6]] },
-  am: { n: 'Mountain Art', e: '🏔️', c: 120, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#7dd3fc', 0, 1.9, .03, 1.1, .6, .01], ['cone4', '#64748b', -.2, 1.65, .04, .6, .4, .01], ['cone4', '#94a3b8', .25, 1.62, .04, .5, .3, .01]] },
-  ar: { n: 'Sunset Art', e: '🖼️', foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#f59e0b', 0, 1.95, .03, 1.1, .35, .01], ['box', '#ef4444', 0, 1.62, .03, 1.1, .35, .01]] },
-  ak: { n: 'Kemy Star Art', e: '✨', c: 120, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#4c1d95', 0, 1.8, .03, 1.1, .7, .01], ['cyl6', '#facc15', 0, 1.8, .05, .4, .4, .02]] },
-  aa: { n: 'Abstract Art', e: '🎨', c: 120, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#0ea5e9', -.3, 1.9, .03, .5, .5, .01], ['box', '#f43f5e', .25, 1.7, .035, .5, .4, .01], ['box', '#facc15', .1, 2.0, .04, .3, .2, .01]] },
+  am: { n: 'Mountain Art', e: '🏔️', c: 120, wall: 1, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#7dd3fc', 0, 1.9, .03, 1.1, .6, .01], ['cone4', '#64748b', -.2, 1.65, .04, .6, .4, .01], ['cone4', '#94a3b8', .25, 1.62, .04, .5, .3, .01]] },
+  ar: { n: 'Sunset Art', e: '🖼️', wall: 1, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#f59e0b', 0, 1.95, .03, 1.1, .35, .01], ['box', '#ef4444', 0, 1.62, .03, 1.1, .35, .01]] },
+  ak: { n: 'Kemy Star Art', e: '✨', c: 120, wall: 1, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#4c1d95', 0, 1.8, .03, 1.1, .7, .01], ['cyl6', '#facc15', 0, 1.8, .05, .4, .4, .02]] },
+  aa: { n: 'Abstract Art', e: '🎨', c: 120, wall: 1, foot: null, p: [['box', 'T', 0, 1.8, 0, 1.3, .9, .05], ['box', '#0ea5e9', -.3, 1.9, .03, .5, .5, .01], ['box', '#f43f5e', .25, 1.7, .035, .5, .4, .01], ['box', '#facc15', .1, 2.0, .04, .3, .2, .01]] },
   ta: { n: 'Table', e: '🍽️', foot: [1.6, 1.1], p: [['box', '#b45309', 0, .75, 0, 1.6, .08, 1.1], ['box', '#78350f', 0, .37, 0, .14, .74, .14], ['box', '#78350f', 0, .03, 0, .7, .06, .5]] },
   cr: { n: 'Chair', e: '🪑', foot: [.5, .5], p: [['box', '#fbbf24', 0, .45, 0, .45, .06, .45], ['box', '#fbbf24', 0, .75, -.2, .45, .6, .06], ['box', 'T', 0, .22, 0, .08, .44, .08]] },
   bs: { n: 'Bookshelf', e: '📚', foot: [1.8, .6], p: [['box', 'T', 0, 1, 0, 1.8, 2, .6], ['box', '#ef4444', -.4, .45, .2, .7, .36, .3], ['box', '#3b82f6', .4, .95, .2, .8, .36, .3], ['box', '#22c55e', -.3, 1.45, .2, .9, .36, .3], ['box', '#f59e0b', .3, 1.85, .2, .7, .2, .3]] },
   dr: { n: 'Dresser', e: '🗄️', foot: [1.4, .6], p: [['box', 'T', 0, .5, 0, 1.4, 1, .6], ['box', '#fde68a', -.35, .7, .31, .1, .06, .02], ['box', '#fde68a', .35, .7, .31, .1, .06, .02], ['box', '#fde68a', 0, .35, .31, .1, .06, .02]] },
   sp: { n: 'Speaker', e: '🔊', foot: [.5, .5], p: [['box', '#111827', 0, .5, 0, .5, 1, .5], ['cyl', '#334155', 0, .65, .26, .32, .02, .32], ['cyl', '#22d3ee', 0, .3, .26, .14, .02, .14, 1]] },
   pn: { n: 'Piano', e: '🎹', c: 500, foot: [1.6, .7], p: [['box', '#111111', 0, .6, 0, 1.6, 1.2, .6], ['box', '#ffffff', 0, .8, .38, 1.5, .05, .25], ['box', '#111111', 0, .4, .3, 1.5, .5, .3]] },
-  aq: { n: 'Aquarium', e: '🐠', d: 40, foot: [1.4, .5], p: [['box', 'T', 0, .4, 0, 1.4, .8, .5], ['box', '#38bdf8', 0, 1.15, 0, 1.4, .7, .5, 1], ['box', '#f97316', -.3, 1.2, .26, .2, .1, .01], ['box', '#facc15', .3, 1.05, .26, .2, .1, .01]] } };
+  aq: { n: 'Aquarium', e: '🐠', d: 40, foot: [1.4, .5], p: [['box', 'T', 0, .4, 0, 1.4, .8, .5], ['box', '#38bdf8', 0, 1.15, 0, 1.4, .7, .5, 1], ['box', '#f97316', -.3, 1.2, .26, .2, .1, .01], ['box', '#facc15', .3, 1.05, .26, .2, .1, .01]] },
+  fw: { n: 'Flowers', e: '🌷', foot: [.45, .45], p: [['cyl', '#b45309', 0, .15, 0, .4, .3, .4], ['cyl', '#15803d', 0, .45, 0, .04, .4, .04], ['sph', '#f472b6', -.08, .72, .04, .28, .22, .22], ['sph', '#facc15', .1, .8, 0, .26, .22, .22], ['sph', '#fb7185', 0, .66, -.06, .22, .2, .2]] },
+  mr: { n: 'Mirror', e: '🪞', wall: 1, foot: null, p: [['box', 'T', 0, 1.7, 0, .9, 1.3, .05], ['box', '#e0f2fe', 0, 1.7, .03, .7, 1.05, .01], ['cyl', '#fde68a', 0, 1.7, .04, .18, .02, .18]] },
+  ck: { n: 'Clock', e: '🕐', wall: 1, foot: null, p: [['cyl', 'T', 0, 1.8, 0, .7, .06, .7], ['cyl', '#f8fafc', 0, 1.8, .04, .55, .02, .55], ['box', '#111827', 0, 1.88, .05, .04, .22, .01], ['box', '#ef4444', .08, 1.76, .05, .16, .03, .01]] },
+  po: { n: 'Poster', e: '📰', wall: 1, foot: null, p: [['box', 'T', 0, 1.7, 0, 1, 1.4, .04], ['box', '#7c3aed', 0, 1.9, .03, .84, .5, .01], ['box', '#fde047', 0, 1.45, .03, .84, .28, .01], ['box', '#fff', 0, 1.18, .03, .7, .12, .01]] },
+  ty: { n: 'Teddy', e: '🧸', foot: [.6, .5], p: [['sph', '#d97706', 0, .35, 0, .55, .5, .45], ['sph', '#b45309', 0, .7, .05, .36, .32, .32], ['sph', '#fde68a', 0, .66, .16, .16, .12, .1], ['sph', '#111827', -.08, .74, .16, .06, .06, .04], ['sph', '#111827', .08, .74, .16, .06, .06, .04]] },
+  kb: { n: 'Blocks', e: '🧱', foot: [.7, .5], p: [['box', '#ef4444', -.15, .12, 0, .28, .24, .28], ['box', '#3b82f6', .12, .12, .08, .26, .24, .26], ['box', '#facc15', 0, .36, .02, .24, .22, .24]] } };
 // interiors are laid out in 'plan units' (the old 12 m house) and scaled up SC x on the ground plane: bigger rooms,
 // wider halls; fixtures + furniture keep their real size (only their positions spread out). Decor saves stay in plan units.
 export const SC = 1.4;
 // mansions (and the palace, now the same size) are bigger: rooms 1.5x wider, two floors, a tall upper hall
 export const scOf = (h) => (h && h.estate ? 2.1 : SC);
+// Plan-unit gap in the upstairs railing, from the door jamb to the east wall.
+// The player capsule is 0.42 m plus the same margin on the far side, so the
+// opening has to stay wider than that after the house scale is applied.
+export const UP_DOOR = { x0: 4.05, x1: 5.9, wall: 6.0 };
+export const doorClear = (gap, sc, rad = 0.42) => gap * sc - rad * 2;
 // seats [x, seatTop, z, yawOffset] in a piece's local frame (front = +z)
 export const SEATS = { bd: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bc: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bk: [[0, .51, .5, 0]], br: [[-.5, .62, .6, 0], [.5, .62, .6, 0]],
   cs: [[-1, .55, .05, 0], [0, .55, .05, 0], [1, .55, .05, 0]], cl: [[-1, .55, -.5, 0], [0, .55, -.5, 0], [1, .55, .5, Math.PI / 2]], ch: [[0, .55, .05, 0]], cr: [[0, .48, .02, 0]] };
 export const SCREENS = { tv: [0, 1.25, .02, 2, .95], tg: [0, 1.5, .02, 3, 1.5] };
 export const decorItem = (code) => { const d = DECOR[code]; return d ? (d.d ? 'z_hd_' + code : 'hd_' + code) : null; };
-// code,xHalf,zHalf,rot[,1][,#rrggbb]. A #hex is a colour, so it is never read as the upstairs flag.
+// code,xHalf,zHalf,rot[,1][,#rrggbb][,fRRGGBB][,sRRGGBB][,pRRGGBB][,cRRGGBB].
+// A #hex is the old single tint. f/s/p/c plus 6 hex digits are frame, sheets, pillows, cushions.
+const PART_KEYS = ['f', 's', 'p', 'c'];
 function readPiece(t) {
   const p = String(t).split(','); const c = p[0];
   if (!DECOR[c]) return null;
   const X = +p[1] / 2, Z = +p[2] / 2;
   if (!Number.isFinite(X) || !Number.isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) return { bad: true };
-  let f = 0, col = '', dirty = false;
+  let f = 0, col = '', dirty = false; const parts = {};
   for (let i = 4; i < p.length; i++) {
     const part = p[i];
     if (part === '1') { if (f) dirty = true; f = 1; continue; }
+    const pm = /^([fspc])([0-9a-f]{6})$/i.exec(part);
+    if (pm) { const k = pm[1].toLowerCase(), h = '#' + pm[2].toLowerCase(); if (parts[k] || part !== k + h.slice(1)) dirty = true; if (!parts[k]) parts[k] = h; continue; }
     const h = hex6(part);
     if (h) { if (col) dirty = true; else { if (part !== h) dirty = true; col = h; } continue; }
     dirty = true;
   }
   const it = { c, x: X, z: Z, r: (+p[3] || 0) & 3, f };
   if (col) it.col = col;
+  if (PART_KEYS.some((k) => parts[k])) it.parts = parts;
   return { it, dirty };
 }
 export function parseItems(s) { const out = []; for (const t of String(s || '').split(';')) { if (!t || t[0] === '~') continue; const got = readPiece(t); if (!got || !got.it) continue; out.push(got.it); if (out.length >= 80) break; } return out; }
-export const serItems = (L) => L.map((i) => { const col = hex6(i.col); return [i.c, Math.round(i.x * 2), Math.round(i.z * 2), (i.r | 0) & 3].join(',') + (i.f ? ',1' : '') + (col ? ',' + col : ''); }).join(';');
+const partTail = (i) => { const src = i && i.parts; if (!src) return ''; let s = ''; for (const k of PART_KEYS) { const h = hex6(src[k]); if (h) s += ',' + k + h.slice(1); } return s; };
+export const serItems = (L) => L.map((i) => { const col = hex6(i.col); return [i.c, Math.round(i.x * 2), Math.round(i.z * 2), (i.r | 0) & 3].join(',') + (i.f ? ',1' : '') + (col ? ',' + col : '') + partTail(i); }).join(';');
 const tintMode = new Map();
 function tintOf(code) {
   const hit = tintMode.get(code); if (hit) return hit;
@@ -169,7 +186,7 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   const { THREE, box, LOW } = api; const { put, flush, G } = K; const y = K.y ?? 0; const SC = scOf(h); const two = h.style === 1 || h.style === 3 || !!h.estate; const S = palOf(h);
   const g = new THREE.Group(); g.name = 'interior-' + h.id; const vc = (o = {}) => (LOW ? new THREE.MeshLambertMaterial({ color: '#fff', vertexColors: true, ...o }) : new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.8, vertexColors: true, ...o }));
   const k = 'in' + h.id; const cols = []; const HR = two ? (h.estate ? 7.6 : 6.55) : 3.2; const T = S.trim, A = S.acc;
-  const B = (key, c, x, yy, z, sx, sy, sz, solid = 0, sh = 'box', ry = 0, fs = 0) => { x *= SC; z *= SC; if (fs) { sx *= SC; sz *= SC; } put(key, G[sh], c, cx + x, y + yy, cz + z, ry, sx, sy, sz); if (solid) { const b = { x0: cx + x - sx / 2, x1: cx + x + sx / 2, z0: cz + z - sz / 2, z1: cz + z + sz / 2, top: solid === 2 ? y + yy + sy / 2 : solid === 3 ? y + 3.2 : 99, bot: solid === 4 ? y + 3.2 : -99 }; box.push(b); cols.push(b); } };
+  const B = (key, c, x, yy, z, sx, sy, sz, solid = 0, sh = 'box', ry = 0, fs = 0) => { x *= SC; z *= SC; if (fs) { sx *= SC; sz *= SC; } put(key, G[sh], c, cx + x, y + yy, cz + z, ry, sx, sy, sz); if (solid) { const meshTop = yy + sy / 2; const top = solid === 2 ? y + meshTop : solid === 3 ? y + 3.2 : meshTop < 3.15 ? y + 3.15 : 99; const b = { x0: cx + x - sx / 2, x1: cx + x + sx / 2, z0: cz + z - sz / 2, z1: cz + z + sz / 2, top, bot: solid === 4 ? y + 3.2 : -99 }; box.push(b); cols.push(b); } };
   const roomAt = (x, z, h0) => (h0 >= 3.1 ? 'U' : x < -0.95 ? (z < -1 ? 'K' : 'L') : x > 0.95 ? (z < 0 ? 'B' : 'T') : 'H');
   const Wl = (x0, x1, z0, z1, h0, h1, solid = 1) => { const lx = x1 - x0 > z1 - z0; const cuts = lx ? [-1, 1] : ((x0 + x1) / 2 < 0 ? [-1] : [0]); for (const c of cuts) { const a = lx ? x0 : z0, b = lx ? x1 : z1; if (c > a + 0.3 && c < b - 0.3) { if (lx) { Wl(x0, c, z0, z1, h0, h1, solid); Wl(c, x1, z0, z1, h0, h1, solid); } else { Wl(x0, x1, z0, c, h0, h1, solid); Wl(x0, x1, c, z1, h0, h1, solid); } return; } }
     if (h1 - h0 > 1 && h0 < 3.1 && h1 > 3.3) { Wl(x0, x1, z0, z1, h0, 3.2, solid); Wl(x0, x1, z0, z1, 3.2, h1, solid); return; } return WlR(roomAt((x0 + x1) / 2, (z0 + z1) / 2, h0), x0, x1, z0, z1, h0, h1, solid); };
@@ -182,10 +199,12 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   const s3 = two ? 3 : 1; for (const [a, b] of [[-6.1, -3.0], [-0.5, 0.9], [2.7, 4.9]]) Wl(0.91, 1.09, a, b, 0, 3.2, s3); for (const [a, b] of [[-3.0, -0.5], [0.9, 2.7]]) Wl(0.91, 1.09, a, b, 2.6, 3.2, 0);
   Wl(1, 6.1, -0.09, 0.09, 0, 3.2, s3); Wl(1, 6.1, 4.81, 4.99, 0, 3.2, s3);
   if (!two) Wl(5.2, 6.1, 4.9, 6.1, 0, 0.0001, 0); // (closet nook stays open)
-  if (two) { // upstairs: slab, partitions, railing, stairs
+  if (two) { // upstairs loft. The railing stops at UP_DOOR so the top of the stairs opens into the room.
     Wl(0.91, 1.09, -6.1, 6.1, 3.2, HR, 4); B(k + 's', FLOORS[S.floor].l || '#8a5a34', 3.55, 3.275, -0.6, 5.1, 0.15, 11, 0, 'box', 0, 1); { const b = { x0: cx + 1 * SC, x1: cx + 6.1 * SC, z0: cz - 6.1 * SC, z1: cz + 4.9 * SC, top: y + 3.35, bot: y + 3.2 }; box.push(b); cols.push(b); const b2 = { x0: cx + 5.5 * SC, x1: cx + 6.1 * SC, z0: cz + 4.9 * SC, z1: cz + 6.1 * SC, top: y + 3.35, bot: y + 3.2 }; box.push(b2); cols.push(b2); }
-    B(k + 's', '#fafaf9', 3.55, 3.3, 5.5, 5.1, 0.05, 1.2, 0, 'box', 0, 1); // landing edge trim
-    B(k + 's', T, 3.2, 4.0, 4.9, 4.4, 0.08, 0.08, 0, 'box', 0, 1); for (let x = 1.2; x < 5.4; x += 0.4) B(k + 's', T, x, 3.7, 4.9, 0.05, 0.7, 0.05); { const b = { x0: cx + 1 * SC, x1: cx + 5.45 * SC, z0: cz + 4.84 * SC, z1: cz + 4.96 * SC, top: 99, bot: y + 3.2 }; box.push(b); cols.push(b); }
+    B(k + 's', '#fafaf9', (1.15 + UP_DOOR.x0) / 2, 4.0, 4.9, UP_DOOR.x0 - 1.15, 0.08, 0.08, 0, 'box', 0, 1);
+    for (let x = 1.25; x < UP_DOOR.x0 - 0.15; x += 0.45) B(k + 's', T, x, 3.7, 4.9, 0.06, 0.7, 0.06);
+    B(k + 's', T, UP_DOOR.x0, 3.75, 4.9, 0.08, 0.9, 0.08); B(k + 's', T, UP_DOOR.x1, 3.75, 4.9, 0.08, 0.9, 0.08);
+    { const b = { x0: cx + 1 * SC, x1: cx + UP_DOOR.x0 * SC, z0: cz + 4.84 * SC, z1: cz + 4.96 * SC, top: 99, bot: y + 3.2 }; box.push(b); cols.push(b); }
     for (let i = 0; i < 10; i++) { const top = (i + 1) * 0.335; B(k + 's', i % 2 ? FLOORS[S.floor].c : FLOORS[S.floor].l || '#8a5a34', 1.4 + i * 0.48, top / 2, 5.5, 0.48, top, 1.0, 2, 'box', 0, 1); }
     B(k + 's', T, 3.4, 1.9, 5.02, 4.8, 0.06, 0.06, 0, 'box', 0, 1); }
   // ceilings
@@ -235,8 +254,9 @@ export function buildInterior(api, K, h, cx, cz, decor) {
     const dk = k + 'd', gk = k + 'dg'; seats = []; screens = []; for (const it of L) { const D = DECOR[it.c]; if (!D || !Number.isFinite(it.x) || !Number.isFinite(it.z) || Math.abs(it.x) > 6 || Math.abs(it.z) > 6) continue; const th = it.r * Math.PI / 2, c = Math.cos(th), s = Math.sin(th), yb = it.f === 1 && two ? 3.35 : 0; const ix = it.x * SC, iz = it.z * SC;
       for (const [x, sy, z, dy] of SEATS[it.c] || []) seats.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th + dy, fx: Math.sin(th + dy), fz: Math.cos(th + dy), fl: y + yb, c: it.c });
       if (SCREENS[it.c]) { const [x, sy, z, w, hh] = SCREENS[it.c]; screens.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th, w, h: hh, fl: y + yb }); }
-      const tint = hex6(it.col), mode = tint ? tintOf(it.c) : ''; const pc = (col) => (mode && (mode === 'A' ? col === 'A' : col === mode) ? tint : (col === 'A' ? A : col === 'T' ? T : col));
-      for (const [sh, col, x, yy, z, sx, sy, sz, gl] of D.p) { const wx = x * c + z * s, wz = -x * s + z * c; put(gl ? gk : dk, G[sh], pc(col), cx + ix + wx, y + yb + yy, cz + iz + wz, th, sx, sy, sz); }
+      const tint = hex6(it.col), mode = tint ? tintOf(it.c) : ''; const owned = it.parts || null;
+      const pc = (col, part) => { const custom = part && owned && hex6(owned[part]); if (custom) return custom; return mode && (mode === 'A' ? col === 'A' : col === mode) ? tint : (col === 'A' ? A : col === 'T' ? T : col); };
+      for (const [sh, col, x, yy, z, sx, sy, sz, gl, part] of D.p) { const wx = x * c + z * s, wz = -x * s + z * c; put(gl ? gk : dk, G[sh], pc(col, part), cx + ix + wx, y + yb + yy, cz + iz + wz, th, sx, sy, sz); }
       if (D.foot) { const [w, d] = it.r & 1 ? [D.foot[1], D.foot[0]] : D.foot; const b = { x0: cx + ix - w / 2, x1: cx + ix + w / 2, z0: cz + iz - d / 2, z1: cz + iz + d / 2, top: y + (it.f && two ? 3.35 : 0) + 1.2, bot: it.f && two ? y + 3.3 : -99 }; box.push(b); decCols.push(b); } }
     flush(dk, vc(), !LOW, decG); flush(gk, new THREE.MeshBasicMaterial({ vertexColors: true }), false, decG); }
   setFloor(decor.floor || S.floor, decor.floors || ''); setItems(items);
