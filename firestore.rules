@@ -1946,18 +1946,37 @@ service cloud.firestore {
           && pd().at == request.time && pd().updatedAt == request.time;
       }
       function plain(id) { return id == '' || (id is string && id.matches('^f_[a-z0-9_]{1,13}$')); }
-      // Diff once per slot. Indexing a missing key throws and blows the expression cap, so a new
-      // slot is recognized by the key list and only then checked against the closet.
-      function owns(o, k) {
-        return plain(o.get(k, ''))
-          || (resource != null && 'outfit' in resource.data && !o.diff(resource.data.outfit).affectedKeys().hasAny([k]))
-          || held(o.get(k, ''));
+      // Empty or free ids skip the closet. A paid id is one exists() of inv/{id}.
+      function pay(o, k) { return plain(o.get(k, '')) || held(o.get(k, '')); }
+      // First outfit (nothing saved yet): every filled slot is checked. Later saves diff once.
+      function eachPay(o) {
+        return pay(o, 'head') && pay(o, 'face') && pay(o, 'neck') && pay(o, 'body') && pay(o, 'feet') && pay(o, 'back')
+          && pay(o, 'hair') && pay(o, 'bottom') && pay(o, 'full') && pay(o, 'bag') && pay(o, 'held')
+          && pay(o, 'ears') && pay(o, 'wrist') && pay(o, 'hand') && pay(o, 'nose');
+      }
+      // Unchanged slots are not indexed and do not call exists(). Only a changed paid id hits the closet.
+      function changedPay(o, ch) {
+        return (!ch.hasAny(['head']) || pay(o, 'head'))
+          && (!ch.hasAny(['face']) || pay(o, 'face'))
+          && (!ch.hasAny(['neck']) || pay(o, 'neck'))
+          && (!ch.hasAny(['body']) || pay(o, 'body'))
+          && (!ch.hasAny(['feet']) || pay(o, 'feet'))
+          && (!ch.hasAny(['back']) || pay(o, 'back'))
+          && (!ch.hasAny(['hair']) || pay(o, 'hair'))
+          && (!ch.hasAny(['bottom']) || pay(o, 'bottom'))
+          && (!ch.hasAny(['full']) || pay(o, 'full'))
+          && (!ch.hasAny(['bag']) || pay(o, 'bag'))
+          && (!ch.hasAny(['held']) || pay(o, 'held'))
+          && (!ch.hasAny(['ears']) || pay(o, 'ears'))
+          && (!ch.hasAny(['wrist']) || pay(o, 'wrist'))
+          && (!ch.hasAny(['hand']) || pay(o, 'hand'))
+          && (!ch.hasAny(['nose']) || pay(o, 'nose'));
       }
       function outfitOk(o) {
         return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand', 'nose'])
-          && owns(o, 'head') && owns(o, 'face') && owns(o, 'neck') && owns(o, 'body') && owns(o, 'feet') && owns(o, 'back')
-          && owns(o, 'hair') && owns(o, 'bottom') && owns(o, 'full') && owns(o, 'bag') && owns(o, 'held')
-          && owns(o, 'ears') && owns(o, 'wrist') && owns(o, 'hand') && owns(o, 'nose');
+          && (resource != null && 'outfit' in resource.data
+            ? changedPay(o, o.diff(resource.data.outfit).affectedKeys())
+            : eachPay(o));
       }
       function patPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid)/pats/$(me()); }
       allow create: if signedIn() && uid == me() && pid.matches('^p[1-6]$') && palValid()
