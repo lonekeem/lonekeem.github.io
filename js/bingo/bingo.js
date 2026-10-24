@@ -3,11 +3,10 @@
 // Written by Lone Keem.
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot, query, where, orderBy, limit, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
-import { drawPal } from '../pals/art.js';
 import { sfx } from '../games/sfx.js';
 import { watchGameRotate } from '../rotate.js';
 import {
-  BOTS, LUCKY_BALLS, PATTERN_NAME, ballsFor, bingoCall, cardFor, cardMiss, cardSlots, claimOk, dayKey, letterOf,
+  BOTS, LUCKY_BALLS, PATTERN_NAME, ballsFor, bingoCall, cardFor, cardMiss, cardSlots, dayKey, letterOf,
   levelOf, luckyRound, markedWin, masksFor, patternFor, roundAt, roundSeed, weekId
 } from './logic.js';
 
@@ -15,7 +14,8 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 .pb-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}.pb-top h1{font-size:1.25rem;margin:0;flex:1}
 .pb-top a,.pb-ico{border:0;background:#fff;border-radius:12px;min-width:40px;height:40px;display:grid;place-items:center;text-decoration:none;color:inherit;font-weight:800}
 .pb h1 small{display:block;font-weight:600;font-size:.72rem;opacity:.7}
-.pb-hero{width:100%;height:168px;border-radius:18px;display:block;background:#3a2468}
+.pb-hero{width:100%;height:140px;border-radius:18px;display:block;background:#7dd3fc;overflow:hidden}
+.pb-banner svg{width:100%;height:140px;display:block}
 .pb-note{font-size:.8rem;background:#fff6d8;border-radius:12px;padding:8px 10px;margin:8px 0}
 .pb-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.pb-row button,.pb-row a{border:0;border-radius:14px;padding:10px 12px;font-weight:800;background:#6b4fd6;color:#fff;text-decoration:none}
 .pb-row .alt{background:#fff;color:#2b1d55}
@@ -25,60 +25,116 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 .pb-xp{height:10px;background:#efe7ff;border-radius:99px;overflow:hidden;margin-top:4px}.pb-xp i{display:block;height:100%;background:#ffb31a}
 .pb-lock{opacity:.45}
 .pb code{font-weight:800;letter-spacing:.12em}
-.pb-play{display:flex;flex-direction:column;gap:8px}
-.pb-caller{display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#4a2d86,#2a1848);color:#fff;border-radius:18px;padding:8px}
-.pb-face{width:62px;height:62px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#f0b6ea);position:relative;flex:none;animation:pbBob 2.6s ease-in-out infinite;box-shadow:0 5px 0 #c48adf}
-.pb-face i{position:absolute;top:22px;width:8px;height:10px;background:#24133f;border-radius:50%;animation:pbBlink 3.6s infinite}
-.pb-face i:nth-child(1){left:16px}.pb-face i:nth-child(2){right:16px}
-.pb-face b{position:absolute;left:22px;right:22px;bottom:14px;height:7px;border-radius:0 0 8px 8px;background:#d45b8c;transition:height .12s}
-.pb-face.talk b{height:14px}
-.pb-ball{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 32% 30%,#fff,#ffe08a 42%,#e7a318);color:#3a2a10;display:grid;place-items:center;font-weight:900;flex:none;box-shadow:inset -5px -6px 0 rgba(80,40,0,.12)}
-.pb-ball small{display:block;font-size:11px;margin-top:-4px}
-.pb-last{display:flex;gap:4px;flex-wrap:wrap}.pb-last b{background:#fff;color:#2b1d55;border-radius:99px;padding:2px 7px;font-size:12px}
 .pb-meta{display:flex;justify-content:space-between;gap:8px;font-weight:800;font-size:.9rem}
 .pb-meta .lucky{color:#a15c00}
-.pb-board{display:flex;gap:3px;font-size:8px;margin-top:4px}.pb-board b{display:flex;flex-direction:column;gap:1px;flex:1;font-weight:800}
-.pb-board i{display:grid;place-items:center;background:#efeaf8;border-radius:3px;min-height:12px;font-style:normal;color:#2b1d55}
-.pb-board i.on{background:#6b4fd6;color:#fff}
 .pb-cards{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
-.pb-card{display:grid;grid-template-columns:repeat(5,42px);gap:3px;background:#fff;border-radius:14px;padding:8px;flex:none;border:3px solid transparent}
+.pb-card{background:#fff;border-radius:14px;padding:8px;flex:none;border:3px solid transparent}
 .pb-card.one{border-color:#ffd34d;box-shadow:0 0 16px #ffd34d}
 .pb-card.win{border-color:#6b4fd6}
-.pb.theme-meadow .pb-card{background:#f3ffe8}.pb.theme-night .pb-card{background:#1d1630;color:#fff}.pb.theme-lucky .pb-card{background:#fff8e0}
-.pb-cell{width:42px;height:42px;border:0;border-radius:8px;background:#f6f1ff;color:inherit;font-weight:800;position:relative}
-.pb-cell.free{background:#ffd34d}
-.pb-cell.got{animation:pbStamp .28s ease-out}.pb-cell.got::after{content:'';position:absolute;inset:5px;border-radius:50%;border:3px solid var(--daub,#6b4fd6)}
-.pb-cell.star::after{border-color:#e7a318;background:rgba(255,211,77,.35)}
+.pb-cell{border:0;border-radius:8px;background:#f6f1ff;color:inherit;font-weight:800;position:relative}
+.pb-cell.got{animation:pbStamp .28s ease-out}
 .pb-powers{display:flex;gap:6px;flex-wrap:wrap}.pb-powers button{border:0;border-radius:12px;padding:8px 10px;font-weight:800;background:#fff}
-.pb-go{position:sticky;bottom:8px;z-index:4}.pb-go button{width:100%;border:0;border-radius:16px;background:#ffd34d;color:#3a2a10;font-weight:900;font-size:22px;padding:12px;box-shadow:0 6px 0 #e0a020}
-.pb-go button:disabled{opacity:.55}
-.pb-hall{width:100%;height:168px;border-radius:18px;display:block;background:#3a2468;touch-action:manipulation}
 .pb-chat{display:flex;gap:6px;flex-wrap:wrap}.pb-chat button{border:0;border-radius:999px;background:#fff;padding:6px 10px;font-weight:800}
+.pb-live{position:fixed;inset:0;z-index:70;isolation:isolate;box-sizing:border-box;width:100%;height:100dvh;max-width:none;max-height:100dvh;margin:0;display:flex;flex-direction:column;gap:6px;overflow:hidden;border-radius:0;padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));color:#1e293b;background:#7dd3fc}
+.pb-scene{position:absolute;inset:0;z-index:0;pointer-events:none}
+.pb-scene svg{width:100%;height:100%;display:block}
+.pb-live>*:not(.pb-scene){position:relative;z-index:1}
+.pb-hud{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.pb-stat{flex:none;min-width:92px;background:linear-gradient(#4c1d95,#1e1b4b);color:#fff;border:3px solid #fbbf24;border-radius:14px;padding:4px 8px;box-shadow:0 3px 0 #b45309;font-weight:900;line-height:1.25}
+.pb-stat div{display:flex;align-items:center;gap:4px}
+.pb-calls{flex:1;min-width:0;text-align:center}
+.pb-left{color:#fff;font-weight:900;text-shadow:0 2px 0 #0369a1;font-size:.95rem}
+.pb-last{display:flex;gap:6px;justify-content:center;min-height:58px;align-items:center}
+.pb-orb{width:52px;height:52px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:16px;line-height:.9;text-shadow:0 1px 0 rgba(0,0,0,.25);box-shadow:inset -4px -5px 0 rgba(0,0,0,.16),0 3px 0 rgba(0,0,0,.18);flex:none}
+.pb-orb small{font-size:10px;line-height:1}
+.pb-orb.now{transform:scale(1.08);box-shadow:0 0 0 3px #fff,0 0 0 6px #fde047,inset -4px -5px 0 rgba(0,0,0,.16)}
+.pb-orb.cB{background:radial-gradient(circle at 32% 28%,#fff,#fb7185 42%,#be123c)}
+.pb-orb.cI{background:radial-gradient(circle at 32% 28%,#fff,#d8b4fe 42%,#7e22ce)}
+.pb-orb.cN{background:radial-gradient(circle at 32% 28%,#fff,#67e8f9 42%,#0e7490)}
+.pb-orb.cG{background:radial-gradient(circle at 32% 28%,#fff,#86efac 42%,#15803d)}
+.pb-orb.cO{background:radial-gradient(circle at 32% 28%,#fff,#fdba74 42%,#c2410c)}
+.pb-tools{display:flex;gap:6px;align-items:center;flex:none}
+.pb-live .pb-round,.pb-live #k-rot.in-tools{width:44px;height:44px;min-width:44px;border-radius:50%;border:3px solid #fff;background:#7c3aed;color:#fff;font:900 18px/1 Inter,system-ui,sans-serif;box-shadow:0 3px 0 #5b21b6;padding:0;display:grid;place-items:center}
+.pb-stage{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.pb-main{min-width:0}
+.pb-live .pb-meta{color:#0f172a;background:rgba(255,255,255,.82);border-radius:12px;padding:4px 8px;font-size:.82rem}
+.pb-live .pb-cards{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 8px}
+.pb-live .pb-card{flex:0 0 min(100%,440px);scroll-snap-align:center;border:4px solid #fbbf24;border-radius:18px;padding:6px 6px 8px;box-shadow:0 6px 0 #d97706;background:#fff;min-width:0}
+.pb-live .pb-card.one{box-shadow:0 0 0 3px #fff,0 0 0 6px #fde047,0 6px 0 #d97706}
+.pb-live .pb-card.win{box-shadow:0 0 0 3px #fff,0 0 0 6px #7c3aed,0 6px 0 #5b21b6}
+.pb-head{display:grid;grid-template-columns:repeat(5,1fr);text-align:center;font-weight:900;font-size:clamp(18px,4.2vw,28px);line-height:1.1;margin-bottom:2px}
+.pb-head span:nth-child(1){color:#e11d48}.pb-head span:nth-child(2){color:#9333ea}.pb-head span:nth-child(3){color:#0891b2}.pb-head span:nth-child(4){color:#16a34a}.pb-head span:nth-child(5){color:#ea580c}
+.pb-grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.pb-live .pb-cell{width:100%;min-height:44px;aspect-ratio:1;font-size:clamp(16px,4vw,24px);font-weight:900;color:#1e293b;background:var(--paper,#fff)}
+.pb-card.wash0{--wash:#fbcfe8;--paper:#fff7fb}.pb-card.wash1{--wash:#a7f3d0;--paper:#f0fdf4}.pb-card.wash2{--wash:#bfdbfe;--paper:#f8fbff}.pb-card.wash3{--wash:#fde68a;--paper:#fffbeb}
+.pb-grid5 .pb-cell:nth-child(10n+1),.pb-grid5 .pb-cell:nth-child(10n+3),.pb-grid5 .pb-cell:nth-child(10n+5),.pb-grid5 .pb-cell:nth-child(10n+7),.pb-grid5 .pb-cell:nth-child(10n+9){background:var(--wash)}
+.pb-grid5 .pb-cell:nth-child(5n+1){--stamp:#fb7185;--stamp2:#be123c}
+.pb-grid5 .pb-cell:nth-child(5n+2){--stamp:#d8b4fe;--stamp2:#7e22ce}
+.pb-grid5 .pb-cell:nth-child(5n+3){--stamp:#67e8f9;--stamp2:#0e7490}
+.pb-grid5 .pb-cell:nth-child(5n+4){--stamp:#86efac;--stamp2:#15803d}
+.pb-grid5 .pb-cell:nth-child(5n+5){--stamp:#fdba74;--stamp2:#c2410c}
+.pb-live .pb-cell.got::before{content:'';position:absolute;inset:3px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,var(--stamp) 46%,var(--stamp2));box-shadow:inset 0 -3px 0 rgba(0,0,0,.16)}
+.pb-live .pb-cell.free::before,.pb-live .pb-cell.star::before{background:radial-gradient(circle at 32% 28%,#fff,#fde047 42%,#f59e0b)}
+.pb-live .pb-cell span{position:relative;z-index:1}
+.pb-live .pb-cell.free span{color:#b45309;font-size:1.3em}
+.pb-boardwrap{background:#1e1b4b;border-radius:16px;border:3px solid #312e81;padding:6px;max-height:220px;overflow:auto}
+.pb-live .pb-board{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:0;font-size:11px}
+.pb-col{display:flex;flex-direction:column;gap:1px;text-align:center;font-weight:800}
+.pb-col h3{margin:0 0 2px;font-size:15px;color:var(--c,#fff)}
+.pb-col i{font-style:normal;color:#94a3b8;border-radius:4px;min-height:14px}
+.pb-col i.on{color:#1e1b4b;background:var(--c);font-weight:900}
+.pb-col.cB{--c:#fb7185}.pb-col.cI{--c:#d8b4fe}.pb-col.cN{--c:#67e8f9}.pb-col.cG{--c:#86efac}.pb-col.cO{--c:#fdba74}
+.pb-names{font-weight:800;font-size:.8rem;color:#14532d;min-height:1em;text-shadow:0 1px 0 rgba(255,255,255,.6)}
+.pb-extra{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;overflow-x:auto}
+.pb-chat{flex-wrap:nowrap}
+.pb-auto{font-weight:800;font-size:.85rem;background:rgba(255,255,255,.88);border-radius:999px;padding:4px 8px}
+.pb-peek{margin:0;font-weight:800;background:#fff6d8;border-radius:10px;padding:6px 8px}
+.pb-dock{flex:none;z-index:4;display:flex;gap:8px;align-items:center;padding:6px;border-radius:16px;background:rgba(240,253,244,.94)}
+.pb-dock .pb-powers{flex:1;min-width:0}
+.pb-dock .pb-powers button,.pb-dock .pb-powers span{background:#fff;border-radius:12px;padding:8px 10px;font-weight:800}
+.pb-dock [data-bingo]{flex:1.4;min-height:56px;border:0;border-radius:16px;background:linear-gradient(#fde047,#f59e0b);color:#7c2d12;font-weight:900;font-size:26px;letter-spacing:.04em;box-shadow:0 5px 0 #b45309}
+.pb-dock [data-bingo]:disabled{opacity:.55}
+.pb-floats{font-weight:800;min-height:1em}
+@media (orientation:landscape){
+  .pb-live .pb-stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,210px);align-items:stretch;overflow:hidden}
+  .pb-live .pb-main{min-height:0;overflow:auto;display:flex;flex-direction:column}
+  .pb-live .pb-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));overflow:visible;scroll-snap-type:none}
+  .pb-live .pb-card{flex:none;width:auto}
+  .pb-boardwrap{max-height:none;height:100%;overflow:auto}
+}
+@media (orientation:landscape) and (max-height:520px){
+  .pb-live{gap:4px;padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left))}
+  .pb-hud{margin-bottom:0}
+  .pb-orb{width:40px;height:40px;font-size:13px}
+  .pb-last{min-height:40px}
+  .pb-live .pb-meta{padding:2px 6px;font-size:.72rem}
+  .pb-live .pb-cell{min-height:0;aspect-ratio:auto;height:clamp(22px,7.4dvh,36px);font-size:14px}
+  .pb-head{font-size:16px;margin-bottom:0}
+  .pb-chat button{padding:4px 8px}
+  .pb-dock{padding:4px}
+  .pb-dock [data-bingo]{min-height:44px;font-size:22px}
+  .pb-boardwrap{max-height:none}
+}
 .pb-win{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:rgba(28,14,58,.42);pointer-events:none}
 .pb-win[hidden]{display:none}.pb-win b{font-size:64px;color:#ffd34d;text-shadow:0 6px 0 #7a4fd0;animation:pbPop .35s ease-out}
 .pb-win p{margin:0;text-align:center;font-weight:800;color:#fff;text-shadow:0 2px 0 #2b1d55}
 .pb-win span{position:absolute;font-size:22px;animation:pbFly 1s ease-out forwards}
 .pb-break{background:#e8fff1;border-radius:12px;padding:8px 10px}
-@keyframes pbBob{50%{transform:translateY(-3px)}}@keyframes pbBlink{0%,88%,100%{transform:scaleY(1)}93%{transform:scaleY(.12)}}
 @keyframes pbStamp{from{transform:scale(1.4) rotate(-8deg)}to{transform:none}}@keyframes pbPop{from{transform:scale(.4)}to{transform:none}}
 @keyframes pbFly{to{transform:translateY(-80px);opacity:0}}
-@media (orientation:landscape) and (max-height:520px){.pb-play{display:grid;grid-template-columns:1fr 300px}.pb-side{display:flex;flex-direction:column;gap:8px}.pb-hero,.pb-hall{height:120px}}
-@media (prefers-reduced-motion:reduce){.pb-face,.pb-cell.got,.pb-win b{animation:none}}`;
+@media (orientation:landscape) and (max-height:520px){.pb-hero{height:120px}}
+@media (prefers-reduced-motion:reduce){.pb-cell.got,.pb-win b,.pb-orb.now{animation:none;transform:none}}`;
+
+const SCENE = `<svg viewBox="0 0 800 480" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="pbSkyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset=".5" stop-color="#bae6fd"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient><linearGradient id="pbGrassG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86efac"/><stop offset="1" stop-color="#15803d"/></linearGradient></defs><rect width="800" height="480" fill="url(#pbSkyG)"/><circle cx="110" cy="68" r="34" fill="#fde047"/><circle cx="98" cy="56" r="10" fill="#fffbeb" opacity=".85"/><ellipse cx="250" cy="78" rx="48" ry="16" fill="#fff"/><ellipse cx="286" cy="70" rx="30" ry="14" fill="#fff"/><ellipse cx="560" cy="96" rx="54" ry="16" fill="#fff" opacity=".95"/><ellipse cx="400" cy="440" rx="480" ry="130" fill="url(#pbGrassG)"/><path d="M20 392c90-34 130 28 210 4s130-40 210 6 150-28 220 8" fill="none" stroke="#38bdf8" stroke-width="18" stroke-linecap="round"/><path d="M20 392c90-34 130 28 210 4s130-40 210 6 150-28 220 8" fill="none" stroke="#e0f2fe" stroke-width="6" stroke-linecap="round"/><g><rect x="64" y="248" width="16" height="72" rx="4" fill="#92400e"/><polygon points="72,146 14,268 130,268" fill="#166534"/><polygon points="72,188 32,268 112,268" fill="#4ade80"/></g><g><rect x="700" y="228" width="18" height="84" rx="4" fill="#92400e"/><polygon points="709,118 640,248 778,248" fill="#14532d"/><polygon points="709,168 662,248 756,248" fill="#22c55e"/></g><g fill="#fbcfe8"><circle cx="190" cy="404" r="7"/><circle cx="178" cy="412" r="5"/><circle cx="202" cy="412" r="5"/></g><circle cx="190" cy="404" r="2.5" fill="#f59e0b"/><g fill="#fde68a"><circle cx="360" cy="424" r="6"/><circle cx="350" cy="432" r="4"/><circle cx="370" cy="432" r="4"/></g><circle cx="360" cy="424" r="2" fill="#ea580c"/><g fill="#fff"><circle cx="630" cy="412" r="6"/><circle cx="620" cy="420" r="4"/><circle cx="640" cy="420" r="4"/></g><circle cx="630" cy="412" r="2" fill="#f59e0b"/></svg>`;
 
 const PHRASES = ['👋', '😄', '🎉', '⭐', 'Nice!', 'Good luck!'];
 const DAUBERS = [{ id: 'ink', name: 'Ink', lv: 1, c: '#6b4fd6' }, { id: 'star', name: 'Star', lv: 2, c: '#e7a318' }, { id: 'heart', name: 'Heart', lv: 3, c: '#ff6fae' }, { id: 'crown', name: 'Crown', lv: 5, c: '#3aa0e0' }];
 const THEMES = [{ id: 'cozy', name: 'Cozy', lv: 1 }, { id: 'meadow', name: 'Meadow', lv: 2 }, { id: 'night', name: 'Night', lv: 4 }, { id: 'lucky', name: 'Lucky', lv: 6 }];
 const POWNAME = { free: 'Free daub', double: 'Double stars', peek: 'Peek next' };
-const FALLBACK = { species: 'kemy', name: 'Pal', level: 3, pattern: 'none', acc: 'none', colors: { body: '#f7cdee', accent: '#8a55dc', eye: '#24133f' } };
 const FRESH = 25000;
 
 function css() { if (document.getElementById('pb-css')) return; const s = document.createElement('style'); s.id = 'pb-css'; s.textContent = CSS; document.head.appendChild(s); }
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-function look(pal, lv) {
-  const p = { ...FALLBACK, ...(pal || {}), colors: { ...FALLBACK.colors, ...((pal && pal.colors) || {}) } };
-  if (!p.acc || p.acc === 'none') p.acc = lv >= 5 ? 'crown' : lv >= 3 ? 'bow' : 'none';
-  return p;
-}
 let audio = null;
 function chirp() {
   if (sfx.muted) return;
@@ -124,10 +180,9 @@ export function openBingo(ctx, q = {}) {
   const ch = () => { if (!prog.ch || prog.ch.day !== today) prog.ch = { day: today, daub: 0, rounds: 0, corners: 0, got: {} }; return prog.ch; };
   const session0 = Date.now(); let broke = false;
   let dead = false, mode = 'lobby', roomId = '', room = null, seats = [], unsubR = null, unsubS = null, hb = 0;
-  let claim = 0, emo = 0, lastSeat = 0, seatQ = Promise.resolve(), myPal = null;
+  let claim = 0, emo = 0, lastSeat = 0, seatQ = Promise.resolve();
   let daubed = new Set(), frees = new Map(), paidRound = -1, peekUntil = 0, doubleOn = false, missUntil = 0, winUntil = 0, winText = '';
-  let seenBall = -1, tickN = 0, drum = 0, botShown = -1, botCache = { seed: 0, at: 0 }, ge = null, seenEmo = new Map(), spots = [];
-  const palCache = new Map();
+  let seenBall = -1, tickN = 0, drum = 0, botShown = -1, botCache = { seed: 0, at: 0 }, ge = null, seenEmo = new Map();
   const arm = () => { if (!dead) watchGameRotate(); };
 
   function grantCh() {
@@ -143,13 +198,6 @@ export function openBingo(ctx, q = {}) {
   }
   function stickerBall(n) { if (!LUCKY_BALLS.includes(n) || prog.stickers.b.includes(n)) return; prog.stickers.b.push(n); persist(); toast('Sticker: ball ' + n); }
   function stickerPat(id) { if (prog.stickers.p.includes(id)) return; prog.stickers.p.push(id); persist(); }
-
-  async function loadPal(who) {
-    if (!who || String(who).startsWith('bot-')) return null;
-    if (!palCache.has(who)) palCache.set(who, import('../pals/core.js').then((m) => m.getActivePal(db, who)).catch(() => null));
-    return palCache.get(who);
-  }
-  loadPal(uid).then((p) => { myPal = p; });
 
   function clock() {
     if (!room || !room.start || !room.start.toMillis) return null;
@@ -232,34 +280,13 @@ export function openBingo(ctx, q = {}) {
     const bots = humans.length >= 6 ? [] : BOTS.slice(0, Math.min(6, 6 - humans.length));
     return [me, ...others, ...bots].slice(0, 10);
   }
-  function drawRoom(cv, frame, moods) {
-    if (!cv) return; const dpr = Math.min(1.5, devicePixelRatio || 1); const w = cv.clientWidth || 320, h = cv.clientHeight || 160;
-    if (cv.width !== Math.floor(w * dpr)) { cv.width = Math.floor(w * dpr); cv.height = Math.floor(h * dpr); }
-    const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
-    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#f7e7c2'); g.addColorStop(0.45, '#6b4c93'); g.addColorStop(1, '#3a2468'); c.fillStyle = g; c.fillRect(0, 0, w, h);
-    c.fillStyle = 'rgba(255,220,150,.9)'; for (let i = 0; i < 7; i++) { c.beginPath(); c.arc(18 + i * ((w - 20) / 6), 14, 3.5, 0, 7); c.fill(); }
-    c.fillStyle = '#e6c39a'; c.beginPath(); c.ellipse(w / 2, h * 0.82, w * 0.42, h * 0.16, 0, 0, 7); c.fill();
-    const pals = roster(); spots = [];
-    pals.forEach((p, i) => {
-      const x = (w / (pals.length + 1)) * (i + 1), y = h * 0.8;
-      const bot = BOTS.find((b) => b.id === p.id);
-      const base = bot ? { species: bot.species, acc: bot.acc, level: 4, name: bot.name } : (p.id === uid ? (myPal || FALLBACK) : (p._pal || FALLBACK));
-      if (!bot && p.id !== uid && !p._pal) { p._wait = p._wait || loadPal(p.id).then((got) => { p._pal = got || FALLBACK; }); }
-      const mood = (moods && moods.get(p.id)) || 'idle';
-      drawPal(c, x, y, Math.min(64, h * 0.42), look(base, p.id === uid ? lv() : 3), { t: frame * 2 + i * 12, mode: mood, flat: true, face: x < w / 2 ? 1 : -1 });
-      c.font = '700 11px Inter,sans-serif'; c.textAlign = 'center'; c.fillStyle = '#fff'; c.strokeStyle = 'rgba(43,29,85,.8)'; c.lineWidth = 3;
-      const tag = (p.name || (bot && bot.name) || 'Pal').slice(0, 16); c.strokeText(tag, x, y + 16); c.fillText(tag, x, y + 16);
-      spots.push({ id: p.id, x, y, me: p.id === uid });
-    });
-  }
-
   function paintLobby() {
     mode = 'lobby'; const slotsN = slots(), lvN = lv();
     const c = ch();
     const goals = [['daub', 'Daub 50 numbers', 50], ['corners', 'Win with four corners', 1], ['rounds', 'Play 2 rounds', 2]];
     main.innerHTML = `<section class="pb theme-${esc(prog.theme)}" style="--daub:${esc((DAUBERS.find((d) => d.id === prog.dauber) || DAUBERS[0]).c)}">
-      <div class="pb-top"><a href="#/arcade" aria-label="Back to arcade">←</a><h1>Pal Bingo 🎱⭐<small>Cozy 75-ball rooms · pals included</small></h1><div data-k-rot></div><button class="pb-ico" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button></div>
-      <canvas class="pb-hero" aria-label="Your pal and friends in the bingo hall"></canvas>
+      <div class="pb-top"><a href="#/arcade" aria-label="Back to arcade">←</a><h1>Pal Bingo 🎱⭐<small>Cozy 75-ball rooms</small></h1><div data-k-rot></div><button class="pb-ico" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button></div>
+      <div class="pb-hero pb-banner" aria-hidden="true">${SCENE}</div>
       <p class="pb-note">⭐ Stars are prizes for playing, with a daily cap. No shop, no bets, no real money.</p>
       ${gifted ? '<p class="pb-note">Welcome in. Here’s a small prize for showing up today — missing a day never takes anything away.</p>' : ''}
       <div class="pb-box"><b>Level ${lvN}</b> · Play days ${prog.days | 0}<div class="pb-xp"><i style="width:${(prog.xp % 30) / 30 * 100}%"></i></div></div>
@@ -275,9 +302,6 @@ export function openBingo(ctx, q = {}) {
       <p class="pb-note">Rounds are about 2–3 minutes. Power-ups (free daub, double stars, peek) are earned by playing, not bought. Chat is quick phrases and emotes only.</p>
       <div class="pb-break" data-break hidden>You’ve been playing a while. A break is nice too — come back whenever you like.</div>
     </section>`;
-    const hero = main.querySelector('.pb-hero');
-    const fake = [{ id: uid, name: myName }, ...BOTS.slice(0, 4)];
-    const prev = seats; seats = fake; drawRoom(hero, 20, new Map()); seats = prev;
     main.querySelector('[data-mute]').onclick = () => { sfx.muted = !sfx.muted; paintLobby(); };
     main.querySelector('[data-pub]').onclick = () => joinPublic();
     main.querySelector('[data-priv]').onclick = () => makePrivate();
@@ -297,37 +321,41 @@ export function openBingo(ctx, q = {}) {
       el.innerHTML = rows.length ? `<ol>${rows.map((r) => `<li>${esc(r.name)} · ${r.wkScore | 0} pts</li>`).join('')}</ol>` : '<p>No wins yet this week. Yours could be first.</p>';
     } catch { if (el) el.textContent = 'The weekly board will show wins once a few rounds are in.'; }
   }
+  function roomPeople() {
+    const humans = seats.filter((s) => s.id === uid || Date.now() - s.at < FRESH);
+    if (!humans.some((s) => s.id === uid)) humans.unshift({ id: uid, name: myName });
+    return humans.slice(0, 10);
+  }
   function paintHall() {
     const dcol = (DAUBERS.find((d) => d.id === prog.dauber) || DAUBERS[0]).c;
-    main.innerHTML = `<section class="pb theme-${esc(prog.theme)}" style="--daub:${esc(dcol)}">
-      <div class="pb-top"><button class="pb-ico" type="button" data-leave aria-label="Back to lobby">←</button><h1>Pal Bingo<small data-code></small></h1><div data-k-rot></div><button class="pb-ico" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button></div>
-      <div class="pb-play"><div>
-        <div class="pb-caller"><div class="pb-face" data-face><i></i><i></i><b></b></div><div class="pb-ball" data-ball><small>—</small>—</div><div><div class="pb-last" data-last></div><button type="button" class="alt" data-board style="margin-top:6px;border:0;border-radius:10px;padding:6px 8px;font-weight:800">Called board</button><div class="pb-board" data-grid hidden></div></div></div>
-        <div class="pb-meta"><span data-pat>Pattern</span><span data-time></span></div>
-        <p class="pb-note" data-peek hidden></p>
+    main.innerHTML = `<section class="pb pb-live theme-${esc(prog.theme)}" style="--daub:${esc(dcol)}">
+      <div class="pb-scene">${SCENE}</div>
+      <div class="pb-hud">
+        <div class="pb-stat"><div data-stars>⭐ …</div><div data-count aria-label="Players in this room">👤 01</div></div>
+        <div class="pb-calls"><div class="pb-left" data-left>75 balls left</div><div class="pb-last" data-last aria-label="Last called balls"></div></div>
+        <div class="pb-tools"><div data-k-rot></div><button class="pb-round" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button><button class="pb-round" type="button" data-leave aria-label="Close">✕</button></div>
+      </div>
+      <div class="pb-stage"><div class="pb-main">
+        <div class="pb-meta"><span data-pat>Pattern</span><span data-time></span><span data-code></span></div>
+        <p class="pb-peek" data-peek hidden></p>
         <div class="pb-cards" data-cards></div>
-        <div class="pb-powers" data-pow></div>
-        <div class="pb-go"><button type="button" data-bingo>BINGO!</button></div>
-      </div><div class="pb-side">
-        <canvas class="pb-hall" data-hall aria-label="Bingo hall and pals"></canvas>
-        <div class="pb-chat" aria-label="Quick chat">${PHRASES.map((p, i) => `<button type="button" data-say="${i}">${esc(p)}</button>`).join('')}<button type="button" data-emo aria-label="Emote">😊</button></div>
-        <div class="pb-floats" style="min-height:1.2em;font-weight:800"></div>
-        <p class="pb-note">Tap a number to stamp it, or leave auto-daub on. Tap your pal to emote.</p>
-        <label class="pb-note"><input type="checkbox" data-auto ${prog.auto ? 'checked' : ''}> Auto-daub</label>
+        <div class="pb-names" data-names></div>
+        <div class="pb-extra">
+          <div class="pb-chat" aria-label="Quick chat">${PHRASES.map((p, i) => `<button type="button" data-say="${i}">${esc(p)}</button>`).join('')}</div>
+          <label class="pb-auto"><input type="checkbox" data-auto ${prog.auto ? 'checked' : ''}> Auto-daub</label>
+          <div class="pb-floats"></div>
+        </div>
         <div class="pb-break" data-break hidden>You’ve been playing a while. A break is nice too — come back whenever you like.</div>
-      </div></div>
+      </div><aside class="pb-boardwrap" aria-label="Called numbers 1 to 75"><div class="pb-board" data-grid></div></aside></div>
+      <div class="pb-dock"><div class="pb-powers" data-pow></div><button type="button" data-bingo>BINGO!</button></div>
       <div class="pb-win" data-win hidden><div><b>BINGO!</b><p data-wint></p></div></div>
     </section>`;
     main.querySelector('[data-leave]').onclick = () => { dropSeat(); paintLobby(); };
     main.querySelector('[data-mute]').onclick = () => { sfx.muted = !sfx.muted; paintHall(); };
     main.querySelector('[data-auto]').onchange = (e) => { prog.auto = e.target.checked; persist(); };
-    main.querySelector('[data-board]').onclick = () => { const g = main.querySelector('[data-grid]'); g.hidden = !g.hidden; };
     main.querySelector('[data-bingo]').onclick = () => pressBingo();
     main.querySelectorAll('[data-say]').forEach((b) => b.onclick = () => { const i = +b.dataset.say; float(PHRASES[i] + ' you'); writeSeat({ emo: i + 1 }); });
     main.querySelector('[data-cards]').onclick = (e) => { const btn = e.target.closest('[data-k]'); if (!btn) return; tapCell(btn.dataset.k); };
-    const hall = main.querySelector('[data-hall]');
-    hall.onclick = (e) => { const r = hall.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const hit = spots.find((s) => Math.hypot(s.x - x, s.y - y) < 36); if (hit && hit.me) main.querySelector('[data-emo]')?.click(); };
-    import('../pals/game-emotes.js').then((m) => { if (dead || mode !== 'hall') return; ge = m.mountGameEmotes(main.querySelector('.pb'), { db, uid, button: main.querySelector('[data-emo]'), toast, send: (code) => writeSeat({ emo: code }) }); }).catch(() => {});
     arm();
   }
   function float(text) { const host = main.querySelector('.pb-floats'); if (!host) return; const el = document.createElement('b'); el.textContent = text; host.appendChild(el); setTimeout(() => el.remove(), 2400); }
@@ -397,7 +425,7 @@ export function openBingo(ctx, q = {}) {
     const sig = st.ck.round + ':' + st.cards.length;
     if (host.dataset.sig !== sig) {
       host.dataset.sig = sig; host.dataset.fresh = '1'; daubed = new Set([0]); frees = new Map();
-      host.innerHTML = st.cards.map((card, ci) => `<div class="pb-card" data-ci="${ci}">${card.map((n, k) => `<button type="button" class="pb-cell${k === 12 ? ' free got' : ''}" data-k="${ci}:${k}">${k === 12 ? '★' : n}</button>`).join('')}</div>`).join('');
+      host.innerHTML = st.cards.map((card, ci) => `<div class="pb-card wash${ci % 4}" data-ci="${ci}"><div class="pb-head" aria-hidden="true"><span>B</span><span>I</span><span>N</span><span>G</span><span>O</span></div><div class="pb-grid5">${card.map((n, k) => `<button type="button" class="pb-cell${k === 12 ? ' free got' : ''}" data-k="${ci}:${k}"${k === 12 ? ' aria-label="Free"' : ''}><span>${k === 12 ? '★' : n}</span></button>`).join('')}</div></div>`).join('');
     }
     if (prog.auto) {
       let added = 0; const fresh = host.dataset.fresh === '1';
@@ -420,25 +448,39 @@ export function openBingo(ctx, q = {}) {
   function tick() {
     if (dead) return;
     tickN++;
-    if (mode === 'lobby') { const cv = main.querySelector('.pb-hero'); if (cv && tickN % 2 === 0) { const prev = seats; seats = [{ id: uid, name: myName }, ...BOTS.slice(0, 4)]; drawRoom(cv, tickN, new Map([[uid, 'idle']])); seats = prev; } return; }
-    const st = liveRound(); const face = main.querySelector('[data-face]');
-    if (!st) { if (face) face.classList.remove('talk'); return; }
-    if (st.ck.round !== botShown && st.ck.called === 0) { botShown = -1; if (paidRound !== st.ck.round) { /* new round */ } }
+    if (mode === 'lobby') return;
+    const st = liveRound();
+    if (!st) return;
+    if (st.ck.round !== botShown && st.ck.called === 0) { botShown = -1; }
     if (seenBall !== st.ck.called) {
-      if (seenBall >= 0 && st.ck.called > seenBall && st.ck.live) { chirp(); sfx.play('pop'); face && face.classList.add('talk'); setTimeout(() => face && face.classList.remove('talk'), 420); }
+      if (seenBall >= 0 && st.ck.called > seenBall && st.ck.live) { chirp(); sfx.play('pop'); }
       seenBall = st.ck.called;
     }
-    const ball = st.ck.called ? st.balls[st.ck.called - 1] : 0;
-    const ballEl = main.querySelector('[data-ball]'); if (ballEl) ballEl.innerHTML = ball ? `<small>${letterOf(ball)}</small>${ball}` : '<small>…</small>•';
-    const last = main.querySelector('[data-last]'); if (last) last.innerHTML = st.balls.slice(Math.max(0, st.ck.called - 5), st.ck.called).reverse().map((n) => `<b>${letterOf(n)}${n}</b>`).join('');
+    const last = main.querySelector('[data-last]');
+    if (last) {
+      const nums = st.balls.slice(Math.max(0, st.ck.called - 5), st.ck.called).reverse();
+      const sig = nums.join(',');
+      if (last.dataset.sig !== sig) { last.dataset.sig = sig; last.innerHTML = nums.map((n, i) => { const L = letterOf(n); return `<b class="pb-orb c${L}${i === 0 ? ' now' : ''}"><small>${L}</small>${n}</b>`; }).join(''); }
+    }
+    const leftEl = main.querySelector('[data-left]'); if (leftEl) leftEl.textContent = st.ck.live ? `${75 - st.ck.called} balls left` : 'Next round';
     const patEl = main.querySelector('[data-pat]'); if (patEl) patEl.innerHTML = `${PATTERN_NAME[st.pat]}${luckyRound(st.ck.round) ? ' · <span class="lucky">Lucky Star</span>' : ''}`;
     const timeEl = main.querySelector('[data-time]'); if (timeEl) { const s = Math.ceil(st.ck.left / 1000); timeEl.textContent = st.ck.live ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Next round soon'; }
     const codeEl = main.querySelector('[data-code]'); if (codeEl) codeEl.textContent = room && room.pub ? 'Public hall' : 'Code ' + roomId;
+    const people = roomPeople();
+    const countEl = main.querySelector('[data-count]'); if (countEl) countEl.textContent = '👤 ' + String(people.length).padStart(2, '0');
+    const namesEl = main.querySelector('[data-names]'); if (namesEl) namesEl.textContent = people.map((p) => p.name).join(' · ');
+    const starsEl = main.querySelector('[data-stars]');
+    if (starsEl && tickN % 4 === 0) { const w = window.kemyWallet && window.kemyWallet.walletState && window.kemyWallet.walletState(); starsEl.textContent = !w || w.c == null ? '⭐ …' : (w.admin ? '⭐ ∞' : '⭐ ' + w.c); }
     const grid = main.querySelector('[data-grid]');
-    if (grid && !grid.hidden && tickN % 4 === 0) {
-      const cols = [[], [], [], [], []];
-      for (let n = 1; n <= 75; n++) cols[Math.floor((n - 1) / 15)].push(n);
-      grid.innerHTML = 'BINGO'.split('').map((L, i) => `<b>${L}${cols[i].map((n) => `<i class="${st.called.has(n) ? 'on' : ''}">${n}</i>`).join('')}</b>`).join('');
+    if (grid) {
+      if (!grid.dataset.built) {
+        const cols = [[], [], [], [], []];
+        for (let n = 1; n <= 75; n++) cols[Math.floor((n - 1) / 15)].push(n);
+        grid.innerHTML = 'BINGO'.split('').map((L, i) => `<div class="pb-col c${L}"><h3>${L}</h3>${cols[i].map((n) => `<i data-n="${n}">${n}</i>`).join('')}</div>`).join('');
+        grid.dataset.built = '1';
+      }
+      const key = st.ck.round + ':' + st.ck.called;
+      if (grid.dataset.key !== key) { grid.dataset.key = key; grid.querySelectorAll('i').forEach((el) => el.classList.toggle('on', st.called.has(+el.dataset.n))); }
     }
     const peek = main.querySelector('[data-peek]');
     if (peek) { const show = peekUntil > Date.now() && st.ck.called < 75; peek.hidden = !show; if (show) { const n = st.balls[st.ck.called]; peek.textContent = 'Next ball: ' + letterOf(n) + n; } }
@@ -451,19 +493,6 @@ export function openBingo(ctx, q = {}) {
     if (botAt && st.ck.called >= botAt && botShown !== st.ck.round) { botShown = st.ck.round; const who = BOTS[(botAt + st.ck.round) % BOTS.length]; float(who.name + ' called BINGO!'); sfx.play('star'); }
     const cardHost = main.querySelector('[data-cards]');
     if (!st.ck.live && cardHost && cardHost.dataset.played === String(st.ck.round) && paidRound !== st.ck.round && daubed.size > 1) { paidRound = st.ck.round; ch().rounds += 1; persist(); prize(3, 'for playing the round'); grantCh(); }
-    const moods = new Map();
-    const dancing = new Set();
-    if (winUntil > Date.now()) dancing.add(uid);
-    seats.forEach((s) => { if (s.claim && claimOk(st.seed, s.id, s.n || 1, st.pat, s.claim) && st.ck.called >= s.claim) dancing.add(s.id); });
-    if (botShown === st.ck.round) BOTS.forEach((b) => dancing.add(b.id));
-    roster().forEach((p) => {
-      let m = 'idle';
-      if (dancing.has(p.id) || (p.id === uid && winUntil > Date.now())) m = 'happy';
-      else if (p.id === uid && missUntil > Date.now()) m = missUntil - Date.now() > 800 ? 'shake' : 'happy';
-      else if (p.id === uid && one) m = 'hop';
-      moods.set(p.id, m);
-    });
-    if (tickN % 2 === 0) drawRoom(main.querySelector('[data-hall]'), tickN, moods);
     const win = main.querySelector('[data-win]');
     if (win) { win.hidden = winUntil <= Date.now(); const t = win.querySelector('[data-wint]'); if (t) t.textContent = winText; if (!win.hidden && !win.dataset.fx) { win.dataset.fx = '1'; for (let i = 0; i < 14; i++) { const s = document.createElement('span'); s.textContent = i % 2 ? '⭐' : '🎱'; s.style.left = (10 + Math.random() * 80) + '%'; s.style.top = (30 + Math.random() * 30) + '%'; win.appendChild(s); } } if (win.hidden) delete win.dataset.fx; }
     breakNote();
