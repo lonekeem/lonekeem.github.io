@@ -12,7 +12,7 @@ import { checkInput, clean } from '../pals/talk.js';
 import { ADMIN_EMAIL, EMU } from '../firebase-init.js';
 import { attachHomeLife } from './homelife.js';
 export const plateBad = (t) => { const s = String(t || ''); return !!(checkInput(s) || checkInput(s.toLowerCase()) || checkInput(s.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').toLowerCase())); };
-import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, defaultItems, placedItems, packLayout, unpackStash, WALL_SW, WALL_ROOMS, parseWalls, EXT_SW, FLOORS, healItems, placeItem } from './interior.js';
+import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, defaultItems, placedItems, packLayout, unpackStash, WALL_SW, WALL_ROOMS, parseWalls, parseFloors, serFloors, hex6, EXT_SW, FLOORS, healItems, placeItem } from './interior.js';
 import { itemAabb, pickIndex, nearestReach, nudgePlan, screenStep, xzGap, stashOnRemove } from './decorate.js';
 import { doorSpot, positionBad, standY } from './safe-spot.js';
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -149,7 +149,7 @@ export function attachHomes(api, W, K) {
   function buildRoom(h) { if (rooms.has(h.id)) return rooms.get(h.id); const { cx, cz } = roomCell(h); const o = owners.get(h.id); const dec = (o && o.decor) || {};
     const I = buildInterior(api, { put, flush, G, y: FLAT }, h, cx, cz, dec); root.add(I.g); const r0 = { g: I.g, cx, cz, I, h, dk: JSON.stringify(dec) }; rooms.set(h.id, r0); return r0; }
   function applyDecor(id) { const o = owners.get(id); const dec = (o && o.decor) || {}; if (W.paintHouse && paintsOutside(HOUSE_BY_ID[id])) W.paintHouse(id, dec.ext || null); const r = rooms.get(id); const k = JSON.stringify(dec);
-    if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall, dec.walls); r.I.setFloor(dec.floor || r.I.S.floor); r.I.setItems(placedItems(dec, r.h, r.I.two)); } }
+    if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall, dec.walls); r.I.setFloor(dec.floor || r.I.S.floor, dec.floors || ''); r.I.setItems(placedItems(dec, r.h, r.I.two)); } }
   const canEnter = (h) => { if (!h.sale) return true; const o = owners.get(h.id); if (!o) return false; return o.owner === uid || o.open === true || (Array.isArray(o.inv) && o.inv.includes(uid)); };
   // A doorbell or a visit on someone else's Kemy Street home. One note per owner per kind per half hour.
   const noted = new Map();
@@ -221,15 +221,32 @@ export function attachHomes(api, W, K) {
 .kh-dbar .kh-handle{display:flex;gap:6px;align-items:center;overflow-x:auto;touch-action:pan-x;padding:6px 8px}
 .kh-dbar .kh-body{padding:0 8px 6px;max-height:86px;overflow:hidden}
 .kh-dbar.open .kh-body{max-height:200px;overflow:auto}
-.kh-dbar button{border:0;border-radius:10px;padding:7px 10px;font:800 13px Inter,sans-serif;background:#e5e7eb;color:#111;min-height:40px;flex:none}
+.kh-dbar button{border:0;border-radius:10px;padding:7px 10px;font:800 15px Inter,sans-serif;background:#e5e7eb;color:#111;min-height:48px;flex:none}
 .kh-dbar button.on,.kh-dbar button.p{background:#6d28d9;color:#fff}
 .kh-dbar button.x{background:#fee2e2;color:#991b1b}
+.kh-dbar .kh-acts{display:flex;gap:6px;flex:1 0 100%}
+.kh-dbar .kh-acts button{flex:1}
+.kh-dbar .kh-tabs{display:flex;gap:6px;flex:1 0 100%}
+.kh-dbar .kh-tabs button{flex:1}
+.kh-dbar.rooms .kh-body,.kh-dbar.tall .kh-body,.kh-dbar.tall.open .kh-body{max-height:48vh;overflow:auto}
+.kh-rooms{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 0}
+.kh-rooms button{min-height:64px;font-size:16px}
+.kh-swatches{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0 8px}
+.kh-dbar .sw{width:44px;height:44px;min-width:44px;min-height:44px}
+.kh-dbar .sw.on{box-shadow:0 0 0 3px #6d28d9}
+.kh-custom{display:flex;flex-direction:column;align-items:center;font-size:11px;font-weight:800;color:#333}
+.kh-custom input[type=color]{width:48px;height:48px;border:0;padding:0;background:transparent}
 .kh-dbar .kh-tip{margin:0;padding:2px 10px 0;color:#3f3f46;font:600 12px/1.35 Inter,sans-serif}
 .kh-dbar .kh-grip{background:transparent;color:#111;padding-left:4px}
 .kh-dbar .kh-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px}
 .kh-dbar .kh-tools b,.kh-dbar .kh-tools small{flex:1 1 100%;color:#333;font-weight:700}
 .kh-dbar .kh-strip{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;padding:6px 0 2px}
 .kh-dbar .sw{width:32px;height:32px;border-radius:50%;padding:0;min-height:32px;min-width:32px;border:2px solid #fff;box-shadow:0 0 0 1px #94a3b8}
+.kh-targets{display:flex;gap:6px;position:sticky;top:0;z-index:2;background:#fff;padding:6px 0 4px}
+.kh-targets button{flex:1 1 22%;min-height:44px;font-size:13px;padding:6px 4px}
+.kh-fam>span{display:block;font:800 12px/1.2 Inter,sans-serif;color:#3f3f46;margin:8px 0 0}
+.kh-dbar .kh-swatches .sw{width:44px;height:44px;min-width:44px;min-height:44px;border-radius:12px;scroll-margin:76px 0 16px}
+.kh-fam{scroll-margin-top:76px}
 .kh-dbar .it{flex:0 0 78px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;min-height:68px;text-align:center;line-height:1.15}
 .kh-dbar .it i{font-style:normal;font-size:20px}.kh-dbar .it em{font-style:normal;font-size:10px;color:#6d28d9}
 .kh-dbar label{display:block;margin:6px 0 2px;font-weight:800}
@@ -511,8 +528,19 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   function itemBaseY(it) { return FLAT + (it.f && deco.r.I.two ? 3.35 : 0); }
   function aabbOf(it) { return itemAabb(it, SC, deco.r.cx, deco.r.cz, itemBaseY(it)); }
   function sameFloor(it) { if (!deco.r.I.two) return true; return (it.f || 0) === (P.y > FLAT + 2.5 ? 1 : 0); }
-  function aabbWalk(it) { return sameFloor(it) ? aabbOf(it) : null; }
+  let roomEditP = null;
+  const loadRoomEdit = () => (roomEditP || (roomEditP = import('./roomedit.js')));
+  function inRoom(it) { if (!deco.room) return true; if (!deco.edit) return false; return deco.edit.itemRoom(it.x, it.z, it.f) === deco.room; }
+  function keepInRoom(it) { return deco.room && deco.edit ? deco.edit.clampToRoom(it, deco.room) : it; }
+  function aabbWalk(it) { if (deco.room && !inRoom(it)) return null; return sameFloor(it) ? aabbOf(it) : null; }
   function nearest() { return nearestReach(deco.items, P.x, P.z, aabbWalk, 1.35); }
+  function focusRoom(id) {
+    const R = deco.edit && deco.edit.roomById(id); const r = deco.r; if (!R || !r) return;
+    const sc = scOf(r.h); P.sit = null; P.x = r.cx + R.x * sc; P.z = r.cz + R.z * sc; P.y = R.up ? FLAT + 3.4 : FLAT; P.yaw = R.yaw; P.vy = 0; P.onGround = true;
+    try { if (window.__p3 && window.__p3.setYaw) window.__p3.setYaw(R.cam); } catch { /* */ }
+    if (roomLight) roomLight.position.set(P.x, P.y + 2.4, P.z); api.markDirty && api.markDirty();
+  }
+  function surfNow() { if (!deco.r) return; deco.r.I.setWall(deco.wall, deco.walls); deco.r.I.setFloor(deco.floor, serFloors(deco.surf)); }
   function camBasis() {
     const cam = api.cam; let fx = 0, fz = 1;
     if (cam) { fx = P.x - cam.position.x; fz = P.z - cam.position.z; const len = Math.hypot(fx, fz) || 1; fx /= len; fz /= len; }
@@ -527,29 +555,29 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     hi.position.set(cx, cy, cz); hi.scale.set(sx, sy, sz); hiEdge.position.copy(hi.position); hiEdge.scale.copy(hi.scale);
     ring.position.set(cx, b.y0 + 0.05, cz); ring.scale.setScalar(Math.max(0.8, Math.max(sx, sz) * 0.55));
   }
-  function snapDeco() { return { items: deco.items.map((i) => ({ ...i })), stash: deco.stash.slice(), wall: deco.wall, walls: deco.walls, floor: deco.floor, ext: { ...deco.ext }, sel: deco.sel }; }
+  function snapDeco() { return { items: deco.items.map((i) => ({ ...i })), stash: deco.stash.slice(), wall: deco.wall, walls: deco.walls, floor: deco.floor, surf: { ...(deco.surf || {}) }, ext: { ...deco.ext }, sel: deco.sel, room: deco.room || '' }; }
   function remember() { if (!deco) return; deco.hist = deco.hist || []; deco.hist.push(snapDeco()); if (deco.hist.length > 25) deco.hist.shift(); }
   function undoDeco() {
     if (!deco || !deco.hist || !deco.hist.length) { say('Nothing to undo'); return; }
     const s = deco.hist.pop();
-    deco.items = s.items; deco.stash = s.stash; deco.wall = s.wall; deco.walls = s.walls; deco.floor = s.floor; deco.ext = s.ext; deco.sel = s.sel; deco.moving = false;
-    if (!deco.out && deco.r) { relItems(); deco.r.I.setWall(deco.wall, deco.walls); deco.r.I.setFloor(deco.floor); }
+    deco.items = s.items; deco.stash = s.stash; deco.wall = s.wall; deco.walls = s.walls; deco.floor = s.floor; deco.surf = s.surf || {}; deco.ext = s.ext; deco.sel = s.sel; deco.room = s.room || ''; deco.moving = false; deco.paintNoted = false;
+    if (!deco.out && deco.r) { relItems(); surfNow(); if (deco.room) focusRoom(deco.room); }
     else if (W.paintHouse) W.paintHouse(myPlot, deco.ext);
     drawDeco();
   }
   function nudgeScreen(sx, sy) {
-    const it = deco && !deco.out && deco.items[deco.sel]; if (!it) return;
-    remember(); const step = screenStep(sx, sy, camBasis()); nudgePlan(it, step.dx, step.dz); relItems(); placeHi();
+    const it = deco && !deco.out && deco.items[deco.sel]; if (!it || !inRoom(it)) return;
+    remember(); const step = screenStep(sx, sy, camBasis()); nudgePlan(it, step.dx, step.dz); keepInRoom(it); relItems(); placeHi();
   }
-  function rotateSel() { const it = deco && !deco.out && deco.items[deco.sel]; if (!it) return; remember(); it.r = (it.r + 1) & 3; placeItem(it); relItems(); placeHi(); }
+  function rotateSel() { const it = deco && !deco.out && deco.items[deco.sel]; if (!it || !inRoom(it)) return; remember(); it.r = (it.r + 1) & 3; placeItem(it); keepInRoom(it); relItems(); placeHi(); }
   function starterOf(r) { return parseItems(defaultItems(r.I.two, r.h && r.h.num ? r.h.seed : 0)); }
   function removeSel() {
-    if (!deco || deco.out || deco.sel < 0) return; remember(); const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece'; const code = it.c;
+    if (!deco || deco.out || deco.sel < 0 || !inRoom(deco.items[deco.sel])) return; remember(); const it = deco.items[deco.sel]; const name = (DECOR[it.c] && DECOR[it.c].n) || 'Piece'; const code = it.c;
     const before = deco.stash.length; deco.items.splice(deco.sel, 1); stashOnRemove(code, deco.base, deco.items.filter((q) => q.c === code).length, deco.stash);
     deco.sel = -1; deco.moving = false; relItems(); drawDeco();
     say(deco.stash.length > before ? name + ' is in your furniture. Place it again any time, free.' : name + ' put away. You can place it again.');
   }
-  function selectItem(i) { if (!deco || deco.out || i < 0 || i >= deco.items.length) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; deco.resetSure = false; placeHi(); paintTools(); markMine(); }
+  function selectItem(i) { if (!deco || deco.out || i < 0 || i >= deco.items.length || !inRoom(deco.items[i])) return; if (deco.sel === i) { placeHi(); return; } deco.sel = i; deco.resetSure = false; placeHi(); paintTools(); markMine(); }
   function beginOutside() {
     const h = HOUSE_BY_ID[myPlot]; if (!h || inside || deco) return;
     if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
@@ -557,7 +585,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (!near || positionBad(P.x, P.z) || !Number.isFinite(P.y)) placeAt(doorSpot(h));
     else { const y = standY(ground(P.x, P.z), P.x, P.z); if (P.y < y - 0.2) { P.y = y; P.vy = 0; P.onGround = true; } }
     const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
-    deco = { out: true, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r: null, wall: d0.wall || '', walls: d0.walls || '', wroom: '', floor: d0.floor || '', ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: [], stash: [], base: {}, sel: -1, tab: 'p', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false };
+    deco = { out: true, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r: null, wall: d0.wall || '', walls: d0.walls || '', wroom: '', floor: d0.floor || '', surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: [], stash: [], base: {}, sel: -1, tab: 'p', room: '', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false };
     document.body.classList.add('kh-decorating'); yardB.hidden = true; decB.hidden = true;
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
     drawDeco(); window.__kh && (window.__kh.deco = true); say('Decorating the outside. You stay in the yard.');
@@ -567,25 +595,29 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (mode === 'out' || (mode !== 'in' && !inside)) { beginOutside(); return; }
     if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
     const base = {}; for (const it of starterOf(r)) base[it.c] = (base[it.c] || 0) + 1;
-    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'f', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false };
+    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'c', room: '', edit: null, editState: 'loading', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false, paintNoted: false, paintTarget: 'wall' };
     document.body.classList.add('kh-decorating');
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
-    loadOwned().then(() => deco && drawDeco()); drawDeco(); decB.hidden = true; yardB.hidden = true; window.__kh && (window.__kh.deco = true); }
-  function endDeco(save) { const d = deco; if (!d) return; document.body.classList.remove('kh-decorating'); const parked = d.parkedRadio; const spot = d.spot; deco = null; dbar.hidden = true; ring.visible = false; hi.visible = false; hiEdge.visible = false; decB.hidden = !(inside && inside.id === myPlot); window.__kh && (window.__kh.deco = false);
+    loadOwned().then(() => deco && drawDeco());
+    loadRoomEdit().then((mod) => { if (!deco || deco.out) return; deco.edit = mod; deco.editState = 'ready'; drawDeco(); }).catch(() => { if (!deco || deco.out) return; deco.editState = 'fail'; drawDeco(); });
+    drawDeco(); decB.hidden = true; yardB.hidden = true; window.__kh && (window.__kh.deco = true); }
+  function endDeco(save) { const d = deco; if (!d) return;
+    if (save && !d.out) { const packed = packLayout(d.items, d.stash); const floors = serFloors(d.surf || {}); if (packed.length > 2000 || floors.length > 160) { say(packed.length > 2000 ? 'Too many pieces to save. Remove one, then tap Done.' : 'Too many colours to save.'); return; } }
+    document.body.classList.remove('kh-decorating'); const parked = d.parkedRadio; const spot = d.spot; deco = null; dbar.hidden = true; dbar.classList.remove('rooms', 'tall'); ring.visible = false; hi.visible = false; hiEdge.visible = false; decB.hidden = !(inside && inside.id === myPlot); window.__kh && (window.__kh.deco = false);
     if (parked && rad && !radioBox.hidden) restoreCard();
     if (d.out) {
-      if (save) { const prev = (owners.get(myPlot) || {}).decor || {}; const dec = { ext: d.ext, v: 2 }; if (typeof prev.items === 'string') dec.items = prev.items; if (prev.wall) dec.wall = prev.wall; if (prev.walls) dec.walls = prev.walls; if (prev.floor) dec.floor = prev.floor; homeW({ decor: dec }).then(() => say('💾 Outside colours saved. You are still in the yard.')).catch((e) => { wErr(e); applyDecor(myPlot); }); }
+      if (save) { const prev = (owners.get(myPlot) || {}).decor || {}; const dec = { ext: d.ext, v: 2 }; if (typeof prev.items === 'string') dec.items = prev.items; if (prev.wall) dec.wall = prev.wall; if (prev.walls) dec.walls = prev.walls; if (prev.floor) dec.floor = prev.floor; if (prev.floors) dec.floors = prev.floors; homeW({ decor: dec }).then(() => say('💾 Outside colours saved. You are still in the yard.')).catch((e) => { wErr(e); applyDecor(myPlot); }); }
       else { applyDecor(myPlot); say('Old outside colours are back. You stayed in the yard.'); }
       const y = standY(ground(P.x, P.z), P.x, P.z);
       if (inside || positionBad(P.x, P.z) || !Number.isFinite(P.y) || P.y < y - 0.4) placeAt(spot);
       return;
     }
-    if (save) { const dec = { wall: d.wall, ...(d.walls ? { walls: d.walls } : {}), floor: d.floor, ext: d.ext, items: packLayout(d.items, d.stash), v: 2 }; homeW({ decor: dec }).then(() => say('💾 Home saved! Visitors see your new look.')).catch((e) => { wErr(e); applyDecor(myPlot); }); const r = rooms.get(myPlot); if (r) r.dk = JSON.stringify(dec); }
+    if (save) { const floors = serFloors(d.surf || {}); const dec = { wall: d.wall, ...(d.walls ? { walls: d.walls } : {}), floor: d.floor, ...(floors ? { floors } : {}), ext: d.ext, items: packLayout(d.items, d.stash), v: 2 }; homeW({ decor: dec }).then(() => say('💾 Home saved! Visitors see your new look.')).catch((e) => { wErr(e); applyDecor(myPlot); }); const r = rooms.get(myPlot); if (r) r.dk = JSON.stringify(dec); }
     else { const r = rooms.get(myPlot); if (r) r.dk = ''; applyDecor(myPlot); } }
   const relItems = () => { if (deco && !deco.out && deco.r) deco.r.I.setItems(deco.items); };
   function decoTick(dt) {
     if (!deco || deco.out || !deco.r) return;
-    if (!deco.drag) { const n = nearest(); if (n >= 0 && n !== deco.sel) { const b = aabbOf(deco.items[n]); if (deco.sel < 0 || xzGap(P.x, P.z, b) < 0.75) selectItem(n); } }
+    if (!deco.drag && deco.sel < 0) { const n = nearest(); if (n >= 0) selectItem(n); }
     placeHi();
     const s = deco.stick; if (deco.moving && s && deco.sel >= 0 && s.mag > 0.45) { deco.stickT += dt; if (deco.stickT >= 0.28) { deco.stickT = 0; if (Math.abs(s.x) >= Math.abs(s.y)) nudgeScreen(Math.sign(s.x), 0); else nudgeScreen(0, Math.sign(s.y)); } }
   }
@@ -595,42 +627,75 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   function paintTools() {
     const box = dbar.querySelector('.kh-tools'); if (!box || !deco) return; const it = deco.items[deco.sel];
     if (deco.out) { box.innerHTML = '<small>Walk around your yard. The colours update on the house while you watch.</small>'; return; }
-    box.innerHTML = it ? `<b>${DECOR[it.c].e} ${DECOR[it.c].n}${it.f ? ' · Upstairs' : ''}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-del>Delete</button>` : '<small>Tap a piece, walk up to it, or pick it from Mine. It snaps to the grid.</small>';
+    if (!deco.room) { box.innerHTML = '<small>Pick a room. You edit one room at a time.</small>'; return; }
+    const here = it && inRoom(it) ? it : null;
+    box.innerHTML = here ? `<b>${DECOR[here.c].e} ${DECOR[here.c].n}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-color>Color</button><button type="button" data-del>Delete</button>` : '<small>Tap a piece in this room. Colour, move, and delete stay in this room.</small>';
     const mv = box.querySelector('[data-move]'); if (mv) mv.onclick = () => { deco.moving = !deco.moving; paintTools(); };
+    const cb = box.querySelector('[data-color]'); if (cb) cb.onclick = () => { deco.paintTarget = 'item'; deco.tab = 'c'; deco.open = true; drawDeco(); };
     box.querySelectorAll('[data-nudge]').forEach((b) => (b.onclick = () => { const [sx, sy] = b.dataset.nudge.split(',').map(Number); nudgeScreen(sx, sy); }));
     const rb = box.querySelector('[data-rot]'); if (rb) rb.onclick = () => rotateSel();
     const db2 = box.querySelector('[data-del]'); if (db2) db2.onclick = () => removeSel();
   }
   function markMine() { dbar.querySelectorAll('[data-mine]').forEach((b) => b.classList.toggle('on', +b.dataset.mine === deco.sel)); }
+  function paintKind(kind, hex, live) {
+    if (!deco || deco.out || !deco.room || !deco.r) return;
+    const c = hex ? hex6(hex) : '';
+    if (hex && !c) return;
+    if (!deco.paintNoted) { remember(); deco.paintNoted = true; }
+    if (kind === 'wall') { const m = parseWalls(deco.walls); if (c) m[deco.room] = c; else delete m[deco.room]; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); }
+    else if (kind === 'floor') { if (c) deco.surf[deco.room] = c; else delete deco.surf[deco.room]; }
+    else if (kind === 'curtain') { const k = 'c' + deco.room; if (c) deco.surf[k] = c; else delete deco.surf[k]; }
+    else if (kind === 'item') { const it = deco.items[deco.sel]; if (!it || !inRoom(it)) return; if (c) it.col = c; else delete it.col; relItems(); }
+    if (kind !== 'item') surfNow();
+    if (!live) { if (c && deco.edit && deco.edit.rememberColor) deco.edit.rememberColor(uid, c); deco.paintNoted = false; paintBody(); }
+  }
   function paintBody() {
     const body = dbar.querySelector('.kh-body'); if (!body || !deco) return; const t = deco.tab;
     const extRows = [['w', 'Walls'], ['r', 'Roof'], ['d', 'Door'], ['t', 'Trim']].map(([k, n]) => `<label>${n}</label><div class="kh-strip">${EXT_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-e="${k}:${c}" aria-label="${n} ${c}"></button>`).join('')}</div>`).join('') + '<button type="button" data-e="reset">Reset outside colours</button>';
+    const oldPaint = () => { body.innerHTML = `<div class="kh-strip" aria-label="Wall colours">${WALL_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}</div><div class="kh-strip">${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button type="button" data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join('')}${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join('')}</div>`; };
     if (deco.out) body.innerHTML = extRows;
-    else if (t === 'p') body.innerHTML = `<div class="kh-strip" aria-label="Wall colours">${WALL_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}</div><div class="kh-strip">${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button type="button" data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join('')}${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join('')}</div>${deco.open ? extRows : ''}`;
-    else if (t === 'm') body.innerHTML = `<div class="kh-strip" aria-label="My furniture">${deco.items.map((it, i) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing placed yet.</small>'}</div>`;
-    else { const stored = (c) => deco.stash.filter((q) => q === c).length; const entries = Object.entries(DECOR).sort((a, b) => stored(b[0]) - stored(a[0]));
+    else if (deco.editState === 'loading') body.innerHTML = '<p class="kh-tip">Opening the room editor…</p>';
+    else if (!deco.edit) oldPaint();
+    else if (!deco.room) body.innerHTML = deco.edit.roomPickerHtml(!!deco.r.I.two) + `<button type="button" data-reset>${deco.resetSure ? 'Tap again to reset the whole home' : 'Reset whole home'}</button>`;
+    else if (t === 'm') { const mine = deco.items.map((it, i) => ({ it, i })).filter(({ it }) => inRoom(it)); body.innerHTML = `<div class="kh-strip" aria-label="Furniture in this room">${mine.map(({ it, i }) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing in this room yet. Use Add.</small>'}</div>`; }
+    else if (t === 'f') { const stored = (c) => deco.stash.filter((q) => q === c).length; const entries = Object.entries(DECOR).sort((a, b) => stored(b[0]) - stored(a[0]));
       body.innerHTML = `<div class="kh-strip" aria-label="Add furniture">${entries.map(([c, D]) => { const n = stored(c); const em = n ? 'Stored' + (n > 1 ? ' ' + n : '') : have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D); return `<button type="button" class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${em}</em></button>`; }).join('')}</div>`; }
+    else { const walls = parseWalls(deco.walls); const it = deco.items[deco.sel]; const here = it && inRoom(it) ? it : null; const R = deco.edit.roomById(deco.room);
+      let kind = deco.paintTarget || 'wall'; if (!['wall', 'floor', 'curtain', 'item'].includes(kind) || (kind === 'item' && !here)) kind = 'wall'; deco.paintTarget = kind;
+      const surf = deco.surf || {}; const current = kind === 'floor' ? (surf[deco.room] || '') : kind === 'curtain' ? (surf['c' + deco.room] || '') : kind === 'item' ? (here.col || '') : (walls[deco.room] || '');
+      body.innerHTML = deco.edit.colorHtml({ roomName: R.name, target: kind, current, recent: deco.edit.recentColors(uid), itemName: here ? `${DECOR[here.c].e} ${DECOR[here.c].n}` : '' });
+      body.querySelectorAll('[data-fl]').forEach((b) => b.classList.toggle('on', b.dataset.fl === deco.floor)); }
+    body.querySelectorAll('[data-room]').forEach((b) => (b.onclick = () => { const id = b.dataset.room; if (!deco.edit.roomById(id)) return; deco.room = id; deco.sel = -1; deco.moving = false; deco.tab = 'c'; deco.open = true; focusRoom(id); placeHi(); drawDeco(); say(deco.edit.roomById(id).name + '. Only this room can be edited.'); }));
     body.querySelectorAll('[data-mine]').forEach((b) => (b.onclick = () => selectItem(+b.dataset.mine)));
     body.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; paintBody(); }));
     body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
-    body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); deco.floor = b.dataset.fl; deco.r.I.setFloor(deco.floor); paintBody(); }));
+    body.querySelectorAll('[data-target]').forEach((b) => (b.onclick = () => { const k = b.dataset.target; if (k === 'item') { const it = deco.items[deco.sel]; if (!it || !inRoom(it)) return; } deco.paintTarget = k; paintBody(); }));
+    body.querySelectorAll('[data-hex]').forEach((b) => (b.onclick = () => paintKind(deco.paintTarget || 'wall', b.dataset.hex, false)));
+    body.querySelectorAll('[data-custom]').forEach((el) => { const apply = (live) => { const c = hex6(el.value); if (c) paintKind(deco.paintTarget || 'wall', c, live); }; el.oninput = () => apply(true); el.onchange = () => apply(false); });
+    body.querySelectorAll('[data-clear]').forEach((b) => (b.onclick = () => paintKind(b.dataset.clear, '', false)));
+    body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); deco.floor = b.dataset.fl; surfNow(); paintBody(); }));
     body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { remember(); if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say(deco.out ? '🎨 That colour is on the house.' : '🎨 Outside colour set. Step out to see it, or use Decorate outside from the yard.'); }));
-    body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { if (deco.out || !deco.r) return; const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
+    const resetB = body.querySelector('[data-reset]'); if (resetB) resetB.onclick = () => { if (!deco.resetSure) { deco.resetSure = true; paintBody(); say('Tap again to put back the furniture that came with the house. Colours stay.'); return; }
+      remember(); deco.items = starterOf(deco.r).map((i) => ({ ...i })); deco.stash = []; deco.sel = -1; deco.moving = false; deco.resetSure = false; relItems(); drawDeco(); say('Starter furniture is back. Pieces you bought are still yours.'); };
+    body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { if (deco.out || !deco.r || !deco.room) return; const c = b.dataset.add, D = DECOR[c]; if (deco.items.length >= 60) { say('Max 60 pieces'); return; }
       const si = deco.stash.indexOf(c); if (si >= 0) deco.stash.splice(si, 1);
       else if (!have(c)) { if (!b.dataset.sure) { b.dataset.sure = 1; b.querySelector('em').textContent = 'Tap to buy ' + priceOf(D); return; } try { b.disabled = true; const { econ: e, dia: d } = await shop(); if (D.d) await d.buy(decorItem(c)); else await e.buy(decorItem(c)); owned = owned || {}; owned[decorItem(c)] = 1; say('🛍️ Bought ' + D.n); }
         catch (e) { b.disabled = false; say(e.code === 'permission-denied' ? 'The shop isn’t selling decor yet (prices not published).' : /Diamond|reading 'd'/.test(e.message || '') ? 'You need more 💎 Diamonds' : e.message || 'Could not buy'); return; } }
       const r = deco.r; const fx = Math.sin(P.yaw || 0), fz = Math.cos(P.yaw || 0);
-      remember(); const it = placeItem({ c, x: (P.x - r.cx + fx * 1.6) / SC, z: (P.z - r.cz + fz * 1.6) / SC, r: (Math.round(((P.yaw || 0) + Math.PI) / (Math.PI / 2)) % 4 + 4) % 4, f: r.I.two && P.y > FLAT + 2.5 ? 1 : 0 }); if (!it) return; deco.items.push(it); deco.sel = deco.items.length - 1; relItems(); drawDeco(); }));
+      remember(); const draft = { c, x: (P.x - r.cx + fx * 1.2) / scOf(r.h), z: (P.z - r.cz + fz * 1.2) / scOf(r.h), r: 0, f: deco.room === 'U' ? 1 : 0 };
+      const it = keepInRoom(placeItem(draft) || draft); if (!it) return; deco.items.push(it); deco.sel = deco.items.length - 1; relItems(); drawDeco(); }));
   }
-  function drawDeco() { if (!deco) return; const t = deco.tab;
-    dbar.classList.toggle('open', !!deco.open); dbar.hidden = false;
-    const tip = deco.out ? 'You stay in the yard. Tap a colour. Done saves. Exit puts the old colours back.' : 'Drag a piece. Arrows nudge. Rotate turns it. Delete puts it away. It stays inside the room, on the floor. Done saves. Exit cancels.';
-    const tabs = deco.out ? '' : `<button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${deco.items.length}</button><button type="button" data-tab="p" class="${t === 'p' ? 'on' : ''}">Paint</button><button type="button" class="g" data-reset aria-label="Reset to default furniture">${deco.resetSure ? 'Sure?' : 'Reset'}</button>`;
-    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} ${deco.out ? 'Outside' : 'Decorate'}</button>${tabs}<button type="button" data-undo>Undo</button><button type="button" class="x" data-x>Exit</button><button type="button" class="p" data-sv>Done</button></div><p class="kh-tip">${tip}</p><div class="kh-tools"></div><div class="kh-body"></div>`;
+  function drawDeco() { if (!deco) return; const t = deco.tab; const roomed = !deco.out && deco.editState === 'ready' && deco.edit;
+    dbar.classList.toggle('open', !!deco.open); dbar.classList.toggle('rooms', !!(roomed && !deco.room)); dbar.classList.toggle('tall', !!(roomed && deco.room && t === 'c')); dbar.hidden = false;
+    const R = roomed && deco.room ? deco.edit.roomById(deco.room) : null;
+    const tip = deco.out ? 'You stay in the yard. Tap a colour. Done saves. Exit puts the old colours back.' : !roomed ? 'Opening the room editor…' : !deco.room ? 'Tap a room. The camera moves there. Only that room can be edited. Done saves. Exit cancels.' : `${R.name}. Tap a piece, then Color. Other rooms stay put. Done saves every room. Exit cancels.`;
+    const count = roomed && deco.room ? deco.items.filter((it) => inRoom(it)).length : deco.items.length;
+    const acts = `<div class="kh-acts">${roomed && deco.room ? '<button type="button" data-rooms>Rooms</button>' : ''}<button type="button" data-undo>Undo</button><button type="button" class="x" data-x>Exit</button><button type="button" class="p" data-sv>Done</button></div>`;
+    const tabs = roomed && deco.room ? `<div class="kh-tabs"><button type="button" data-tab="c" class="${t === 'c' ? 'on' : ''}">Color</button><button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${count}</button></div>` : '';
+    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} ${deco.out ? 'Outside' : (R ? R.name : 'Decorate')}</button>${acts}${tabs}</div><p class="kh-tip">${tip}</p><div class="kh-tools"></div><div class="kh-body"></div>`;
     dbar.querySelector('[data-handle]').onclick = () => { deco.open = !deco.open; drawDeco(); };
-    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; deco.resetSure = false; drawDeco(); }));
-    const resetB = dbar.querySelector('[data-reset]'); if (resetB) resetB.onclick = () => { if (!deco.resetSure) { deco.resetSure = true; drawDeco(); say('Tap Sure to put back the furniture that came with the house. Paint stays.'); return; }
-      remember(); deco.items = starterOf(deco.r).map((i) => ({ ...i })); deco.stash = []; deco.sel = -1; deco.moving = false; deco.resetSure = false; relItems(); drawDeco(); say('Starter furniture is back. Pieces you bought are still yours.'); };
+    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; deco.open = true; drawDeco(); }));
+    const roomsB = dbar.querySelector('[data-rooms]'); if (roomsB) roomsB.onclick = () => { deco.room = ''; deco.sel = -1; deco.moving = false; placeHi(); drawDeco(); };
     const undoB = dbar.querySelector('[data-undo]'); if (undoB) undoB.onclick = () => undoDeco();
     dbar.querySelector('[data-x]').onclick = () => endDeco(false); dbar.querySelector('[data-sv]').onclick = () => endDeco(true);
     paintTools(); paintBody(); }
@@ -642,10 +707,10 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     return { origin, dir };
   }
   function onDecoDown(e) {
-    if (!deco || deco.out || e.button > 0) return;
-    if (e.target.closest && e.target.closest('button, a, input, textarea, select, .kh-dbar, .kh-radio, .kh-note-btn, .kc-b, .kc-gear, .kh-p, .ks-panel')) return;
+    if (!deco || deco.out || !deco.room || e.button > 0) return;
+    if (e.target.closest && e.target.closest('button, a, input, textarea, select, label, .kh-dbar, .kh-radio, .kh-note-btn, .kc-b, .kc-gear, .kh-p, .ks-panel')) return;
     const ray = rayAt(e.clientX, e.clientY); if (!ray) return;
-    const hit = pickIndex(deco.items, ray.origin, ray.dir, aabbOf);
+    const hit = pickIndex(deco.items, ray.origin, ray.dir, (it) => (inRoom(it) ? aabbOf(it) : null));
     const idx = hit >= 0 ? hit : (deco.moving && deco.sel >= 0 ? deco.sel : -1);
     if (idx < 0) return;
     e.preventDefault(); e.stopPropagation(); selectItem(idx);
@@ -662,7 +727,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     const y = itemBaseY(it) + 0.02, t = (y - ray.origin.y) / ray.dir.y; if (t < 0) return;
     const wx = ray.origin.x + ray.dir.x * t, wz = ray.origin.z + ray.dir.z * t;
     if (!d.noted) { remember(); d.noted = true; }
-    it.x = d.ox + (wx - d.wx) / SC; it.z = d.oz + (wz - d.wz) / SC; placeItem(it);
+    it.x = d.ox + (wx - d.wx) / SC; it.z = d.oz + (wz - d.wz) / SC; placeItem(it); keepInRoom(it);
     relItems(); placeHi();
   }
   function onDecoUp(e) { if (deco && deco.drag && e.pointerId === deco.drag.id) deco.drag = null; }
@@ -686,7 +751,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (pressed.confirm) { deco.moving = !deco.moving; paintTools(); }
     return true;
   }
-  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, out: !!deco.out, name: it ? DECOR[it.c].n : '', code: it ? it.c : '', x: it ? it.x : null, z: it ? it.z : null, stash: deco.stash.slice(), hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden, spot: deco.spot }; }
+  function decoState() { if (!deco) return null; const it = deco.items[deco.sel]; return { sel: deco.sel, n: deco.items.length, open: !!deco.open, moving: !!deco.moving, out: !!deco.out, room: deco.room || '', floors: serFloors(deco.surf || {}), col: it && it.col || '', name: it ? DECOR[it.c].n : '', code: it ? it.c : '', x: it ? it.x : null, z: it ? it.z : null, stash: deco.stash.slice(), hud: document.body.classList.contains('kh-decorating'), dock: radioBox.classList.contains('dock'), note: !noteBtn.hidden, spot: deco.spot }; }
   function screenOf(i) {
     if (!deco || !deco.items[i] || !api.cam) return null; const b = aabbOf(deco.items[i]); api.cam.updateMatrixWorld(); const v = new THREE.Vector3((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2); v.project(api.cam);
     const rect = view.querySelector('canvas').getBoundingClientRect(); return { x: (v.x + 1) / 2 * rect.width + rect.left, y: (1 - v.y) / 2 * rect.height + rect.top, behind: v.z > 1 };
@@ -719,7 +784,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   function healDecor() { if (decorHealed || !myPlot || !uid || !db || deco) return; const o = owners.get(myPlot); const h = HOUSE_BY_ID[myPlot]; if (!o || !h || !o.decor || typeof o.decor.items !== 'string') { decorHealed = true; return; }
     const heal = healItems(o.decor.items, h.style === 1 || h.style === 3 || !!h.estate); decorHealed = true; if (!heal.changed) return;
     const ext0 = o.decor.ext && typeof o.decor.ext === 'object' ? o.decor.ext : {}; const decor = { ext: { w: ext0.w || '', r: ext0.r || '', d: ext0.d || '', t: ext0.t || '' }, items: heal.packed, v: 2 };
-    if (o.decor.wall) decor.wall = o.decor.wall; if (o.decor.walls) decor.walls = o.decor.walls; if (o.decor.floor) decor.floor = o.decor.floor;
+    if (o.decor.wall) decor.wall = o.decor.wall; if (o.decor.walls) decor.walls = o.decor.walls; if (o.decor.floor) decor.floor = o.decor.floor; if (o.decor.floors) decor.floors = o.decor.floors;
     homeW({ decor }).then(() => { const r = rooms.get(myPlot); if (r) { r.dk = ''; applyDecor(myPlot); } }).catch(() => {}); }
   async function buyHome(h, btn) { try { if (myPlot) throw new Error('You already own a home (one per player). Move out first to buy another.'); if (owners.has(h.id)) throw new Error('Someone just bought this one!');
       busy(btn, 'Buying…'); const st = HOME_STYLES[h.style]; const { econ: e, dia: d } = await shop(); const inv = await e.inventory(true); if (!inv[st.item]) { if (st.d) await d.buy(st.item); else await e.buy(st.item); }
