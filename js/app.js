@@ -13,6 +13,7 @@ import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
 import { deliveryUrls, LIMITS, safePhotoURL, keepTrying } from './media-config.js';
+import { uncheckedFields, claimFields } from './songcheck.js';
 import { createStories } from './stories.js';
 import { createSearch, SEARCH_ICON } from './search.js';
 import { searchFields, userSearchFields, linkify } from './search-index.js';
@@ -322,7 +323,7 @@ function adminMediaCleanup(urls) {
 }
 let works = null;
 function getWorks() {
-  if (!works) works = createWorks({ holdOrSet: (b, r, d) => mod.holdOrSet(b, r, d, d.mediaUrl || (d.work && d.work.cover) ? takeHold() : null), db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
+  if (!works) works = createWorks({ holdOrSet: (b, r, d, songForce) => { const scan = (d.mediaUrl || (d.work && d.work.cover)) ? takeHold() : null; return mod.holdOrSet(b, r, d, songForce && songForce.reason ? songForce : scan); }, db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
   return works;
 }
 const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
@@ -478,7 +479,7 @@ function renderPosts(container, posts, emptyMsg) {
 }
 
 // ---------------------------------------------------------------- moderation actions
-const REPORT_REASONS = [['bullying', '😢 Bullying or being mean'], ['inappropriate', '🙈 Inappropriate (swearing, adult or scary)'], ['spam', '📢 Spam or scam'], ['personal', '🔒 Shares personal info'], ['under13', '🧒 Seems under 13'], ['other', '❓ Something else']];
+const REPORT_REASONS = [['bullying', '😢 Bullying or being mean'], ['inappropriate', '🙈 Inappropriate (swearing, adult or scary)'], ['spam', '📢 Spam or scam'], ['personal', '🔒 Shares personal info'], ['under13', '🧒 Seems under 13'], ['copyright', '🎵 Copyright / not their video'], ['other', '❓ Something else']];
 async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '', hideKeyId = '') {
   if (!requireAuth()) return;
   if (!mod.iAmMod()) {
@@ -525,6 +526,9 @@ async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '
         const fl = doc(db, 'posts', postId, 'flags', S.user.uid);
         const [had, ps] = await Promise.all([getDoc(fl).then((d) => d.exists()).catch(() => true), getDoc(doc(db, 'posts', postId)).catch(() => null)]);
         if (!had && ps && ps.exists() && ps.data().authorId !== S.user.uid) { b.set(fl, { at: serverTimestamp() }); b.update(doc(db, 'posts', postId), { reportCount: increment(1) }); }
+        if (pick.value === 'copyright' && ps && ps.exists() && ps.data().authorId !== S.user.uid && /^[A-Za-z0-9_-]{1,120}$/.test(postId)) {
+          b.set(doc(db, 'songChecks', postId + '_' + S.user.uid), { kind: 'report', postId, authorId: ps.data().authorId, by: S.user.uid, note: 'Copyright / not their video', status: 'open', createdAt: serverTimestamp() });
+        }
       }
       await b.commit();
       if (hideKeyId) noteReport(db, S.user.uid, hideKeyId).catch(() => {});
@@ -973,7 +977,7 @@ function textComposeForm(slot, open) {
 }
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
-async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
+async function saveMediaPost({ upload, info, caption, asStudio, cat = '', song = null }) {
   if (!asStudio && !safety.canPostNow()) throw Object.assign(new Error('Posting photos and videos is off for this account.'), { code: 'kemy/young' });
   if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Slow down a bit 💜 Try posting again in a moment.'), { code: 'kemy/spam' });
   if (caption) safety.scanAge(caption, 'post');
@@ -983,7 +987,7 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
   const b = writeBatch(db);
   const n = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
   const duration = urls.mediaType === 'video' ? Math.min(LIMITS.maxVideoSeconds + 1, Math.round((Number(upload.duration) || Number(info.duration) || 0) * 10) / 10) : 0;
-  mod.holdOrSet(b, ref, {
+  const data = {
     authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
     type: 'media', text: caption.slice(0, LIMITS.captionMax), linkUrl: '',
     mediaUrl: urls.mediaUrl, mediaType: urls.mediaType, poster: urls.posterUrl, posterUrl: urls.posterUrl,
@@ -991,7 +995,14 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
     cloudinaryPublicId: String(upload.public_id).slice(0, 255), ...(cat ? { cat } : {}),
     ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
-  }, takeHold());
+  };
+  if (song && song.holdReason) {
+    S.lastHeld = ref.id;
+    b.set(doc(db, 'songChecks', ref.id), { ...claimFields(ref.id, authorId, S.user.uid, song.holdReason, data), createdAt: serverTimestamp() });
+  } else {
+    const held = mod.holdOrSet(b, ref, data, takeHold());
+    if (song && song.unchecked && !held) b.set(doc(db, 'songChecks', ref.id), { ...uncheckedFields(ref.id, authorId, S.user.uid), createdAt: serverTimestamp() });
+  }
   const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
   await b.commit(); postDone(st);
   return ref.id;
@@ -1416,7 +1427,7 @@ async function pageAdmin(token) {
     ${big('media', '🧹', 'Media cleanup', 'After you delete a post, Kemy shows a command to erase its files from Cloudinary on your computer (the key never goes in the app). For a full sweep run <code>node scripts/cloudinary-cleanup.mjs</code> (dry run first).')}
     <div id="push-admin-host"></div>
     <a class="card pad adm-tool" href="#/updates" style="display:block;margin-bottom:12px;text-decoration:none;color:inherit"><b style="font-size:1.05rem">✨ What's New</b><p class="muted small" style="margin:3px 0 0">Add an entry players see on the What's New page. You can also send the update notification from there.</p></a>
-    <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports <a class="btn btn-sm" href="#/mod" style="margin-left:8px">Open Moderator Tools</a></h2>
+    <h2 style="font-size:1.15rem;margin:18px 0 8px">🚩 Reports <a class="btn btn-sm" href="#/mod/queue" style="margin-left:8px">🎵 Song review</a> <a class="btn btn-sm" href="#/mod">Open Moderator Tools</a></h2>
     <div id="reports"></div>`;
   const founderSet = async (on) => { if (!isAdmin()) return toast('Admins only'); try { const m = await pals.myPals(true); const p = m && (m.list.find((x) => x.id === S.profile.activePet) || m.list[0]); if (!p) return toast('Hatch a Pal first');
       const k = 'kemy-founder-prev-' + p.id; let sp = 'founder'; if (on) { if (p.species !== 'founder') localStorage.setItem(k, p.species); } else { sp = localStorage.getItem(k) || 'kemy'; }

@@ -39,6 +39,11 @@ export const GIFS = {
   rating: 'pg'        // stricter than pg-13
 };
 
+// AcoustID song check (https://acoustid.org/webservice). This is a public client key,
+// meant to ship in the app — not a secret. Paste the key from your AcoustID application here.
+// Leave it empty and the check is skipped: the post still goes up, marked for Keem to review.
+export const ACOUSTID_CLIENT_KEY = '';
+
 // Client-side limits (Cloudinary free plan caps: images 10 MB, videos 100 MB).
 export const LIMITS = {
   maxVideoSeconds: 600,      // library uploads: up to 10 minutes

@@ -673,6 +673,12 @@ service cloud.firestore {
       allow create: if isMod() && exists(/databases/$(database)/documents/heldPosts/$(postId))
         && request.resource.data == get(/databases/$(database)/documents/heldPosts/$(postId)).data.post
         && !existsAfter(/databases/$(database)/documents/heldPosts/$(postId));
+      // Approve a "I made this sound myself" claim: the exact saved post, marked kept in the same batch.
+      allow create: if isMod() && exists(/databases/$(database)/documents/songChecks/$(postId))
+        && get(/databases/$(database)/documents/songChecks/$(postId)).data.kind == 'claim'
+        && get(/databases/$(database)/documents/songChecks/$(postId)).data.status == 'open'
+        && request.resource.data == get(/databases/$(database)/documents/songChecks/$(postId)).data.post
+        && getAfter(/databases/$(database)/documents/songChecks/$(postId)).data.status == 'kept';
       // Search-index backfill by the author (or admin): only keywords / hashtags.
       function searchChange() {
         return changed().hasOnly(['keywords', 'hashtags'])
@@ -1807,6 +1813,35 @@ service cloud.firestore {
             || (hp().level == 'mod' && isMod() && hp().by == me() && exists(livePost())
                 && hp().post == get(livePost()).data && !existsAfter(livePost())));
       allow delete: if signedIn() && (isMod() || resource.data.authorId == me());
+    }
+    // Song checks for the Review queue. "unchecked" = the AcoustID lookup didn't run or failed,
+    // and the post was published anyway. "report" = someone tapped Copyright / not their video.
+    // The audio itself is never stored. Keem marks one kept or removed.
+    match /songChecks/{id} {
+      function sc() { return request.resource.data; }
+      function songPost() { return /databases/$(database)/documents/posts/$(sc().postId); }
+      allow read: if isMod() || (signedIn() && resource.data.kind == 'claim' && resource.data.authorId == me());
+      allow update: if isMod() && changed().hasOnly(['status']) && sc().status in ['kept', 'removed'];
+      allow create: if signedIn() && notBanned()
+        && sc().keys().hasOnly(['kind', 'postId', 'authorId', 'by', 'note', 'status', 'createdAt', 'post'])
+        && sc().kind in ['unchecked', 'report', 'claim']
+        && sc().status == 'open' && sc().createdAt == request.time && sc().by == me()
+        && isStr(sc().note, 1, 180) && isStr(sc().authorId, 1, 128)
+        && sc().postId.matches('^[A-Za-z0-9_-]{1,120}$')
+        && ((sc().kind == 'unchecked' && !('post' in sc()) && id == sc().postId && actingAs(sc().authorId)
+              && existsAfter(songPost()) && getAfter(songPost()).data.authorId == sc().authorId)
+            || (sc().kind == 'report' && !('post' in sc()) && id == sc().postId + '_' + me() && sc().authorId != me()
+              && exists(songPost()) && get(songPost()).data.authorId == sc().authorId
+              && (isMod() || (reportsAllowed() && quotaBumped())))
+            || (sc().kind == 'claim' && id == sc().postId && actingAs(sc().authorId) && sc().post is map
+              && sc().post.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
+                'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount', 'commentCount', 'lastCommentId', 'studio',
+                'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId', 'keywords', 'hashtags', 'work', 'cat'])
+              && sc().post.authorId == sc().authorId && sc().post.createdAt == request.time
+              && sc().post.type in ['media', 'movie', 'song']
+              && cloudinaryUrl(sc().post.mediaUrl)
+              && !exists(songPost()) && !existsAfter(songPost())));
+      allow delete: if false;
     }
     // One team note per minute. The player writes this stamp in the same batch as the note.
     match /feedbackQuota/{uid} {
