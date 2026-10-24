@@ -63,7 +63,7 @@ function lazyMod(load) {
 // ---------------------------------------------------------------- state
 const S = {
   user: null, profile: null, ready: false,
-  following: new Set(), blocked: new Set(), saved: new Set(), liked: new Map(),
+  following: new Set(), blocked: new Set(), saved: new Set(), liked: new Map(), reposted: new Map(),
   unsubs: [], globalUnsubs: [], unreadNotes: false, unreadChats: false
 };
 const main = document.getElementById('main'); initPolish();
@@ -257,6 +257,50 @@ function openSnap(ref, m) {
 
 // ---------------------------------------------------------------- shared social actions
 // Used by post cards, the post page, profiles and the vertical video feed (js/watch.js).
+function postShareUrl(id) {
+  return location.origin + '/app.html?post=' + encodeURIComponent(id);
+}
+// Share sheet on phones. Desktop and in-app browsers without it get the link copied.
+async function sharePost(id) {
+  const url = postShareUrl(id);
+  const text = 'Check this out on Kemy 👑';
+  if (typeof navigator.share === 'function') {
+    try { await navigator.share({ text, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Link copied!'); }
+  catch { prompt('Copy this link:', url); }
+}
+function repostId(postId) { return S.user.uid + '_' + postId; }
+async function isReposted(postId) {
+  if (!S.user) return false;
+  if (S.reposted.has(postId)) return S.reposted.get(postId);
+  const snap = await getDoc(doc(db, 'reposts', repostId(postId)));
+  const on = snap.exists();
+  S.reposted.set(postId, on);
+  return on;
+}
+// One repost per person per post (the doc id). Tap again deletes it. The original keeps the media.
+async function toggleRepost(p, on) {
+  const ref = doc(db, 'reposts', repostId(p.id));
+  const b = writeBatch(db);
+  if (on) {
+    b.set(ref, {
+      uid: S.user.uid, username: S.profile.username, originalId: p.id,
+      originalUsername: p.authorUsername || '', createdAt: serverTimestamp()
+    });
+  } else b.delete(ref);
+  b.update(doc(db, 'posts', p.id), { repostCount: increment(on ? 1 : -1) });
+  await b.commit();
+  S.reposted.set(p.id, on);
+}
+async function purgeReposts(postId) {
+  const snap = await getDocs(query(collection(db, 'reposts'), where('originalId', '==', postId), limit(200)));
+  if (!snap.size) return;
+  const b = writeBatch(db);
+  snap.docs.forEach((d) => b.delete(d.ref));
+  await b.commit();
+}
 async function likePost(p, on) {
   const b = writeBatch(db);
   const likeRef = doc(db, 'posts', p.id, 'likes', S.user.uid);
@@ -305,6 +349,7 @@ const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c ===
 // up (unsigned browser uploads can't delete; see scripts/cloudinary-setup.mjs notes).
 async function deletePost(p) {
   await deleteDoc(doc(db, 'posts', p.id));
+  await purgeReposts(p.id).catch(() => {});
   // Admin: the Cloudinary files can only be erased with the API secret, which never ships in the site.
   // Show the ready-to-run local cleanup command instead (scripts/cloudinary-cleanup.mjs).
   const urls = [p.mediaUrl, p.poster, p.work && p.work.cover].filter((u) => /res\.cloudinary\.com\//.test(u || ''));
@@ -376,7 +421,10 @@ function postCard(p, { detail = false } = {}) {
   el.className = 'card post';
   el.dataset.postId = p.id;
   const mine = S.user && (p.authorId === S.user.uid || (p.authorId === STUDIO_UID && isAdmin()));
+  const rp = p._repost;
+  const credit = rp ? `<p class="repost-line">🔁 Reposted by <a href="#/u/${esc(rp.username)}">@${esc(rp.username)}</a> · from <a href="#/u/${esc(p.authorUsername)}">@${esc(p.authorUsername)}</a></p>` : '';
   el.innerHTML = `
+    ${credit}
     <div class="post-head">
       ${avatar(p)}
       <div class="who">
@@ -399,6 +447,8 @@ function postCard(p, { detail = false } = {}) {
     <div class="actions">
       <button class="act like" data-a="like" aria-pressed="false" aria-label="Give a star">${ICON.heart}<span class="n">${Number(p.likeCount) || 0}</span></button>
       <a class="act" href="#/post/${esc(p.id)}" aria-label="Comments">${ICON.comment}<span>${Number(p.commentCount) || 0}</span></a>
+      <button class="act repost" data-a="repost" aria-pressed="false" aria-label="Repost">🔁<span class="n">${Number(p.repostCount) || 0}</span></button>
+      <button class="act share" data-a="share" aria-label="Share">📤</button>
       <button class="act saved" data-a="save" aria-pressed="false" aria-label="Save to favorites">${ICON.save}</button>
       ${viewsHtml(p.viewCount, p.id, 'act views')}
     </div>`;
@@ -445,6 +495,20 @@ function postCard(p, { detail = false } = {}) {
       await savePost(p.id, on); toast(on ? 'Saved to your profile' : 'Removed from saved');
     } catch (e) { setSave(!on); toast(friendlyError(e)); }
   };
+  const rpBtn = $('[data-a=repost]', el), rpN = $('.n', rpBtn);
+  const setRp = (on) => { rpBtn.classList.toggle('on', on); rpBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); rpBtn.setAttribute('aria-label', on ? 'Undo repost' : 'Repost'); };
+  rpBtn.disabled = true;
+  isReposted(p.id).then((on) => { setRp(on); rpBtn.disabled = false; }).catch(() => { rpBtn.disabled = false; });
+  rpBtn.onclick = async () => {
+    if (!requireAuth()) return;
+    const on = !rpBtn.classList.contains('on');
+    const cur = parseInt(rpN.textContent, 10) || 0;
+    setRp(on); rpN.textContent = Math.max(0, cur + (on ? 1 : -1)); rpBtn.disabled = true;
+    try { await toggleRepost(p, on); toast(on ? 'Reposted' : 'Repost removed'); }
+    catch (e) { setRp(!on); rpN.textContent = cur; toast(friendlyError(e)); }
+    rpBtn.disabled = false;
+  };
+  $('[data-a=share]', el).onclick = () => sharePost(p.id);
   const menuBtn = $('[data-a=menu]', el), menu = $('.menu', el);
   menuBtn.onclick = (ev) => {
     ev.stopPropagation();
@@ -828,6 +892,29 @@ function feedDonate() {
   const kids = box.children; if (kids.length > 3) kids[2].after(slot); else box.append(slot);
   donate.mountHome(slot);
 }
+// Followed people's reposts, shown as the original post plus a credit line. A missing or
+// hidden original is skipped, so a deleted or moderated post takes its reposts with it.
+async function repostCards(authors, already) {
+  if (!authors.length) return [];
+  const chunks = [];
+  for (let i = 0; i < authors.length; i += 30) chunks.push(authors.slice(i, i + 30));
+  const snaps = await Promise.all(chunks.map(async (c) => {
+    try { return await getDocs(query(collection(db, 'reposts'), where('uid', 'in', c), orderBy('createdAt', 'desc'), limit(15))); }
+    catch (e) { if (e.code !== 'failed-precondition') throw e; return getDocs(query(collection(db, 'reposts'), where('uid', 'in', c), limit(40))); }
+  }));
+  const reps = snaps.flatMap((s) => s.docs.map((d) => ({ id: d.id, ...d.data() })));
+  const have = new Map(already.map((p) => [p.id, p]));
+  const miss = [...new Set(reps.map((r) => r.originalId))].filter((id) => id && !have.has(id));
+  if (miss.length) {
+    const docs = await Promise.all(miss.map((id) => getDoc(doc(db, 'posts', id)).catch(() => null)));
+    docs.forEach((d) => { if (d && d.exists()) have.set(d.id, { id: d.id, ...d.data() }); });
+  }
+  return reps.map((r) => {
+    const orig = have.get(r.originalId);
+    if (!orig || orig.type === 'repost' || window.kemyReportHidden?.(orig) || parental.hidePost(orig)) return null;
+    return { ...orig, _repost: r, _at: r.createdAt };
+  }).filter(Boolean);
+}
 async function pageFeed(token) {
   if (!S.user || !S.profile) {
     main.innerHTML = `${feedToggle('feed')}<a class="pk-quick" href="#/park" aria-label="Open Pal Park"><span class="pk-quick-ic" aria-hidden="true">🌳</span><span><b>Pal Park</b><small>Hang out with friends in 3D</small></span><span class="pk-quick-go">Play ›</span></a>
@@ -863,9 +950,15 @@ async function pageFeed(token) {
   const chunks = []; for (let i = 0; i < authors.length; i += 30) chunks.push(authors.slice(i, i + 30));
   const results = await Promise.all(chunks.map((c, i) => cachedQuery('feed:' + S.user.uid + ':' + i + ':' + c.length, query(collection(db, 'posts'), where('authorId', 'in', c), orderBy('createdAt', 'desc'), limit(20)), 300e3)));
   if (stale(token)) return;
-  const ms = (p) => p.createdAt?.toMillis?.() || Date.now();
-  const posts = results.flatMap((r) => r.docs.map((d) => ({ id: d.id, ...d.data() }))).sort((a, b) => ms(b) - ms(a)).slice(0, 30);
-  renderPosts($('#posts'), posts, 'Your feed is empty. <a href="#/explore">Explore</a> to find people to follow, or <a href="#/new">make your first post</a>.');
+  const ms = (p) => (p._at || p.createdAt)?.toMillis?.() || 0;
+  const posts = results.flatMap((r) => r.docs.map((d) => ({ id: d.id, ...d.data() })));
+  let mixed = posts.map((p) => ({ ...p, _at: p.createdAt }));
+  try {
+    const cards = await repostCards(authors, posts);
+    mixed = mixed.concat(cards).sort((a, b) => ms(b) - ms(a)).slice(0, 30);
+  } catch (e) { console.warn('reposts', e.code || e.message); mixed = mixed.sort((a, b) => ms(b) - ms(a)).slice(0, 30); }
+  if (stale(token)) return;
+  renderPosts($('#posts'), mixed, 'Your feed is empty. <a href="#/explore">Explore</a> to find people to follow, or <a href="#/new">make your first post</a>.');
   feedDonate();
 }
 
@@ -1510,6 +1603,16 @@ const nextHash = () => {
   return /^#\/(login|signup|onboard|reset)/.test(n) ? '#/watch' : n;
 };
 function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
+// app.html?post=ID opens that post. Signed-out visitors land on log-in first, then the post.
+(function capturePostLink() {
+  let id = '';
+  try { id = new URLSearchParams(location.search).get('post') || ''; } catch { return; }
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) return;
+  pendingNext = '#/post/' + id;
+  const hash = '#/login?next=' + encodeURIComponent(pendingNext);
+  try { history.replaceState(null, '', location.pathname + hash); }
+  catch { location.hash = hash; }
+})();
 function authShell(title, sub, body) {
   main.innerHTML = `<section class="card pad auth-card"><div class="center"><img class="auth-logo" src="kemy-logo.png" alt="Kemy app icon" width="64" height="64" style="border-radius:22%">
     <h1 style="font-size:1.5rem">${title}</h1><p class="muted" style="margin:6px 0 18px">${sub}</p></div>${body}</section>`;
@@ -1810,7 +1913,7 @@ startInput({ toast });
 getRedirectResult(auth).catch((e) => toast(friendlyError(e)));
 onAuthStateChanged(auth, async (user) => {
   S.ready = false;
-  S.user = user; S.profile = null; S.liked.clear();
+  S.user = user; S.profile = null; S.liked.clear(); S.reposted.clear();
   S.following = new Set(); S.blocked = new BlockSet([], S.hidden); S.saved = new Set();
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; S.unreadNotes = S.unreadChats = false;
   if (user) {
