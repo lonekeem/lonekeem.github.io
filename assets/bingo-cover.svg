@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" role="img" aria-label="Pal Bingo">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient>
+<linearGradient id="grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86efac"/><stop offset="1" stop-color="#15803d"/></linearGradient>
+</defs>
+<rect width="120" height="80" rx="14" fill="url(#sky)"/>
+<circle cx="100" cy="14" r="7" fill="#fde047"/>
+<ellipse cx="24" cy="16" rx="10" ry="4" fill="#fff"/><ellipse cx="34" cy="14" rx="7" ry="4" fill="#fff"/>
+<path d="M0 56c18-8 28 6 46 1s22-8 38 2 18-6 36 1v21H0z" fill="url(#grass)"/>
+<rect x="30" y="18" width="60" height="46" rx="6" fill="#fff" stroke="#fbbf24" stroke-width="2"/>
+<g font-family="Arial,sans-serif" font-size="7" font-weight="700" text-anchor="middle">
+<text x="38" y="27" fill="#e11d48">B</text><text x="50" y="27" fill="#9333ea">I</text><text x="62" y="27" fill="#0891b2">N</text><text x="74" y="27" fill="#16a34a">G</text><text x="86" y="27" fill="#ea580c">O</text>
+</g>
+<g>
+<rect x="34" y="30" width="10" height="9" rx="2" fill="#fbcfe8"/><rect x="46" y="30" width="10" height="9" rx="2" fill="#fff"/><rect x="58" y="30" width="10" height="9" rx="2" fill="#fbcfe8"/><rect x="70" y="30" width="10" height="9" rx="2" fill="#fff"/><rect x="82" y="30" width="10" height="9" rx="2" fill="#fbcfe8"/>
+<rect x="34" y="41" width="10" height="9" rx="2" fill="#fff"/><rect x="46" y="41" width="10" height="9" rx="2" fill="#fbcfe8"/><rect x="58" y="41" width="10" height="9" rx="2" fill="#fff"/><rect x="70" y="41" width="10" height="9" rx="2" fill="#fbcfe8"/><rect x="82" y="41" width="10" height="9" rx="2" fill="#fff"/>
+<rect x="34" y="52" width="10" height="9" rx="2" fill="#fbcfe8"/><rect x="46" y="52" width="10" height="9" rx="2" fill="#fff"/><rect x="58" y="52" width="10" height="9" rx="2" fill="#fbcfe8"/><rect x="70" y="52" width="10" height="9" rx="2" fill="#fff"/><rect x="82" y="52" width="10" height="9" rx="2" fill="#fbcfe8"/>
+</g>
+<circle cx="39" cy="34.5" r="3.4" fill="#fb7185"/><circle cx="67" cy="45.5" r="3.6" fill="#fde047" stroke="#f59e0b" stroke-width=".6"/>
+<path d="M67 43.2l.7 1.4 1.5.2-1.1 1 .3 1.5-1.4-.8-1.4.8.3-1.5-1.1-1 1.5-.2z" fill="#b45309"/>
+<circle cx="87" cy="56.5" r="3.4" fill="#86efac"/>
+<circle cx="16" cy="36" r="7" fill="#fb7185" stroke="#fff" stroke-width="1.5"/>
+<circle cx="104" cy="40" r="6" fill="#67e8f9" stroke="#fff" stroke-width="1.5"/>
+<circle cx="18" cy="52" r="5" fill="#d8b4fe" stroke="#fff" stroke-width="1.2"/>
+</svg>

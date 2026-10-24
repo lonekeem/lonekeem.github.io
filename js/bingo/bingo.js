@@ -7,7 +7,7 @@ import { sfx } from '../games/sfx.js';
 import { watchGameRotate } from '../rotate.js';
 import {
   BOTS, LUCKY_BALLS, PATTERN_NAME, ballsFor, bingoCall, cardFor, cardMiss, cardSlots, dayKey, letterOf,
-  levelOf, luckyRound, markedWin, masksFor, patternFor, roundAt, roundSeed, weekId
+  botReactMs, levelOf, luckyRound, markedWin, masksFor, patternFor, roundAt, roundSeed, weekId
 } from './logic.js';
 
 const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b1d55;font-family:Inter,system-ui,sans-serif}
@@ -39,15 +39,17 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 .pb-scene{position:absolute;inset:0;z-index:0;pointer-events:none}
 .pb-scene svg{width:100%;height:100%;display:block}
 .pb-live>*:not(.pb-scene){position:relative;z-index:1}
-.pb-hud{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.pb-stat{flex:none;min-width:92px;background:linear-gradient(#4c1d95,#1e1b4b);color:#fff;border:3px solid #fbbf24;border-radius:14px;padding:4px 8px;box-shadow:0 3px 0 #b45309;font-weight:900;line-height:1.25}
+.pb-hud{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"stat left tools" "balls balls balls";align-items:center;gap:4px 8px;margin-bottom:4px}
+.pb-stat{grid-area:stat;z-index:2;min-width:92px;background:linear-gradient(#4c1d95,#1e1b4b);color:#fff;border:3px solid #fbbf24;border-radius:14px;padding:4px 8px;box-shadow:0 3px 0 #b45309;font-weight:900;line-height:1.25}
 .pb-stat div{display:flex;align-items:center;gap:4px}
-.pb-calls{flex:1;min-width:0;text-align:center}
-.pb-left{color:#fff;font-weight:900;text-shadow:0 2px 0 #0369a1;font-size:.95rem}
-.pb-last{display:flex;gap:6px;justify-content:center;min-height:58px;align-items:center}
-.pb-orb{width:52px;height:52px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:16px;line-height:.9;text-shadow:0 1px 0 rgba(0,0,0,.25);box-shadow:inset -4px -5px 0 rgba(0,0,0,.16),0 3px 0 rgba(0,0,0,.18);flex:none}
+.pb-calls{display:contents}
+.pb-left{grid-area:left;color:#fff;font-weight:900;text-shadow:0 2px 0 #0369a1;font-size:.95rem;text-align:center}
+.pb-tools{grid-area:tools}
+.pb-last{grid-area:balls;display:flex;gap:6px;justify-content:center;align-items:center;min-height:68px;padding:6px 0 2px;overflow:hidden}
+.pb-orb{width:46px;height:46px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:15px;line-height:.9;text-shadow:0 1px 0 rgba(0,0,0,.25);box-shadow:inset -4px -5px 0 rgba(0,0,0,.16),0 3px 0 rgba(0,0,0,.18);flex:none;position:relative}
 .pb-orb small{font-size:10px;line-height:1}
-.pb-orb.now{transform:scale(1.08);box-shadow:0 0 0 3px #fff,0 0 0 6px #fde047,inset -4px -5px 0 rgba(0,0,0,.16)}
+.pb-orb.now{width:58px;height:58px;font-size:18px;box-shadow:inset -4px -5px 0 rgba(0,0,0,.16),0 3px 0 rgba(0,0,0,.18)}
+.pb-orb.now::after{content:"";position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(from -90deg,#fff var(--pb-wait,100%),rgba(255,255,255,.28) 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3px));mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3px));pointer-events:none}
 .pb-orb.cB{background:radial-gradient(circle at 32% 28%,#fff,#fb7185 42%,#be123c)}
 .pb-orb.cI{background:radial-gradient(circle at 32% 28%,#fff,#d8b4fe 42%,#7e22ce)}
 .pb-orb.cN{background:radial-gradient(circle at 32% 28%,#fff,#67e8f9 42%,#0e7490)}
@@ -57,7 +59,11 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 .pb-live .pb-round,.pb-live #k-rot.in-tools{width:44px;height:44px;min-width:44px;border-radius:50%;border:3px solid #fff;background:#7c3aed;color:#fff;font:900 18px/1 Inter,system-ui,sans-serif;box-shadow:0 3px 0 #5b21b6;padding:0;display:grid;place-items:center}
 .pb-stage{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
 .pb-main{min-width:0}
-.pb-live .pb-meta{color:#0f172a;background:rgba(255,255,255,.82);border-radius:12px;padding:4px 8px;font-size:.82rem}
+.pb-live .pb-meta{color:#0f172a;background:rgba(255,255,255,.82);border-radius:12px;padding:4px 8px;font-size:.82rem;align-items:center}
+.pb-opts{margin-left:auto;font-size:.75rem}
+.pb-opts summary{font-weight:800;cursor:pointer;list-style:none;min-height:32px;display:inline-flex;align-items:center}
+.pb-opts summary::-webkit-details-marker{display:none}
+.pb-opts .pb-auto{display:flex;margin-top:4px}
 .pb-live .pb-cards{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 8px}
 .pb-live .pb-card{flex:0 0 min(100%,440px);scroll-snap-align:center;border:4px solid #fbbf24;border-radius:18px;padding:6px 6px 8px;box-shadow:0 6px 0 #d97706;background:#fff;min-width:0}
 .pb-live .pb-card.one{box-shadow:0 0 0 3px #fff,0 0 0 6px #fde047,0 6px 0 #d97706}
@@ -76,6 +82,7 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 .pb-live .pb-cell.got::before{content:'';position:absolute;inset:3px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,var(--stamp) 46%,var(--stamp2));box-shadow:inset 0 -3px 0 rgba(0,0,0,.16)}
 .pb-live .pb-cell.free::before,.pb-live .pb-cell.star::before{background:radial-gradient(circle at 32% 28%,#fff,#fde047 42%,#f59e0b)}
 .pb-live .pb-cell span{position:relative;z-index:1}
+.pb-cell.pb-shake{animation:pbShake .32s ease}
 .pb-live .pb-cell.free span{color:#b45309;font-size:1.3em}
 .pb-boardwrap{background:#1e1b4b;border-radius:16px;border:3px solid #312e81;padding:6px;max-height:220px;overflow:auto}
 .pb-live .pb-board{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:0;font-size:11px}
@@ -90,12 +97,26 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 .pb-auto{font-weight:800;font-size:.85rem;background:rgba(255,255,255,.88);border-radius:999px;padding:4px 8px}
 .pb-peek{margin:0;font-weight:800;background:#fff6d8;border-radius:10px;padding:6px 8px}
 .pb-dock{flex:none;z-index:4;display:flex;gap:8px;align-items:center;padding:6px;border-radius:16px;background:rgba(240,253,244,.94)}
+body:has(.pb-live) .toast{bottom:168px}
 .pb-dock .pb-powers{flex:1;min-width:0}
 .pb-dock .pb-powers button,.pb-dock .pb-powers span{background:#fff;border-radius:12px;padding:8px 10px;font-weight:800}
 .pb-dock [data-bingo]{flex:1.4;min-height:56px;border:0;border-radius:16px;background:linear-gradient(#fde047,#f59e0b);color:#7c2d12;font-weight:900;font-size:26px;letter-spacing:.04em;box-shadow:0 5px 0 #b45309}
 .pb-dock [data-bingo]:disabled{opacity:.55}
 .pb-floats{font-weight:800;min-height:1em}
+.pb-live>.pb-callout,.pb-live>.pb-ready{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:5;display:grid;place-items:center;text-align:center;pointer-events:none}
+.pb-live>.pb-callout[hidden],.pb-live>.pb-ready[hidden]{display:none}
+.pb-callout *,.pb-ready *{pointer-events:none}
+.pb-live>.pb-win{position:fixed;z-index:80}
+.pb-callout[hidden],.pb-ready[hidden]{display:none}
+.pb-callout .pb-orb{width:112px;height:112px;font-size:40px}
+.pb-callout .pb-orb small{font-size:18px}
+.pb-callout .pb-orb::after{display:none}
+.pb-ready b{font-size:72px;line-height:.9;color:#fff;text-shadow:0 4px 0 #0369a1}
+.pb-ready span{font-weight:900;color:#fff;text-shadow:0 2px 0 #0369a1}
 @media (orientation:landscape){
+  .pb-hud{grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-areas:"stat left balls tools"}
+  .pb-left{text-align:left;white-space:nowrap}
+  .pb-last{min-height:52px;padding:0}
   .pb-live .pb-stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,210px);align-items:stretch;overflow:hidden}
   .pb-live .pb-main{min-height:0;overflow:auto;display:flex;flex-direction:column}
   .pb-live .pb-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));overflow:visible;scroll-snap-type:none}
@@ -105,8 +126,9 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 @media (orientation:landscape) and (max-height:520px){
   .pb-live{gap:4px;padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left))}
   .pb-hud{margin-bottom:0}
-  .pb-orb{width:40px;height:40px;font-size:13px}
-  .pb-last{min-height:40px}
+  .pb-orb{width:36px;height:36px;font-size:12px}
+  .pb-orb.now{width:44px;height:44px;font-size:14px}
+  .pb-last{min-height:48px}
   .pb-live .pb-meta{padding:2px 6px;font-size:.72rem}
   .pb-live .pb-cell{min-height:0;aspect-ratio:auto;height:clamp(22px,7.4dvh,36px);font-size:14px}
   .pb-head{font-size:16px;margin-bottom:0}
@@ -122,8 +144,11 @@ const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b
 .pb-break{background:#e8fff1;border-radius:12px;padding:8px 10px}
 @keyframes pbStamp{from{transform:scale(1.4) rotate(-8deg)}to{transform:none}}@keyframes pbPop{from{transform:scale(.4)}to{transform:none}}
 @keyframes pbFly{to{transform:translateY(-80px);opacity:0}}
+@keyframes pbShake{0%,100%{transform:none}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+@keyframes pbIn{from{transform:translate(-50%,-50%) scale(.5)}to{transform:translate(-50%,-50%) scale(1)}}
+.pb-callout,.pb-ready{animation:pbIn .28s ease-out}
 @media (orientation:landscape) and (max-height:520px){.pb-hero{height:120px}}
-@media (prefers-reduced-motion:reduce){.pb-cell.got,.pb-win b,.pb-orb.now{animation:none;transform:none}}`;
+@media (prefers-reduced-motion:reduce){.pb-cell.got,.pb-win b,.pb-orb.now,.pb-cell.pb-shake,.pb-callout,.pb-ready{animation:none}}`;
 
 const SCENE = `<svg viewBox="0 0 800 480" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="pbSkyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset=".5" stop-color="#bae6fd"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient><linearGradient id="pbGrassG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86efac"/><stop offset="1" stop-color="#15803d"/></linearGradient></defs><rect width="800" height="480" fill="url(#pbSkyG)"/><circle cx="110" cy="68" r="34" fill="#fde047"/><circle cx="98" cy="56" r="10" fill="#fffbeb" opacity=".85"/><ellipse cx="250" cy="78" rx="48" ry="16" fill="#fff"/><ellipse cx="286" cy="70" rx="30" ry="14" fill="#fff"/><ellipse cx="560" cy="96" rx="54" ry="16" fill="#fff" opacity=".95"/><ellipse cx="400" cy="440" rx="480" ry="130" fill="url(#pbGrassG)"/><path d="M20 392c90-34 130 28 210 4s130-40 210 6 150-28 220 8" fill="none" stroke="#38bdf8" stroke-width="18" stroke-linecap="round"/><path d="M20 392c90-34 130 28 210 4s130-40 210 6 150-28 220 8" fill="none" stroke="#e0f2fe" stroke-width="6" stroke-linecap="round"/><g><rect x="64" y="248" width="16" height="72" rx="4" fill="#92400e"/><polygon points="72,146 14,268 130,268" fill="#166534"/><polygon points="72,188 32,268 112,268" fill="#4ade80"/></g><g><rect x="700" y="228" width="18" height="84" rx="4" fill="#92400e"/><polygon points="709,118 640,248 778,248" fill="#14532d"/><polygon points="709,168 662,248 756,248" fill="#22c55e"/></g><g fill="#fbcfe8"><circle cx="190" cy="404" r="7"/><circle cx="178" cy="412" r="5"/><circle cx="202" cy="412" r="5"/></g><circle cx="190" cy="404" r="2.5" fill="#f59e0b"/><g fill="#fde68a"><circle cx="360" cy="424" r="6"/><circle cx="350" cy="432" r="4"/><circle cx="370" cy="432" r="4"/></g><circle cx="360" cy="424" r="2" fill="#ea580c"/><g fill="#fff"><circle cx="630" cy="412" r="6"/><circle cx="620" cy="420" r="4"/><circle cx="640" cy="420" r="4"/></g><circle cx="630" cy="412" r="2" fill="#f59e0b"/></svg>`;
 
@@ -136,6 +161,47 @@ const FRESH = 25000;
 function css() { if (document.getElementById('pb-css')) return; const s = document.createElement('style'); s.id = 'pb-css'; s.textContent = CSS; document.head.appendChild(s); }
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let audio = null;
+let saidReady = -1, saidBall = -1, calloutUntil = 0, voicePick = null;
+function hookVoices() {
+  const s = window.speechSynthesis;
+  if (!s || hookVoices.done) return;
+  hookVoices.done = 1;
+  const pick = () => {
+    let list = [];
+    try { list = s.getVoices() || []; } catch { list = []; }
+    voicePick = list.find((v) => /^en/i.test(v.lang) && /samantha|karen|google|natural|female|zira/i.test(v.name))
+      || list.find((v) => /^en(-|_)?US/i.test(v.lang))
+      || list.find((v) => /^en/i.test(v.lang))
+      || null;
+  };
+  try { s.addEventListener('voiceschanged', pick); } catch { /* old webkit */ }
+  pick();
+}
+function unlockVoice() {
+  const s = window.speechSynthesis;
+  if (!s || !window.SpeechSynthesisUtterance) return;
+  hookVoices();
+  try {
+    s.resume();
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0.01; u.rate = 1; u.lang = 'en-US';
+    s.speak(u);
+  } catch { /* speech isn't available here */ }
+}
+function sayParts(parts) {
+  const s = window.speechSynthesis;
+  if (sfx.muted || !s || !window.SpeechSynthesisUtterance) return;
+  try {
+    s.cancel();
+    parts.forEach((text) => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.9; u.lang = 'en-US';
+      if (voicePick) u.voice = voicePick;
+      s.speak(u);
+    });
+  } catch { /* skip the caller if the browser refuses */ }
+}
+function hush() { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch { /* ignore */ } }
 function chirp() {
   if (sfx.muted) return;
   try {
@@ -156,9 +222,10 @@ export function openBingo(ctx, q = {}) {
   const fast = q.fast === '1';
   const SK = 'kemy-bingo-v1-' + uid;
   let prog = {}; try { prog = JSON.parse(localStorage.getItem(SK) || '{}'); } catch { prog = {}; }
-  prog = { xp: 0, daubs: 0, days: 0, day: '', gift: '', powers: [], dauber: 'ink', theme: 'cozy', auto: true, cards: 1, stickers: { b: [], p: [] }, ch: null, ...prog };
+  prog = { xp: 0, daubs: 0, days: 0, day: '', gift: '', powers: [], dauber: 'ink', theme: 'cozy', auto: false, autoOff: 0, cards: 1, stickers: { b: [], p: [] }, ch: null, ...prog };
   if (!prog.stickers) prog.stickers = { b: [], p: [] };
   const persist = () => { try { localStorage.setItem(SK, JSON.stringify(prog)); } catch { /* full */ } };
+  if (!prog.autoOff) { prog.auto = false; prog.autoOff = 1; persist(); }
   const lv = () => levelOf(prog.xp);
   const slots = () => cardSlots(lv());
   let econ = null;
@@ -182,7 +249,7 @@ export function openBingo(ctx, q = {}) {
   let dead = false, mode = 'lobby', roomId = '', room = null, seats = [], unsubR = null, unsubS = null, hb = 0;
   let claim = 0, emo = 0, lastSeat = 0, seatQ = Promise.resolve();
   let daubed = new Set(), frees = new Map(), paidRound = -1, peekUntil = 0, doubleOn = false, missUntil = 0, winUntil = 0, winText = '';
-  let seenBall = -1, tickN = 0, drum = 0, botShown = -1, botCache = { seed: 0, at: 0 }, ge = null, seenEmo = new Map();
+  let seenBall = -1, tickN = 0, drum = 0, botShown = -1, lastRound = -1, botCache = { key: '', plan: null }, ge = null, seenEmo = new Map();
   const arm = () => { if (!dead) watchGameRotate(); };
 
   function grantCh() {
@@ -252,6 +319,7 @@ export function openBingo(ctx, q = {}) {
     const el = document.createElement('b'); el.textContent = (PHRASES[(x.emo || 1) - 1] || '⭐') + ' ' + x.name; host.appendChild(el); setTimeout(() => el.remove(), 2400);
   }
   async function joinPublic() {
+    unlockVoice();
     try {
       for (const id of ['hall', 'hall2', 'hall3']) {
         await ensure(id, true);
@@ -261,11 +329,13 @@ export function openBingo(ctx, q = {}) {
     } catch (e) { console.warn('bingo room', e && (e.code || e.message)); toast(friendlyError ? friendlyError(e) : 'Could not open the hall'); }
   }
   async function makePrivate() {
+    unlockVoice();
     const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let id = '';
     for (let i = 0; i < 5; i++) id += A[Math.floor(Math.random() * A.length)];
     try { await ensure(id, false); listen(id); toast('Room code ' + id); } catch (e) { toast(friendlyError ? friendlyError(e) : 'Could not make a room'); }
   }
   async function joinCode(raw) {
+    unlockVoice();
     const id = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
     if (id.length < 4) { toast('Codes look like ABCDE'); return; }
     const s = await getDoc(doc(db, 'bingoRooms', id));
@@ -285,7 +355,7 @@ export function openBingo(ctx, q = {}) {
     const c = ch();
     const goals = [['daub', 'Daub 50 numbers', 50], ['corners', 'Win with four corners', 1], ['rounds', 'Play 2 rounds', 2]];
     main.innerHTML = `<section class="pb theme-${esc(prog.theme)}" style="--daub:${esc((DAUBERS.find((d) => d.id === prog.dauber) || DAUBERS[0]).c)}">
-      <div class="pb-top"><a href="#/arcade" aria-label="Back to arcade">←</a><h1>Pal Bingo 🎱⭐<small>Cozy 75-ball rooms</small></h1><div data-k-rot></div><button class="pb-ico" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button></div>
+      <div class="pb-top"><a href="#/arcade" aria-label="Back to arcade">←</a><h1>Pal Bingo ⭐<small>Cozy 75-ball rooms</small></h1><div data-k-rot></div><button class="pb-ico" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button></div>
       <div class="pb-hero pb-banner" aria-hidden="true">${SCENE}</div>
       <p class="pb-note">⭐ Stars are prizes for playing, with a daily cap. No shop, no bets, no real money.</p>
       ${gifted ? '<p class="pb-note">Welcome in. Here’s a small prize for showing up today — missing a day never takes anything away.</p>' : ''}
@@ -299,7 +369,7 @@ export function openBingo(ctx, q = {}) {
       <div class="pb-box"><h2>Today’s challenges</h2><ul>${goals.map(([k, label, goal]) => `<li>${c.got && c.got[k] ? '✅' : '▫️'} ${esc(label)} (${Math.min(goal, c[k] || 0)}/${goal})</li>`).join('')}</ul><p class="pb-note">A new set each day you visit. Skipping a day just starts fresh.</p></div>
       <details class="pb-box"><summary><b>Sticker book</b></summary><p>Balls: ${LUCKY_BALLS.map((n) => prog.stickers.b.includes(n) ? n : '·').join(' ')}</p><p>Patterns: ${['line', 'corners', 'x', 'heart', 'star', 'crown', 'blackout'].map((id) => prog.stickers.p.includes(id) ? PATTERN_NAME[id] : '·').join(' · ')}</p></details>
       <div class="pb-box"><h2>This week</h2><div data-week>Loading…</div><p><a href="#/scores/bingo?tab=week">Full weekly board</a></p></div>
-      <p class="pb-note">Rounds are about 2–3 minutes. Power-ups (free daub, double stars, peek) are earned by playing, not bought. Chat is quick phrases and emotes only.</p>
+      <p class="pb-note">Each ball waits a few seconds so you can find it and tap it. Power-ups (free daub, double stars, peek) are earned by playing, not bought. Chat is quick phrases and emotes only.</p>
       <div class="pb-break" data-break hidden>You’ve been playing a while. A break is nice too — come back whenever you like.</div>
     </section>`;
     main.querySelector('[data-mute]').onclick = () => { sfx.muted = !sfx.muted; paintLobby(); };
@@ -336,22 +406,23 @@ export function openBingo(ctx, q = {}) {
         <div class="pb-tools"><div data-k-rot></div><button class="pb-round" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button><button class="pb-round" type="button" data-leave aria-label="Close">✕</button></div>
       </div>
       <div class="pb-stage"><div class="pb-main">
-        <div class="pb-meta"><span data-pat>Pattern</span><span data-time></span><span data-code></span></div>
+        <div class="pb-meta"><span data-pat>Pattern</span><span data-time></span><span data-code></span><details class="pb-opts"><summary>Options</summary><label class="pb-auto"><input type="checkbox" data-auto ${prog.auto ? 'checked' : ''}> Auto-daub</label></details></div>
         <p class="pb-peek" data-peek hidden></p>
         <div class="pb-cards" data-cards></div>
         <div class="pb-names" data-names></div>
         <div class="pb-extra">
           <div class="pb-chat" aria-label="Quick chat">${PHRASES.map((p, i) => `<button type="button" data-say="${i}">${esc(p)}</button>`).join('')}</div>
-          <label class="pb-auto"><input type="checkbox" data-auto ${prog.auto ? 'checked' : ''}> Auto-daub</label>
           <div class="pb-floats"></div>
         </div>
         <div class="pb-break" data-break hidden>You’ve been playing a while. A break is nice too — come back whenever you like.</div>
       </div><aside class="pb-boardwrap" aria-label="Called numbers 1 to 75"><div class="pb-board" data-grid></div></aside></div>
       <div class="pb-dock"><div class="pb-powers" data-pow></div><button type="button" data-bingo>BINGO!</button></div>
+      <div class="pb-ready" data-ready hidden><b data-ready-n>3</b><span>Get ready</span></div>
+      <div class="pb-callout" data-callout hidden><b class="pb-orb" data-callball></b></div>
       <div class="pb-win" data-win hidden><div><b>BINGO!</b><p data-wint></p></div></div>
     </section>`;
     main.querySelector('[data-leave]').onclick = () => { dropSeat(); paintLobby(); };
-    main.querySelector('[data-mute]').onclick = () => { sfx.muted = !sfx.muted; paintHall(); };
+    main.querySelector('[data-mute]').onclick = () => { sfx.muted = !sfx.muted; if (sfx.muted) hush(); paintHall(); };
     main.querySelector('[data-auto]').onchange = (e) => { prog.auto = e.target.checked; persist(); };
     main.querySelector('[data-bingo]').onclick = () => pressBingo();
     main.querySelectorAll('[data-say]').forEach((b) => b.onclick = () => { const i = +b.dataset.say; float(PHRASES[i] + ' you'); writeSeat({ emo: i + 1 }); });
@@ -374,7 +445,8 @@ export function openBingo(ctx, q = {}) {
     const n = card[k]; if (k === 12) return;
     if (st.called.has(n)) { if (!daubed.has(n)) { daubed.add(n); addDaubs(1); stickerBall(n); sfx.play('place'); } return; }
     if (prog.powers.includes('free') && !frees.has(ci)) { frees.set(ci, k); prog.powers.splice(prog.powers.indexOf('free'), 1); persist(); sfx.play('star'); toast('Free daub placed'); return; }
-    toast('That number has not been called yet');
+    const btn = main.querySelector(`[data-k="${key}"]`);
+    if (btn) { btn.classList.remove('pb-shake'); void btn.offsetWidth; btn.classList.add('pb-shake'); }
   }
   function usePower(id) {
     const i = prog.powers.indexOf(id); if (i < 0) return; const st = liveRound(); if (!st) return;
@@ -401,8 +473,8 @@ export function openBingo(ctx, q = {}) {
     if (needMark && !win) { toast('Stamp the called numbers first'); return; }
     if (!win) { missUntil = Date.now() + 1600; sfx.play('lose'); toast(one ? 'So close — one number away' : 'Not yet. Keep going!'); return; }
     const C = st.ck.called;
-    const botAt = botBingo(st);
-    const earlier = seats.some((s) => s.id !== uid && s.claim > 0 && s.claim < C) || (botAt && botAt < C);
+    const bot = botPlan(st);
+    const earlier = seats.some((s) => s.id !== uid && s.claim > 0 && s.claim < C) || !!(bot && st.ck.t >= bot.tPress);
     claim = C; writeSeat({ claim: C });
     const lucky = luckyRound(st.ck.round);
     let stars = earlier ? 5 : (lucky ? 18 : 12);
@@ -410,15 +482,23 @@ export function openBingo(ctx, q = {}) {
     doubleOn = false;
     if (paidRound !== st.ck.round) { paidRound = st.ck.round; prize(stars, earlier ? 'for a bingo' : 'for winning the round'); prog.xp += 20; ch().rounds += 1; if (st.pat === 'corners') ch().corners += 1; stickerPat(st.pat); persist(); grantCh(); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 12 } })); import('../leaderboard.js').then((m) => m.recordScore('bingo', { r: earlier ? 'l' : 'w', pts: stars })).catch(() => {}); }
     winText = earlier ? 'You got BINGO too!' : (lucky ? 'Lucky Star win!' : 'You won this round!');
-    winUntil = Date.now() + 8000; sfx.play('win');
+    winUntil = Date.now() + 8000; sfx.play('win'); sayParts(['Bingo!']);
   }
-  function botBingo(st) {
+  function botPlan(st) {
     const humans = seats.filter((s) => Date.now() - s.at < FRESH).length || 1;
-    const key = st.seed + ':' + st.pat + ':' + humans;
-    if (botCache.key === key) return botCache.at;
-    let best = 0;
-    if (humans < 6) { const n = Math.min(6, 6 - humans); for (let i = 0; i < n; i++) { const c = bingoCall(st.seed, BOTS[i].id, 1, st.pat); if (c && (!best || c < best)) best = c; } }
-    botCache = { key, at: best }; return best;
+    const key = st.seed + ':' + st.pat + ':' + humans + ':' + (fast ? 1 : 0);
+    if (botCache.key === key) return botCache.plan;
+    let plan = null;
+    if (humans < 6) {
+      const n = Math.min(6, 6 - humans);
+      for (let i = 0; i < n; i++) {
+        const c = bingoCall(st.seed, BOTS[i].id, 1, st.pat);
+        if (!c) continue;
+        const tPress = st.ck.ready + (c - 1) * st.ck.call + botReactMs(st.seed, BOTS[i].id, fast);
+        if (!plan || tPress < plan.tPress) plan = { ball: c, tPress, name: BOTS[i].name };
+      }
+    }
+    botCache = { key, plan }; return plan;
   }
   function syncCards(st) {
     const host = main.querySelector('[data-cards]'); if (!host) return;
@@ -451,18 +531,39 @@ export function openBingo(ctx, q = {}) {
     if (mode === 'lobby') return;
     const st = liveRound();
     if (!st) return;
-    if (st.ck.round !== botShown && st.ck.called === 0) { botShown = -1; }
+    if (st.ck.round !== lastRound) { lastRound = st.ck.round; botShown = -1; saidReady = -1; saidBall = -1; seenBall = -1; }
+    if (st.ck.phase === 'ready' && st.ck.live && saidReady !== st.ck.round) { saidReady = st.ck.round; sayParts(['Get ready!']); }
     if (seenBall !== st.ck.called) {
-      if (seenBall >= 0 && st.ck.called > seenBall && st.ck.live) { chirp(); sfx.play('pop'); }
+      const fresh = seenBall >= 0 || (st.ck.called > 0 && st.ck.nextIn > st.ck.call - 1600);
+      if (fresh && st.ck.called > seenBall && st.ck.live && st.ck.phase !== 'ready') {
+        chirp(); sfx.play('pop');
+        const n = st.balls[st.ck.called - 1];
+        if (saidBall !== st.ck.called) { saidBall = st.ck.called; sayParts([letterOf(n), String(n)]); showCallout(n); }
+      }
       seenBall = st.ck.called;
     }
+    const readyEl = main.querySelector('[data-ready]');
+    if (readyEl) {
+      const show = st.ck.live && st.ck.phase === 'ready';
+      readyEl.hidden = !show;
+      if (show) { const b = readyEl.querySelector('[data-ready-n]'); if (b) b.textContent = st.ck.count ? String(st.ck.count) : 'Get ready'; }
+    }
+    const callout = main.querySelector('[data-callout]');
+    if (callout) callout.hidden = calloutUntil <= Date.now() || (st.ck.phase === 'ready');
     const last = main.querySelector('[data-last]');
     if (last) {
       const nums = st.balls.slice(Math.max(0, st.ck.called - 5), st.ck.called).reverse();
       const sig = nums.join(',');
       if (last.dataset.sig !== sig) { last.dataset.sig = sig; last.innerHTML = nums.map((n, i) => { const L = letterOf(n); return `<b class="pb-orb c${L}${i === 0 ? ' now' : ''}"><small>${L}</small>${n}</b>`; }).join(''); }
+      const now = last.querySelector('.now');
+      if (now && st.ck.call) {
+        const span = st.ck.called === 0 ? st.ck.ready : st.ck.call;
+        const frac = span ? Math.max(0, Math.min(1, st.ck.nextIn / span)) : 0;
+        now.style.setProperty('--pb-wait', Math.round(frac * 100) + '%');
+      }
     }
-    const leftEl = main.querySelector('[data-left]'); if (leftEl) leftEl.textContent = st.ck.live ? `${75 - st.ck.called} balls left` : 'Next round';
+    const leftEl = main.querySelector('[data-left]');
+    if (leftEl) leftEl.textContent = !st.ck.live ? 'Next round' : st.ck.phase === 'ready' ? 'Get ready…' : `${75 - st.ck.called} balls left`;
     const patEl = main.querySelector('[data-pat]'); if (patEl) patEl.innerHTML = `${PATTERN_NAME[st.pat]}${luckyRound(st.ck.round) ? ' · <span class="lucky">Lucky Star</span>' : ''}`;
     const timeEl = main.querySelector('[data-time]'); if (timeEl) { const s = Math.ceil(st.ck.left / 1000); timeEl.textContent = st.ck.live ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Next round soon'; }
     const codeEl = main.querySelector('[data-code]'); if (codeEl) codeEl.textContent = room && room.pub ? 'Public hall' : 'Code ' + roomId;
@@ -489,12 +590,12 @@ export function openBingo(ctx, q = {}) {
     syncCards(st);
     const one = st.cards.some((card, ci) => cardMiss(card, st.called, st.masks, frees.has(ci) ? frees.get(ci) : -1) === 1);
     if (one && st.ck.live && st.ck.nextIn < 800 && drum < 3) { drum++; sfx.play('tick'); } if (!one) drum = 0;
-    const botAt = botBingo(st);
-    if (botAt && st.ck.called >= botAt && botShown !== st.ck.round) { botShown = st.ck.round; const who = BOTS[(botAt + st.ck.round) % BOTS.length]; float(who.name + ' called BINGO!'); sfx.play('star'); }
+    const bot = botPlan(st);
+    if (bot && st.ck.t >= bot.tPress && st.ck.live && botShown !== st.ck.round) { botShown = st.ck.round; float(bot.name + ' called BINGO!'); sfx.play('star'); sayParts(['Bingo!']); }
     const cardHost = main.querySelector('[data-cards]');
     if (!st.ck.live && cardHost && cardHost.dataset.played === String(st.ck.round) && paidRound !== st.ck.round && daubed.size > 1) { paidRound = st.ck.round; ch().rounds += 1; persist(); prize(3, 'for playing the round'); grantCh(); }
     const win = main.querySelector('[data-win]');
-    if (win) { win.hidden = winUntil <= Date.now(); const t = win.querySelector('[data-wint]'); if (t) t.textContent = winText; if (!win.hidden && !win.dataset.fx) { win.dataset.fx = '1'; for (let i = 0; i < 14; i++) { const s = document.createElement('span'); s.textContent = i % 2 ? '⭐' : '🎱'; s.style.left = (10 + Math.random() * 80) + '%'; s.style.top = (30 + Math.random() * 30) + '%'; win.appendChild(s); } } if (win.hidden) delete win.dataset.fx; }
+    if (win) { win.hidden = winUntil <= Date.now(); const t = win.querySelector('[data-wint]'); if (t) t.textContent = winText; if (!win.hidden && !win.dataset.fx) { win.dataset.fx = '1'; for (let i = 0; i < 14; i++) { const s = document.createElement('span'); s.textContent = '⭐'; s.style.left = (10 + Math.random() * 80) + '%'; s.style.top = (30 + Math.random() * 30) + '%'; win.appendChild(s); } } if (win.hidden) delete win.dataset.fx; }
     breakNote();
     const go = main.querySelector('[data-bingo]'); if (go) go.disabled = !st.ck.live;
     window.__pb = { ready: st.ck.live && st.cards.some((card, ci) => cardMiss(card, st.called, st.masks, frees.has(ci) ? frees.get(ci) : -1) === 0), live: st.ck.live, celeb: winUntil > Date.now(), called: st.ck.called, round: st.ck.round, pat: st.pat, bots: roster().filter((p) => String(p.id).startsWith('bot-')).length, seats: seats.length, room: roomId };
@@ -511,6 +612,13 @@ export function openBingo(ctx, q = {}) {
   const iv = setInterval(loop, 200);
   const onHash = () => { if (!location.hash.startsWith('#/arcade/bingo')) stop(); };
   addEventListener('hashchange', onHash);
-  function stop() { dead = true; clearInterval(iv); removeEventListener('hashchange', onHash); main.removeEventListener('click', onPow); dropSeat(); window.__pb = null; }
+  function showCallout(n) {
+    const el = main.querySelector('[data-callout]'); if (!el) return;
+    const ball = el.querySelector('[data-callball]');
+    const L = letterOf(n);
+    if (ball) { ball.className = 'pb-orb c' + L; ball.innerHTML = `<small>${L}</small>${n}`; }
+    calloutUntil = Date.now() + 1700; el.hidden = false;
+  }
+  function stop() { dead = true; clearInterval(iv); removeEventListener('hashchange', onHash); main.removeEventListener('click', onPow); hush(); dropSeat(); window.__pb = null; }
   return { destroy: stop };
 }
