@@ -95,7 +95,7 @@ export async function reviewUploadedSong(file, sound) {
 export function mountSoundPicker(host) {
   if (!host) return { get() { return null; }, destroy() {} };
   let picked = null;
-  let tab = 'originals';
+  let tab = 'trending';
   let playing = '';
   const preview = new Audio();
   preview.preload = 'none';
@@ -104,7 +104,8 @@ export function mountSoundPicker(host) {
     <div class="ks-box">
       <p class="ks-title">🎵 Kemy Sounds</p>
       <div class="ks-tabs" role="tablist" aria-label="Kemy Sounds">
-        <button type="button" role="tab" data-tab="originals" aria-selected="true">Originals</button>
+        <button type="button" role="tab" data-tab="trending" aria-selected="true">Trending</button>
+        <button type="button" role="tab" data-tab="originals" aria-selected="false">Originals</button>
         <button type="button" role="tab" data-tab="all" aria-selected="false">All</button>
         ${MOODS.map(([id, name]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="false">${name}</button>`).join('')}
       </div>
@@ -112,7 +113,7 @@ export function mountSoundPicker(host) {
         <input type="search" data-ks-q placeholder="Search songs or artists" aria-label="Search songs or artists" autocomplete="off">
         <select data-ks-artist aria-label="Artist"><option value="">All artists</option></select>
       </div>
-      <p class="ks-sec">Lone Keem Originals</p>
+      <p class="ks-sec">Trending</p>
       <div class="ks-list" role="list"></div>
       <label class="ks-sl">Your sound <input type="range" min="0" max="100" value="100" data-ks-orig aria-label="Your sound volume"></label>
       <label class="ks-sl">Music <input type="range" min="0" max="100" value="80" data-ks-vol aria-label="Music volume"></label>
@@ -132,12 +133,16 @@ export function mountSoundPicker(host) {
   }
   async function paint() {
     host.querySelectorAll('.ks-tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'));
-    const head = tab === 'originals' ? 'Lone Keem Originals' : tab === 'all' ? 'Free Music' : 'Free Music · ' + (MOODS.find(([id]) => id === tab)?.[1] || '');
+    const head = tab === 'originals' ? 'Lone Keem Originals'
+      : tab === 'trending' ? 'Trending'
+      : tab === 'all' ? 'Free Music'
+      : 'Free Music · ' + (MOODS.find(([id]) => id === tab)?.[1] || '');
     let pool = [];
     try {
       const list = await allTracks();
       pool = tab === 'originals' ? list.filter((t) => t.section === 'original')
         : tab === 'all' ? list.filter((t) => t.section === 'free')
+        : tab === 'trending' ? list.filter((t) => t.section === 'free' && Number(t.trending) > 0).sort((a, b) => Number(a.trending) - Number(b.trending) || a.title.localeCompare(b.title))
         : list.filter((t) => t.mood === tab);
     } catch { listEl.innerHTML = '<p class="muted small">The sound list didn’t load. Try again in a moment.</p>'; return; }
     const curArtist = aEl.value;
@@ -317,7 +322,8 @@ export async function creditsPage(root) {
     </section>
     <section class="card pad ks-page">
       <h2>Free Music</h2>
-      <p class="muted small">Only licenses that allow an app to keep and share the music: public domain / CC0, CC BY, and CC BY-SA. CC BY and CC BY-SA need the credit line on the post. CC BY-SA also means a remix of that track stays under the same license. Non-commercial and no-derivatives tracks are not included.</p>
+      <p class="muted small">Only licenses that allow an app to keep and share the music: public domain / CC0, CC BY, and CC BY-SA. CC BY and CC BY-SA need the credit line on the post. CC BY-SA also means a remix of that track stays under the same license. Non-commercial and no-derivatives tracks are not included. Trending is the most-played music that fits a video.</p>
+      <h3>Trending</h3><ul class="ks-credits">${free.filter((t) => Number(t.trending) > 0).sort((a, b) => Number(a.trending) - Number(b.trending)).map(row).join('')}</ul>
       ${MOODS.map(([id, name]) => `<h3>${name}</h3><ul class="ks-credits">${free.filter((t) => t.mood === id).map(row).join('')}</ul>`).join('')}
     </section>`;
 }
