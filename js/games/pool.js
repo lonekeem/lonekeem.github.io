@@ -88,12 +88,14 @@ export function createPool(ctx) {
       const bw = (board && board.clientWidth) || wrap.clientWidth || 320;
       const availW = Math.max(150, bw - sideW - 8);
       const ctrl = host.querySelector('.pl-ctrl'), hint = host.querySelector('#pl-hint');
-      const below = (ctrl ? ctrl.offsetHeight : 80) + (hint ? hint.offsetHeight : 20) + 8;
+      const short = window.innerHeight < 520 && window.innerWidth > window.innerHeight;
+      const below = Math.max(short ? 70 : 0, (ctrl ? ctrl.offsetHeight : 80) + (hint ? hint.offsetHeight : 0) + 4);
       const em = document.querySelector('.g-emotes'), act = document.querySelector('#g-actions');
-      const tail = (em ? em.offsetHeight : 0) + (act ? act.offsetHeight : 0) + 8;
+      const tail = short ? 0 : (em ? em.offsetHeight : 0) + (act ? act.offsetHeight : 0) + 8;
       const top = board ? Math.max(0, board.getBoundingClientRect().top) : 100;
-      const availH = Math.max(220, window.innerHeight - top - below - tail - 28);
-      V.rot = availW > availH * 1.25 && availW > 680;
+      const room = Math.max(90, window.innerHeight - top - below - tail - 8);
+      const availH = short ? room : Math.max(220, room);
+      V.rot = short || (availW > availH * 1.25 && availW > 680);
       const tw = V.rot ? P.H : 1, th = V.rot ? 1 : P.H;
       V.s = Math.max(48, Math.min(availW / (tw + RAIL * 2), availH / (th + RAIL * 2)));
       const cw = Math.round((tw + RAIL * 2) * V.s), ch = Math.round((th + RAIL * 2) * V.s);

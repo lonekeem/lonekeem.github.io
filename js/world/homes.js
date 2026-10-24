@@ -233,7 +233,7 @@ export function attachHomes(api, W, K) {
 .kh-dbar .it{flex:0 0 78px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;min-height:68px;text-align:center;line-height:1.15}
 .kh-dbar .it i{font-style:normal;font-size:20px}.kh-dbar .it em{font-style:normal;font-size:10px;color:#6d28d9}
 .kh-dbar label{display:block;margin:6px 0 2px;font-weight:800}
-body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kh-yard,body.kh-decorating .kd-my,body.kh-decorating .p3-chat,body.kh-decorating .p3-log,body.kh-decorating #ks-bag,body.kh-decorating .p3-top,body.kh-decorating #p3-set,body.kh-decorating .kc-gear{display:none!important}
+body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kh-yard,body.kh-decorating .kd-my,body.kh-decorating .p3-chat,body.kh-decorating .p3-log,body.kh-decorating #ks-bag,body.kh-decorating .p3-top,body.kh-decorating #p3-set,body.kh-decorating #p3-rot,body.kh-decorating .p3-rotip,body.kh-decorating .kc-gear{display:none!important}
 body.kh-decorating .kh-stuck{display:inline-block!important}
 @media (min-width:900px) and (pointer:fine){.kh-dbar{bottom:12px}}
 @media (orientation:landscape) and (max-height:500px){.kh-dec,.kh-yard{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 400px)}.kh-stuck{top:calc(max(8px,env(safe-area-inset-top)) + 4px);right:calc(max(8px,env(safe-area-inset-right)) + 56px)}.kh-dbar{width:min(58vw,460px);left:auto;right:8px;bottom:8px;transform:none}.kh-dbar .kh-body,.kh-dbar.open .kh-body{max-height:28vh}.kh-radio:not(.min):not(.dock){top:calc(max(8px,env(safe-area-inset-top)) + 4px)}}`; document.head.appendChild(css2);
@@ -270,7 +270,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     const w = innerWidth, h = innerHeight;
     // The walking joystick sits in the lower-left corner and the action buttons sit lower-right, even before a thumb shows the knob.
     const pads = [{ l: 0, t: h - 190, r: 145, b: h }, { l: w - 160, t: h - 210, r: w, b: h }];
-    document.querySelectorAll('#ks-act, .kc-joy, .kc-btns, .kh-in, .dh-c, #p3-set, #ks-bag, #ks-map, .kh-home, .p3-top, .p3-joy, .p3-btns, .p3-chat, .p3-log, .gm-fab, .rs-q, .p3-act').forEach((el) => {
+    document.querySelectorAll('#ks-act, .kc-joy, .kc-btns, .kh-in, .dh-c, #p3-set, #p3-rot, #ks-bag, #ks-map, .kh-home, .p3-top, .p3-joy, .p3-btns, .p3-chat, .p3-log, .gm-fab, .rs-q, .p3-act').forEach((el) => {
       if (el.hidden || el.closest('.kh-radio')) return;
       const st = getComputedStyle(el); if (st.display === 'none' || st.visibility === 'hidden') return;
       const r = el.getBoundingClientRect(); if (r.width < 8 || r.height < 8) return;
@@ -319,7 +319,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     const size = 40, m = 8, w = innerWidth, h = innerHeight;
     const right = Math.max(m, w - size - m);
     let below = headerBottom();
-    for (const sel of ['#p3-set', '.rs-q', '.gm-fab', '#ks-map', '.kh-home', '#ks-bag']) {
+    for (const sel of ['#p3-set', '#p3-rot', '.rs-q', '.gm-fab', '#ks-map', '.kh-home', '#ks-bag']) {
       const el = document.querySelector(sel); if (!el || el.hidden) continue;
       const st = getComputedStyle(el); if (st.display === 'none' || st.visibility === 'hidden') continue;
       const r = el.getBoundingClientRect(); if (r.width < 8 || r.height < 8 || r.left < w * 0.45) continue;
