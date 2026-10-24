@@ -1,0 +1,496 @@
+{
+  "about": "Free Music for Kemy Sounds. Trimmed to about 60 seconds, 96 kbps mono. CC0 and CC BY allow these edits.",
+  "sources": [
+    {
+      "name": "FreePD",
+      "license": "CC0 1.0",
+      "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "note": "Public-domain dedication. freepd.com stated every track is CC0 1.0 and may be included in an app. The site closed in 2025; files were taken from the Dec 31, 2024 catalog."
+    },
+    {
+      "name": "Kevin MacLeod (incompetech.com)",
+      "license": "CC BY 4.0",
+      "url": "https://creativecommons.org/licenses/by/4.0/",
+      "note": "Licensed under Creative Commons Attribution 4.0. Credit is required."
+    }
+  ],
+  "tracks": [
+    {
+      "id": "fp-funshine",
+      "title": "Funshine",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Funshine.mp3",
+      "file": "assets/sounds/fp-funshine.mp3"
+    },
+    {
+      "id": "fp-city-sunshine",
+      "title": "City Sunshine",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/City%20Sunshine.mp3",
+      "file": "assets/sounds/fp-city-sunshine.mp3"
+    },
+    {
+      "id": "fp-happy-ukulele",
+      "title": "Happy Whistling Ukulele",
+      "artist": "Rafael Krux",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3",
+      "file": "assets/sounds/fp-happy-ukulele.mp3"
+    },
+    {
+      "id": "fp-pickled-pink",
+      "title": "Pickled Pink",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Pickled%20Pink.mp3",
+      "file": "assets/sounds/fp-pickled-pink.mp3"
+    },
+    {
+      "id": "fp-study-relax",
+      "title": "Study and Relax",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Study%20and%20Relax.mp3",
+      "file": "assets/sounds/fp-study-relax.mp3"
+    },
+    {
+      "id": "fp-river",
+      "title": "River Meditation",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/River%20Meditation.mp3",
+      "file": "assets/sounds/fp-river.mp3"
+    },
+    {
+      "id": "fp-kalimba",
+      "title": "Kalimba Relaxation Music",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Kalimba%20Relaxation%20Music.mp3",
+      "file": "assets/sounds/fp-kalimba.mp3"
+    },
+    {
+      "id": "fp-shining-stars",
+      "title": "Shining Stars",
+      "artist": "Rafael Krux",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Shining%20Stars.mp3",
+      "file": "assets/sounds/fp-shining-stars.mp3"
+    },
+    {
+      "id": "fp-pond",
+      "title": "Pond",
+      "artist": "Rafael Krux",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Pond.mp3",
+      "file": "assets/sounds/fp-pond.mp3"
+    },
+    {
+      "id": "fp-infinite-peace",
+      "title": "Infinite Peace",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Infinite%20Peace.mp3",
+      "file": "assets/sounds/fp-infinite-peace.mp3"
+    },
+    {
+      "id": "fp-new-hero",
+      "title": "New Hero in Town",
+      "artist": "Kevin MacLeod",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/New%20Hero%20in%20Town.mp3",
+      "file": "assets/sounds/fp-new-hero.mp3"
+    },
+    {
+      "id": "fp-funky-loop",
+      "title": "Funky Energy Loop",
+      "artist": "Kevin MacLeod",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Funky%20Energy%20Loop.mp3",
+      "file": "assets/sounds/fp-funky-loop.mp3"
+    },
+    {
+      "id": "fp-city-run",
+      "title": "City Run",
+      "artist": "Rafael Krux",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/City%20Run.mp3",
+      "file": "assets/sounds/fp-city-run.mp3"
+    },
+    {
+      "id": "fp-energizing",
+      "title": "Energizing",
+      "artist": "Kevin MacLeod",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Energizing.mp3",
+      "file": "assets/sounds/fp-energizing.mp3"
+    },
+    {
+      "id": "fp-wizard-circus",
+      "title": "Wizard Circus",
+      "artist": "Kevin MacLeod",
+      "mood": "funny",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Wizard%20Circus.mp3",
+      "file": "assets/sounds/fp-wizard-circus.mp3"
+    },
+    {
+      "id": "fp-bananas",
+      "title": "Going Bananas",
+      "artist": "Bryan Teoh",
+      "mood": "funny",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Going%20Bananas.mp3",
+      "file": "assets/sounds/fp-bananas.mp3"
+    },
+    {
+      "id": "fp-bunny",
+      "title": "My Giant Bunny Friend",
+      "artist": "Bryan Teoh",
+      "mood": "funny",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/My%20Giant%20Bunny%20Friend.mp3",
+      "file": "assets/sounds/fp-bunny.mp3"
+    },
+    {
+      "id": "fp-llama",
+      "title": "Llama in Pajama",
+      "artist": "Rafael Krux",
+      "mood": "funny",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Llama%20in%20Pajama.mp3",
+      "file": "assets/sounds/fp-llama.mp3"
+    },
+    {
+      "id": "fp-spring-chicken",
+      "title": "Spring Chicken",
+      "artist": "Bryan Teoh",
+      "mood": "funny",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Spring%20Chicken.mp3",
+      "file": "assets/sounds/fp-spring-chicken.mp3"
+    },
+    {
+      "id": "fp-entertainer",
+      "title": "The Entertainer",
+      "artist": "Kevin MacLeod",
+      "mood": "funny",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/The%20Entertainer.mp3",
+      "file": "assets/sounds/fp-entertainer.mp3"
+    },
+    {
+      "id": "fp-adventure",
+      "title": "Adventure",
+      "artist": "Rafael Krux",
+      "mood": "adventure",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Adventure.mp3",
+      "file": "assets/sounds/fp-adventure.mp3"
+    },
+    {
+      "id": "fp-heroic",
+      "title": "Heroic Adventure",
+      "artist": "Rafael Krux",
+      "mood": "adventure",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Heroic%20Adventure.mp3",
+      "file": "assets/sounds/fp-heroic.mp3"
+    },
+    {
+      "id": "fp-flight",
+      "title": "Inventing Flight",
+      "artist": "Bryan Teoh",
+      "mood": "adventure",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Inventing%20Flight.mp3",
+      "file": "assets/sounds/fp-flight.mp3"
+    },
+    {
+      "id": "fp-garden",
+      "title": "Magic in the Garden",
+      "artist": "Rafael Krux",
+      "mood": "adventure",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Magic%20in%20the%20Garden.mp3",
+      "file": "assets/sounds/fp-garden.mp3"
+    },
+    {
+      "id": "fp-stunted",
+      "title": "Stunted Adventure",
+      "artist": "Bryan Teoh",
+      "mood": "adventure",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Stunted%20Adventure.mp3",
+      "file": "assets/sounds/fp-stunted.mp3"
+    },
+    {
+      "id": "fp-fright",
+      "title": "Fright Night Twist",
+      "artist": "Bryan Teoh",
+      "mood": "spooky",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Fright%20Night%20Twist.mp3",
+      "file": "assets/sounds/fp-fright.mp3"
+    },
+    {
+      "id": "fp-monsters",
+      "title": "Monsters in Hotel",
+      "artist": "Rafael Krux",
+      "mood": "spooky",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Monsters%20in%20Hotel.mp3",
+      "file": "assets/sounds/fp-monsters.mp3"
+    },
+    {
+      "id": "fp-ghost-town",
+      "title": "Ghost Town",
+      "artist": "Rafael Krux",
+      "mood": "spooky",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Ghost%20Town.mp3",
+      "file": "assets/sounds/fp-ghost-town.mp3"
+    },
+    {
+      "id": "fp-creepy-comedy",
+      "title": "Creepy Comedy",
+      "artist": "Rafael Krux",
+      "mood": "spooky",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Creepy%20Comedy.mp3",
+      "file": "assets/sounds/fp-creepy-comedy.mp3"
+    },
+    {
+      "id": "fp-witch-waltz",
+      "title": "Witch Waltz",
+      "artist": "Kevin MacLeod",
+      "mood": "spooky",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Witch%20Waltz.mp3",
+      "file": "assets/sounds/fp-witch-waltz.mp3"
+    },
+    {
+      "id": "fp-castle",
+      "title": "Night in the Castle",
+      "artist": "Kevin MacLeod",
+      "mood": "spooky",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Night%20in%20the%20Castle.mp3",
+      "file": "assets/sounds/fp-castle.mp3"
+    },
+    {
+      "id": "fp-forest-night",
+      "title": "Forest Night",
+      "artist": "Rafael Krux",
+      "mood": "spooky",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Forest%20Night.mp3",
+      "file": "assets/sounds/fp-forest-night.mp3"
+    },
+    {
+      "id": "km-carefree",
+      "title": "Carefree",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3",
+      "file": "assets/sounds/km-carefree.mp3"
+    },
+    {
+      "id": "km-happy-alley",
+      "title": "Happy Alley",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Happy%20Alley.mp3",
+      "file": "assets/sounds/km-happy-alley.mp3"
+    },
+    {
+      "id": "km-somewhere-sunny",
+      "title": "Somewhere Sunny",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Somewhere%20Sunny.mp3",
+      "file": "assets/sounds/km-somewhere-sunny.mp3"
+    },
+    {
+      "id": "km-monkeys",
+      "title": "Monkeys Spinning Monkeys",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3",
+      "file": "assets/sounds/km-monkeys.mp3"
+    },
+    {
+      "id": "km-easy-lemon",
+      "title": "Easy Lemon",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Easy%20Lemon%2060%20second.mp3",
+      "file": "assets/sounds/km-easy-lemon.mp3"
+    },
+    {
+      "id": "km-wallpaper",
+      "title": "Wallpaper",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wallpaper.mp3",
+      "file": "assets/sounds/km-wallpaper.mp3"
+    },
+    {
+      "id": "km-feather-waltz",
+      "title": "Feather Waltz",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Feather%20Waltz.mp3",
+      "file": "assets/sounds/km-feather-waltz.mp3"
+    },
+    {
+      "id": "km-nu-flute",
+      "title": "Nu Flute",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Nu%20Flute.mp3",
+      "file": "assets/sounds/km-nu-flute.mp3"
+    },
+    {
+      "id": "km-heroic-age",
+      "title": "Heroic Age",
+      "artist": "Kevin MacLeod",
+      "mood": "hype",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Heroic%20Age.mp3",
+      "file": "assets/sounds/km-heroic-age.mp3"
+    },
+    {
+      "id": "km-take-a-chance",
+      "title": "Take a Chance",
+      "artist": "Kevin MacLeod",
+      "mood": "hype",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Take%20a%20Chance.mp3",
+      "file": "assets/sounds/km-take-a-chance.mp3"
+    },
+    {
+      "id": "km-a-mission",
+      "title": "A Mission",
+      "artist": "Kevin MacLeod",
+      "mood": "hype",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/A%20Mission.mp3",
+      "file": "assets/sounds/km-a-mission.mp3"
+    },
+    {
+      "id": "km-sneaky-snitch",
+      "title": "Sneaky Snitch",
+      "artist": "Kevin MacLeod",
+      "mood": "funny",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3",
+      "file": "assets/sounds/km-sneaky-snitch.mp3"
+    },
+    {
+      "id": "km-fluffing-a-duck",
+      "title": "Fluffing a Duck",
+      "artist": "Kevin MacLeod",
+      "mood": "funny",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Fluffing%20a%20Duck.mp3",
+      "file": "assets/sounds/km-fluffing-a-duck.mp3"
+    },
+    {
+      "id": "km-hamster-march",
+      "title": "Hamster March",
+      "artist": "Kevin MacLeod",
+      "mood": "funny",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hamster%20March.mp3",
+      "file": "assets/sounds/km-hamster-march.mp3"
+    },
+    {
+      "id": "km-golly-gee",
+      "title": "Golly Gee",
+      "artist": "Kevin MacLeod",
+      "mood": "funny",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Golly%20Gee.mp3",
+      "file": "assets/sounds/km-golly-gee.mp3"
+    },
+    {
+      "id": "km-call-to-adventure",
+      "title": "Call to Adventure",
+      "artist": "Kevin MacLeod",
+      "mood": "adventure",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Call%20to%20Adventure.mp3",
+      "file": "assets/sounds/km-call-to-adventure.mp3"
+    },
+    {
+      "id": "km-gaslamp",
+      "title": "Gaslamp Funworks",
+      "artist": "Kevin MacLeod",
+      "mood": "adventure",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gaslamp%20Funworks.mp3",
+      "file": "assets/sounds/km-gaslamp.mp3"
+    },
+    {
+      "id": "km-curtain",
+      "title": "The Curtain Rises",
+      "artist": "Kevin MacLeod",
+      "mood": "adventure",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Curtain%20Rises.mp3",
+      "file": "assets/sounds/km-curtain.mp3"
+    },
+    {
+      "id": "km-comfy-mystery",
+      "title": "Comfortable Mystery",
+      "artist": "Kevin MacLeod",
+      "mood": "spooky",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Comfortable%20Mystery%204.mp3",
+      "file": "assets/sounds/km-comfy-mystery.mp3"
+    },
+    {
+      "id": "km-sneaky-adventure",
+      "title": "Sneaky Adventure",
+      "artist": "Kevin MacLeod",
+      "mood": "spooky",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Adventure.mp3",
+      "file": "assets/sounds/km-sneaky-adventure.mp3"
+    },
+    {
+      "id": "km-mystery",
+      "title": "Mystery!",
+      "artist": "Kevin MacLeod",
+      "mood": "spooky",
+      "license": "CC BY 4.0",
+      "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/mystery.mp3",
+      "file": "assets/sounds/km-mystery.mp3"
+    }
+  ]
+}

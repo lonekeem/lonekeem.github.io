@@ -9,6 +9,7 @@ import { createSeries } from './series.js';
 import { stripExif } from './safety.js';
 import { postStamp, postDone } from './spam.js';
 import { guardUpload } from './mediascan.js';
+import { mountSoundPicker, reviewUploadedSong, bindBed, showCredit } from './sounds.js';
 import { faceName, adminNameClass } from './kemy-name.js';
 
 export const GENRES = {
@@ -80,7 +81,8 @@ export function createWorks(ctx) {
     el.className = 'card post wcard'; el.dataset.postId = p.id;
     el.innerHTML = `<div class="post-head">${avatar(p)}<div class="who"><a class="name${adminNameClass(p.authorId) ? ' ' + adminNameClass(p.authorId) : ''}" href="#/u/${esc(p.authorUsername)}">${esc(faceName(p.authorId, p.authorName))}</a>${badge(p.authorId)}
       <div class="handle">shared a ${p.type === 'song' ? 'song' : 'movie'} · ${esc(timeAgo(p.createdAt))}</div></div></div>
-      <div class="wcard-body">${tile(p, { size: 'wide' })}${p.text ? `<p class="wcard-desc">${esc(p.text.slice(0, 160))}${p.text.length > 160 ? '…' : ''}</p>` : ''}</div>`;
+      <div class="wcard-body">${tile(p, { size: 'wide' })}${p.text ? `<p class="wcard-desc">${esc(p.text.slice(0, 160))}${p.text.length > 160 ? '…' : ''}</p>` : ''}${p.sound && p.sound.id ? '<p class="ks-credit" data-ks-credit></p>' : ''}</div>`;
+    if (p.sound && p.sound.id) showCredit(el, p.sound);
     return el;
   }
 
@@ -142,7 +144,7 @@ export function createWorks(ctx) {
         <div class="field" data-src="youtube"><label for="w-yt">YouTube link</label><input id="w-yt" type="text" inputmode="url" placeholder="https://youtube.com/watch?v=…" autocomplete="off"></div>
         <div class="field" data-src="youtube"><label for="w-rt">Runtime (minutes)</label><input id="w-rt" type="number" min="0" max="1440" step="1" placeholder="e.g. ${isSong ? '3' : '12'}"></div>
         ${isSong ? `<div class="field" data-src="mlink"><label for="w-ml">Apple Music or Spotify link</label><input id="w-ml" type="text" inputmode="url" placeholder="https://music.apple.com/… or https://open.spotify.com/…" autocomplete="off"></div>` : ''}
-        <div class="field" data-src="upload"><label for="w-file">${isSong ? 'Audio file' : 'Movie file'}</label><input id="w-file" type="file" accept="${isSong ? 'audio/*,.mp3,.m4a,.aac,.wav,.ogg' : 'video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm'}"><p class="small muted" id="w-fileinfo"></p></div>
+        <div class="field" data-src="upload"><label for="w-file">${isSong ? 'Audio file' : 'Movie file'}</label><input id="w-file" type="file" accept="${isSong ? 'audio/*,.mp3,.m4a,.aac,.wav,.ogg' : 'video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm'}"><p class="small muted" id="w-fileinfo"></p><div class="ks-host" id="w-sounds"></div></div>
         <div class="field"><div class="row"><label for="w-title">Title</label><span class="spacer"></span><span class="small muted counter" id="w-title-n"></span></div><input id="w-title" type="text" maxlength="80" required></div>
         ${isSong ? `<div class="field"><label for="w-artist">Artist name</label><input id="w-artist" type="text" maxlength="50" value="${esc(S.profile.displayName)}"></div>` : ''}
         <div class="field"><label for="w-genre">Genre</label><select id="w-genre">${GENRES[kind].map((g) => `<option>${esc(g)}</option>`).join('')}</select></div>
@@ -168,6 +170,7 @@ export function createWorks(ctx) {
     const src = () => main.querySelector('input[name=src]:checked').value;
     const paintSrc = () => main.querySelectorAll('[data-src]').forEach((e) => (e.hidden = e.dataset.src !== src()));
     main.querySelectorAll('input[name=src]').forEach((r) => (r.onchange = paintSrc)); paintSrc();
+    const soundCtl = mountSoundPicker($('#w-sounds'));
     let fileDur = 0;
     $('#w-file').onchange = async () => {
       const f = $('#w-file').files[0]; const info = $('#w-fileinfo'); fileDur = 0; if (!f) { info.textContent = ''; return; }
@@ -238,7 +241,11 @@ export function createWorks(ctx) {
       try {
         let cover = '', poster = '', mediaUrl = '', mediaType = '';
         if (art) { status.textContent = 'Uploading artwork…'; const r = await upload(art, CLOUDINARY.uploadPreset, 'lks_work_art', prog(0, file ? 0.15 : 0.9)); cover = isSong ? squareUrl(r) : deliveryUrls(r).mediaUrl; if (!isSong) poster = deliveryUrls(r).posterUrl; }
+        const sound = file ? soundCtl.get() : null;
         if (file) {
+          const rev = await reviewUploadedSong(file, sound);
+          if (rev && rev.action === 'cancel') { go.disabled = false; bar.hidden = true; return; }
+          if (rev && rev.action === 'hold') { go.disabled = false; bar.hidden = true; err.textContent = 'This sound needs review before it can be posted.'; return; }
           status.textContent = isSong ? 'Uploading your song…' : 'Uploading your movie…';
           const r = await upload(file, isSong ? (CLOUDINARY.songPreset || 'lks_songs') : CLOUDINARY.uploadPreset, isSong ? 'lks_song' : 'lks_movie', prog(art ? 0.15 : 0, art ? 0.8 : 0.95));
           if (isSong) { mediaUrl = audioUrl(r); mediaType = 'audio'; if (r.duration) runtime = Math.round(r.duration * 10) / 10; }
@@ -255,7 +262,7 @@ export function createWorks(ctx) {
         (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, {
           authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
           type: kind, text: desc.slice(0, 1000), linkUrl: yt ? `https://www.youtube.com/watch?v=${yt}` : '', mediaUrl, mediaType, poster: isSong ? '' : poster,
-          work, ...(pickedCat(main, 'w-cat') ? { cat: pickedCat(main, 'w-cat') } : {}), ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
+          work, ...(sound ? { sound } : {}), ...(pickedCat(main, 'w-cat') ? { cat: pickedCat(main, 'w-cat') } : {}), ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
           createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
         });
         const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
@@ -286,7 +293,7 @@ export function createWorks(ctx) {
     // One sound at a time: a song starting stops the theme music and pauses feed videos; a video/YouTube
     // starting with sound elsewhere pauses the song.
     audio.addEventListener('play', () => window.dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'song' } })));
-    window.addEventListener('kemy:media-play', (e) => { if (e.detail?.source !== 'song' && !audio.paused) audio.pause(); });
+    window.addEventListener('kemy:media-play', (e) => { const s = e.detail?.source; if (s !== 'song' && s !== 'kemy-sound' && !audio.paused) audio.pause(); });
     const listeners = new Set(); const emit = () => listeners.forEach((f) => f());
     function analyser() {
       if (an || !audio.src) return an;
@@ -314,6 +321,7 @@ export function createWorks(ctx) {
     function load(p) {
       cur = p; played = 0; last = null; counted = false;
       audio.src = p.mediaUrl; audio.currentTime = 0;
+      bindBed(audio, p.sound);
       analyser(); ac && ac.resume && ac.resume();
       audio.play().catch(() => {}); media(); paint(); emit();
     }
@@ -325,7 +333,7 @@ export function createWorks(ctx) {
       load(p);
     }
     function next() { if (queue.length < 2) return; idx = (idx + 1) % queue.length; load(queue[idx]); }
-    function close() { audio.pause(); audio.removeAttribute('src'); audio.load(); cur = null; paint(); emit(); }
+    function close() { audio.pause(); bindBed(audio, null); audio.removeAttribute('src'); audio.load(); cur = null; paint(); emit(); }
     audio.addEventListener('timeupdate', () => {
       if (!cur) return;
       bar.querySelector('.mp-prog span').style.transform = `scaleX(${audio.duration ? audio.currentTime / audio.duration : 0})`;
@@ -370,11 +378,13 @@ export function createWorks(ctx) {
           ${isMine(p) || isAdmin() ? '<button class="wact danger" data-a="delete">Delete</button>' : ''}
         </div>
         ${p.text ? `<p class="wdesc">${linkify(esc(p.text))}</p>` : ''}
+        ${p.sound && p.sound.id ? '<p class="ks-credit" data-ks-credit></p>' : ''}
         ${w.aiTools ? `<p class="small muted">Made with: ${esc(w.aiTools)}</p>` : ''}
         ${isSong && w.lyrics ? `<details class="wlyr"><summary>Lyrics</summary><pre>${esc(w.lyrics)}</pre></details>` : ''}
       </div>
       <div class="wmore" hidden><h2>More from ${esc(faceName(p.authorId, p.authorName))}</h2><div class="wrow"></div></div>`;
     slot.appendChild(el);
+    if (p.sound && p.sound.id) showCredit(el, p.sound);
     const q = (s) => el.querySelector(s);
     // views / plays
     if (!isSong) series().episodeBar(p, el).catch(() => {});
