@@ -18,7 +18,11 @@ import { prefsStore as sharedPrefsStore } from './interests.js';
 import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from './autoplay.js';
 import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 import { faceName, adminNameClass } from './kemy-name.js';
-import { bindBed, setBedHear, showCredit } from './sounds.js';
+let soundMod = null, sounds = null;
+function loadSounds() {
+  if (!soundMod) soundMod = import('./sounds.js').then((m) => { sounds = m; return m; }).catch(() => null);
+  return soundMod;
+}
 export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['music', 'Music'], ['trending', 'Trending']];
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
@@ -280,8 +284,7 @@ export function createWatch(ctx) {
       const p = byId.get(sl.dataset.id);
       if (!p || !p.sound || !p.sound.id) return;
       const v = sl.querySelector('video');
-      if (v) bindBed(v, p.sound);
-      showCredit(sl, p.sound);
+      loadSounds().then((m) => { if (!m || !sl.isConnected) return; const v2 = sl.querySelector('video'); if (v2) m.bindBed(v2, p.sound); m.showCredit(sl, p.sound); }).catch(() => {});
     });
     let active = -1, sheetUnsub = null;
 
@@ -294,7 +297,7 @@ export function createWatch(ctx) {
         const n = Number(v.dataset.kemyOrig);
         if (n > 0 && n <= 1) v.volume = n;
       }
-      setBedHear(v, !muted);
+      if (sounds) sounds.setBedHear(v, !muted); else loadSounds().then((m) => { if (m && v.isConnected) m.setBedHear(v, !muted); }).catch(() => {});
     }
     const paintMute = () => {
       muteBtn.innerHTML = muted ? IC.muted : IC.sound;

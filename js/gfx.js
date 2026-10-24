@@ -26,7 +26,21 @@ export function autoTier() { // picks by device: memory, cores, data saver, phon
 export function gfxTier() { const v = gfxSetting(); return v === 'auto' ? autoTier() : v; }
 export const isPhone = () => { const n = navigator; return /iPhone|iPad|iPod|Android|Mobile/i.test(n.userAgent || '') || (n.maxTouchPoints > 1 && Math.min(innerWidth, innerHeight) < 600); };
 // phones: pixel ratio capped at 1.5 (1.0 on Low), smaller shadow maps, shorter draw distance: the iPhone fill-rate budget
-export function gfxPreset() { const q = { tier: gfxTier(), ...PRESETS[gfxTier()] }; if (isPhone()) { q.phone = true; q.dpr = Math.min(q.dpr, q.tier === 'low' ? 1 : 1.5); q.shadowMap = Math.min(q.shadowMap, q.tier === 'ultra' ? 2048 : 1024); q.draw = Math.min(q.draw, q.tier === 'low' ? 140 : 230); q.grass = Math.min(q.grass, 0.45); } return q; }
+export function gfxPreset() {
+  const q = { tier: gfxTier(), ...PRESETS[gfxTier()] };
+  if (isPhone()) {
+    q.phone = true;
+    const hi = q.tier === 'high' || q.tier === 'ultra';
+    // Mid and low phones skip MSAA and the shadow pass. Those two were the frame-time cost.
+    q.dpr = Math.min(q.dpr, q.tier === 'low' ? 1 : hi ? 1.5 : 1.25);
+    q.shadowMap = Math.min(q.shadowMap, q.tier === 'ultra' ? 1024 : hi ? 768 : 512);
+    q.draw = Math.min(q.draw, q.tier === 'low' ? 120 : hi ? 190 : 160);
+    q.grass = Math.min(q.grass, 0.4);
+    q.aa = false;
+    if (!hi) { q.shadows = false; q.post = false; }
+  }
+  return q;
+}
 export const showFps = () => ls(FPSK) === '1';
 export const setShowFps = (on) => { ls(FPSK, on ? '1' : '0'); dispatchEvent(new CustomEvent('kemy:gfx', { detail: 'fps' })); };
 
