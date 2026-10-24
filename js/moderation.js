@@ -380,7 +380,8 @@ export function createModeration(ctx) {
   async function queueTab(body) {
     const snap = await getDocs(query(collection(db, 'heldPosts'), orderBy('createdAt', 'desc'), limit(100)));
     const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    body.innerHTML = `<div id="q-rep"></div>${isAdmin() ? '<div class="card pad" id="q-cfg"><b>🌱 New-account video check</b><p class="muted small" style="margin:3px 0 8px">Videos from accounts under 3 days old, or with fewer than this many live posts, wait here for review first.</p><label class="small" for="q-n">Approved posts needed</label> <input id="q-n" type="number" min="0" max="50" inputmode="numeric" style="width:5em"> <button class="btn btn-sm" id="q-n-save">Save</button> <span class="small muted" id="q-n-msg"></span></div>' : ''}<p class="muted small">Auto-flagged posts (and posts a moderator pulled) are hidden from everyone until you act. The poster sees “Your post is being reviewed”.</p><div id="q-list"></div>`;
+    body.innerHTML = `<div id="q-song"></div><div id="q-rep"></div>${isAdmin() ? '<div class="card pad" id="q-cfg"><b>🌱 New-account video check</b><p class="muted small" style="margin:3px 0 8px">Videos from accounts under 3 days old, or with fewer than this many live posts, wait here for review first.</p><label class="small" for="q-n">Approved posts needed</label> <input id="q-n" type="number" min="0" max="50" inputmode="numeric" style="width:5em"> <button class="btn btn-sm" id="q-n-save">Save</button> <span class="small muted" id="q-n-msg"></span></div>' : ''}<p class="muted small">Auto-flagged posts (and posts a moderator pulled) are hidden from everyone until you act. The poster sees “Your post is being reviewed”.</p><div id="q-list"></div>`;
+    songQueue($('#q-song'));
     reportedPosts($('#q-rep'));
     if (isAdmin()) { const ms = await import('./mediascan.js'); const inp = $('#q-n'); ms.reviewConfig().then((c) => (inp.value = c.minApproved)); $('#q-n-save').onclick = async () => { try { inp.value = await ms.saveReviewConfig(inp.value); $('#q-n-msg').textContent = '✅ Saved'; } catch (er) { $('#q-n-msg').textContent = friendlyError(er); } }; }
     const list = $('#q-list');
@@ -399,6 +400,52 @@ export function createModeration(ctx) {
         else if (a === 'warn') { await deleteDoc(doc(db, 'heldPosts', id)); log('remove', h.authorId, p.authorName, 'held post: ' + (p.text || '').slice(0, 120)); gone(); messageDialog(h.authorId, p.authorName, 'warn', { ref: 'post:' + id, prefill: `We removed your post because it broke the Kemy rules (${h.reason.toLowerCase()}). Please keep Kemy safe and kind. This is a warning.` }); }
         else if (a === 'ban') { if (await banDialog(h.authorId, p.authorName, p.authorUsername)) { await deleteDoc(doc(db, 'heldPosts', id)).catch(() => {}); gone(); } }
         else if (a === 'user') location.hash = '#/mod/users?u=' + h.authorId;
+      } catch (er) { toast(friendlyError(er)); }
+    };
+  }
+  // Published posts the song check couldn't finish, plus "Copyright / not their video" reports.
+  async function songQueue(box) {
+    const snap = await getDocs(query(collection(db, 'songChecks'), where('status', '==', 'open'), limit(40))).catch(() => null);
+    const items = snap ? snap.docs.map((d) => ({ id: d.id, ...d.data() })) : [];
+    if (!items.length) { box.innerHTML = ''; return; }
+    const posts = await Promise.all(items.map((it) => getDoc(doc(db, 'posts', it.postId || '')).then((s) => (s.exists() ? s.data() : null)).catch(() => null)));
+    box.innerHTML = `<h3 class="hub-h3">🎵 Song checks (${items.length})</h3>` + items.map((it, i) => {
+      const p = posts[i] || {};
+      const claim = it.kind === 'claim' ? (it.post || {}) : null;
+      const shown = claim || p;
+      const why = it.kind === 'report' ? '🎵 Copyright / not their video' : it.kind === 'claim' ? (it.note || 'Player says they made this sound') : '⏳ Unchecked — the song check didn’t finish, so it was posted for you to look at';
+      const title = (shown.work && shown.work.title) || '';
+      return `<div class="card pad mod-rep st-open" data-id="${esc(it.id)}"><p style="margin:0 0 4px"><b>Why:</b> ${esc(why)}</p>
+        <p class="small" style="margin:0 0 6px">${esc(shown.authorName || it.authorId || '')}${title ? ' · ' + esc(title) : ''}${shown.text ? ' · ' + esc(String(shown.text).slice(0, 80)) : ''} · <a href="#/post/${esc(it.postId)}">Open post</a></p>
+        <div class="mod-acts"><button class="btn btn-sm" data-s="keep">${it.kind === 'claim' ? '✅ Approve' : '✅ It’s fine'}</button><button class="btn btn-sm btn-danger" data-s="remove">${it.kind === 'claim' ? '🗑️ Reject' : '🗑️ Remove post'}</button></div></div>`;
+    }).join('');
+    box.onclick = async (e) => {
+      const b = e.target.closest('[data-s]'); if (!b) return;
+      const card = b.closest('[data-id]'); const it = items.find((x) => x.id === card.dataset.id); if (!it) return;
+      try {
+        if (b.dataset.s === 'keep') {
+          if (it.kind === 'claim' && it.post) {
+            const bt = writeBatch(db);
+            bt.set(doc(db, 'posts', it.postId), it.post);
+            bt.update(doc(db, 'songChecks', it.id), { status: 'kept' });
+            await bt.commit();
+          } else await updateDoc(doc(db, 'songChecks', it.id), { status: 'kept' });
+          log('restore', it.authorId, '', 'song check kept');
+        }
+        else {
+          if (!confirm(it.kind === 'claim' ? 'Reject this sound? It will not be posted.' : 'Remove this post from Kemy?')) return;
+          const bt = writeBatch(db);
+          bt.update(doc(db, 'songChecks', it.id), { status: 'removed' });
+          const live = await getDoc(doc(db, 'posts', it.postId)).catch(() => null);
+          if (live && live.exists()) bt.delete(doc(db, 'posts', it.postId));
+          await bt.commit();
+          log('remove', it.authorId, '', 'song check removed');
+          const note = it.kind === 'claim' && !(live && live.exists())
+            ? 'Your sound wasn’t approved, so it wasn’t posted.'
+            : 'Your post was reviewed and removed because it didn’t follow the Kemy rules.';
+          notice(it.authorId, note).catch(() => {});
+        }
+        card.remove(); toast('Done');
       } catch (er) { toast(friendlyError(er)); }
     };
   }
@@ -600,11 +647,17 @@ export function createModeration(ctx) {
     b.set(doc(db, 'heldPosts', ref.id), { post: data, reason: f.reason, level: f.level, authorId: data.authorId, createdAt: serverTimestamp() });
     S.lastHeld = ref.id; return f;
   }
+  function reviewWait(quote) {
+    return `<section class="card pad center mod-susp"><div style="font-size:2.6rem" aria-hidden="true">🕒</div><h1 class="page-title">Your post is being reviewed</h1><p>A moderator will look at this before it goes on Kemy. Only you can see this note. If it’s okay, it goes live.</p><blockquote class="mod-quote" style="text-align:left">${esc(quote || '')}</blockquote><div class="btns" style="justify-content:center"><a class="btn btn-sm" href="#/watch">Back to Kemy</a><a class="btn btn-sm btn-ghost" href="guidelines.html">Kemy rules</a></div></section>`;
+  }
   async function heldNotice(id) {
     if (!S.user) return '';
     const s = await getDoc(doc(db, 'heldPosts', id)).catch(() => null);
-    if (!s || !s.exists() || s.data().authorId !== S.user.uid) return '';
-    return `<section class="card pad center mod-susp"><div style="font-size:2.6rem" aria-hidden="true">🕒</div><h1 class="page-title">Your post is being reviewed</h1><p>Kemy’s safety check spotted something it wasn’t sure about, so a moderator will look at your post soon. Only you can see this note. If it’s okay, it goes live.</p><blockquote class="mod-quote" style="text-align:left">${esc(s.data().post.text || '')}</blockquote><div class="btns" style="justify-content:center"><a class="btn btn-sm" href="#/watch">Back to Kemy</a><a class="btn btn-sm btn-ghost" href="guidelines.html">Kemy rules</a></div></section>`;
+    if (s && s.exists() && s.data().authorId === S.user.uid) return reviewWait(s.data().post.text || '');
+    const c = await getDoc(doc(db, 'songChecks', id)).catch(() => null);
+    if (!c || !c.exists() || c.data().kind !== 'claim' || c.data().authorId !== S.user.uid || c.data().status !== 'open') return '';
+    const p = c.data().post || {};
+    return reviewWait((p.work && p.work.title) || p.text || '');
   }
   // ---- user-facing: Kemy Moderators thread + feedback form
   async function supportPage(main) {
