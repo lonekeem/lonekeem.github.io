@@ -15,7 +15,11 @@ import { FX_DEFAULT } from './fx/looks.js';
 import { onDoubleTap } from './tapstar.js';
 import { stripExif, piiOk } from './safety.js';
 import { guardUpload, REVIEW_MSG } from './mediascan.js';
-import { mountSoundPicker, reviewUploadedSong } from './sounds.js';
+let soundMod = null;
+function loadSounds() {
+  if (!soundMod) soundMod = import('./sounds.js').catch(() => null);
+  return soundMod;
+}
 import { openEditor } from './snapedit.js';
 import { WORK_IC, DESC as WORK_DESC } from './works.js';
 
@@ -607,7 +611,8 @@ export function createComposer(ctx) {
       ${panel}
       ${inputsHtml}`, 'cam-preview' + (story ? ' is-story' : ''));
     wireInputs(el);
-    const soundCtl = isVideo && !story ? mountSoundPicker(el.querySelector('#pv-sounds')) : null;
+    const soundStub = { get() { return null; } }; let soundCtl = soundStub;
+    if (isVideo && !story) loadSounds().then((m) => { const host = el.querySelector('#pv-sounds'); if (m && host) soundCtl = m.mountSoundPicker(host) || soundStub; }).catch(() => {});
     const media = el.querySelector('.pv-el');
     if (media && isVideo) {
       media.addEventListener('click', () => (media.paused ? media.play() : media.pause()));
@@ -649,7 +654,7 @@ export function createComposer(ctx) {
           let sound = null;
           if (isVideo && !story && soundCtl) {
             sound = soundCtl.get();
-            const rev = await reviewUploadedSong(file, sound);
+            const snd = await loadSounds(); const rev = snd ? await snd.reviewUploadedSong(file, sound) : null;
             if (rev && rev.action === 'cancel') { busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; return; }
             if (rev && rev.action === 'hold') { busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; err.textContent = 'This sound needs review before it can be posted.'; return; }
           }

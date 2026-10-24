@@ -9,7 +9,11 @@ import { createSeries } from './series.js';
 import { stripExif } from './safety.js';
 import { postStamp, postDone } from './spam.js';
 import { guardUpload } from './mediascan.js';
-import { mountSoundPicker, reviewUploadedSong, bindBed, showCredit } from './sounds.js';
+let soundMod = null;
+function loadSounds() {
+  if (!soundMod) soundMod = import('./sounds.js').catch(() => null);
+  return soundMod;
+}
 import { faceName, adminNameClass } from './kemy-name.js';
 
 export const GENRES = {
@@ -82,7 +86,7 @@ export function createWorks(ctx) {
     el.innerHTML = `<div class="post-head">${avatar(p)}<div class="who"><a class="name${adminNameClass(p.authorId) ? ' ' + adminNameClass(p.authorId) : ''}" href="#/u/${esc(p.authorUsername)}">${esc(faceName(p.authorId, p.authorName))}</a>${badge(p.authorId)}
       <div class="handle">shared a ${p.type === 'song' ? 'song' : 'movie'} · ${esc(timeAgo(p.createdAt))}</div></div></div>
       <div class="wcard-body">${tile(p, { size: 'wide' })}${p.text ? `<p class="wcard-desc">${esc(p.text.slice(0, 160))}${p.text.length > 160 ? '…' : ''}</p>` : ''}${p.sound && p.sound.id ? '<p class="ks-credit" data-ks-credit></p>' : ''}</div>`;
-    if (p.sound && p.sound.id) showCredit(el, p.sound);
+    if (p.sound && p.sound.id) loadSounds().then((m) => { if (m && el.isConnected) m.showCredit(el, p.sound); }).catch(() => {});
     return el;
   }
 
@@ -170,7 +174,8 @@ export function createWorks(ctx) {
     const src = () => main.querySelector('input[name=src]:checked').value;
     const paintSrc = () => main.querySelectorAll('[data-src]').forEach((e) => (e.hidden = e.dataset.src !== src()));
     main.querySelectorAll('input[name=src]').forEach((r) => (r.onchange = paintSrc)); paintSrc();
-    const soundCtl = mountSoundPicker($('#w-sounds'));
+    const soundStub = { get() { return null; } }; let soundCtl = soundStub;
+    loadSounds().then((m) => { const host = document.getElementById('w-sounds'); if (m && host) soundCtl = m.mountSoundPicker(host) || soundStub; }).catch(() => {});
     let fileDur = 0;
     $('#w-file').onchange = async () => {
       const f = $('#w-file').files[0]; const info = $('#w-fileinfo'); fileDur = 0; if (!f) { info.textContent = ''; return; }
@@ -243,7 +248,7 @@ export function createWorks(ctx) {
         if (art) { status.textContent = 'Uploading artwork…'; const r = await upload(art, CLOUDINARY.uploadPreset, 'lks_work_art', prog(0, file ? 0.15 : 0.9)); cover = isSong ? squareUrl(r) : deliveryUrls(r).mediaUrl; if (!isSong) poster = deliveryUrls(r).posterUrl; }
         const sound = file ? soundCtl.get() : null;
         if (file) {
-          const rev = await reviewUploadedSong(file, sound);
+          const snd = await loadSounds(); const rev = snd ? await snd.reviewUploadedSong(file, sound) : null;
           if (rev && rev.action === 'cancel') { go.disabled = false; bar.hidden = true; return; }
           if (rev && rev.action === 'hold') { go.disabled = false; bar.hidden = true; err.textContent = 'This sound needs review before it can be posted.'; return; }
           status.textContent = isSong ? 'Uploading your song…' : 'Uploading your movie…';
@@ -321,7 +326,7 @@ export function createWorks(ctx) {
     function load(p) {
       cur = p; played = 0; last = null; counted = false;
       audio.src = p.mediaUrl; audio.currentTime = 0;
-      bindBed(audio, p.sound);
+      loadSounds().then((m) => { if (m) m.bindBed(audio, p.sound); }).catch(() => {});
       analyser(); ac && ac.resume && ac.resume();
       audio.play().catch(() => {}); media(); paint(); emit();
     }
@@ -333,7 +338,7 @@ export function createWorks(ctx) {
       load(p);
     }
     function next() { if (queue.length < 2) return; idx = (idx + 1) % queue.length; load(queue[idx]); }
-    function close() { audio.pause(); bindBed(audio, null); audio.removeAttribute('src'); audio.load(); cur = null; paint(); emit(); }
+    function close() { audio.pause(); loadSounds().then((m) => { if (m) m.bindBed(audio, null); }).catch(() => {}); audio.removeAttribute('src'); audio.load(); cur = null; paint(); emit(); }
     audio.addEventListener('timeupdate', () => {
       if (!cur) return;
       bar.querySelector('.mp-prog span').style.transform = `scaleX(${audio.duration ? audio.currentTime / audio.duration : 0})`;
@@ -384,7 +389,7 @@ export function createWorks(ctx) {
       </div>
       <div class="wmore" hidden><h2>More from ${esc(faceName(p.authorId, p.authorName))}</h2><div class="wrow"></div></div>`;
     slot.appendChild(el);
-    if (p.sound && p.sound.id) showCredit(el, p.sound);
+    if (p.sound && p.sound.id) loadSounds().then((m) => { if (m && el.isConnected) m.showCredit(el, p.sound); }).catch(() => {});
     const q = (s) => el.querySelector(s);
     // views / plays
     if (!isSong) series().episodeBar(p, el).catch(() => {});

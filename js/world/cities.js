@@ -36,7 +36,7 @@ export const GALLERY = { lx: 22, lz: 0, w: 20, dep: 6.6 };
 export function attachCities(api, W, K) {
   const { THREE, scene, Q, LOW, box } = api; const { put, flush, G, std, rng } = K; const glowMat = K.glowMat;
   const root = new THREE.Group(); root.name = 'kemy-cities'; scene.add(root);
-  const M = { ground: api.terrainMat || std('#fff', { vc: true, r: 1 }), road: std('#fff', { vc: true, r: 0.92 }), wall: std('#fff', { vc: true, r: 0.85 }), roof: std('#fff', { vc: true, r: 0.7 }), trim: std('#fff', { vc: true, r: 0.55 }),
+  const M = { ground: api.terrainMat || std('#fff', { vc: true, r: 1 }), road: std('#fff', { vc: true, r: 0.92 }), mark: std('#fff', { vc: true, r: 0.55, x: { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 } }), wall: std('#fff', { vc: true, r: 0.85 }), roof: std('#fff', { vc: true, r: 0.7 }), trim: std('#fff', { vc: true, r: 0.55 }),
     leaf: std('#fff', { vc: true, r: 0.9 }), glow: glowMat || new THREE.MeshBasicMaterial({ vertexColors: true }), water: new THREE.MeshStandardMaterial({ color: '#3fa7d6', roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.88 }) };
   // water: one plane per river / sea piece (cheap: 2 triangles each). The old sea mesh already covers z < 774 east.
   for (const w of WATER) { const z0 = w.id === 'sea' ? 770 : w.z0, x0 = w.x0, x1 = w.x1, z1 = w.z1; const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0 + 16, z1 - z0 + (w.id === 'sea' ? 30 : 16)), M.water); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, WATER_Y - (w.id === 'sea' ? 0.01 : 0), (z0 + z1) / 2 + (w.id === 'sea' ? 8 : 0)); m.renderOrder = 1; root.add(m); }
@@ -57,11 +57,11 @@ export function attachCities(api, W, K) {
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); const y = bigGround(x, z); p.setY(i, y - 0.06); const nz = Math.sin(x * 0.13) * Math.cos(z * 0.11) * 0.5 + 0.5; col.copy(cA).lerp(cB, nz); const wd = waterD(x, z); if (wd < 10) col.lerp(cS, 1 - Math.max(0, wd) / 10); if (y > FLAT + 4) col.lerp(cR, Math.min(1, (y - FLAT - 4) / 10)); c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; }
       gg.setAttribute('color', new THREE.BufferAttribute(c, 3)); gg.computeVertexNormals(); const m = new THREE.Mesh(gg, M.ground); m.receiveShadow = true; g.add(m); }
     // roads (+ sidewalks on city streets, dashed centre lines, shoulders on highways)
-    const y = FLAT + 0.035; for (const R of P.roads) { const { r, a, b } = R; const len = Math.hypot(b[0] - a[0], b[1] - a[1]), ang = Math.atan2(b[0] - a[0], b[1] - a[1]), cx = (a[0] + b[0]) / 2, cz = (a[1] + b[1]) / 2; const ext = (R.first || R.last) ? r.w : 0.2;
-      put(k + 'road', G.plane, r.hw ? '#3a3c46' : '#41434d', cx, y, cz, ang, r.w, 1, len + ext);
-      if (r.hw) { for (const s of [-1, 1]) put(k + 'road', G.plane, '#f4f4f5', cx + Math.cos(ang) * s * (r.w / 2 - 0.5), y + 0.004, cz - Math.sin(ang) * s * (r.w / 2 - 0.5), ang, 0.16, 1, len); }
+    const y = FLAT + 0.035; for (const R of P.roads) { const { r, a, b } = R; const len = Math.hypot(b[0] - a[0], b[1] - a[1]), ang = Math.atan2(b[0] - a[0], b[1] - a[1]), cx = (a[0] + b[0]) / 2, cz = (a[1] + b[1]) / 2; const ext = (R.first || R.last) ? Math.min(r.w * 0.22, 1.4) : 0.02; const seam = ((r.id && r.id.charCodeAt(r.id.length - 1)) || 0) & 1 ? 0.008 : 0;
+      put(k + 'road', G.plane, r.hw ? '#3a3c46' : '#41434d', cx, y + seam, cz, ang, r.w, 1, len + ext);
+      if (r.hw) { for (const s of [-1, 1]) put(k + 'mark', G.plane, '#f4f4f5', cx + Math.cos(ang) * s * (r.w / 2 - 0.5), y + seam + 0.014, cz - Math.sin(ang) * s * (r.w / 2 - 0.5), ang, 0.16, 1, len); }
       else if (r.w >= 8) for (const s of [-1, 1]) { const ox = Math.cos(ang) * s * (r.w / 2 + 1.3), oz = -Math.sin(ang) * s * (r.w / 2 + 1.3); put(k + 'road', G.box, '#c9c4bb', cx + ox, FLAT + 0.09, cz + oz, ang, 2.6, 0.14, len + ext); }
-      for (let t = 2; t < len - 2; t += r.hw ? 6 : 4) { const q = t / len; put(k + 'road', G.plane, r.hw ? '#ffd84a' : '#f2f2f2', a[0] + (b[0] - a[0]) * q, y + 0.006, a[1] + (b[1] - a[1]) * q, ang, 0.16, 1, r.hw ? 3 : 2); } }
+      for (let t = 2; t < len - 2; t += r.hw ? 6 : 4) { const q = t / len; put(k + 'mark', G.plane, r.hw ? '#ffd84a' : '#f2f2f2', a[0] + (b[0] - a[0]) * q, y + seam + 0.016, a[1] + (b[1] - a[1]) * q, ang, 0.16, 1, r.hw ? 3 : 2); } }
     // bridges: deck, side rails (colliders), pillars down into the water
     for (const B of P.bridges) { const { b, a, c } = B; const len = Math.hypot(c[0] - a[0], c[1] - a[1]), ang = Math.atan2(c[0] - a[0], c[1] - a[1]), cx = (a[0] + c[0]) / 2, cz = (a[1] + c[1]) / 2;
       put(k + 'trim', G.box, '#a8a29e', cx, FLAT - 0.35, cz, ang, b.w + 1.2, 0.7, len); for (const s of [-1, 1]) { const ox = Math.cos(ang) * s * (b.w / 2 + 0.4), oz = -Math.sin(ang) * s * (b.w / 2 + 0.4);
@@ -87,7 +87,7 @@ export function attachCities(api, W, K) {
       for (const s of [-1, 1]) put(k + 'trim', G.box, '#6b4a2f', S.x + s * 2.1 * Math.cos(Math.PI / 4), FLAT + 1, S.z - s * 2.1 * Math.sin(Math.PI / 4), 0, 0.2, 2, 0.2); }
     // countryside trees (seeded per chunk, away from roads, lots and water)
     if (big) { const r = rng(ci * 977 + cj * 131 + 5); const n = LOW ? 8 : 18; for (let i = 0; i < n; i++) { const x = x0 + r() * CH, z = z0 + r() * CH; if (x < BOUNDS.x0 + 6 || z > BOUNDS.z1 || roadD(x, z) < 7 || waterD(x, z) < 6 || lotOf(x, z)) continue; tree(k, x, z, 0.8 + r() * 0.9, r); cols.push({ x0: x - 0.3, x1: x + 0.3, z0: z - 0.3, z1: z + 0.3, top: 99, bot: -99 }); } }
-    for (const [n2, m] of [['road', M.road], ['wall', M.wall], ['roof', M.roof], ['trim', M.trim], ['leaf', M.leaf], ['glow', M.glow]]) flush(k + n2, m, !LOW && n2 !== 'road' && n2 !== 'glow', g);
+    for (const [n2, m] of [['road', M.road], ['mark', M.mark], ['wall', M.wall], ['roof', M.roof], ['trim', M.trim], ['leaf', M.leaf], ['glow', M.glow]]) flush(k + n2, m, !LOW && n2 !== 'road' && n2 !== 'mark' && n2 !== 'glow', g);
     for (const c of cols) box.push(c); root.add(g); chunks.set(key, { g, cols });
     for (const { h } of P.houses) if (h.estate && W.recolorHouse) W.recolorHouse(h.id); }
   function tree(k, x, z, s, r) { const y0 = bigGround(x, z); put(k + 'trim', G.cyl6, '#7c4a2a', x, y0 + 1.1 * s, z, 0, 0.32 * s, 2.2 * s, 0.32 * s); if (r() < 0.5) { put(k + 'leaf', G.cone, ['#2f7d32', '#3f8f3a', '#1f6b3a'][Math.floor(r() * 3)], x, y0 + 3.4 * s, z, 0, 2.6 * s, 3.6 * s, 2.6 * s); }

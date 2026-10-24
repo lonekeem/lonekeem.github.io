@@ -143,7 +143,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   function sitPose(obj, dt) { const m = obj.userData.m; const J = m.userData.J; obj.userData.st = (obj.userData.st || 0) + dt * 60; api.posePal3D(m, { mode: 'idle', t: obj.userData.st, dt60: dt * 60, still: true });
     for (const n of ['Left', 'Right']) { if (J[n + 'UpperLeg']) J[n + 'UpperLeg'].rotation.x = -1.45; if (J[n + 'LowerLeg']) J[n + 'LowerLeg'].rotation.x = 1.35; if (J[n + 'UpperArm']) J[n + 'UpperArm'].rotation.x = -0.9; } }
   // ---------------------------------------------------------------- per frame
-  const camP = new THREE.Vector3(), camL = new THREE.Vector3(); let camInit = false;
+  const camP = new THREE.Vector3(), camL = new THREE.Vector3(), camWant = new THREE.Vector3(); let camInit = false;
   // 🪞 first-person cockpit: rear-view mirror (small render target, refreshed every 3rd frame), head bob + lean into turns, FOV widens with speed
   const CK2 = { t: 0, lean: 0, yaw0: null, n: 0, fov: 72 }; let mirror = null; const rearCam = new THREE.PerspectiveCamera(55, 3.2, 0.3, 260); const fwdV = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0);
   function mirrorOn() { if (mirror || LOW || !api.R) return mirror; const rt = new THREE.WebGLRenderTarget(256, 80); rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.wrapS = THREE.RepeatWrapping; rt.texture.repeat.x = -1; rt.texture.offset.x = 1;
@@ -190,7 +190,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
       // camera
       if (drive || my.state === 'exit') { const fx = Math.sin(rs.yaw), fz = Math.cos(rs.yaw);
         if (camMode === 'pov') cockpitCam(dt, rs, fx, fz);
-        else { mirrorOff(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = new THREE.Vector3(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
+        else { mirrorOff(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = camWant.set(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
           if (!camInit) { camP.copy(want); camInit = true; } else camP.lerp(want, Math.min(1, dt * 5)); camL.set(rs.x + fx * 2, rs.y + 1.0, rs.z + fz * 2); cam.position.copy(camP); if (getCfg().shake && Math.abs(my.V.vf) > 14) { const k = Math.min(1, (Math.abs(my.V.vf) - 14) / 20) * 0.035, t = nowMs / 1000; camP.x += Math.sin(t * 37) * k; camP.y += Math.sin(t * 43 + 1) * k; } cam.position.copy(camP); cam.lookAt(camL); const fv = getCfg().fov + Math.min(8, Math.abs(my.V.vf) * 0.2); if (Math.abs(cam.fov - fv) > 0.3) { cam.fov = fv; cam.updateProjectionMatrix(); } } } }
     else { poseCar(my.m, my.rs, 0, my.V.spin); setDoors(my.m, my.door); FX.update(dt, null); H.blur.style.opacity = 0; }
     publishSync();
@@ -230,7 +230,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     seatP(R.m, sp); me.position.copy(sp); me.rotation.y = R.s.yaw; me.scale.setScalar(0.6); sitPose(me, dt); P.x = R.s.x; P.z = R.s.z; P.y = ground(P.x, P.z);
     const fx = Math.sin(R.s.yaw), fz = Math.cos(R.s.yaw);
     if (ride.cam === 'pov') { me.visible = false; camP.set(sp.x, sp.y + 0.62, sp.z); camL.set(camP.x + fx * 10, camP.y - 0.7, camP.z + fz * 10); cam.position.copy(camP); cam.lookAt(camL); }
-    else { me.visible = true; const dist = ride.cam === 'far' ? 12 : 6.5, h = ride.cam === 'far' ? 3.8 : 2.4; const want = new THREE.Vector3(R.s.x - fx * dist, ground(R.s.x, R.s.z) + h, R.s.z - fz * dist); camP.lerp(want, Math.min(1, dt * 5)); if (camP.distanceTo(want) > 30) camP.copy(want); camL.set(R.s.x + fx * 2, ground(R.s.x, R.s.z) + 1, R.s.z + fz * 2); cam.position.copy(camP); cam.lookAt(camL); }
+    else { me.visible = true; const dist = ride.cam === 'far' ? 12 : 6.5, h = ride.cam === 'far' ? 3.8 : 2.4; const want = camWant.set(R.s.x - fx * dist, ground(R.s.x, R.s.z) + h, R.s.z - fz * dist); camP.lerp(want, Math.min(1, dt * 5)); if (camP.distanceTo(want) > 30) camP.copy(want); camL.set(R.s.x + fx * 2, ground(R.s.x, R.s.z) + 1, R.s.z + fz * 2); cam.position.copy(camP); cam.lookAt(camL); }
     window.__kd = Object.assign(window.__kd || {}, { ride: ride.st, rideCam: ride.cam }); }
   // world hooks
   api.prompt = () => { if (my && my.state === 'parked' && Math.hypot(my.V.x - P.x, my.V.z - P.z) < 3.4) return { id: 'enter', label: '🚗 Enter car' };

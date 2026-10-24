@@ -50,7 +50,12 @@ import { gameName, GAMES } from './games/art.js';
 import { loadDiscover } from './discover.js';
 import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, setMode as setThemeMode, THEME_TITLE } from './theme.js';
 import { page as pageSettingsHub } from './settings-hub.js';
-import { showCredit, creditsPage } from './sounds.js';
+// Sounds load on demand. A missing or broken sounds.js must not stop the rest of Kemy.
+let soundMod = null;
+function loadSounds() {
+  if (!soundMod) soundMod = import('./sounds.js').catch(() => null);
+  return soundMod;
+}
 import { startHelper } from './helper/watch.js';
 import { startMod } from './helper/mod.js';
 // Heavy feature modules load on demand (their route, or idle time after the feed): calls are queued until the
@@ -403,7 +408,7 @@ function postCard(p, { detail = false } = {}) {
       <button class="act saved" data-a="save" aria-pressed="false" aria-label="Save to favorites">${ICON.save}</button>
       ${viewsHtml(p.viewCount, p.id, 'act views')}
     </div>`;
-  if (p.sound && p.sound.id) showCredit(el, p.sound);
+  if (p.sound && p.sound.id) loadSounds().then((m) => { if (m && el.isConnected) m.showCredit(el, p.sound); }).catch(() => {});
   const likeBtn = $('[data-a=like]', el), saveBtn = $('[data-a=save]', el);
   const setLike = (on) => { likeBtn.classList.toggle('on', on); likeBtn.setAttribute('aria-pressed', on); likeBtn.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); };
   const setSave = (on) => { saveBtn.classList.toggle('on', on); saveBtn.setAttribute('aria-pressed', on); saveBtn.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to favorites'); };
@@ -676,7 +681,7 @@ const routes = [
   [/^#\/settings\/parental$/, () => parental.page(main), 'me'],
   [/^#\/settings\/interests$/, (t) => interestsPage({ main, esc, toast, getDoc, doc, db, loadDiscover, stale, token: t }), 'me'],
   [/^#\/music$/, (t) => music.page(t), 'explore'],
-  [/^#\/sounds$/, () => creditsPage(main), 'explore'],
+  [/^#\/sounds$/, () => loadSounds().then((m) => { if (m) return m.creditsPage(main); main.innerHTML = '<div class="empty">Kemy Sounds could not load. The rest of Kemy is fine.</div>'; }).catch(() => { main.innerHTML = '<div class="empty">Kemy Sounds could not load. The rest of Kemy is fine.</div>'; }), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
   [/^#\/members$/, (t) => import('./members.js').then((m) => m.page(main, { stale: () => stale(t), toast, mod })), ''],
@@ -709,6 +714,15 @@ function gameMusicFor(hash) {
   if (/^#\/(games?(\/|\?|$)|park$|street$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
   else hideGameMusic();
 }
+// The rotate button is only for game screens. Leave it unloaded on the feed so a body
+// observer never runs while posts are painting.
+let rotateReady = null;
+function armRotate(hash) {
+  const game = /^#\/(park|street|arcade|games|game)(\/|$|\?)/.test(hash || '');
+  if (!game && !rotateReady) return;
+  if (!rotateReady) rotateReady = import('./rotate.js');
+  rotateReady.then((m) => m.watchGameRotate()).catch(() => {});
+}
 // YouTube posts that can't play here get one moderator report per device (posts are never deleted).
 setYtReporter((postId, yt, why) => {
   if (!S.user) return; const k = 'kemy-yt-rep-' + postId; if (localStorage.getItem(k)) return; localStorage.setItem(k, '1');
@@ -733,6 +747,7 @@ async function route() {
   closeModal();
   // Accept short deep links like app.html#watch/<postId> as well as #/watch/<postId>.
   const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch').replace(/^#game\//, '#/game/');
+  armRotate(hash);
   const token = ++routeToken;
   for (const [re, fn, nav] of routes) {
     const m = hash.match(re);
