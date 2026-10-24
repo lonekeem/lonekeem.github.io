@@ -189,14 +189,30 @@ function sync() {
   placeHint();
 }
 
-let watching = false;
+let armed = false;
+let observer = null;
+let raf = 0;
+function kick() {
+  // Off a game screen the button is gone and the observer is disconnected, so feed
+  // updates do not schedule rotate work.
+  if (!onGame()) {
+    if (observer) { observer.disconnect(); observer = null; }
+    cancelAnimationFrame(raf);
+    sync();
+    return;
+  }
+  if (!observer && document.body) {
+    observer = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(sync); });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(sync);
+}
 export function watchGameRotate() {
-  if (watching || !document.body) { sync(); return; }
-  watching = true;
-  let raf = 0;
-  const kick = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(sync); };
-  new MutationObserver(kick).observe(document.body, { childList: true, subtree: true });
-  window.addEventListener('hashchange', kick);
-  window.addEventListener('resize', kick);
+  if (!armed) {
+    armed = true;
+    window.addEventListener('hashchange', kick);
+    window.addEventListener('resize', kick);
+  }
   kick();
 }

@@ -9,7 +9,6 @@ import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { KEMY_NAME, reservedKemy, noteAdminUid, rememberKemy, isAdminUid, faceName, adminNameClass, ownerBadgeHtml } from './kemy-name.js';
 import { mountHeaderChip, gameChip } from './wallet-chip.js';
 import { mountGameMusic, hideGameMusic } from './gamemusic.js';
-import { watchGameRotate } from './rotate.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
@@ -710,6 +709,15 @@ function gameMusicFor(hash) {
   if (/^#\/(games?(\/|\?|$)|park$|street$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
   else hideGameMusic();
 }
+// The rotate button is only for game screens. Leave it unloaded on the feed so a body
+// observer never runs while posts are painting.
+let rotateReady = null;
+function armRotate(hash) {
+  const game = /^#\/(park|street|arcade|games|game)(\/|$|\?)/.test(hash || '');
+  if (!game && !rotateReady) return;
+  if (!rotateReady) rotateReady = import('./rotate.js');
+  rotateReady.then((m) => m.watchGameRotate()).catch(() => {});
+}
 // YouTube posts that can't play here get one moderator report per device (posts are never deleted).
 setYtReporter((postId, yt, why) => {
   if (!S.user) return; const k = 'kemy-yt-rep-' + postId; if (localStorage.getItem(k)) return; localStorage.setItem(k, '1');
@@ -734,6 +742,7 @@ async function route() {
   closeModal();
   // Accept short deep links like app.html#watch/<postId> as well as #/watch/<postId>.
   const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch').replace(/^#game\//, '#/game/');
+  armRotate(hash);
   const token = ++routeToken;
   for (const [re, fn, nav] of routes) {
     const m = hash.match(re);
@@ -764,7 +773,6 @@ async function route() {
 }
 initInterests({ S, db, fs: { doc, getDoc, setDoc, serverTimestamp } });
 window.addEventListener('hashchange', route);
-watchGameRotate();
 initThemeMusic();
 // Search icons: focus a throwaway input inside the tap so phones (iOS) open the keyboard,
 // then the search page moves focus to the real box.
