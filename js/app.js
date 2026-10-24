@@ -50,6 +50,7 @@ import { gameName, GAMES } from './games/art.js';
 import { loadDiscover } from './discover.js';
 import { initThemeMusic, playIntro, play as playTheme, stop as stopTheme, isPlaying as themePlaying, setMode as setThemeMode, THEME_TITLE } from './theme.js';
 import { page as pageSettingsHub } from './settings-hub.js';
+import { showCredit, creditsPage } from './sounds.js';
 import { startHelper } from './helper/watch.js';
 import { startMod } from './helper/mod.js';
 // Heavy feature modules load on demand (their route, or idle time after the feed): calls are queued until the
@@ -395,12 +396,14 @@ function postCard(p, { detail = false } = {}) {
     </div>
     ${p.text ? `<p class="post-text">${linkify(esc(p.text))}</p>` : ''}
     ${mediaHtml(p)}
+    ${p.sound && p.sound.id ? '<p class="ks-credit" data-ks-credit></p>' : ''}
     <div class="actions">
       <button class="act like" data-a="like" aria-pressed="false" aria-label="Give a star">${ICON.heart}<span class="n">${Number(p.likeCount) || 0}</span></button>
       <a class="act" href="#/post/${esc(p.id)}" aria-label="Comments">${ICON.comment}<span>${Number(p.commentCount) || 0}</span></a>
       <button class="act saved" data-a="save" aria-pressed="false" aria-label="Save to favorites">${ICON.save}</button>
       ${viewsHtml(p.viewCount, p.id, 'act views')}
     </div>`;
+  if (p.sound && p.sound.id) showCredit(el, p.sound);
   const likeBtn = $('[data-a=like]', el), saveBtn = $('[data-a=save]', el);
   const setLike = (on) => { likeBtn.classList.toggle('on', on); likeBtn.setAttribute('aria-pressed', on); likeBtn.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); };
   const setSave = (on) => { saveBtn.classList.toggle('on', on); saveBtn.setAttribute('aria-pressed', on); saveBtn.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to favorites'); };
@@ -673,6 +676,7 @@ const routes = [
   [/^#\/settings\/parental$/, () => parental.page(main), 'me'],
   [/^#\/settings\/interests$/, (t) => interestsPage({ main, esc, toast, getDoc, doc, db, loadDiscover, stale, token: t }), 'me'],
   [/^#\/music$/, (t) => music.page(t), 'explore'],
+  [/^#\/sounds$/, () => creditsPage(main), 'explore'],
   [/^#\/notifications(?:\/(studio))?$/, pageNotifications, ''],
   [/^#\/admin$/, pageAdmin, ''],
   [/^#\/members$/, (t) => import('./members.js').then((m) => m.page(main, { stale: () => stale(t), toast, mod })), ''],
@@ -973,7 +977,7 @@ function textComposeForm(slot, open) {
 }
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
-async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
+async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound = null }) {
   if (!asStudio && !safety.canPostNow()) throw Object.assign(new Error('Posting photos and videos is off for this account.'), { code: 'kemy/young' });
   if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Slow down a bit 💜 Try posting again in a moment.'), { code: 'kemy/spam' });
   if (caption) safety.scanAge(caption, 'post');
@@ -988,7 +992,7 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '' }) {
     type: 'media', text: caption.slice(0, LIMITS.captionMax), linkUrl: '',
     mediaUrl: urls.mediaUrl, mediaType: urls.mediaType, poster: urls.posterUrl, posterUrl: urls.posterUrl,
     width: n(upload.width || info.width, 20000), height: n(upload.height || info.height, 20000), duration,
-    cloudinaryPublicId: String(upload.public_id).slice(0, 255), ...(cat ? { cat } : {}),
+    cloudinaryPublicId: String(upload.public_id).slice(0, 255), ...(cat ? { cat } : {}), ...(sound ? { sound } : {}),
     ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
   }, takeHold());

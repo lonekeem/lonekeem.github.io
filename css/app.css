@@ -1887,3 +1887,30 @@ button.nm-back { background: none; border: 0; padding: 0; font: inherit; cursor:
 #nm-end { height: 1px; }
 
 .bottom-nav a { font-size: .66rem; }
+
+/* Kemy Sounds picker + credit line */
+.ks-box { margin: 8px 0 12px; padding: 10px; border: 1px solid var(--border); border-radius: 14px; background: rgba(138,43,226,.08); }
+.ks-title { margin: 0 0 8px; font-weight: 700; }
+.ks-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.ks-tabs button { flex: 0 0 auto; min-height: 36px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); }
+.ks-tabs button[aria-selected="true"] { background: var(--purple); border-color: transparent; color: #fff; }
+.ks-find { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.ks-find input, .ks-find select { width: 100%; min-height: 40px; border-radius: 12px; border: 1px solid var(--border); background: #120c1c; color: var(--text); padding: 6px 10px; }
+.ks-sec { margin: 6px 0; font-size: .82rem; color: var(--muted); }
+.ks-list { max-height: 220px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.ks-row { display: flex; gap: 8px; align-items: center; }
+.ks-prev { flex: 1; display: flex; gap: 8px; align-items: center; min-height: 44px; text-align: left; border: 0; background: rgba(255,255,255,.04); border-radius: 12px; padding: 6px 8px; }
+.ks-row.picked .ks-prev { outline: 2px solid var(--purple-light); }
+.ks-meta { display: flex; flex-direction: column; line-height: 1.2; }
+.ks-meta small { color: var(--muted); }
+.ks-use { min-height: 36px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; }
+.ks-row.picked .ks-use { background: var(--purple); border-color: transparent; color: #fff; }
+.ks-sl { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: .85rem; }
+.ks-sl input { flex: 1; }
+.ks-status { margin: 4px 0; }
+.ks-credits-link { font-size: .85rem; }
+.ks-credit { margin: 6px 0 0; font-size: .8rem; color: var(--muted); }
+.vmeta .ks-credit { color: #fff; text-shadow: 0 1px 2px #000; }
+.ks-page h2, .ks-page h3 { margin: 12px 0 6px; }
+.ks-credits { margin: 0; padding-left: 18px; }
+.ks-credits li { margin: 0 0 8px; }
