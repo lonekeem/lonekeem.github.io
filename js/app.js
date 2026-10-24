@@ -714,6 +714,15 @@ function gameMusicFor(hash) {
   if (/^#\/(games?(\/|\?|$)|park$|street$)/.test(hash)) mountGameMusic({ kemySongs: kemySongsForGames }).catch(() => {});
   else hideGameMusic();
 }
+// The rotate button is only for game screens. Leave it unloaded on the feed so a body
+// observer never runs while posts are painting.
+let rotateReady = null;
+function armRotate(hash) {
+  const game = /^#\/(park|street|arcade|games|game)(\/|$|\?)/.test(hash || '');
+  if (!game && !rotateReady) return;
+  if (!rotateReady) rotateReady = import('./rotate.js');
+  rotateReady.then((m) => m.watchGameRotate()).catch(() => {});
+}
 // YouTube posts that can't play here get one moderator report per device (posts are never deleted).
 setYtReporter((postId, yt, why) => {
   if (!S.user) return; const k = 'kemy-yt-rep-' + postId; if (localStorage.getItem(k)) return; localStorage.setItem(k, '1');
@@ -738,6 +747,7 @@ async function route() {
   closeModal();
   // Accept short deep links like app.html#watch/<postId> as well as #/watch/<postId>.
   const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch').replace(/^#game\//, '#/game/');
+  armRotate(hash);
   const token = ++routeToken;
   for (const [re, fn, nav] of routes) {
     const m = hash.match(re);
