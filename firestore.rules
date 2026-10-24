@@ -721,7 +721,21 @@ service cloud.firestore {
       function reportOkChange() {
         return isMod() && changed().hasOnly(['reportOk']) && request.resource.data.reportOk == resource.data.get('reportCount', 0);
       }
-      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange() || catChange() || shareChange() || reportChange() || reportOkChange()));
+      // Reposts: the counter lives on the original post. ±1 only, in the same batch as creating
+      // or deleting your own reposts/{you_postId} doc. Nothing else on the post may change.
+      function repostDoc(id) { return /databases/$(database)/documents/reposts/$(id); }
+      function repostChange() {
+        let rp = repostDoc(me() + '_' + postId);
+        let n = request.resource.data.get('repostCount', 0);
+        let o = resource.data.get('repostCount', 0);
+        return changed().hasOnly(['repostCount'])
+          && n is int && n >= 0
+          && ((n == o + 1 && !exists(rp) && existsAfter(rp)
+               && getAfter(rp).data.originalId == postId && getAfter(rp).data.uid == me())
+            || (n == o - 1 && exists(rp) && !existsAfter(rp)
+               && get(rp).data.uid == me() && get(rp).data.originalId == postId));
+      }
+      allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange() || catChange() || shareChange() || reportChange() || reportOkChange() || repostChange()));
       allow delete: if signedIn() && (resource.data.authorId == me() || isMod());
 
       match /flags/{flaggerId} {
@@ -888,6 +902,33 @@ service cloud.firestore {
           allow delete: if signedIn() && (!existsAfter(cmt()) || !existsAfter(postPath()));
         }
       }
+    }
+
+    // A repost is a pointer at an existing post (reposts/{uid}_{postId}). It does not copy
+    // media. Only that signed-in user can create or delete it, and only together with ±1
+    // on the original post's repostCount. No edits. If the original post is already gone,
+    // the leftover pointer can be deleted so it disappears with the post.
+    match /reposts/{repostId} {
+      function orig() { return /databases/$(database)/documents/posts/$(request.resource.data.originalId); }
+      function origNow() { return /databases/$(database)/documents/posts/$(resource.data.originalId); }
+      allow read: if true;
+      allow update: if false;
+      allow create: if signedIn() && notBanned()
+        && repostId == me() + '_' + request.resource.data.originalId
+        && request.resource.data.keys().hasOnly(['uid', 'username', 'originalId', 'originalUsername', 'createdAt'])
+        && request.resource.data.uid == me()
+        && request.resource.data.username == get(userPath(me())).data.username
+        && request.resource.data.originalId is string
+        && request.resource.data.originalId.matches('^[A-Za-z0-9_-]{1,120}$')
+        && request.resource.data.createdAt == request.time
+        && exists(orig())
+        && get(orig()).data.get('type', '') != 'repost'
+        && get(orig()).data.authorUsername == request.resource.data.originalUsername
+        && getAfter(orig()).data.get('repostCount', 0) == get(orig()).data.get('repostCount', 0) + 1;
+      allow delete: if signedIn() && resource.data.uid == me()
+        && exists(origNow())
+        && getAfter(origNow()).data.get('repostCount', 0) == get(origNow()).data.get('repostCount', 0) - 1;
+      allow delete: if signedIn() && !exists(origNow());
     }
 
     // Collection-group lookups used by account deletion: your comments anywhere, and the
