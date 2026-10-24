@@ -716,7 +716,7 @@ setYtReporter((postId, yt, why) => {
 });
 try { startAutoplayAll(); } catch (e) { console.warn('autoplay', e); }
 // Game loading screen name for a route ('' = not a game start).
-const ARCADE_NAMES = { zombie: 'Pal Zombie Survival', show: 'the Kemy Challenge Show' };
+const ARCADE_NAMES = { zombie: 'Pal Zombie Survival', show: 'the Kemy Challenge Show', bingo: 'Pal Bingo' };
 function gameLoadName(hash) {
   if (/^#\/park$/.test(hash)) return 'Pal Park';
   if (/^#\/street$/.test(hash)) return 'Kemy Street';

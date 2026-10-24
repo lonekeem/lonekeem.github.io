@@ -6,7 +6,8 @@ export function registerMinigame(g) { if (!MINIGAMES.some((x) => x.id === g.id))
 export const BOOTHS = [ // park coordinates (2D park world px; 3D park: x/40, y/40), near the plaza
   { id: 'zombie', x: 1600, y: 1560, label: '🧟 Zombie Survival' },
   { id: 'armory', x: 1760, y: 1560, label: '🛡️ Zombie Armory' },
-  { id: 'show', x: 1440, y: 1560, label: '🎪 Challenge Show' }
+  { id: 'show', x: 1440, y: 1560, label: '🎪 Challenge Show' },
+  { id: 'bingo', x: 1280, y: 1560, label: '🎱 Pal Bingo' }
 ];
 registerMinigame({ id: 'zombie', name: 'Pal Zombie Survival', emoji: '🧟', color: '#3d2a7a', tag: '3D · Action · Solo or 2-4 player co-op',
   desc: 'Play as your own Pal and splat waves of goofy zombies with goo, foam, bubbles and a pillow hammer. Earn 💎 Diamonds!',
@@ -17,6 +18,9 @@ registerMinigame({ id: 'show', name: 'Kemy Challenge Show', emoji: '🎪', color
 registerMinigame({ id: 'armory', name: 'Zombie Armory', emoji: '🛡️', color: '#5b3a1e', tag: 'Shop', desc: 'Weapons, upgrades and armor for Zombie Survival. Pay with 💎 Diamonds or ★ Star Coins.',
   open: async (ctx) => { const m = await import('./armory.js'); return m.createArmory(ctx).page(ctx.main); } });
 registerMinigame({ id: 'palgames', name: 'Pal Games', emoji: '🐾', color: '#2a6a4a', tag: 'Race · Bubbles · Stars · Dance', desc: 'The classic Pal mini-games (vs other players or a bot).', href: '#/games/pals' });
+registerMinigame({ id: 'bingo', name: 'Pal Bingo', emoji: '🎱', color: '#4a2d86', tag: '75-ball · up to 20 pals · or vs bots',
+  desc: 'A cozy bingo hall. Bring your Pal, daub a card, and win ⭐ prizes — never a bet, never real money.',
+  open: async (ctx, q) => { const m = await import('../bingo/bingo.js'); return m.openBingo(ctx, q || {}); } });
 export function createArcade(ctx) {
   const { main, esc, requireAuth } = ctx;
   function hub() {

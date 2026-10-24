@@ -400,9 +400,27 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })), paintHouse: (id, ext) => paintHouse(id, ext) };
   const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, loopAt, move: (m) => m, driving: () => false };
+  const HALL = { x: 40, z: 248, door: [40, 255.2] };
+  { const gy = ground(HALL.x, HALL.z);
+    const bx = (color, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(G.box, std(color, { r: 0.72 })); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = !LOW; m.receiveShadow = true; root.add(m); return m; };
+    bx('#f6e7c8', HALL.x, gy + 2, HALL.z, 12, 4, 8);
+    bx('#5b3a7a', HALL.x, gy + 4.15, HALL.z, 13, 0.45, 9);
+    bx('#ffd34d', HALL.x, gy + 4.7, HALL.z, 1.2, 1.2, 1.2);
+    bx('#7ec8ff', HALL.x - 3.2, gy + 2.45, HALL.z + 4.02, 1.5, 1.4, 0.12);
+    bx('#7ec8ff', HALL.x + 3.2, gy + 2.45, HALL.z + 4.02, 1.5, 1.4, 0.12);
+    bx('#6b3a1e', HALL.x, gy + 1.15, HALL.z + 4.06, 1.7, 2.2, 0.16);
+    bx('#d8c4ef', HALL.x, gy + 0.08, HALL.z + 6.4, 3.4, 0.12, 4.2);
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const g2 = cv.getContext('2d'); g2.fillStyle = '#2b1d55'; g2.fillRect(0, 0, 256, 64); g2.fillStyle = '#ffd34d'; g2.font = '700 28px sans-serif'; g2.textAlign = 'center'; g2.textBaseline = 'middle'; g2.fillText('PAL BINGO', 128, 34);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.05), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) })); sign.position.set(HALL.x, gy + 3.5, HALL.z + 4.08); root.add(sign);
+    box.push({ x0: HALL.x - 6, x1: HALL.x + 6, z0: HALL.z - 4, z1: HALL.z + 4, top: gy + 4.4, bot: gy });
+  }
+  const prevBingoAct = api.onAction; api.onAction = (a) => { if (a === 'bingo') location.hash = '#/arcade/bingo'; else if (prevBingoAct) prevBingoAct(a); };
   const D = attachDrive(api, W); W.drive = D;
   const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
+  const prevLm = W.landmarks; W.landmarks = () => (prevLm ? prevLm() : []).concat([{ name: '🎱 Bingo Hall', x: HALL.x, z: HALL.z, gx: HALL.x, gz: HALL.door[1] }]);
+  const prevHallPrompt = api.prompt; api.prompt = () => { const p0 = prevHallPrompt && prevHallPrompt(); if (p0) return p0; if (Math.hypot(P.x - HALL.door[0], P.z - HALL.door[1]) < 3.2) return { id: 'bingo', label: '🎱 Enter Bingo Hall' }; return null; };
+  const prevLab = W.mapLabels; W.mapLabels = (g, mx, mz) => { if (prevLab) prevLab(g, mx, mz); g.fillStyle = '#ffd34d'; g.font = 'bold 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('🎱 Bingo', mx(HALL.x), mz(HALL.z)); };
   const Rs = attachRespawn(api, W);
   const Kh = attachHelper(api, W);
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat, tag: (t) => { ptag = t; }, forget: (group) => { const meshes = []; group.traverse((o) => { if (o.isMesh) meshes.push(o); }); forgetTagged(tagged, meshes); } }); const Mp = attachMap(api, W);
