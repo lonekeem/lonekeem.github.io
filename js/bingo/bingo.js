@@ -8,7 +8,7 @@ import { sfx } from '../games/sfx.js';
 import { watchGameRotate } from '../rotate.js';
 import {
   BOTS, LUCKY_BALLS, PATTERN_NAME, ballsFor, bingoCall, cardFor, cardMiss, cardSlots, claimOk, dayKey, letterOf,
-  levelOf, luckyRound, markedWin, masksFor, mix, patternFor, roundAt, roundSeed, weekId
+  levelOf, luckyRound, markedWin, masksFor, patternFor, roundAt, roundSeed, weekId
 } from './logic.js';
 
 const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b1d55;font-family:Inter,system-ui,sans-serif}
@@ -210,7 +210,7 @@ export function openBingo(ctx, q = {}) {
         if (await freshCount(id) < 20) { listen(id); return; }
       }
       toast('Public halls are full. Try a private room with friends.');
-    } catch (e) { toast(friendlyError ? friendlyError(e) : 'Could not open the hall'); }
+    } catch (e) { console.warn('bingo room', e && (e.code || e.message)); toast(friendlyError ? friendlyError(e) : 'Could not open the hall'); }
   }
   async function makePrivate() {
     const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let id = '';
@@ -382,7 +382,7 @@ export function openBingo(ctx, q = {}) {
     doubleOn = false;
     if (paidRound !== st.ck.round) { paidRound = st.ck.round; prize(stars, earlier ? 'for a bingo' : 'for winning the round'); prog.xp += 20; ch().rounds += 1; if (st.pat === 'corners') ch().corners += 1; stickerPat(st.pat); persist(); grantCh(); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 12 } })); import('../leaderboard.js').then((m) => m.recordScore('bingo', { r: earlier ? 'l' : 'w', pts: stars })).catch(() => {}); }
     winText = earlier ? 'You got BINGO too!' : (lucky ? 'Lucky Star win!' : 'You won this round!');
-    winUntil = Date.now() + 4200; sfx.play('win');
+    winUntil = Date.now() + 8000; sfx.play('win');
   }
   function botBingo(st) {
     const humans = seats.filter((s) => Date.now() - s.at < FRESH).length || 1;
@@ -408,7 +408,7 @@ export function openBingo(ctx, q = {}) {
     host.querySelectorAll('.pb-card').forEach((cardEl) => {
       const ci = +cardEl.dataset.ci; const card = st.cards[ci]; const free = frees.has(ci) ? frees.get(ci) : -1;
       const miss = cardMiss(card, st.called, st.masks, free);
-      cardEl.classList.toggle('one', miss === 1 && st.ck.live); cardEl.classList.toggle('win', miss === 0);
+      cardEl.classList.toggle('one', miss === 1 && st.ck.live); cardEl.classList.toggle('win', miss === 0 && st.ck.live);
       cardEl.querySelectorAll('.pb-cell').forEach((cell, k) => {
         const on = k === free || (k !== 12 && daubed.has(card[k]));
         const was = cell.classList.contains('got');
@@ -467,7 +467,8 @@ export function openBingo(ctx, q = {}) {
     const win = main.querySelector('[data-win]');
     if (win) { win.hidden = winUntil <= Date.now(); const t = win.querySelector('[data-wint]'); if (t) t.textContent = winText; if (!win.hidden && !win.dataset.fx) { win.dataset.fx = '1'; for (let i = 0; i < 14; i++) { const s = document.createElement('span'); s.textContent = i % 2 ? '⭐' : '🎱'; s.style.left = (10 + Math.random() * 80) + '%'; s.style.top = (30 + Math.random() * 30) + '%'; win.appendChild(s); } } if (win.hidden) delete win.dataset.fx; }
     breakNote();
-    window.__pb = { ready: st.cards.some((card, ci) => cardMiss(card, st.called, st.masks, frees.has(ci) ? frees.get(ci) : -1) === 0), celeb: winUntil > Date.now(), called: st.ck.called, round: st.ck.round, pat: st.pat, bots: roster().filter((p) => String(p.id).startsWith('bot-')).length, seats: seats.length, room: roomId };
+    const go = main.querySelector('[data-bingo]'); if (go) go.disabled = !st.ck.live;
+    window.__pb = { ready: st.ck.live && st.cards.some((card, ci) => cardMiss(card, st.called, st.masks, frees.has(ci) ? frees.get(ci) : -1) === 0), live: st.ck.live, celeb: winUntil > Date.now(), called: st.ck.called, round: st.ck.round, pat: st.pat, bots: roster().filter((p) => String(p.id).startsWith('bot-')).length, seats: seats.length, room: roomId };
   }
   function breakNote() {
     const el = main.querySelector('[data-break]'); if (!el) return;
