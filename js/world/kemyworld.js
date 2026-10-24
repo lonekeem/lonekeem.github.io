@@ -420,9 +420,9 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const D = attachDrive(api, W); W.drive = D;
   const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
-  const prevLm = W.landmarks; W.landmarks = () => (prevLm ? prevLm() : []).concat([{ name: '🎱 Bingo Hall', x: HALL.x, z: HALL.z, gx: HALL.x, gz: HALL.door[1] }]);
-  const prevHallPrompt = api.prompt; api.prompt = () => { const p0 = prevHallPrompt && prevHallPrompt(); if (p0) return p0; if (Math.hypot(P.x - HALL.door[0], P.z - HALL.door[1]) < 3.2) return { id: 'bingo', label: '🎱 Enter Bingo Hall' }; return null; };
-  const prevLab = W.mapLabels; W.mapLabels = (g, mx, mz) => { if (prevLab) prevLab(g, mx, mz); g.fillStyle = '#ffd34d'; g.font = 'bold 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('🎱 Bingo', mx(HALL.x), mz(HALL.z)); };
+  const prevLm = W.landmarks; W.landmarks = () => (prevLm ? prevLm() : []).concat([{ name: '⭐ Bingo Hall', x: HALL.x, z: HALL.z, gx: HALL.x, gz: HALL.door[1] }]);
+  const prevHallPrompt = api.prompt; api.prompt = () => { const p0 = prevHallPrompt && prevHallPrompt(); if (p0) return p0; if (Math.hypot(P.x - HALL.door[0], P.z - HALL.door[1]) < 3.2) return { id: 'bingo', label: '⭐ Enter Bingo Hall' }; return null; };
+  const prevLab = W.mapLabels; W.mapLabels = (g, mx, mz) => { if (prevLab) prevLab(g, mx, mz); g.fillStyle = '#ffd34d'; g.font = 'bold 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('⭐ Bingo', mx(HALL.x), mz(HALL.z)); };
   const Rs = attachRespawn(api, W);
   const Kh = attachHelper(api, W);
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat, tag: (t) => { ptag = t; }, forget: (group) => { const meshes = []; group.traverse((o) => { if (o.isMesh) meshes.push(o); }); forgetTagged(tagged, meshes); } }); const Mp = attachMap(api, W);

@@ -21,7 +21,7 @@ export function createGames(ctx) {
   const { S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale } = ctx;
   bindProfiles(ctx.getProfile);
   if (!document.getElementById('games-css')) {
-    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=3'; document.head.appendChild(l);
+    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=4'; document.head.appendChild(l);
   }
   const net = createNet({ db, S });
   const signedIn = () => !!(S.user && S.profile);
@@ -121,7 +121,7 @@ export function createGames(ctx) {
       <form class="g-code" id="g-code"><label for="g-code-in" class="sr-only">Room code</label><input id="g-code-in" maxlength="6" placeholder="Have a room code?" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Join</button></form>
       <a class="g-palgames" href="#/games/pals"><span>🐾</span><div><b>Pal Games</b><small>Your Pal vs friends in real time: Pal Race, Bubble Pop Battle, Star Catch and Dance-Off</small></div><span class="g-tag">New</span></a>
       <h2 class="g-h2" id="g-all">All games</h2>
-      <div class="g-cards">${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}<a class="g-card" href="kemy-quest.html" data-game="kemy-quest"><img src="assets/kemy-quest/cover.svg" alt="" width="120" height="90" style="width:100%;height:auto;border-radius:14px"><div class="g-card-t"><b>Kemy's Bubble Quest</b><span class="muted small">Hop, swim and blow bubbles with Kemy the axolotl.</span><span class="g-tag">1 player</span></div></a><a class="g-card" href="#/arcade/bingo"><div class="g-card-t"><b>🎱 Pal Bingo</b><span class="muted small">75-ball rooms with your Pal. Public hall, friend code, or bots. ⭐ prizes, never a bet.</span><span class="g-tag">Up to 20</span></div></a></div>
+      <div class="g-cards"><a class="g-card" href="#/arcade/bingo"><span class="g-thumb"><img class="gcover" src="assets/bingo-cover.svg" alt="" width="120" height="80"><i class="g-new">NEW</i></span><div class="g-card-t"><b>Pal Bingo</b><span class="muted small">Call, tap and shout BINGO with friends. ⭐ prizes, never a bet.</span><span class="g-tag">Up to 20</span></div></a>${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}<a class="g-card" href="kemy-quest.html" data-game="kemy-quest"><img src="assets/kemy-quest/cover.svg" alt="" width="120" height="90" style="width:100%;height:auto;border-radius:14px"><div class="g-card-t"><b>Kemy's Bubble Quest</b><span class="muted small">Hop, swim and blow bubbles with Kemy the axolotl.</span><span class="g-tag">1 player</span></div></a></div>
       <h2 class="g-h2">Your record</h2>
       <div class="card g-record" id="g-record">${signedIn() ? '<div class="spinner"></div>' : '<p class="muted small" style="margin:0">Your vs-computer record is saved on this device. <a href="#/login?next=%23%2Fgames">Sign in</a> to play online and get on the leaderboard.</p>'}</div>
       <h2 class="g-h2">Top players</h2>

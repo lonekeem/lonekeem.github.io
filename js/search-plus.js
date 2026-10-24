@@ -64,9 +64,9 @@ export const GAMES = [
   ['trivia', 'Studio Trivia', '#/games/trivia', 'trivia quiz questions'],
   ['klgrid', 'KL Grid', '#/games/klgrid', 'tic tac toe ultimate grid'],
   ['palgames', 'Pal Games', '#/games/pals', 'pal race bubble pop star catch dance off'],
-  ['bingo', 'Pal Bingo', '#/arcade/bingo', 'bingo hall 75 ball daub pals'],
+  ['bingo', 'Pal Bingo', '#/arcade/bingo', 'bingo hall 75 ball daub call tap friends', 'assets/bingo-cover.svg'],
   ['park', 'Pal Park', '#/park', 'pal park walk treasures friends']
-].map(([id, name, href, kw]) => ({ id, name, href, kw, kind: 'game', cat: 'gaming' }));
+].map(([id, name, href, kw, cover]) => ({ id, name, href, kw, kind: 'game', cat: 'gaming', ...(cover ? { cover } : {}) }));
 export const PAGES = [
   { id: 'music', name: 'Music', href: '#/music', kw: 'music songs music videos kidz bop playlist listen', kind: 'page', cat: 'music', emoji: '🎵' },
   { id: 'aimovie', name: 'AI Movie Maker', href: '#/new/aimovie', kw: 'ai movie maker make a movie story animation', kind: 'page', cat: 'movies', emoji: '🎬' },

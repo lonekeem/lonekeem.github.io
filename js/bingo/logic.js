@@ -26,18 +26,32 @@ export const letterOf = (n) => 'BINGO'[Math.floor((n - 1) / 15)] || '';
 export const levelOf = (xp) => 1 + Math.floor(Math.max(0, xp) / 30);
 export const cardSlots = (lv) => (lv >= 5 ? 4 : lv >= 3 ? 3 : lv >= 2 ? 2 : 1);
 
+// ready: countdown before ball 1. call: gap between balls. claim: time after ball 75 to press BINGO.
+// Every phone derives the same ball from the room start time, so a new interval stays in sync.
 export function timing(fast) {
-  return fast ? { cycle: 36000, play: 32000, call: 400 } : { cycle: 160000, play: 148000, call: 2100 };
+  return fast
+    ? { ready: 0, call: 400, claim: 1600, gap: 4000 }
+    : { ready: 4500, call: 5500, claim: 12000, gap: 18000 };
 }
 export function roundAt(startMs, now, fast) {
   const T = timing(fast);
+  const play = T.ready + 74 * T.call + T.claim;
+  const cycle = play + T.gap;
   const elapsed = Math.max(0, now - startMs);
-  const round = Math.floor(elapsed / T.cycle);
-  const t = elapsed - round * T.cycle;
-  const live = t < T.play;
-  const called = Math.min(75, Math.floor((live ? t : T.play) / T.call));
-  const nextIn = live && called < 75 ? T.call - (t % T.call) : 0;
-  return { round, t, live, called, nextIn, left: live ? T.play - t : Math.max(0, T.cycle - t) };
+  const round = Math.floor(elapsed / cycle);
+  const t = elapsed - round * cycle;
+  const live = t < play;
+  let called = 0, count = 0;
+  if (t < T.ready) {
+    const leftReady = T.ready - t;
+    count = leftReady <= 1000 ? 1 : leftReady <= 2000 ? 2 : leftReady <= 3000 ? 3 : 0;
+  } else called = Math.min(75, 1 + Math.floor((t - T.ready) / T.call));
+  const nextIn = !live || called >= 75 ? 0 : called === 0 ? T.ready - t : T.call - ((t - T.ready) % T.call);
+  return { round, t, live, called, nextIn, left: live ? play - t : Math.max(0, cycle - t), phase: t < T.ready ? 'ready' : 'call', count, call: T.call, ready: T.ready, play, cycle };
+}
+// How long a bot waits after its card is complete before it presses BINGO. Same seed, same wait.
+export function botReactMs(seed, botId, fast) {
+  return (fast ? 800 : 7000) + (mix(seed, 'react-' + botId) % (fast ? 500 : 4500));
 }
 
 function rng(seed) {
