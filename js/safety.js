@@ -133,7 +133,7 @@ export const RULES = [
   ['🚫', 'No bullying', 'No mean comments, teasing, threats or ganging up on anyone.'],
   ['🧼', 'Keep it clean', 'No swearing and no adult, scary or violent content.'],
   ['🔒', 'Keep your info private', 'Never share your address, school, phone number, email, or a link to another app. Players can’t privately message each other.'],
-  ['🎨', 'Post your own stuff', 'Only post videos and pictures you made yourself (it\'s OK if you made them on another app). Don\'t upload other people\'s videos — use 🔁 Repost to share Kemy posts you like.'],
+  ['🎨', 'Post your own stuff', 'Only post things you made or have the right to share.'],
   ['🎵', 'No copyrighted music or videos', 'Don\'t upload songs, shows or movies made by someone else.'],
   ['🙅', 'No false reports', 'Only report real problems. Reporting people to be mean or as a joke can pause your reporting.'],
   ['🚩', 'Report anything that feels wrong', 'Tap ⋯ or 🚩 Report. Moderators check every report, and it\'s private.']

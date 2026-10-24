@@ -124,10 +124,7 @@ textarea { resize: vertical; min-height: 96px; }
 .post-media .embed.tall { aspect-ratio: 9/16; max-height: 72vh; margin: 0 auto; }
 .post-media iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .link-card { display: block; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; text-decoration: none; overflow-wrap: anywhere; }
-.repost-line { margin: 0 0 8px; color: var(--muted); font-size: .84rem; line-height: 1.35; }
-.repost-line a { color: var(--text); font-weight: 600; text-decoration: none; }
-.actions { display: flex; align-items: center; gap: 2px; margin-top: 10px; flex-wrap: wrap; }
-.act.repost.on { color: #d7c4ff; }
+.actions { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
 .act {
   display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; cursor: pointer; color: var(--muted);
   padding: 8px 10px; border-radius: 999px; font-weight: 500; font-size: .92rem; min-height: 40px; text-decoration: none;

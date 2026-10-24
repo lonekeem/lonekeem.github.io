@@ -75,17 +75,6 @@ export function createAccountDeleter({ auth, db, esc, openModal, closeModal, fri
         for (const r of refs.filter((x) => x.parent.id === 'comments')) refs.push(...await sub(['posts', d.id, 'comments', r.id, 'likes']).catch(() => []));
         // The post goes in the first batch, so the rules see it as deleted for its leftovers.
         await deleteRefs(refs, (b) => b.delete(d.ref));
-        const reps = await getDocs(query(collection(db, 'reposts'), where('originalId', '==', d.id), limit(200))).catch(() => null);
-        if (reps && reps.docs.length) await deleteRefs(reps.docs.map((x) => x.ref));
-      }
-    }));
-    await step('Removing your reposts…', () => drain(query(collection(db, 'reposts'), where('uid', '==', uid)), async (docs) => {
-      for (const d of docs) {
-        const orig = d.data().originalId;
-        const b = writeBatch(db);
-        b.delete(d.ref);
-        if (orig && !ownPosts.has(orig)) b.update(doc(db, 'posts', orig), { repostCount: increment(-1) });
-        try { await b.commit(); } catch { await deleteDoc(d.ref).catch(() => {}); }
       }
     }));
     await step('Removing your stars on posts and comments…', () => drain(query(collectionGroup(db, 'likes'), where('uid', '==', uid)), async (docs) => {
