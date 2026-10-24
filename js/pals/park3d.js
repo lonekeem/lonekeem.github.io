@@ -29,6 +29,7 @@ import { addParkHD } from './park-hd.js';
 import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; import { roomState } from '../world/layout.js'; // Kemy World: Kemy Street district etc. (own module)
 import { PRESENCE_GAP_MS, presenceDeny, afterPresenceDeny, presenceVelInt, extrapSec, keepRemotePal, inVehicle, lookKey } from './presence-sync.js';
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
+import { attachRotate } from '../rotate.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
 const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX), Math.round(z * PX + CY)];
@@ -669,32 +670,7 @@ export function createPark3D(ctx) {
       openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="park-card" id="pr-f"><h2>Report @${esc(o.uname)}</h2><select id="pr-r"><option>Mean or rude chat</option><option>Inappropriate name or Pal</option><option>Spam</option><option>Something else</option></select><textarea id="pr-t" maxlength="300" placeholder="What happened? (optional)"></textarea><button class="btn">Send report</button></form>`);
       document.getElementById('pr-f').onsubmit = async (e) => { e.preventDefault(); try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: o.uid, postId: '', reason: ('Pal Park: ' + document.getElementById('pr-r').value + '. ' + document.getElementById('pr-t').value).slice(0, 500), excerpt: String(o.say || '').slice(0, 300), createdAt: serverTimestamp() }); closeModal(); toast('Thanks. The report was sent.'); } catch (er) { toast(friendlyError(er)); } }; }
     const hintEl = $('#p3-hint'); function hint(t) { hintEl.textContent = t; hintEl.classList.add('on'); clearTimeout(hintEl._t); hintEl._t = setTimeout(() => hintEl.classList.remove('on'), 2200); }
-    const rotBtn = $('#p3-rot'); let rotWant = 'auto';
-    const rotLabel = () => { if (!rotBtn) return; rotBtn.classList.toggle('on', rotWant !== 'auto'); rotBtn.setAttribute('aria-label', rotWant === 'landscape' ? 'Landscape. Tap for portrait' : rotWant === 'portrait' ? 'Portrait. Tap for auto rotate' : 'Rotate. Tap for landscape'); };
-    const rotFriendly = 'Turn your phone sideways to rotate';
-    async function cycleRotate() {
-      const ori = screen.orientation;
-      if (!ori || typeof ori.lock !== 'function') { hint(rotFriendly); return; }
-      const next = rotWant === 'auto' ? 'landscape' : rotWant === 'landscape' ? 'portrait' : 'auto';
-      try {
-        if (next === 'auto') { try { ori.unlock(); } catch { /* already free */ } rotWant = 'auto'; rotLabel(); hint('Auto rotate'); return; }
-        const hadFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        if (!hadFs) {
-          const el = document.documentElement; const req = el.requestFullscreen || el.webkitRequestFullscreen;
-          if (req) { try { await req.call(el); } catch { /* a home-screen or Play app may already be full screen */ } }
-        }
-        try { await ori.lock(next); }
-        catch (err) {
-          if (!hadFs && (document.fullscreenElement || document.webkitFullscreenElement)) {
-            const exit = document.exitFullscreen || document.webkitExitFullscreen;
-            if (exit) { try { await exit.call(document); } catch { /* leave the page as it was */ } }
-          }
-          throw err;
-        }
-        rotWant = next; rotLabel(); hint(next === 'landscape' ? 'Landscape' : 'Portrait');
-      } catch { hint(rotFriendly); }
-    }
-    if (rotBtn) rotBtn.onclick = () => { cycleRotate(); }; rotLabel();
+    attachRotate($('#p3-rot'), hint);
     function showRotTip() {
       if (!document.body.contains(view)) return;
       const KEY = 'kemy-rot-tip'; let n = 0;

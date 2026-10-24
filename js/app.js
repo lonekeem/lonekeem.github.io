@@ -9,6 +9,7 @@ import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { KEMY_NAME, reservedKemy, noteAdminUid, rememberKemy, isAdminUid, faceName, adminNameClass, ownerBadgeHtml } from './kemy-name.js';
 import { mountHeaderChip, gameChip } from './wallet-chip.js';
 import { mountGameMusic, hideGameMusic } from './gamemusic.js';
+import { watchGameRotate } from './rotate.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
@@ -759,6 +760,7 @@ async function route() {
 }
 initInterests({ S, db, fs: { doc, getDoc, setDoc, serverTimestamp } });
 window.addEventListener('hashchange', route);
+watchGameRotate();
 initThemeMusic();
 // Search icons: focus a throwaway input inside the tap so phones (iOS) open the keyboard,
 // then the search page moves focus to the real box.

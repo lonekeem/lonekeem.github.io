@@ -80,6 +80,7 @@
 </section></main>
 <script type="module">
 import { mountGameMusic } from './js/gamemusic.js'; mountGameMusic({ corner: 'top-right' }).catch(() => {});
+import { watchGameRotate } from './js/rotate.js'; watchGameRotate();
 
 import { boot } from './js/games/kemy-quest/main.js?v=2';
 boot(document.getElementById('kq')).catch((e) => { console.error(e); document.getElementById('kq').textContent = 'Could not start the game. Please reload.'; });
