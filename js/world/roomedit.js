@@ -2,12 +2,51 @@
 // plan units (the same ones interior.js saves). No THREE in here. Written by Lone Keem.
 import { DECOR, hex6, FLOORS } from './interior.js';
 
-export const PALETTE = [
-  ['#ffffff', 'White'], ['#fde7c7', 'Cream'], ['#f8fafc', 'Snow'], ['#dbeafe', 'Sky'], ['#93c5fd', 'Blue'],
-  ['#a7f3d0', 'Mint'], ['#86efac', 'Leaf'], ['#fce7f3', 'Pink'], ['#f9a8d4', 'Rose'], ['#fecaca', 'Blush'],
-  ['#ef4444', 'Red'], ['#f97316', 'Orange'], ['#fde047', 'Yellow'], ['#a78bfa', 'Lilac'], ['#7c3aed', 'Purple'],
-  ['#c4b5fd', 'Lavender'], ['#b45309', 'Wood'], ['#6b4423', 'Dark wood'], ['#94a3b8', 'Grey'], ['#1f2937', 'Ink']
+// CSS colour chips only. This list stays in the lazy editor, not the app shell.
+export const FAMILIES = [
+  { name: 'Pinks', colors: [['#fbcfe8', 'Baby pink'], ['#ec4899', 'Hot pink'], ['#fecdd3', 'Blush'], ['#e11d48', 'Rose'], ['#d946ef', 'Magenta']] },
+  { name: 'Purples', colors: [['#ddd6fe', 'Lavender'], ['#c084fc', 'Lilac'], ['#8b5cf6', 'Violet'], ['#7c3aed', 'Kemy purple']] },
+  { name: 'Blues', colors: [['#7dd3fc', 'Sky'], ['#bfdbfe', 'Baby blue'], ['#1e3a8a', 'Navy'], ['#0f766e', 'Teal'], ['#2dd4bf', 'Turquoise']] },
+  { name: 'Greens', colors: [['#a7f3d0', 'Mint'], ['#9caf88', 'Sage'], ['#84cc16', 'Lime'], ['#166534', 'Forest']] },
+  { name: 'Yellows and oranges', colors: [['#fef08a', 'Butter'], ['#eab308', 'Gold'], ['#fdba74', 'Peach'], ['#fb923c', 'Coral'], ['#f97316', 'Orange']] },
+  { name: 'Reds', colors: [['#dc2626', 'Cherry'], ['#9f1239', 'Burgundy']] },
+  { name: 'Neutrals', colors: [['#ffffff', 'White'], ['#fde7c7', 'Cream'], ['#e7d3b0', 'Beige'], ['#d2a679', 'Tan'], ['#92400e', 'Brown'], ['#d1d5db', 'Light gray'], ['#374151', 'Charcoal'], ['#111827', 'Black']] },
+  { name: 'Pastels', colors: [['#d1fae5', 'Pastel mint'], ['#fef9c3', 'Pastel lemon'], ['#ede9fe', 'Pastel lilac']] },
+  { name: 'Bright', colors: [['#ff2bd6', 'Neon pink'], ['#39ff14', 'Neon green'], ['#fff01f', 'Neon yellow'], ['#00f0ff', 'Neon cyan']] }
 ];
+export const PALETTE = FAMILIES.flatMap((f) => f.colors);
+
+const RECENT_KEY = 'kemy-house-colors';
+const RECENT_MAX = 8;
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Most recent first. Drops anything that is not a #rrggbb colour and keeps eight.
+export function pushRecent(list, hex) {
+  const prev = (Array.isArray(list) ? list : []).map((h) => hex6(h)).filter(Boolean);
+  const c = hex6(hex);
+  return (c ? [c, ...prev.filter((h) => h !== c)] : prev).slice(0, RECENT_MAX);
+}
+function recentMap() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const o = JSON.parse(localStorage.getItem(RECENT_KEY) || '{}');
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch { return {}; }
+}
+export function recentColors(uid) {
+  const id = String(uid || '').slice(0, 128);
+  const map = id ? recentMap() : null;
+  return map ? pushRecent(map[id], '') : [];
+}
+export function rememberColor(uid, hex) {
+  const id = String(uid || '').slice(0, 128);
+  const map = recentMap();
+  const next = pushRecent(map && id ? map[id] : [], hex);
+  if (!id || !hex6(hex) || !map) return next;
+  map[id] = next;
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(map)); } catch { /* private mode or a full disk */ }
+  return next;
+}
 
 // Bounds are the room the piece's centre must stay inside. Camera stands inside that room.
 const ROOMS = [
@@ -46,17 +85,27 @@ export function clampToRoom(it, roomId) {
   return it;
 }
 
-const swatches = (kind, current) => PALETTE.map(([h, n]) => `<button type="button" class="sw${current === h ? ' on' : ''}" style="background:${h}" data-paint="${kind}:${h}" aria-label="${n}"></button>`).join('')
-  + `<label class="kh-custom">Custom<input type="color" data-custom="${kind}" value="${hex6(current) || '#7c3aed'}" aria-label="Custom colour"></label>`;
+const TARGETS = [['wall', 'Walls'], ['floor', 'Floor'], ['curtain', 'Curtains'], ['item', 'Piece']];
+const CLEAR = { wall: 'Use house wall colour', floor: 'Use floor style', curtain: 'No curtains', item: 'Original colour' };
+const chip = (h, n, on) => `<button type="button" class="sw${on ? ' on' : ''}" style="background:${h}" data-hex="${h}" aria-label="${esc(n)}"></button>`;
 
 export function roomPickerHtml(two) {
   return `<div class="kh-rooms">${roomsFor(two).map((r) => `<button type="button" data-room="${r.id}" aria-label="Edit ${r.name}">${r.emoji} ${r.name}</button>`).join('')}</div>`;
 }
 
-export function colorHtml({ roomName, wall, floor, curtain, itemName, item }) {
-  return `<label>${roomName} walls</label><div class="kh-swatches">${swatches('wall', wall)}</div><button type="button" data-clear="wall">Use house wall colour</button>`
-    + `<label>${roomName} floor</label><div class="kh-swatches">${swatches('floor', floor)}</div><button type="button" data-clear="floor">Use floor style</button>`
-    + `<label>${roomName} curtains</label><div class="kh-swatches">${swatches('curtain', curtain)}</div><button type="button" data-clear="curtain">No curtains</button>`
-    + (itemName ? `<label>${itemName}</label><div class="kh-swatches">${swatches('item', item)}</div><button type="button" data-clear="item">Original colour</button>` : '<p class="kh-tip">Tap a couch, bed, chair, table, or rug, then pick its colour here.</p>')
-    + `<label>Floor style for rooms with no colour</label><div class="kh-strip">${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}">${F.n}</button>`).join('')}</div>`;
+// One palette for walls, floor, carpet, curtains, and the selected piece. `target` is which of those the chips paint.
+export function colorHtml({ roomName, target, current, recent, itemName }) {
+  const kind = TARGETS.some(([k]) => k === target) ? target : 'wall';
+  const cur = hex6(current) || '';
+  const rec = pushRecent(recent, '');
+  const targets = TARGETS.map(([k, n]) => `<button type="button" data-target="${k}" class="${kind === k ? 'on' : ''}" aria-pressed="${kind === k ? 'true' : 'false'}"${k === 'item' && !itemName ? ' disabled' : ''}>${n}</button>`).join('');
+  const families = FAMILIES.map((f) => `<div class="kh-fam"><span>${esc(f.name)}</span><div class="kh-swatches">${f.colors.map(([h, n]) => chip(h, n, cur === h)).join('')}</div></div>`).join('');
+  const painting = kind === 'item' ? (itemName || 'a piece') : (TARGETS.find(([k]) => k === kind)[1]);
+  const pieceTip = kind === 'item' && !itemName ? '<p class="kh-tip">Tap a couch, bed, chair, table, or rug, then pick its colour.</p>' : '';
+  const clear = kind === 'item' && !itemName ? '' : `<button type="button" data-clear="${kind}">${CLEAR[kind]}</button>`;
+  return `<div class="kh-targets" role="group" aria-label="What to colour">${targets}</div>`
+    + `<p class="kh-tip">${esc(roomName)} · ${esc(painting)}. The floor colour also covers carpet.</p>${pieceTip}`
+    + `<div class="kh-fam"><span>Recent</span><div class="kh-swatches">${rec.map((h) => chip(h, 'Recent ' + h, cur === h)).join('')}<label class="kh-custom">Custom<input type="color" data-custom value="${cur || '#7c3aed'}" aria-label="Custom colour"></label></div></div>`
+    + clear + families
+    + `<label>Floor style for rooms with no colour</label><div class="kh-strip">${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}">${esc(F.n)}</button>`).join('')}</div>`;
 }

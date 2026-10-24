@@ -242,6 +242,11 @@ export function attachHomes(api, W, K) {
 .kh-dbar .kh-tools b,.kh-dbar .kh-tools small{flex:1 1 100%;color:#333;font-weight:700}
 .kh-dbar .kh-strip{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;padding:6px 0 2px}
 .kh-dbar .sw{width:32px;height:32px;border-radius:50%;padding:0;min-height:32px;min-width:32px;border:2px solid #fff;box-shadow:0 0 0 1px #94a3b8}
+.kh-targets{display:flex;gap:6px;position:sticky;top:0;z-index:2;background:#fff;padding:6px 0 4px}
+.kh-targets button{flex:1 1 22%;min-height:44px;font-size:13px;padding:6px 4px}
+.kh-fam>span{display:block;font:800 12px/1.2 Inter,sans-serif;color:#3f3f46;margin:8px 0 0}
+.kh-dbar .kh-swatches .sw{width:44px;height:44px;min-width:44px;min-height:44px;border-radius:12px;scroll-margin:76px 0 16px}
+.kh-fam{scroll-margin-top:76px}
 .kh-dbar .it{flex:0 0 78px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;min-height:68px;text-align:center;line-height:1.15}
 .kh-dbar .it i{font-style:normal;font-size:20px}.kh-dbar .it em{font-style:normal;font-size:10px;color:#6d28d9}
 .kh-dbar label{display:block;margin:6px 0 2px;font-weight:800}
@@ -590,7 +595,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (mode === 'out' || (mode !== 'in' && !inside)) { beginOutside(); return; }
     if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
     const base = {}; for (const it of starterOf(r)) base[it.c] = (base[it.c] || 0) + 1;
-    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'c', room: '', edit: null, editState: 'loading', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false, paintNoted: false };
+    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i })), stash: unpackStash(d0.items), base, sel: -1, tab: 'c', room: '', edit: null, editState: 'loading', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false, paintNoted: false, paintTarget: 'wall' };
     document.body.classList.add('kh-decorating');
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
     loadOwned().then(() => deco && drawDeco());
@@ -626,7 +631,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     const here = it && inRoom(it) ? it : null;
     box.innerHTML = here ? `<b>${DECOR[here.c].e} ${DECOR[here.c].n}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-color>Color</button><button type="button" data-del>Delete</button>` : '<small>Tap a piece in this room. Colour, move, and delete stay in this room.</small>';
     const mv = box.querySelector('[data-move]'); if (mv) mv.onclick = () => { deco.moving = !deco.moving; paintTools(); };
-    const cb = box.querySelector('[data-color]'); if (cb) cb.onclick = () => { deco.tab = 'c'; deco.open = true; drawDeco(); };
+    const cb = box.querySelector('[data-color]'); if (cb) cb.onclick = () => { deco.paintTarget = 'item'; deco.tab = 'c'; deco.open = true; drawDeco(); };
     box.querySelectorAll('[data-nudge]').forEach((b) => (b.onclick = () => { const [sx, sy] = b.dataset.nudge.split(',').map(Number); nudgeScreen(sx, sy); }));
     const rb = box.querySelector('[data-rot]'); if (rb) rb.onclick = () => rotateSel();
     const db2 = box.querySelector('[data-del]'); if (db2) db2.onclick = () => removeSel();
@@ -642,7 +647,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     else if (kind === 'curtain') { const k = 'c' + deco.room; if (c) deco.surf[k] = c; else delete deco.surf[k]; }
     else if (kind === 'item') { const it = deco.items[deco.sel]; if (!it || !inRoom(it)) return; if (c) it.col = c; else delete it.col; relItems(); }
     if (kind !== 'item') surfNow();
-    if (!live) { deco.paintNoted = false; paintBody(); }
+    if (!live) { if (c && deco.edit && deco.edit.rememberColor) deco.edit.rememberColor(uid, c); deco.paintNoted = false; paintBody(); }
   }
   function paintBody() {
     const body = dbar.querySelector('.kh-body'); if (!body || !deco) return; const t = deco.tab;
@@ -656,14 +661,17 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     else if (t === 'f') { const stored = (c) => deco.stash.filter((q) => q === c).length; const entries = Object.entries(DECOR).sort((a, b) => stored(b[0]) - stored(a[0]));
       body.innerHTML = `<div class="kh-strip" aria-label="Add furniture">${entries.map(([c, D]) => { const n = stored(c); const em = n ? 'Stored' + (n > 1 ? ' ' + n : '') : have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D); return `<button type="button" class="it" data-add="${c}"><i>${D.e}</i>${D.n}<em>${em}</em></button>`; }).join('')}</div>`; }
     else { const walls = parseWalls(deco.walls); const it = deco.items[deco.sel]; const here = it && inRoom(it) ? it : null; const R = deco.edit.roomById(deco.room);
-      body.innerHTML = deco.edit.colorHtml({ roomName: R.name, wall: walls[deco.room] || '', floor: (deco.surf && deco.surf[deco.room]) || '', curtain: (deco.surf && deco.surf['c' + deco.room]) || '', itemName: here ? `${DECOR[here.c].e} ${DECOR[here.c].n}` : '', item: (here && here.col) || '' });
+      let kind = deco.paintTarget || 'wall'; if (!['wall', 'floor', 'curtain', 'item'].includes(kind) || (kind === 'item' && !here)) kind = 'wall'; deco.paintTarget = kind;
+      const surf = deco.surf || {}; const current = kind === 'floor' ? (surf[deco.room] || '') : kind === 'curtain' ? (surf['c' + deco.room] || '') : kind === 'item' ? (here.col || '') : (walls[deco.room] || '');
+      body.innerHTML = deco.edit.colorHtml({ roomName: R.name, target: kind, current, recent: deco.edit.recentColors(uid), itemName: here ? `${DECOR[here.c].e} ${DECOR[here.c].n}` : '' });
       body.querySelectorAll('[data-fl]').forEach((b) => b.classList.toggle('on', b.dataset.fl === deco.floor)); }
     body.querySelectorAll('[data-room]').forEach((b) => (b.onclick = () => { const id = b.dataset.room; if (!deco.edit.roomById(id)) return; deco.room = id; deco.sel = -1; deco.moving = false; deco.tab = 'c'; deco.open = true; focusRoom(id); placeHi(); drawDeco(); say(deco.edit.roomById(id).name + '. Only this room can be edited.'); }));
     body.querySelectorAll('[data-mine]').forEach((b) => (b.onclick = () => selectItem(+b.dataset.mine)));
     body.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; paintBody(); }));
     body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
-    body.querySelectorAll('[data-paint]').forEach((b) => (b.onclick = () => { const i = b.dataset.paint.indexOf(':'); paintKind(b.dataset.paint.slice(0, i), b.dataset.paint.slice(i + 1), false); }));
-    body.querySelectorAll('[data-custom]').forEach((el) => { const apply = (live) => { const c = hex6(el.value); if (c) paintKind(el.dataset.custom, c, live); }; el.oninput = () => apply(true); el.onchange = () => apply(false); });
+    body.querySelectorAll('[data-target]').forEach((b) => (b.onclick = () => { const k = b.dataset.target; if (k === 'item') { const it = deco.items[deco.sel]; if (!it || !inRoom(it)) return; } deco.paintTarget = k; paintBody(); }));
+    body.querySelectorAll('[data-hex]').forEach((b) => (b.onclick = () => paintKind(deco.paintTarget || 'wall', b.dataset.hex, false)));
+    body.querySelectorAll('[data-custom]').forEach((el) => { const apply = (live) => { const c = hex6(el.value); if (c) paintKind(deco.paintTarget || 'wall', c, live); }; el.oninput = () => apply(true); el.onchange = () => apply(false); });
     body.querySelectorAll('[data-clear]').forEach((b) => (b.onclick = () => paintKind(b.dataset.clear, '', false)));
     body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); deco.floor = b.dataset.fl; surfNow(); paintBody(); }));
     body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { remember(); if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say(deco.out ? '🎨 That colour is on the house.' : '🎨 Outside colour set. Step out to see it, or use Decorate outside from the yard.'); }));
