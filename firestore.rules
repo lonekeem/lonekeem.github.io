@@ -2376,7 +2376,8 @@ service cloud.firestore {
         && (r.k != 'link' || (r.url is string && r.url.size() <= 300 && r.url.matches('^https://(open[.]spotify[.]com|embed[.]music[.]apple[.]com|music[.]apple[.]com|(www[.])?youtube[.]com|m[.]youtube[.]com|(www[.])?youtube-nocookie[.]com|(www[.])?youtu[.]be)/.*')))
         && (!('t' in r) || (r.t is int && r.t >= 0 && r.t < 50)) && (!('s' in r) || r.s is int); }
       function extOk(e) { return e is map && e.keys().hasOnly(['w', 'r', 'd', 't']) && (!('w' in e) || isStr(e.w, 0, 9)) && (!('r' in e) || isStr(e.r, 0, 9)) && (!('d' in e) || isStr(e.d, 0, 9)) && (!('t' in e) || isStr(e.t, 0, 9)); }
-      function decorOk(d) { return d is map && d.keys().hasOnly(['wall', 'walls', 'floor', 'ext', 'items', 'v']) && (!('wall' in d) || isStr(d.wall, 0, 9)) && (!('walls' in d) || isStr(d.walls, 0, 120)) && (!('floor' in d) || d.floor in ['wood', 'dark', 'tile', 'carpet', 'marble', 'mint', 'rose', 'night', 'gold'])
+      function decorOk(d) { return d is map && d.keys().hasOnly(['wall', 'walls', 'floor', 'floors', 'ext', 'items', 'v']) && (!('wall' in d) || isStr(d.wall, 0, 9)) && (!('walls' in d) || isStr(d.walls, 0, 120)) && (!('floor' in d) || d.floor in ['wood', 'dark', 'tile', 'carpet', 'marble', 'mint', 'rose', 'night', 'gold'])
+        && (!('floors' in d) || (isStr(d.floors, 1, 160) && d.floors.matches('^([c]?[LKBTHU]:#[0-9a-fA-F]{6})(,[c]?[LKBTHU]:#[0-9a-fA-F]{6})*$')))
         && (!('items' in d) || isStr(d.items, 0, 2000)) && (!('ext' in d) || extOk(d.ext)) && (!('v' in d) || d.v is int); }
       // open house / invites (uids + usernames for display), house radio, decor: owner-only, size-limited
       function extrasOk() { return (!('open' in hd()) || hd().open is bool) && (!('inv' in hd()) || (hd().inv is list && hd().inv.size() <= 50)) && (!('invN' in hd()) || (hd().invN is list && hd().invN.size() <= 50))

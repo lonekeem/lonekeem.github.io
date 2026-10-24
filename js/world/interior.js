@@ -14,6 +14,12 @@ export function palOf(h) { if (!h || (!h.num && PAL[h.town || 'street'])) return
 export const WALL_SW = ['#fde7c7', '#ffffff', '#e5e7eb', '#dbeafe', '#fce7f3', '#ecfccb', '#ede9fe', '#fef3c7', '#f4c99a', '#1f2937', '#bae6fd', '#a7f3d0', '#fecaca', '#fbcfe8', '#ddd6fe', '#fde68a', '#99f6e4', '#c7d2fe', '#d9f99d', '#475569'];
 export const WALL_ROOMS = [['L', 'Living room'], ['K', 'Kitchen'], ['B', 'Bedroom'], ['T', 'Bathroom'], ['H', 'Hallway'], ['U', 'Upstairs']];
 export const parseWalls = (s) => { const o = {}; for (const t of String(s || '').split(',')) { const m = /^([LKBTHU]):(#[0-9a-f]{6})$/i.exec(t); if (m) o[m[1].toUpperCase()] = m[2]; } return o; };
+export const HEX6 = /^#[0-9a-f]{6}$/i;
+export const hex6 = (s) => { const t = String(s || '').trim().toLowerCase(); return HEX6.test(t) ? t : ''; };
+// Per-room floor colour is "L:#aabbcc". Curtain colour for that room is "cL:#aabbcc".
+const FLOOR_KEYS = ['L', 'K', 'B', 'T', 'H', 'U', 'cL', 'cK', 'cB', 'cT', 'cH', 'cU'];
+export function parseFloors(s) { const o = {}; for (const t of String(s || '').split(',')) { const m = /^(c?)([LKBTHU]):(#[0-9a-f]{6})$/i.exec(t.trim()); if (m) o[(m[1] ? 'c' : '') + m[2].toUpperCase()] = m[3].toLowerCase(); } return o; }
+export function serFloors(o) { return FLOOR_KEYS.filter((k) => hex6(o && o[k])).map((k) => (k[0] === 'c' ? 'c' + k.slice(1) : k) + ':' + hex6(o[k])).join(','); }
 export const EXT_SW = ['#f6e7c8', '#ffffff', '#cfe3f0', '#f3d1dc', '#d8ecd0', '#efe0ff', '#fca5a5', '#fde047', '#93c5fd', '#475569', '#7c3aed', '#7a3b3b', '#2f5d50', '#111827'];
 export const FLOORS = { wood: { n: 'Wood', c: '#b07a4a', l: '#8a5a34' }, dark: { n: 'Dark wood', c: '#6b4423', l: '#4a2e17' }, tile: { n: 'Tile', c: '#e5e7eb', l: '#cbd5e1' }, carpet: { n: 'Carpet', c: '#a78bfa', l: null }, marble: { n: 'Marble', c: '#f1f5f9', l: '#e2e8f0' }, mint: { n: 'Mint tile', c: '#a7f3d0', l: '#6ee7b7' }, rose: { n: 'Rose wood', c: '#c2847a', l: '#9f5f56' }, night: { n: 'Night sky', c: '#312e81', l: '#1e1b4b' }, gold: { n: 'Gold tile', c: '#fcd34d', l: '#d97706' } };
 // furniture: parts [shape, colour ('A' accent, 'T' trim), x, y, z, sx, sy, sz, glow?]; foot = collider [w, d] or null
@@ -64,8 +70,34 @@ export const SEATS = { bd: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bc: [[-.5, .63
   cs: [[-1, .55, .05, 0], [0, .55, .05, 0], [1, .55, .05, 0]], cl: [[-1, .55, -.5, 0], [0, .55, -.5, 0], [1, .55, .5, Math.PI / 2]], ch: [[0, .55, .05, 0]], cr: [[0, .48, .02, 0]] };
 export const SCREENS = { tv: [0, 1.25, .02, 2, .95], tg: [0, 1.5, .02, 3, 1.5] };
 export const decorItem = (code) => { const d = DECOR[code]; return d ? (d.d ? 'z_hd_' + code : 'hd_' + code) : null; };
-export function parseItems(s) { const out = []; for (const t of String(s || '').split(';')) { const [c, x, z, r, f] = t.split(','); if (!DECOR[c]) continue; const X = +x / 2, Z = +z / 2; if (!isFinite(X) || !isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) continue; out.push({ c, x: X, z: Z, r: (+r || 0) & 3, f: f === '1' ? 1 : 0 }); if (out.length >= 80) break; } return out; }
-export const serItems = (L) => L.map((i) => [i.c, Math.round(i.x * 2), Math.round(i.z * 2), i.r & 3].join(',') + (i.f ? ',1' : '')).join(';');
+// code,xHalf,zHalf,rot[,1][,#rrggbb]. A #hex is a colour, so it is never read as the upstairs flag.
+function readPiece(t) {
+  const p = String(t).split(','); const c = p[0];
+  if (!DECOR[c]) return null;
+  const X = +p[1] / 2, Z = +p[2] / 2;
+  if (!Number.isFinite(X) || !Number.isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) return { bad: true };
+  let f = 0, col = '', dirty = false;
+  for (let i = 4; i < p.length; i++) {
+    const part = p[i];
+    if (part === '1') { if (f) dirty = true; f = 1; continue; }
+    const h = hex6(part);
+    if (h) { if (col) dirty = true; else { if (part !== h) dirty = true; col = h; } continue; }
+    dirty = true;
+  }
+  const it = { c, x: X, z: Z, r: (+p[3] || 0) & 3, f };
+  if (col) it.col = col;
+  return { it, dirty };
+}
+export function parseItems(s) { const out = []; for (const t of String(s || '').split(';')) { if (!t || t[0] === '~') continue; const got = readPiece(t); if (!got || !got.it) continue; out.push(got.it); if (out.length >= 80) break; } return out; }
+export const serItems = (L) => L.map((i) => { const col = hex6(i.col); return [i.c, Math.round(i.x * 2), Math.round(i.z * 2), (i.r | 0) & 3].join(',') + (i.f ? ',1' : '') + (col ? ',' + col : ''); }).join(';');
+const tintMode = new Map();
+function tintOf(code) {
+  const hit = tintMode.get(code); if (hit) return hit;
+  const D = DECOR[code]; let a = 0, trim = 0, best = 'T', bv = 0; const hv = Object.create(null);
+  for (const p of (D && D.p) || []) { if (p[8]) continue; const v = Math.abs(p[5] * p[6] * p[7]) || 0; if (p[1] === 'A') a += v; else if (p[1] === 'T') trim += v; else hv[p[1]] = (hv[p[1]] || 0) + v; }
+  if (a > 0) best = 'A'; else { bv = trim; for (const c in hv) if (hv[c] > bv) { best = c; bv = hv[c]; } }
+  tintMode.set(code, best); return best;
+}
 // Snap onto the 0.5 grid and keep the piece's footprint inside the room.
 // There is no under-floor height: f is only "upstairs" (1) or the ground floor (0).
 export function placeItem(it) {
@@ -99,11 +131,9 @@ export function healItems(raw, two) {
   for (const t of String(raw || '').split(';')) {
     if (!t) continue;
     if (t[0] === '~') { const c = t.slice(1); if (!DECOR[c]) { changed = true; continue; } stash.push(c); continue; }
-    const [c, xs, zs, rs, fs] = t.split(',');
-    if (!DECOR[c]) { changed = true; continue; }
-    const X = +xs / 2, Z = +zs / 2;
-    if (!Number.isFinite(X) || !Number.isFinite(Z) || Math.abs(X) > 6 || Math.abs(Z) > 6) { changed = true; continue; }
-    const draft = { c, x: X, z: Z, r: (+rs || 0) & 3, f: fs === '1' ? 1 : 0 };
+    const got = readPiece(t);
+    if (!got || !got.it) { changed = true; continue; }
+    const draft = got.it; if (got.dirty) changed = true;
     if (!two && draft.f) { draft.f = 0; changed = true; }
     if (spills(draft)) { const before = draft.x + ',' + draft.z; placeItem(draft); if (draft.x + ',' + draft.z !== before) changed = true; }
     items.push(draft);
@@ -183,18 +213,33 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   // (interior doors removed: open doorways everywhere)
   // floor (rebuildable) + furniture (rebuildable)
   let floorM = null, decG = null; let decCols = [], seats = [], screens = []; let items = placedItems(decor, h, two);
-  function setFloor(t) { const F = FLOORS[t] || FLOORS[S.floor]; if (floorM) { g.remove(floorM); floorM.geometry.dispose(); } const fk = k + 'f'; put(fk, G.box, F.c, cx, y - 0.05, cz, 0, 12.4 * SC, 0.1, 12.4 * SC);
-    if (t === 'tile') { for (let i = -6; i < 6; i++) for (let j = -6; j < 6; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC, SC, 1, -Math.PI / 2); }
-    else if (F.l) for (let i = -5; i <= 5; i++) put(fk, G.box, F.l, cx + i * 1.1 * SC, y + 0.002, cz, 0, 0.03, 0.004, 12.2 * SC);
-    floorM = flush(fk, vc({ roughness: t === 'carpet' ? 1 : 0.6 }), false, g); }
+  function setFloor(t, floors) { const F = FLOORS[t] || FLOORS[S.floor]; const map = parseFloors(floors); const painted = FLOOR_KEYS.some((key) => map[key]); if (floorM) { g.remove(floorM); floorM.geometry.dispose(); floorM = null; } const fk = k + 'f';
+    if (!painted) { put(fk, G.box, F.c, cx, y - 0.05, cz, 0, 12.4 * SC, 0.1, 12.4 * SC);
+      if (t === 'tile') { for (let i = -6; i < 6; i++) for (let j = -6; j < 6; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC, SC, 1, -Math.PI / 2); }
+      else if (F.l) for (let i = -5; i <= 5; i++) put(fk, G.box, F.l, cx + i * 1.1 * SC, y + 0.002, cz, 0, 0.03, 0.004, 12.2 * SC);
+      floorM = flush(fk, vc({ roughness: t === 'carpet' ? 1 : 0.6 }), false, g); return; }
+    for (const [rm, x0, x1, z0, z1] of [['K', -6.2, -0.95, -6.2, -1], ['L', -6.2, -0.95, -1, 6.2], ['B', 0.95, 6.2, -6.2, 0], ['T', 0.95, 6.2, 0, 6.2], ['H', -0.95, 0.95, -6.2, 6.2]]) {
+      const hex = map[rm], col = hex || F.c, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, sx = (x1 - x0) * SC, sz = (z1 - z0) * SC;
+      put(fk, G.box, col, cx + mx * SC, y - 0.05, cz + mz * SC, 0, sx, 0.1, sz);
+      if (!hex && t === 'tile') { for (let i = Math.ceil(x0); i < x1; i++) for (let j = Math.ceil(z0); j < z1; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC * 0.92, SC * 0.92, 1, -Math.PI / 2); }
+      else if (!hex && F.l) for (let s = 1; s <= 3; s++) put(fk, G.box, F.l, cx + (x0 + (x1 - x0) * s / 4) * SC, y + 0.002, cz + mz * SC, 0, 0.03, 0.004, sz * 0.96); }
+    if (two && map.U) put(fk, G.box, map.U, cx + 3.55 * SC, y + 3.37, cz - 0.55 * SC, 0, 5 * SC, 0.04, 10.6 * SC);
+    const wins = [['L', -3.6, 1.6, 5.98, 1.8, 1.2, 0, -1], ['K', -3, 1.85, -5.98, 1.6, 0.8, 0, 1], ['K', -5.98, 1.6, -2.4, 1.4, 1.1, 1, 0], ['B', 5.98, 1.6, -4, 1.4, 1.1, -1, 0], ['T', 5.98, 2, 4, 0.8, 0.6, -1, 0]];
+    if (two) wins.push(['U', 3.6, 4.9, -5.98, 1.6, 1.1, 0, 1], ['U', 5.98, 4.9, -2, 1.4, 1.1, -1, 0]);
+    for (const [rm, x, yy, z, w, hh, ix, iz] of wins) { const col = map['c' + rm]; if (!col) continue; const panel = Math.max(0.22, w * 0.34), side = w / 2 - panel / 2, alongX = !ix;
+      const px0 = cx + x * SC, pz0 = cz + z * SC, inn = 0.22;
+      put(fk, G.box, col, px0 + (alongX ? 0 : ix * inn), y + yy + hh * 0.42, pz0 + (alongX ? iz * inn : 0), 0, alongX ? w * 0.98 : 0.07, 0.16, alongX ? 0.07 : w * 0.98);
+      for (const s of [-1, 1]) put(fk, G.box, col, px0 + (alongX ? s * side : ix * inn), y + yy - 0.05, pz0 + (alongX ? iz * inn : s * side), 0, alongX ? panel : 0.07, hh * 0.84, alongX ? 0.07 : panel); }
+    floorM = flush(fk, vc({ roughness: 0.9 }), false, g); }
   function setItems(L) { items = L; if (decG) { g.remove(decG); decG.traverse((o) => o.geometry && o.geometry.dispose()); } for (const b of decCols) { const i = box.indexOf(b); if (i >= 0) box.splice(i, 1); } decCols = []; decG = new THREE.Group(); g.add(decG);
     const dk = k + 'd', gk = k + 'dg'; seats = []; screens = []; for (const it of L) { const D = DECOR[it.c]; if (!D || !Number.isFinite(it.x) || !Number.isFinite(it.z) || Math.abs(it.x) > 6 || Math.abs(it.z) > 6) continue; const th = it.r * Math.PI / 2, c = Math.cos(th), s = Math.sin(th), yb = it.f === 1 && two ? 3.35 : 0; const ix = it.x * SC, iz = it.z * SC;
       for (const [x, sy, z, dy] of SEATS[it.c] || []) seats.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th + dy, fx: Math.sin(th + dy), fz: Math.cos(th + dy), fl: y + yb, c: it.c });
       if (SCREENS[it.c]) { const [x, sy, z, w, hh] = SCREENS[it.c]; screens.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th, w, h: hh, fl: y + yb }); }
-      for (const [sh, col, x, yy, z, sx, sy, sz, gl] of D.p) { const wx = x * c + z * s, wz = -x * s + z * c; put(gl ? gk : dk, G[sh], col === 'A' ? A : col === 'T' ? T : col, cx + ix + wx, y + yb + yy, cz + iz + wz, th, sx, sy, sz); }
+      const tint = hex6(it.col), mode = tint ? tintOf(it.c) : ''; const pc = (col) => (mode && (mode === 'A' ? col === 'A' : col === mode) ? tint : (col === 'A' ? A : col === 'T' ? T : col));
+      for (const [sh, col, x, yy, z, sx, sy, sz, gl] of D.p) { const wx = x * c + z * s, wz = -x * s + z * c; put(gl ? gk : dk, G[sh], pc(col), cx + ix + wx, y + yb + yy, cz + iz + wz, th, sx, sy, sz); }
       if (D.foot) { const [w, d] = it.r & 1 ? [D.foot[1], D.foot[0]] : D.foot; const b = { x0: cx + ix - w / 2, x1: cx + ix + w / 2, z0: cz + iz - d / 2, z1: cz + iz + d / 2, top: y + (it.f && two ? 3.35 : 0) + 1.2, bot: it.f && two ? y + 3.3 : -99 }; box.push(b); decCols.push(b); } }
     flush(dk, vc(), !LOW, decG); flush(gk, new THREE.MeshBasicMaterial({ vertexColors: true }), false, decG); }
-  setFloor(decor.floor || S.floor); setItems(items);
+  setFloor(decor.floor || S.floor, decor.floors || ''); setItems(items);
   function update() { /* doors removed */ }
   // kitchen + bath fixtures for homelife.js (fridge / stove / sink / shower): where to stand, where the thing is, which way to face
   const at = (x, z) => [cx + x * SC, cz + z * SC];
