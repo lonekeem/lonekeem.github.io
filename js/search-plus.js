@@ -64,6 +64,7 @@ export const GAMES = [
   ['trivia', 'Studio Trivia', '#/games/trivia', 'trivia quiz questions'],
   ['klgrid', 'KL Grid', '#/games/klgrid', 'tic tac toe ultimate grid'],
   ['palgames', 'Pal Games', '#/games/pals', 'pal race bubble pop star catch dance off'],
+  ['bingo', 'Pal Bingo', '#/arcade/bingo', 'bingo hall 75 ball daub pals'],
   ['park', 'Pal Park', '#/park', 'pal park walk treasures friends']
 ].map(([id, name, href, kw]) => ({ id, name, href, kw, kind: 'game', cat: 'gaming' }));
 export const PAGES = [
