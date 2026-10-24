@@ -55,21 +55,23 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
 
   // ---------------------------------------------------------------- roads, sidewalks, crosswalks, lane marks
   { const asphalt = std('#3a3c46', { r: 0.92, vc: true }); const y = FLAT + 0.035;
-    for (const r of ROADS) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2;
-      put('road', G.plane, '#3b3d48', cx, y, cz, ang, r.w, 1, len + r.w);
+    const seamOf = (r) => ((r.id && r.id.charCodeAt(0)) % 2 ? 0.008 : 0);
+    for (const r of ROADS) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2; const seam = seamOf(r);
+      put('road', G.plane, '#3b3d48', cx, y + seam, cz, ang, r.w, 1, len + Math.min(r.w * 0.22, 1.4));
       for (const s of [-1, 1]) { const ox = Math.cos(ang) * s * (r.w / 2 + SIDEWALK / 2), oz = -Math.sin(ang) * s * (r.w / 2 + SIDEWALK / 2); put('walk', G.box, '#c9c4bb', cx + ox, FLAT + 0.09, cz + oz, ang, SIDEWALK, 0.14, len + r.w + SIDEWALK * 2);
         const kx = Math.cos(ang) * s * (r.w / 2 + 0.06), kz = -Math.sin(ang) * s * (r.w / 2 + 0.06); put('walk', G.box, '#9c968c', cx + kx, FLAT + 0.1, cz + kz, ang, 0.14, 0.18, len); }
-      for (let t = 2; t < len - 2; t += 4) { const k = t / len; put('mark', G.plane, '#ffd84a', ax + (bx - ax) * k, y + 0.006, az + (bz - az) * k, ang, 0.16, 1, 2); } }
+      for (let t = 2; t < len - 2; t += 4) { const k = t / len; put('mark', G.plane, '#ffd84a', ax + (bx - ax) * k, y + seam + 0.016, az + (bz - az) * k, ang, 0.16, 1, 2); } }
     // crosswalk stripes at every crossing + the gate path
     const X = [[-64, 100], [64, 100], [0, 100], [-64, 145], [64, 145], [0, 145]];
-    for (const [x, z] of X) for (const [dx, dz, rot] of [[0, -6.2, 0], [0, 6.2, 0], [-6.2, 0, Math.PI / 2], [6.2, 0, Math.PI / 2]]) for (let i = -3; i <= 3; i++) put('mark', G.plane, '#f2f2f2', x + dx + (rot ? 0 : i * 1.05), y + 0.007, z + dz + (rot ? i * 1.05 : 0), rot, 0.55, 1, 2.4);
+    for (const [x, z] of X) for (const [dx, dz, rot] of [[0, -6.2, 0], [0, 6.2, 0], [-6.2, 0, Math.PI / 2], [6.2, 0, Math.PI / 2]]) for (let i = -3; i <= 3; i++) put('mark', G.plane, '#f2f2f2', x + dx + (rot ? 0 : i * 1.05), y + 0.02, z + dz + (rot ? i * 1.05 : 0), rot, 0.55, 1, 2.4);
     put('walk', G.box, '#d8cdb8', 0, FLAT + 0.06, (PARK.H - 8 + 96) / 2, 0, 4.5, 0.1, 96 - PARK.H + 8); // path from the park
     // Open Plains country roads: asphalt, dashed yellow centre, white edge lines (merged into the same batches = no extra draw calls)
-    for (const r of ROADS3) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2, dx = (bx - ax) / len, dz = (bz - az) / len;
-      put('road', G.plane, '#3b3d48', cx, y - 0.004, cz, ang, r.w, 1, len + r.w);
-      for (const s2 of [-1, 1]) put('mark', G.plane, '#e8e8e8', cx - dz * s2 * (r.w / 2 - 0.35), y + 0.005, cz + dx * s2 * (r.w / 2 - 0.35), ang, 0.16, 1, len);
-      for (let t = 3; t < len - 3; t += 6) { const k = t / len; put('mark', G.plane, '#ffd84a', ax + (bx - ax) * k, y + 0.006, az + (bz - az) * k, ang, 0.16, 1, 3); } }
-    flush('road', asphalt, false); flush('walk', std('#fff', { vc: true, r: 0.85 }), false); flush('mark', std('#fff', { vc: true, r: 0.6 }), false); }
+    for (const r of ROADS3) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2, dx = (bx - ax) / len, dz = (bz - az) / len; const seam = seamOf(r);
+      put('road', G.plane, '#3b3d48', cx, y - 0.004 + seam, cz, ang, r.w, 1, len + Math.min(r.w * 0.22, 1.4));
+      for (const s2 of [-1, 1]) put('mark', G.plane, '#e8e8e8', cx - dz * s2 * (r.w / 2 - 0.35), y + seam + 0.014, cz + dx * s2 * (r.w / 2 - 0.35), ang, 0.16, 1, len);
+      for (let t = 3; t < len - 3; t += 6) { const k = t / len; put('mark', G.plane, '#ffd84a', ax + (bx - ax) * k, y + seam + 0.016, az + (bz - az) * k, ang, 0.16, 1, 3); } }
+    const markMat = std('#fff', { vc: true, r: 0.6, x: { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 } });
+    flush('road', asphalt, false); flush('walk', std('#fff', { vc: true, r: 0.85 }), false); flush('mark', markMat, false); }
 
   // ---------------------------------------------------------------- houses (4 original styles, merged by material)
   const WALL = ['#f6e7c8', '#cfe3f0', '#f3d1dc', '#d8ecd0', '#efe0ff', '#ffe2b8', '#e2e8f0', '#f5d0a9'], ROOF = ['#5b3a7a', '#7a3b3b', '#3b4a7a', '#2f5d50', '#6b4a2f', '#4a3a6b'], TRIM = ['#ffffff', '#fff6e0', '#3b2a55'];
