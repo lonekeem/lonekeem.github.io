@@ -1419,7 +1419,7 @@ service cloud.firestore {
         return lb().keys().hasOnly(['uid', 'game', 'name', 'uname', 'color', 'pal', 'score', 'wins', 'losses', 'draws', 'games', 'best', 'wk', 'wkScore', 'updatedAt'])
           && lb().keys().hasAll(['uid', 'game', 'name', 'uname', 'color', 'score', 'wins', 'losses', 'draws', 'games', 'best', 'wk', 'wkScore', 'updatedAt'])
           && lb().uid == me()
-          && lb().game in ['stardrop', 'starcards', 'pool', 'chess', 'ludo', 'trivia', 'klgrid', 'checkers', 'pals', 'quest', 'all']
+          && lb().game in ['stardrop', 'starcards', 'pool', 'chess', 'ludo', 'trivia', 'klgrid', 'checkers', 'pals', 'quest', 'bingo', 'all']
           && docId == me() + '_' + lb().game
           && lb().name == get(userPath(me())).data.displayName && lb().uname == get(userPath(me())).data.username
           && isStr(lb().color, 0, 20)
@@ -2417,6 +2417,33 @@ service cloud.firestore {
         && (!('street' in wd()) || wd().street == null || carOk(wd().street))
         && wd().at == request.time && (resource == null || resource.data.at + duration.value(5, 's') < request.time);
     }
+    // Pal Bingo. One write-once room doc (seed + start). Each player writes only their own seat.
+    match /bingoRooms/{rid} {
+      allow read: if true;
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.keys().hasOnly(['host', 'code', 'pub', 'seed', 'start'])
+        && request.resource.data.host == me() && request.resource.data.code == rid
+        && request.resource.data.seed is int && request.resource.data.seed > 0 && request.resource.data.seed <= 2000000000
+        && request.resource.data.start == request.time
+        && request.resource.data.pub == (rid in ['hall', 'hall2', 'hall3']);
+      allow update, delete: if false;
+      match /seats/{uid} {
+        function bingoSeat() {
+          return request.resource.data.keys().hasOnly(['name', 'col', 'n', 'claim', 'emo', 'at'])
+            && request.resource.data.name == get(userPath(me())).data.displayName
+            && isStr(request.resource.data.col, 0, 20)
+            && request.resource.data.n is int && request.resource.data.n >= 1 && request.resource.data.n <= 4
+            && request.resource.data.claim is int && request.resource.data.claim >= 0 && request.resource.data.claim <= 75
+            && request.resource.data.emo is int && request.resource.data.emo >= 0 && request.resource.data.emo <= 400
+            && request.resource.data.at == request.time;
+        }
+        allow read: if true;
+        allow create, update: if signedIn() && uid == me() && bingoSeat()
+          && (resource == null ? notBanned() : resource.data.at + duration.value(2, 's') < request.time);
+        allow delete: if signedIn() && uid == me();
+      }
+    }
+
     // ================= Pal Park presence: rooms of ~20, ~14 writes/s while moving, stale docs removable by anyone
     match /parkRooms/{room}/p/{uid} {
       function pp() { return request.resource.data; }

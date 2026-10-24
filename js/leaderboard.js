@@ -11,7 +11,8 @@ export const LB_GAMES = [
   { id: 'chess', name: 'Chess', emoji: '♟️' }, { id: 'checkers', name: 'Checkers', emoji: '🔴' }, { id: 'pool', name: 'Star Pool', emoji: '🎱' },
   { id: 'starcards', name: 'Star Cards', emoji: '🃏' }, { id: 'ludo', name: 'Ludo', emoji: '🎲' }, { id: 'stardrop', name: 'Star Drop', emoji: '⭐' },
   { id: 'klgrid', name: 'KL Grid', emoji: '#️⃣' }, { id: 'trivia', name: 'Studio Trivia', emoji: '❓' },
-  { id: 'quest', name: 'Bubble Quest', emoji: '🫧' }, { id: 'pals', name: 'Pal Games', emoji: '🐾' }
+  { id: 'quest', name: 'Bubble Quest', emoji: '🫧' }, { id: 'pals', name: 'Pal Games', emoji: '🐾' },
+  { id: 'bingo', name: 'Pal Bingo', emoji: '🎱' }
 ];
 export const lbName = (g) => (LB_GAMES.find((x) => x.id === g) || { name: 'Game' }).name;
 const MATCH = ['chess', 'checkers', 'pool', 'starcards', 'ludo', 'stardrop', 'klgrid', 'trivia', 'pals'];
