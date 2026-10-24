@@ -15,7 +15,6 @@ import { FX_DEFAULT } from './fx/looks.js';
 import { onDoubleTap } from './tapstar.js';
 import { stripExif, piiOk } from './safety.js';
 import { guardUpload, REVIEW_MSG } from './mediascan.js';
-import { reviewSongFile } from './songcheck.js';
 import { openEditor } from './snapedit.js';
 import { WORK_IC, DESC as WORK_DESC } from './works.js';
 
@@ -559,7 +558,7 @@ export function createComposer(ctx) {
 
   function openPreview(file, info, source, camMode) {
     const ready = uploadsReady();
-    let xhr = null, uploaded = null, songNote = null, busy = false;
+    let xhr = null, uploaded = null, busy = false;
     const isVideo = info.kind === 'video';
     const story = isStory();
     const panel = story ? `
@@ -642,15 +641,6 @@ export function createComposer(ctx) {
         if (!uploaded) {
           // on-device picture/video check + kind words on the caption (mediascan.js)
           await guardUpload(file, { where: story ? 'story' : 'post', caption: cap.value, onStatus: (t) => (status.textContent = t) });
-          if (isVideo && !story) {
-            status.textContent = 'Checking the sound…';
-            const song = await reviewSongFile(file);
-            if (song.action === 'cancel') {
-              busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; status.textContent = '';
-              return;
-            }
-            songNote = song.action === 'hold' ? { holdReason: song.reason } : song.action === 'unchecked' ? { unchecked: true } : null;
-          }
           bar.hidden = false; status.textContent = 'Uploading… 0%';
           uploaded = await upload(file, (f) => { barIn.style.transform = `scaleX(${f})`; status.textContent = f >= 1 ? 'Processing…' : `Uploading… ${Math.round(f * 100)}%`; });
         }
@@ -664,7 +654,7 @@ export function createComposer(ctx) {
           return;
         }
         status.textContent = 'Saving your post…';
-        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat'), song: songNote });
+        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat') });
         closeOverlay();
         dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 30 } }));
         if (S.lastHeld === id) { toast(REVIEW_MSG); location.hash = '#/post/' + id; return; }

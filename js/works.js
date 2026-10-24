@@ -8,8 +8,7 @@ import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloud
 import { createSeries } from './series.js';
 import { stripExif } from './safety.js';
 import { postStamp, postDone } from './spam.js';
-import { guardUpload, REVIEW_MSG } from './mediascan.js';
-import { reviewSongFile, uncheckedFields, claimFields } from './songcheck.js';
+import { guardUpload } from './mediascan.js';
 import { faceName, adminNameClass } from './kemy-name.js';
 
 export const GENRES = {
@@ -237,14 +236,6 @@ export function createWorks(ctx) {
       go.disabled = true; bar.hidden = false;
       const prog = (base, span) => (f) => (barIn.style.transform = `scaleX(${base + span * Math.min(1, f)})`);
       try {
-        let song = null;
-        if (file) {
-          status.textContent = 'Checking the sound…';
-          const r = await reviewSongFile(file);
-          if (r.action === 'cancel') { go.disabled = false; bar.hidden = true; status.textContent = ''; return; }
-          if (r.action === 'hold') song = { holdReason: r.reason };
-          else if (r.action === 'unchecked') song = { unchecked: true };
-        }
         let cover = '', poster = '', mediaUrl = '', mediaType = '';
         if (art) { status.textContent = 'Uploading artwork…'; const r = await upload(art, CLOUDINARY.uploadPreset, 'lks_work_art', prog(0, file ? 0.15 : 0.9)); cover = isSong ? squareUrl(r) : deliveryUrls(r).mediaUrl; if (!isSong) poster = deliveryUrls(r).posterUrl; }
         if (file) {
@@ -261,25 +252,18 @@ export function createWorks(ctx) {
         else work.rating = main.querySelector('input[name=rating]:checked').value;
         const ref = doc(collection(db, 'posts'));
         const b = writeBatch(db);
-        const data = {
+        (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, {
           authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
           type: kind, text: desc.slice(0, 1000), linkUrl: yt ? `https://www.youtube.com/watch?v=${yt}` : '', mediaUrl, mediaType, poster: isSong ? '' : poster,
           work, ...(pickedCat(main, 'w-cat') ? { cat: pickedCat(main, 'w-cat') } : {}), ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
           createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
-        };
-        if (song && song.holdReason) {
-          S.lastHeld = ref.id;
-          b.set(doc(db, 'songChecks', ref.id), { ...claimFields(ref.id, authorId, S.user.uid, song.holdReason, data), createdAt: serverTimestamp() });
-        } else {
-          const held = (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, data, null);
-          if (song && song.unchecked && !held) b.set(doc(db, 'songChecks', ref.id), { ...uncheckedFields(ref.id, authorId, S.user.uid), createdAt: serverTimestamp() });
-        }
+        });
         const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
         await b.commit(); postDone(st);
         barIn.style.transform = 'scaleX(1)';
         const sp = pickSeries();
-        if (sp && S.lastHeld !== ref.id) { status.textContent = 'Adding to your series…'; try { await series().addEpisode(sp.series, ref.id, sp.season, sp.ep, work.title); } catch (e) { toast('Shared, but it couldn’t be added to the series: ' + (e.message || '')); } }
-        toast(S.lastHeld === ref.id ? REVIEW_MSG : (isSong ? 'Song shared!' : 'Movie shared!'));
+        if (sp) { status.textContent = 'Adding to your series…'; try { await series().addEpisode(sp.series, ref.id, sp.season, sp.ep, work.title); } catch (e) { toast('Shared, but it couldn’t be added to the series: ' + (e.message || '')); } }
+        toast(isSong ? 'Song shared!' : 'Movie shared!');
         location.hash = '#/post/' + ref.id;
       } catch (e) {
         go.disabled = false; status.textContent = '';
@@ -525,9 +509,6 @@ export function createWorks(ctx) {
     if (!requireAuth()) throw new Error('Sign in to post.');
     if (file.size > 100 * 1048576) throw new Error('Movies can be up to 100 MB.');
     if (runtime > 600.5) throw new Error('Uploads can be up to 10 minutes.');
-    const gate = await reviewSongFile(file);
-    if (gate.action === 'cancel') return null;
-    const song = gate.action === 'hold' ? { holdReason: gate.reason } : gate.action === 'unchecked' ? { unchecked: true } : null;
     const r = await upload(file, CLOUDINARY.uploadPreset, 'lks_movie', onProgress);
     const d = deliveryUrls(r);
     const rt = Math.min(601, Math.round((r.duration || runtime) * 10) / 10);
@@ -535,22 +516,15 @@ export function createWorks(ctx) {
     const work = { title: String(title).slice(0, 80), genre: GENRES.movie.includes(genre) ? genre : 'Animation', aiTools: aiTools.slice(0, 100), runtime: rt, yt: '', cover: '', rights: true, rating };
     const ref = doc(collection(db, 'posts'));
     const b = writeBatch(db);
-    const data = {
+    (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, {
       authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
       type: 'movie', text: String(desc).slice(0, 1000), linkUrl: '', mediaUrl: d.mediaUrl, mediaType: 'video', poster: d.posterUrl,
       work, ...searchFields({ text: [work.title, desc, work.genre, aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
       createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
-    };
-    if (song && song.holdReason) {
-      S.lastHeld = ref.id;
-      b.set(doc(db, 'songChecks', ref.id), { ...claimFields(ref.id, authorId, S.user.uid, song.holdReason, data), createdAt: serverTimestamp() });
-    } else {
-      const held = (ctx.holdOrSet || ((bb, r, d) => bb.set(r, d)))(b, ref, data, null);
-      if (song && song.unchecked && !held) b.set(doc(db, 'songChecks', ref.id), { ...uncheckedFields(ref.id, authorId, S.user.uid), createdAt: serverTimestamp() });
-    }
+    });
     const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
     await b.commit(); postDone(st);
-    if (seriesPick && S.lastHeld !== ref.id) await series().addEpisode(seriesPick.series, ref.id, seriesPick.season, seriesPick.ep, work.title);
+    if (seriesPick) await series().addEpisode(seriesPick.series, ref.id, seriesPick.season, seriesPick.ep, work.title);
     return ref.id;
   }
   return { isWork, card, page, explore, grid, composePage, tile, player, publishMovie, series };
