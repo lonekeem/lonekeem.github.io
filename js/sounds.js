@@ -45,11 +45,21 @@ export async function trackById(id) {
   return list.find((t) => t.id === id) || null;
 }
 
+function viaOf(t) {
+  if (t.via) return t.via;
+  const src = String(t.source || '');
+  if (src.includes('incompetech.com')) return 'incompetech.com';
+  if (src.includes('freepd.com')) return 'freepd.com';
+  if (src.includes('ccmixter.org')) return 'ccmixter.org';
+  if (src.includes('wikimedia.org')) return 'commons.wikimedia.org';
+  return '';
+}
 export function creditText(t) {
   if (!t) return '';
   if (t.section === 'original' || String(t.id || '').startsWith('keem-')) return `Music: '${t.title}' by Lone Keem`;
-  if (String(t.license).startsWith('CC BY')) return `Music: '${t.title}' by Kevin MacLeod (incompetech.com), CC BY 4.0`;
-  return `Music: '${t.title}' by ${t.artist} (freepd.com), CC0 1.0`;
+  const via = viaOf(t);
+  const lic = t.license || '';
+  return `Music: '${t.title}' by ${t.artist}${via ? ` (${via})` : ''}${lic ? `, ${lic}` : ''}`;
 }
 
 // Stored on the post. Credit is looked up from the manifest, not copied onto the document.
@@ -95,7 +105,12 @@ export function mountSoundPicker(host) {
       <p class="ks-title">🎵 Kemy Sounds</p>
       <div class="ks-tabs" role="tablist" aria-label="Kemy Sounds">
         <button type="button" role="tab" data-tab="originals" aria-selected="true">Originals</button>
+        <button type="button" role="tab" data-tab="all" aria-selected="false">All</button>
         ${MOODS.map(([id, name]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="false">${name}</button>`).join('')}
+      </div>
+      <div class="ks-find">
+        <input type="search" data-ks-q placeholder="Search songs or artists" aria-label="Search songs or artists" autocomplete="off">
+        <select data-ks-artist aria-label="Artist"><option value="">All artists</option></select>
       </div>
       <p class="ks-sec">Lone Keem Originals</p>
       <div class="ks-list" role="list"></div>
@@ -106,6 +121,8 @@ export function mountSoundPicker(host) {
     </div>`;
   const listEl = host.querySelector('.ks-list');
   const status = host.querySelector('.ks-status');
+  const qEl = host.querySelector('[data-ks-q]');
+  const aEl = host.querySelector('[data-ks-artist]');
   const vol = () => (+host.querySelector('[data-ks-vol]').value) / 100;
   const orig = () => (+host.querySelector('[data-ks-orig]').value) / 100;
   const stopPreview = () => { preview.pause(); playing = ''; };
@@ -115,16 +132,26 @@ export function mountSoundPicker(host) {
   }
   async function paint() {
     host.querySelectorAll('.ks-tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'));
-    host.querySelector('.ks-sec').textContent = tab === 'originals' ? 'Lone Keem Originals' : 'Free Music · ' + (MOODS.find(([id]) => id === tab)?.[1] || '');
-    let rows = [];
+    const head = tab === 'originals' ? 'Lone Keem Originals' : tab === 'all' ? 'Free Music' : 'Free Music · ' + (MOODS.find(([id]) => id === tab)?.[1] || '');
+    let pool = [];
     try {
       const list = await allTracks();
-      rows = tab === 'originals' ? list.filter((t) => t.section === 'original') : list.filter((t) => t.mood === tab);
+      pool = tab === 'originals' ? list.filter((t) => t.section === 'original')
+        : tab === 'all' ? list.filter((t) => t.section === 'free')
+        : list.filter((t) => t.mood === tab);
     } catch { listEl.innerHTML = '<p class="muted small">The sound list didn’t load. Try again in a moment.</p>'; return; }
+    const curArtist = aEl.value;
+    const names = [...new Set(pool.map((t) => t.artist))].sort((a, b) => a.localeCompare(b));
+    aEl.innerHTML = `<option value="">All artists</option>${names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}`;
+    if (names.includes(curArtist)) aEl.value = curArtist;
+    const q = qEl.value.trim().toLowerCase();
+    const who = aEl.value;
+    const rows = pool.filter((t) => (!who || t.artist === who) && (!q || `${t.title} ${t.artist}`.toLowerCase().includes(q)));
+    host.querySelector('.ks-sec').textContent = `${head} · ${rows.length}`;
     listEl.innerHTML = rows.map((t) => `<div class="ks-row ${picked && picked.id === t.id ? 'picked' : ''} ${playing === t.id ? 'on' : ''}" role="listitem">
-      <button type="button" class="ks-prev" data-id="${esc(t.id)}" aria-label="Preview ${esc(t.title)}"><span aria-hidden="true">${playing === t.id ? '⏸' : '▶'}</span><span class="ks-meta"><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></span></button>
+      <button type="button" class="ks-prev" data-id="${esc(t.id)}" aria-label="Preview ${esc(t.title)}"><span aria-hidden="true">${playing === t.id ? '⏸' : '▶'}</span><span class="ks-meta"><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.vocals ? ' · singing' : ''}</small></span></button>
       <button type="button" class="ks-use" data-pick="${esc(t.id)}">${picked && picked.id === t.id ? 'Picked' : 'Pick'}</button>
-    </div>`).join('') || '<p class="muted small">Nothing in this group.</p>';
+    </div>`).join('') || '<p class="muted small">Nothing matches.</p>';
   }
   host.querySelector('.ks-tabs').onclick = (e) => {
     const b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -150,6 +177,8 @@ export function mountSoundPicker(host) {
     preview.volume = Math.max(0.05, vol());
     preview.play().then(() => { playing = id; paint(); dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'kemy-sound' } })); }).catch(() => {});
   };
+  qEl.oninput = () => paint();
+  aEl.onchange = () => paint();
   host.querySelector('[data-ks-vol]').oninput = () => { preview.volume = vol(); if (picked) paintStatus(); };
   host.querySelector('[data-ks-orig]').oninput = () => { if (picked) paintStatus(); };
   const onOther = (e) => { if (e.detail?.source !== 'kemy-sound') stopPreview(); };
@@ -262,16 +291,25 @@ export async function creditsPage(root) {
   catch { root.innerHTML = '<p class="card pad">The sound list didn’t load. <a href="#/sounds">Try again</a></p>'; return; }
   const orig = list.filter((t) => t.section === 'original');
   const free = list.filter((t) => t.section === 'free');
+  const licHref = (license) => {
+    const s = String(license || '');
+    if (s === 'CC0 1.0' || s === 'CC0') return 'https://creativecommons.org/publicdomain/zero/1.0/';
+    if (/public domain/i.test(s)) return 'https://creativecommons.org/publicdomain/mark/1.0/';
+    const sa = s.match(/CC BY-SA\s+([0-9.]+)/i);
+    if (sa) return `https://creativecommons.org/licenses/by-sa/${sa[1]}/`;
+    const by = s.match(/CC BY\s+([0-9.]+)/i);
+    if (by) return `https://creativecommons.org/licenses/by/${by[1]}/`;
+    return '';
+  };
   const licLink = (t) => {
-    if (t.license === 'CC0 1.0') return `<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">CC0 1.0</a>`;
-    if (String(t.license).startsWith('CC BY')) return `<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>`;
-    return 'Lone Keem original';
+    const href = licHref(t.license);
+    return href ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${esc(t.license)}</a>` : esc(t.license || 'Lone Keem original');
   };
   const row = (t) => `<li><b>${esc(t.title)}</b> — ${esc(t.artist)} · ${licLink(t)}${t.source ? ` · <a href="${esc(t.source)}" target="_blank" rel="noopener noreferrer">Source</a>` : ''}<br><span class="muted">${esc(creditText(t))}</span></li>`;
   root.innerHTML = `
     <a class="back-link" href="#/settings">← Settings</a>
     <h1 class="page-title">🎵 Kemy Sounds</h1>
-    <p class="muted">Music players can put behind a video or sound. Free tracks are shortened to about a minute so the app stays small.</p>
+    <p class="muted">Music you can put behind a video or sound. Free tracks are shortened so the app stays small.</p>
     <section class="card pad ks-page">
       <h2>Lone Keem Originals</h2>
       <p class="muted small">Keem’s own songs, already in Kemy. Each one is credited to Lone Keem. These names are on the song checker allow-list.</p>
@@ -279,7 +317,7 @@ export async function creditsPage(root) {
     </section>
     <section class="card pad ks-page">
       <h2>Free Music</h2>
-      <p class="muted small">Only music whose license allows use inside an app. <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">CC0 1.0</a> from FreePD (public domain), and <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> from Kevin MacLeod (incompetech.com). A post that uses a CC BY track shows the credit line below.</p>
+      <p class="muted small">Only licenses that allow an app to keep and share the music: public domain / CC0, CC BY, and CC BY-SA. CC BY and CC BY-SA need the credit line on the post. CC BY-SA also means a remix of that track stays under the same license. Non-commercial and no-derivatives tracks are not included.</p>
       ${MOODS.map(([id, name]) => `<h3>${name}</h3><ul class="ks-credits">${free.filter((t) => t.mood === id).map(row).join('')}</ul>`).join('')}
     </section>`;
 }

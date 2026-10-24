@@ -1,5 +1,5 @@
 {
-  "about": "Free Music for Kemy Sounds. Trimmed to about 60 seconds, 96 kbps mono. CC0 and CC BY allow these edits.",
+  "about": "Free Music for Kemy Sounds. Each file is 64\u201396 kbps mono and trimmed to about 60\u201390 seconds. CC0, public domain, CC BY, and CC BY-SA allow these edits when the track page says so. To add another track later, drop an mp3 in assets/sounds/ and add an object to tracks with id, title, artist, mood (happy, chill, hype, funny, adventure, spooky), license, source (the page that states the license), file, and via. No code change is required. Do not add NC, ND, Pixabay, or YouTube-only tracks.",
   "sources": [
     {
       "name": "FreePD",
@@ -12,6 +12,24 @@
       "license": "CC BY 4.0",
       "url": "https://creativecommons.org/licenses/by/4.0/",
       "note": "Licensed under Creative Commons Attribution 4.0. Credit is required."
+    },
+    {
+      "name": "ccMixter",
+      "license": "CC BY, CC BY-SA, or CC0 on each track page",
+      "url": "https://ccmixter.org/",
+      "note": "Each file's track page license box is CC BY, CC BY-SA, or CC0. The site footer (BY-NC for the site text) is not the music license. No non-commercial or no-derivatives uploads."
+    },
+    {
+      "name": "Wikimedia Commons",
+      "license": "CC BY, CC BY-SA, or CC0 on each file page",
+      "url": "https://commons.wikimedia.org/",
+      "note": "A few individual songs whose file page LicenseShortName is CC BY, CC BY-SA, or CC0."
+    },
+    {
+      "name": "Musopen",
+      "license": "Public domain or CC0 on each Commons file page",
+      "url": "https://commons.wikimedia.org/wiki/Category:Musopen",
+      "note": "Classical recordings from the Musopen Commons category whose own file page says public domain, CC0, or CC BY-SA. Trimmed to about 90 seconds. CC BY-SA credits the performer named on that page."
     }
   ],
   "tracks": [
@@ -22,7 +40,9 @@
       "mood": "happy",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Funshine.mp3",
-      "file": "assets/sounds/fp-funshine.mp3"
+      "file": "assets/sounds/fp-funshine.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-city-sunshine",
@@ -31,7 +51,9 @@
       "mood": "happy",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/City%20Sunshine.mp3",
-      "file": "assets/sounds/fp-city-sunshine.mp3"
+      "file": "assets/sounds/fp-city-sunshine.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-happy-ukulele",
@@ -40,7 +62,9 @@
       "mood": "happy",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3",
-      "file": "assets/sounds/fp-happy-ukulele.mp3"
+      "file": "assets/sounds/fp-happy-ukulele.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-pickled-pink",
@@ -49,7 +73,9 @@
       "mood": "happy",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Pickled%20Pink.mp3",
-      "file": "assets/sounds/fp-pickled-pink.mp3"
+      "file": "assets/sounds/fp-pickled-pink.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-study-relax",
@@ -58,7 +84,9 @@
       "mood": "chill",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Study%20and%20Relax.mp3",
-      "file": "assets/sounds/fp-study-relax.mp3"
+      "file": "assets/sounds/fp-study-relax.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-river",
@@ -67,7 +95,9 @@
       "mood": "chill",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/River%20Meditation.mp3",
-      "file": "assets/sounds/fp-river.mp3"
+      "file": "assets/sounds/fp-river.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-kalimba",
@@ -76,7 +106,9 @@
       "mood": "chill",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Kalimba%20Relaxation%20Music.mp3",
-      "file": "assets/sounds/fp-kalimba.mp3"
+      "file": "assets/sounds/fp-kalimba.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-shining-stars",
@@ -85,7 +117,9 @@
       "mood": "chill",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Shining%20Stars.mp3",
-      "file": "assets/sounds/fp-shining-stars.mp3"
+      "file": "assets/sounds/fp-shining-stars.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-pond",
@@ -94,7 +128,9 @@
       "mood": "chill",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Pond.mp3",
-      "file": "assets/sounds/fp-pond.mp3"
+      "file": "assets/sounds/fp-pond.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-infinite-peace",
@@ -103,7 +139,9 @@
       "mood": "chill",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Infinite%20Peace.mp3",
-      "file": "assets/sounds/fp-infinite-peace.mp3"
+      "file": "assets/sounds/fp-infinite-peace.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-new-hero",
@@ -112,7 +150,9 @@
       "mood": "hype",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/New%20Hero%20in%20Town.mp3",
-      "file": "assets/sounds/fp-new-hero.mp3"
+      "file": "assets/sounds/fp-new-hero.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-funky-loop",
@@ -121,7 +161,9 @@
       "mood": "hype",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Funky%20Energy%20Loop.mp3",
-      "file": "assets/sounds/fp-funky-loop.mp3"
+      "file": "assets/sounds/fp-funky-loop.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-city-run",
@@ -130,7 +172,9 @@
       "mood": "hype",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/City%20Run.mp3",
-      "file": "assets/sounds/fp-city-run.mp3"
+      "file": "assets/sounds/fp-city-run.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-energizing",
@@ -139,7 +183,9 @@
       "mood": "hype",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Energizing.mp3",
-      "file": "assets/sounds/fp-energizing.mp3"
+      "file": "assets/sounds/fp-energizing.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-wizard-circus",
@@ -148,7 +194,9 @@
       "mood": "funny",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Wizard%20Circus.mp3",
-      "file": "assets/sounds/fp-wizard-circus.mp3"
+      "file": "assets/sounds/fp-wizard-circus.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-bananas",
@@ -157,7 +205,9 @@
       "mood": "funny",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Going%20Bananas.mp3",
-      "file": "assets/sounds/fp-bananas.mp3"
+      "file": "assets/sounds/fp-bananas.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-bunny",
@@ -166,7 +216,9 @@
       "mood": "funny",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/My%20Giant%20Bunny%20Friend.mp3",
-      "file": "assets/sounds/fp-bunny.mp3"
+      "file": "assets/sounds/fp-bunny.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-llama",
@@ -175,7 +227,9 @@
       "mood": "funny",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Llama%20in%20Pajama.mp3",
-      "file": "assets/sounds/fp-llama.mp3"
+      "file": "assets/sounds/fp-llama.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-spring-chicken",
@@ -184,7 +238,9 @@
       "mood": "funny",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Spring%20Chicken.mp3",
-      "file": "assets/sounds/fp-spring-chicken.mp3"
+      "file": "assets/sounds/fp-spring-chicken.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-entertainer",
@@ -193,7 +249,9 @@
       "mood": "funny",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/The%20Entertainer.mp3",
-      "file": "assets/sounds/fp-entertainer.mp3"
+      "file": "assets/sounds/fp-entertainer.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-adventure",
@@ -202,7 +260,9 @@
       "mood": "adventure",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Adventure.mp3",
-      "file": "assets/sounds/fp-adventure.mp3"
+      "file": "assets/sounds/fp-adventure.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-heroic",
@@ -211,7 +271,9 @@
       "mood": "adventure",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Heroic%20Adventure.mp3",
-      "file": "assets/sounds/fp-heroic.mp3"
+      "file": "assets/sounds/fp-heroic.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-flight",
@@ -220,7 +282,9 @@
       "mood": "adventure",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Inventing%20Flight.mp3",
-      "file": "assets/sounds/fp-flight.mp3"
+      "file": "assets/sounds/fp-flight.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-garden",
@@ -229,7 +293,9 @@
       "mood": "adventure",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Magic%20in%20the%20Garden.mp3",
-      "file": "assets/sounds/fp-garden.mp3"
+      "file": "assets/sounds/fp-garden.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-stunted",
@@ -238,7 +304,9 @@
       "mood": "adventure",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Stunted%20Adventure.mp3",
-      "file": "assets/sounds/fp-stunted.mp3"
+      "file": "assets/sounds/fp-stunted.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-fright",
@@ -247,7 +315,9 @@
       "mood": "spooky",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Fright%20Night%20Twist.mp3",
-      "file": "assets/sounds/fp-fright.mp3"
+      "file": "assets/sounds/fp-fright.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-monsters",
@@ -256,7 +326,9 @@
       "mood": "spooky",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Monsters%20in%20Hotel.mp3",
-      "file": "assets/sounds/fp-monsters.mp3"
+      "file": "assets/sounds/fp-monsters.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-ghost-town",
@@ -265,7 +337,9 @@
       "mood": "spooky",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Ghost%20Town.mp3",
-      "file": "assets/sounds/fp-ghost-town.mp3"
+      "file": "assets/sounds/fp-ghost-town.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-creepy-comedy",
@@ -274,7 +348,9 @@
       "mood": "spooky",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Creepy%20Comedy.mp3",
-      "file": "assets/sounds/fp-creepy-comedy.mp3"
+      "file": "assets/sounds/fp-creepy-comedy.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-witch-waltz",
@@ -283,7 +359,9 @@
       "mood": "spooky",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Witch%20Waltz.mp3",
-      "file": "assets/sounds/fp-witch-waltz.mp3"
+      "file": "assets/sounds/fp-witch-waltz.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-castle",
@@ -292,7 +370,9 @@
       "mood": "spooky",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Night%20in%20the%20Castle.mp3",
-      "file": "assets/sounds/fp-castle.mp3"
+      "file": "assets/sounds/fp-castle.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "fp-forest-night",
@@ -301,7 +381,9 @@
       "mood": "spooky",
       "license": "CC0 1.0",
       "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Forest%20Night.mp3",
-      "file": "assets/sounds/fp-forest-night.mp3"
+      "file": "assets/sounds/fp-forest-night.mp3",
+      "via": "freepd.com",
+      "vocals": false
     },
     {
       "id": "km-carefree",
@@ -310,7 +392,9 @@
       "mood": "happy",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3",
-      "file": "assets/sounds/km-carefree.mp3"
+      "file": "assets/sounds/km-carefree.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-happy-alley",
@@ -319,7 +403,9 @@
       "mood": "happy",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Happy%20Alley.mp3",
-      "file": "assets/sounds/km-happy-alley.mp3"
+      "file": "assets/sounds/km-happy-alley.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-somewhere-sunny",
@@ -328,7 +414,9 @@
       "mood": "happy",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Somewhere%20Sunny.mp3",
-      "file": "assets/sounds/km-somewhere-sunny.mp3"
+      "file": "assets/sounds/km-somewhere-sunny.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-monkeys",
@@ -337,7 +425,9 @@
       "mood": "happy",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3",
-      "file": "assets/sounds/km-monkeys.mp3"
+      "file": "assets/sounds/km-monkeys.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-easy-lemon",
@@ -346,7 +436,9 @@
       "mood": "chill",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Easy%20Lemon%2060%20second.mp3",
-      "file": "assets/sounds/km-easy-lemon.mp3"
+      "file": "assets/sounds/km-easy-lemon.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-wallpaper",
@@ -355,7 +447,9 @@
       "mood": "chill",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wallpaper.mp3",
-      "file": "assets/sounds/km-wallpaper.mp3"
+      "file": "assets/sounds/km-wallpaper.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-feather-waltz",
@@ -364,7 +458,9 @@
       "mood": "chill",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Feather%20Waltz.mp3",
-      "file": "assets/sounds/km-feather-waltz.mp3"
+      "file": "assets/sounds/km-feather-waltz.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-nu-flute",
@@ -373,7 +469,9 @@
       "mood": "chill",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Nu%20Flute.mp3",
-      "file": "assets/sounds/km-nu-flute.mp3"
+      "file": "assets/sounds/km-nu-flute.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-heroic-age",
@@ -382,7 +480,9 @@
       "mood": "hype",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Heroic%20Age.mp3",
-      "file": "assets/sounds/km-heroic-age.mp3"
+      "file": "assets/sounds/km-heroic-age.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-take-a-chance",
@@ -391,7 +491,9 @@
       "mood": "hype",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Take%20a%20Chance.mp3",
-      "file": "assets/sounds/km-take-a-chance.mp3"
+      "file": "assets/sounds/km-take-a-chance.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-a-mission",
@@ -400,7 +502,9 @@
       "mood": "hype",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/A%20Mission.mp3",
-      "file": "assets/sounds/km-a-mission.mp3"
+      "file": "assets/sounds/km-a-mission.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-sneaky-snitch",
@@ -409,7 +513,9 @@
       "mood": "funny",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3",
-      "file": "assets/sounds/km-sneaky-snitch.mp3"
+      "file": "assets/sounds/km-sneaky-snitch.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-fluffing-a-duck",
@@ -418,7 +524,9 @@
       "mood": "funny",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Fluffing%20a%20Duck.mp3",
-      "file": "assets/sounds/km-fluffing-a-duck.mp3"
+      "file": "assets/sounds/km-fluffing-a-duck.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-hamster-march",
@@ -427,7 +535,9 @@
       "mood": "funny",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hamster%20March.mp3",
-      "file": "assets/sounds/km-hamster-march.mp3"
+      "file": "assets/sounds/km-hamster-march.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-golly-gee",
@@ -436,7 +546,9 @@
       "mood": "funny",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Golly%20Gee.mp3",
-      "file": "assets/sounds/km-golly-gee.mp3"
+      "file": "assets/sounds/km-golly-gee.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-call-to-adventure",
@@ -445,7 +557,9 @@
       "mood": "adventure",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Call%20to%20Adventure.mp3",
-      "file": "assets/sounds/km-call-to-adventure.mp3"
+      "file": "assets/sounds/km-call-to-adventure.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-gaslamp",
@@ -454,7 +568,9 @@
       "mood": "adventure",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gaslamp%20Funworks.mp3",
-      "file": "assets/sounds/km-gaslamp.mp3"
+      "file": "assets/sounds/km-gaslamp.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-curtain",
@@ -463,7 +579,9 @@
       "mood": "adventure",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Curtain%20Rises.mp3",
-      "file": "assets/sounds/km-curtain.mp3"
+      "file": "assets/sounds/km-curtain.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-comfy-mystery",
@@ -472,7 +590,9 @@
       "mood": "spooky",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Comfortable%20Mystery%204.mp3",
-      "file": "assets/sounds/km-comfy-mystery.mp3"
+      "file": "assets/sounds/km-comfy-mystery.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-sneaky-adventure",
@@ -481,7 +601,9 @@
       "mood": "spooky",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Adventure.mp3",
-      "file": "assets/sounds/km-sneaky-adventure.mp3"
+      "file": "assets/sounds/km-sneaky-adventure.mp3",
+      "via": "incompetech.com",
+      "vocals": false
     },
     {
       "id": "km-mystery",
@@ -490,7 +612,1395 @@
       "mood": "spooky",
       "license": "CC BY 4.0",
       "source": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/mystery.mp3",
-      "file": "assets/sounds/km-mystery.mp3"
+      "file": "assets/sounds/km-mystery.mp3",
+      "via": "incompetech.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-natural-vibes-kevin-macl",
+      "title": "Natural Vibes",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Natural%20Vibes.mp3",
+      "file": "assets/sounds/fp-natural-vibes-kevin-macl.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-fresh-focus-kevin-macleo",
+      "title": "Fresh Focus",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Fresh%20Focus.mp3",
+      "file": "assets/sounds/fp-fresh-focus-kevin-macleo.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-and-just-like-that-bryan",
+      "title": "And Just Like That",
+      "artist": "Bryan Teoh",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/And%20Just%20Like%20That.mp3",
+      "file": "assets/sounds/fp-and-just-like-that-bryan.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-bar-brawl-bryan-teoh",
+      "title": "Bar Brawl",
+      "artist": "Bryan Teoh",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Bar%20Brawl.mp3",
+      "file": "assets/sounds/fp-bar-brawl-bryan-teoh.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-from-page-to-practice-br",
+      "title": "From Page to Practice",
+      "artist": "Bryan Teoh",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/From%20Page%20to%20Practice.mp3",
+      "file": "assets/sounds/fp-from-page-to-practice-br.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-limit-70-kevin-macleod",
+      "title": "Limit 70",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Limit%2070.mp3",
+      "file": "assets/sounds/fp-limit-70-kevin-macleod.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-still-pickin-kevin-macle",
+      "title": "Still Pickin",
+      "artist": "Kevin MacLeod",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Still%20Pickin.mp3",
+      "file": "assets/sounds/fp-still-pickin-kevin-macle.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-motions-rafael-krux",
+      "title": "Motions",
+      "artist": "Rafael Krux",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Motions.mp3",
+      "file": "assets/sounds/fp-motions-rafael-krux.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-ukulele-song-rafael-krux",
+      "title": "Ukulele Song",
+      "artist": "Rafael Krux",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Ukulele%20Song.mp3",
+      "file": "assets/sounds/fp-ukulele-song-rafael-krux.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-advertime-rafael-krux",
+      "title": "Advertime",
+      "artist": "Rafael Krux",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Advertime.mp3",
+      "file": "assets/sounds/fp-advertime-rafael-krux.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-inspiration-rafael-krux",
+      "title": "Inspiration",
+      "artist": "Rafael Krux",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Inspiration.mp3",
+      "file": "assets/sounds/fp-inspiration-rafael-krux.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-stereotype-news-rafael-k",
+      "title": "Stereotype News",
+      "artist": "Rafael Krux",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Stereotype%20News.mp3",
+      "file": "assets/sounds/fp-stereotype-news-rafael-k.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-isolation-waltz-bryan-te",
+      "title": "Isolation Waltz",
+      "artist": "Bryan Teoh",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Isolation%20Waltz.mp3",
+      "file": "assets/sounds/fp-isolation-waltz-bryan-te.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-lucky-break-bryan-teoh",
+      "title": "Lucky Break",
+      "artist": "Bryan Teoh",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Lucky%20Break.mp3",
+      "file": "assets/sounds/fp-lucky-break-bryan-teoh.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-landra-s-dream-kevin-mac",
+      "title": "Landra's Dream",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Landra%27s%20Dream.mp3",
+      "file": "assets/sounds/fp-landra-s-dream-kevin-mac.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-amazing-grace-kevin-macl",
+      "title": "Amazing Grace",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Amazing%20Grace.mp3",
+      "file": "assets/sounds/fp-amazing-grace-kevin-macl.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-night-in-venice-kevin-ma",
+      "title": "Night in Venice",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Night%20in%20Venice.mp3",
+      "file": "assets/sounds/fp-night-in-venice-kevin-ma.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-patience-party-kevin-mac",
+      "title": "Patience Party",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Patience%20Party.mp3",
+      "file": "assets/sounds/fp-patience-party-kevin-mac.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-a-very-brady-special-kev",
+      "title": "A Very Brady Special",
+      "artist": "Kevin MacLeod",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/A%20Very%20Brady%20Special.mp3",
+      "file": "assets/sounds/fp-a-very-brady-special-kev.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-champ-de-tournesol-rafae",
+      "title": "Champ de tournesol",
+      "artist": "Rafael Krux",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Champ%20de%20tournesol.mp3",
+      "file": "assets/sounds/fp-champ-de-tournesol-rafae.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "fp-nostalgic-piano-rafael-k",
+      "title": "Nostalgic Piano",
+      "artist": "Rafael Krux",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Nostalgic%20Piano.mp3",
+      "file": "assets/sounds/fp-nostalgic-piano-rafael-k.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "cm-jayvee-enaguas-in-the-fl",
+      "title": "In the Flower Bay",
+      "artist": "Jayvee Enaguas (The Harvett Vault)",
+      "mood": "happy",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AJayvee_Enaguas_-_In_the_Flower_Bay_%282023%29.flac",
+      "file": "assets/sounds/cm-jayvee-enaguas-in-the-fl.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": false
+    },
+    {
+      "id": "cm-little-glass-men-spray-p",
+      "title": "Spray paint it Gold",
+      "artist": "Little Glass Men",
+      "mood": "happy",
+      "license": "CC BY 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ALittle_Glass_Men_-_Spray_paint_it_Gold.mp3",
+      "file": "assets/sounds/cm-little-glass-men-spray-p.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": false
+    },
+    {
+      "id": "fp-think-about-it-bryan-teo",
+      "title": "Think About It",
+      "artist": "Bryan Teoh",
+      "mood": "adventure",
+      "license": "CC0 1.0",
+      "source": "https://web.archive.org/web/20241231185827/https://freepd.com/music/Think%20About%20It.mp3",
+      "file": "assets/sounds/fp-think-about-it-bryan-teo.mp3",
+      "via": "freepd.com",
+      "vocals": false
+    },
+    {
+      "id": "cm-exploration-m-lodique-no",
+      "title": "Exploration m\u00e9lodique no2 (mix 4 avril 2013) (arr CD)",
+      "artist": "Claude Reid",
+      "mood": "happy",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AExploration_m%C3%A9lodique_no2_%28mix_4_avril_2013%29_%28arr_CD%29.flac",
+      "file": "assets/sounds/cm-exploration-m-lodique-no.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": false
+    },
+    {
+      "id": "cm-amari-funky-souls-2019-a",
+      "title": "Funky Souls",
+      "artist": "Amari\u00e0",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AAmari%C3%A0_-_Funky_Souls_%282019%29.mp3",
+      "file": "assets/sounds/cm-amari-funky-souls-2019-a.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": false
+    },
+    {
+      "id": "cm-lukas-lukas-keys-lukas",
+      "title": "Lukas Keys",
+      "artist": "LUKAS",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ALukas_-_Lukas_Keys.mp3",
+      "file": "assets/sounds/cm-lukas-lukas-keys-lukas.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": false
+    },
+    {
+      "id": "cm-suedey-midnight-over-lon",
+      "title": "Midnight Over London",
+      "artist": "Suedey",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ASuedey_-_Midnight_Over_London.mp3",
+      "file": "assets/sounds/cm-suedey-midnight-over-lon.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": false
+    },
+    {
+      "id": "cm-thinn-oo-oo-t-kh-i-s-kai",
+      "title": "Thinn-oo-oo",
+      "artist": "T\u00e8 Kh\u00e1i-s\u016b (Kaihsu Tai)",
+      "mood": "happy",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AThinn-oo-oo.mp3",
+      "file": "assets/sounds/cm-thinn-oo-oo-t-kh-i-s-kai.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": false
+    },
+    {
+      "id": "cm-another-lullaby-antti-lu",
+      "title": "Another Lullaby",
+      "artist": "Antti Luode",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AAnother_Lullaby_%28Antti_Luode%29.mp3",
+      "file": "assets/sounds/cm-another-lullaby-antti-lu.mp3",
+      "via": "commons.wikimedia.org",
+      "vocals": true
+    },
+    {
+      "id": "mo-alexander-scriabin-pre",
+      "title": "Prelude No. 1, Op. 67",
+      "artist": "Alexander Scriabin",
+      "mood": "chill",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File%3AAlexander_Scriabin_-_prelude_no._1%2C_op._67.ogg",
+      "file": "assets/sounds/mo-alexander-scriabin-pre.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-bach-siloti-prelude-in",
+      "title": "Prelude in B minor",
+      "artist": "Johann Sebastian Bach",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ABach-Siloti%2C_Prelude_in_B_minor_%28J._S._Bach%2C_arranged_Siloti%29%2C_arrangement_of_Prelude_in_E_minor_BWV_855a.ogg",
+      "file": "assets/sounds/mo-bach-siloti-prelude-in.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-carl-maria-von-weber-c",
+      "title": "Clarinet Concerto No. 2, III. Allegro",
+      "artist": "Carl Maria von Weber",
+      "mood": "chill",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File%3ACarl_Maria_von_Weber_-_clarinet_concerto_no._2_in_e_flat_major%2C_j._118_-_iii._alla_polacca.ogg",
+      "file": "assets/sounds/mo-carl-maria-von-weber-c.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-chopin-nocturne-op-15",
+      "title": "Nocturne Op. 15 No. 1 in F Major",
+      "artist": "Fr\u00e9d\u00e9ric Chopin",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AChopin_-_Nocturne_Op._15_no._1_in_F_major.ogg",
+      "file": "assets/sounds/mo-chopin-nocturne-op-15.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-charpentier-te-deum-ia",
+      "title": "Te Deum",
+      "artist": "Marc-Antoine Charpentier",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ACharpentier%2C_Te_Deum_%28Prelude%29.ogg",
+      "file": "assets/sounds/mo-charpentier-te-deum-ia.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-carmen-prelude-to-act",
+      "title": "Carmen: Prelude to Act 1",
+      "artist": "Georges Bizet",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ACarmen_-_Prelude_to_Act_1.ogg",
+      "file": "assets/sounds/mo-carmen-prelude-to-act.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-brahms-symphony-no-1-i",
+      "title": "Symphony No. 1, III. Un poco allegretto",
+      "artist": "Johannes Brahms",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ABrahms%2C_Symphony_No._1_in_C_Minor%2C_Op._68_-_III._Un_poco_allegretto_e_grazioso.ogg",
+      "file": "assets/sounds/mo-brahms-symphony-no-1-i.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-a-midsummer-night-s-dr",
+      "title": "A Midsummer Night's Dream: Dance of Clowns",
+      "artist": "Felix Mendelssohn",
+      "mood": "adventure",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File%3AA_Midsummer_Night%27s_Dream_Op._61_Dance_of_Clowns_%28Mendelssohn%29_European_Archive.ogg",
+      "file": "assets/sounds/mo-a-midsummer-night-s-dr.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-brahms-symphony-no-2-i",
+      "title": "Symphony No. 2, III. Allegretto grazioso",
+      "artist": "Johannes Brahms",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3ABrahms%2C_Symphony_No._2_in_D_Major%2C_Op._73_-_III._Allegretto_Grazioso.ogg",
+      "file": "assets/sounds/mo-brahms-symphony-no-2-i.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-a-midsummer-night-s-dr-2",
+      "title": "A Midsummer Night's Dream: Scherzo",
+      "artist": "Felix Mendelssohn",
+      "mood": "adventure",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File%3AA_Midsummer_Night%27s_Dream_Op._61_Scherzo_%28Mendelssohn%29_European_Archive.ogg",
+      "file": "assets/sounds/mo-a-midsummer-night-s-dr-2.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-chopin-bourr-e-aya-hig",
+      "title": "Bourr\u00e9e (Chopin)",
+      "artist": "Aya Higuchi",
+      "mood": "chill",
+      "license": "CC BY-SA 4.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AChopin_Bourr%C3%A9e.ogg",
+      "file": "assets/sounds/mo-chopin-bourr-e-aya-hig.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-chopin-nocturne-21-in",
+      "title": "Nocturne No. 21 in C minor",
+      "artist": "Fr\u00e9d\u00e9ric Chopin",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AChopin_Nocturne_21_in_C_minor_Posthumous_Diana_Hughes.ogg",
+      "file": "assets/sounds/mo-chopin-nocturne-21-in.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-bach-j-s-goldberg-vari",
+      "title": "Goldberg Variations: Variation 16",
+      "artist": "Johann Sebastian Bach",
+      "mood": "adventure",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File%3ABach%2C_J_S_-_Goldberg_Variations%2C_BWV988_-_17._Variation_16._Overture_%28Shelley_Katz%29.flac",
+      "file": "assets/sounds/mo-bach-j-s-goldberg-vari.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-chopin-nocturne-op-15-2",
+      "title": "Nocturne Op. 15 No. 2 in F-sharp Major",
+      "artist": "Fr\u00e9d\u00e9ric Chopin",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AChopin_-_Nocturne_Op._15_no._2_in_F_sharp_major.ogg",
+      "file": "assets/sounds/mo-chopin-nocturne-op-15-2.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-beethoven-piano-sonata",
+      "title": "Piano Sonata No. 28, I. Etwas lebhaft",
+      "artist": "Ludwig van Beethoven",
+      "mood": "chill",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File%3ABeethoven_-_Piano_Sonata_No._28_in_A_Major%2C_Op._101_-_I._Etwas_lebhaft%2C_und_mit_der_innigsten_Empfindung.ogg",
+      "file": "assets/sounds/mo-beethoven-piano-sonata.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-beethoven-piano-sonata-2",
+      "title": "Piano Sonata No. 28, II. Lebhaft",
+      "artist": "Ludwig van Beethoven",
+      "mood": "chill",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File%3ABeethoven_-_Piano_Sonata_No._28_in_A_Major%2C_Op._101_-_II._Lebhaft._Marschm%C3%A4%C3%9Fig.ogg",
+      "file": "assets/sounds/mo-beethoven-piano-sonata-2.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "mo-chopin-nocturne-op-pos",
+      "title": "Nocturne Op. posth. 72 No. 1",
+      "artist": "Fr\u00e9d\u00e9ric Chopin",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://commons.wikimedia.org/wiki/File%3AChopin_-_Nocturne_Op._posth._72_no._1.ogg",
+      "file": "assets/sounds/mo-chopin-nocturne-op-pos.mp3",
+      "via": "Musopen",
+      "vocals": false
+    },
+    {
+      "id": "cx-22803",
+      "title": "Winter Sunlight",
+      "artist": "3rd attempt",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/3rd_attempt/22803",
+      "file": "assets/sounds/cx-22803.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-52187",
+      "title": "Fallwind",
+      "artist": "7OOP3D",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/7OOP3D/52187",
+      "file": "assets/sounds/cx-52187.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-54200",
+      "title": "Like A Dragon",
+      "artist": "@nop",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/Lancefield/54200",
+      "file": "assets/sounds/cx-54200.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-31462",
+      "title": "100 Paper Washingtons",
+      "artist": "Alex",
+      "mood": "chill",
+      "license": "CC BY-SA 3.0",
+      "source": "https://ccmixter.org/files/AlexBeroza/31462",
+      "file": "assets/sounds/cx-31462.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-57397",
+      "title": "All the Lines",
+      "artist": "Admiral Bob",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/admiralbob77/57397",
+      "file": "assets/sounds/cx-57397.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-30108",
+      "title": "Emergence Hymn",
+      "artist": "Anchor",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/anchormejans/30108",
+      "file": "assets/sounds/cx-30108.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-55872",
+      "title": "Party At The End Of Time",
+      "artist": "Andrew Wainwright",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/andrewwainwright/55872",
+      "file": "assets/sounds/cx-55872.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-33929",
+      "title": "Brake Dance",
+      "artist": "Andres Franco",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/andrewfranco/33929",
+      "file": "assets/sounds/cx-33929.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-62724",
+      "title": "Music Through Love ft. Kara Square",
+      "artist": "Apoxode",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Apoxode/62724",
+      "file": "assets/sounds/cx-62724.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-57478",
+      "title": "Castle Town",
+      "artist": "AntumDeluge",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/AntumDeluge/57478",
+      "file": "assets/sounds/cx-57478.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-2905",
+      "title": "Photo theme: Window like",
+      "artist": "Antony Raijekov",
+      "mood": "chill",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/zeos/2905",
+      "file": "assets/sounds/cx-2905.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-34377",
+      "title": "Snowflake - Longing (Base Mode Chillout Mix)",
+      "artist": "Base Mode",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/basemode/34377",
+      "file": "assets/sounds/cx-34377.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-56606",
+      "title": "Fire and Ice (presto mix)",
+      "artist": "Barzakh",
+      "mood": "spooky",
+      "license": "CC BY-SA 3.0",
+      "source": "https://ccmixter.org/files/Barzakh/56606",
+      "file": "assets/sounds/cx-56606.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-56698",
+      "title": "Funk It: How It Is",
+      "artist": "Aussens@iter",
+      "mood": "hype",
+      "license": "CC BY-SA 3.0",
+      "source": "https://ccmixter.org/files/tobias_weber/56698",
+      "file": "assets/sounds/cx-56698.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-69011",
+      "title": "Pour des Chemins Facil (Small Mountain Remix)",
+      "artist": "Ben Blohowiak",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/bblohowiak/69011",
+      "file": "assets/sounds/cx-69011.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-31638",
+      "title": "Brass Beat",
+      "artist": "Blake",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/blakeht/31638",
+      "file": "assets/sounds/cx-31638.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-23243",
+      "title": "TIQUE TYPIQUE ft. Sebco",
+      "artist": "Black Sunday Productions",
+      "mood": "hype",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/Black_Sunday_Productions/23243",
+      "file": "assets/sounds/cx-23243.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-54205",
+      "title": "Attack of the Aguaviva",
+      "artist": "Blue_Wave_Theory",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Blue_Wave_Theory/54205",
+      "file": "assets/sounds/cx-54205.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-60179",
+      "title": "Bonne nuit",
+      "artist": "Bluemillenium",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Bluemillenium/60179",
+      "file": "assets/sounds/cx-60179.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-31024",
+      "title": "Bustin Out",
+      "artist": "Benjamin Orth",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Benjamin_Orth/31024",
+      "file": "assets/sounds/cx-31024.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-22904",
+      "title": "BECKFORDS & THE BOCREW",
+      "artist": "Bocrew",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/BOCrew/22904",
+      "file": "assets/sounds/cx-22904.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-17447",
+      "title": "She of Infinite Sorrows",
+      "artist": "Brant Huddleston",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/blues_agent/17447",
+      "file": "assets/sounds/cx-17447.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-6492",
+      "title": "Glass Ceiling - backing vocal",
+      "artist": "Briareus",
+      "mood": "chill",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/Briareus/6492",
+      "file": "assets/sounds/cx-6492.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-17050",
+      "title": "KINGSTON-MALAK",
+      "artist": "BoomShaak",
+      "mood": "happy",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/_BoomShaak_/17050",
+      "file": "assets/sounds/cx-17050.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-33526",
+      "title": "Bardo Tso Dholl 4 Joe Lincoln",
+      "artist": "Budapest BluesBoy",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/hepepe/33526",
+      "file": "assets/sounds/cx-33526.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-50155",
+      "title": "Don't Be Scared ft. Christine Autumn",
+      "artist": "Calling Sister Midnight",
+      "mood": "chill",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/romancito/50155",
+      "file": "assets/sounds/cx-50155.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-36912",
+      "title": "In peace (our destiny)",
+      "artist": "Carosone",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Carosone/36912",
+      "file": "assets/sounds/cx-36912.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-33004",
+      "title": "Strike",
+      "artist": "Cezary Ostrowski",
+      "mood": "hype",
+      "license": "CC BY-SA 3.0",
+      "source": "https://ccmixter.org/files/ditri23/33004",
+      "file": "assets/sounds/cx-33004.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-23709",
+      "title": "Aurora Borealis (winter lights wandering)",
+      "artist": "CherryGollogoly",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/CherryGollogoly/23709",
+      "file": "assets/sounds/cx-23709.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-31717",
+      "title": "Sehnsucht nach den Sternen",
+      "artist": "Chomolungmas_Kleid",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/Chomolungmas_Kleid/31717",
+      "file": "assets/sounds/cx-31717.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-39255",
+      "title": "Put Your Hands Up (Dubstep Version)",
+      "artist": "Chandan Boruah",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/chandubaba/39255",
+      "file": "assets/sounds/cx-39255.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-8159",
+      "title": "Open your eyes- Long Island Remix",
+      "artist": "CoffeeTrim",
+      "mood": "hype",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/coffeetrim/8159",
+      "file": "assets/sounds/cx-8159.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-33853",
+      "title": "Vaguely Spanish Guitar",
+      "artist": "Clarence Simpson",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/casimps1/33853",
+      "file": "assets/sounds/cx-33853.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-38248",
+      "title": "Free Hearts Connections",
+      "artist": "CSoul",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/CSoul/38248",
+      "file": "assets/sounds/cx-38248.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-2961",
+      "title": "everyday choices",
+      "artist": "Colin Mutchler",
+      "mood": "happy",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/commonsplice/2961",
+      "file": "assets/sounds/cx-2961.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-29987",
+      "title": "Quueniemusic - The Forest of Dreams",
+      "artist": "DCMsc",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/DCMsc/29987",
+      "file": "assets/sounds/cx-29987.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-56602",
+      "title": "ILUSMIH 1",
+      "artist": "Darkroom",
+      "mood": "spooky",
+      "license": "CC BY-SA 3.0",
+      "source": "https://ccmixter.org/files/mactonite/56602",
+      "file": "assets/sounds/cx-56602.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-68964",
+      "title": "Conflict Opposition (deeplastik remix)",
+      "artist": "Deeplastik",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Deeplastik/68964",
+      "file": "assets/sounds/cx-68964.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-15611",
+      "title": "Home Tonight",
+      "artist": "DoKashiteru",
+      "mood": "chill",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/DoKashiteru/15611",
+      "file": "assets/sounds/cx-15611.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-7371",
+      "title": "Ophelia's Song (DNA Remix)",
+      "artist": "DNA",
+      "mood": "hype",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/DNA/7371",
+      "file": "assets/sounds/cx-7371.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-32420",
+      "title": "Plume",
+      "artist": "Donkey Horse Mule",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/donkeyhorsemule/32420",
+      "file": "assets/sounds/cx-32420.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-8751",
+      "title": "B Calm Violin Track",
+      "artist": "Dimitri Artemenko",
+      "mood": "chill",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/stringfactory/8751",
+      "file": "assets/sounds/cx-8751.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-42025",
+      "title": "A Stranger To Ourselves",
+      "artist": "Donnie Ozone",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/donnieozone/42025",
+      "file": "assets/sounds/cx-42025.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-29148",
+      "title": "Bedtime Blues",
+      "artist": "Down With Ben",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/cuajitoben/29148",
+      "file": "assets/sounds/cx-29148.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-41581",
+      "title": "Changes",
+      "artist": "DreamSynth",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/DreamSynth/41581",
+      "file": "assets/sounds/cx-41581.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-22593",
+      "title": "Ave Maria (Schubert)",
+      "artist": "Dr. Emiliyan Stankov",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/iestankov/22593",
+      "file": "assets/sounds/cx-22593.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-43310",
+      "title": "Alice In the City",
+      "artist": "Doxent Zsigmond",
+      "mood": "adventure",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/doxent/43310",
+      "file": "assets/sounds/cx-43310.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-55041",
+      "title": "Paper Planes - Durden ft. Airtone",
+      "artist": "DURDEN",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/DURDEN/55041",
+      "file": "assets/sounds/cx-55041.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-49416",
+      "title": "Prayer",
+      "artist": "Emm Rodriguez",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/emmrodriguez/49416",
+      "file": "assets/sounds/cx-49416.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-56249",
+      "title": "Snake in my Net",
+      "artist": "Echolex",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/Echolex/56249",
+      "file": "assets/sounds/cx-56249.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-54231",
+      "title": "Bygger med magneter",
+      "artist": "FaglighedFortalt",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/FaglighedFortalt/54231",
+      "file": "assets/sounds/cx-54231.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-33477",
+      "title": "Marcello",
+      "artist": "Ezra Skull",
+      "mood": "happy",
+      "license": "CC BY-SA 3.0",
+      "source": "https://ccmixter.org/files/Haskel/33477",
+      "file": "assets/sounds/cx-33477.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-34501",
+      "title": "Ansiedad",
+      "artist": "Experimental",
+      "mood": "hype",
+      "license": "CC BY-SA 2.5",
+      "source": "https://ccmixter.org/files/mcsierritas/34501",
+      "file": "assets/sounds/cx-34501.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-49195",
+      "title": "Disclosure Beat 130",
+      "artist": "Forkboy",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/Forkboy70/49195",
+      "file": "assets/sounds/cx-49195.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-23501",
+      "title": "See you Thursday",
+      "artist": "Fireproof_Babies",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/Fireproof_Babies/23501",
+      "file": "assets/sounds/cx-23501.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-54485",
+      "title": "City Crickets",
+      "artist": "GeeArtriasRose",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/GeeArtriasRose/54485",
+      "file": "assets/sounds/cx-54485.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-8721",
+      "title": "\"Stop\" (blue mix)",
+      "artist": "Ghost_k (Ghost Kollective)",
+      "mood": "chill",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/Ghost_k/8721",
+      "file": "assets/sounds/cx-8721.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-14064",
+      "title": "Best Friend Remix",
+      "artist": "George_Ellinas",
+      "mood": "hype",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/George_Ellinas/14064",
+      "file": "assets/sounds/cx-14064.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-61842",
+      "title": "Hard Breakbeat",
+      "artist": "Hugh_Jass",
+      "mood": "hype",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/Hugh_Jass/61842",
+      "file": "assets/sounds/cx-61842.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-58654",
+      "title": "Power To Strike (Feat\u200b.\u200bKara Square)",
+      "artist": "INVISIBLE KAOS OUTSIDE",
+      "mood": "hype",
+      "license": "CC BY-SA 3.0",
+      "source": "https://ccmixter.org/files/alexIko_2016/58654",
+      "file": "assets/sounds/cx-58654.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-42282",
+      "title": "Black Shadow",
+      "artist": "Hans Atom",
+      "mood": "adventure",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/hansatom/42282",
+      "file": "assets/sounds/cx-42282.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-35429",
+      "title": "Gonna Love You More",
+      "artist": "Ivan Chew",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/ramblinglibrarian/35429",
+      "file": "assets/sounds/cx-35429.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-62036",
+      "title": "Don't You Think That I",
+      "artist": "J.Lang",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/djlang59/62036",
+      "file": "assets/sounds/cx-62036.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-45491",
+      "title": "Absolutely Clear",
+      "artist": "Jeris",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/VJ_Memes/45491",
+      "file": "assets/sounds/cx-45491.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-37708",
+      "title": "Routine Mission - Heart of Mine",
+      "artist": "Joel Frijters",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/KungFuFrijters/37708",
+      "file": "assets/sounds/cx-37708.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-39601",
+      "title": "One Moon (In Every Pool)",
+      "artist": "Javolenus",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Javolenus/39601",
+      "file": "assets/sounds/cx-39601.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-23875",
+      "title": "Permafrost Cubique. Will You Face Me?",
+      "artist": "Kaer Trouz",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Kaer_Trouz/23875",
+      "file": "assets/sounds/cx-23875.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-32530",
+      "title": "Ants!",
+      "artist": "Kara Square",
+      "mood": "funny",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/mindmapthat/32530",
+      "file": "assets/sounds/cx-32530.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-14476",
+      "title": "The Long Goodbye",
+      "artist": "John Pazdan",
+      "mood": "chill",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/flatwound/14476",
+      "file": "assets/sounds/cx-14476.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-23074",
+      "title": "If you cant (deeper mix)",
+      "artist": "Kojo_Akusa",
+      "mood": "hype",
+      "license": "CC BY 2.5",
+      "source": "https://ccmixter.org/files/Kojo_Akusa/23074",
+      "file": "assets/sounds/cx-23074.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-43938",
+      "title": "Shiro (Kirkoid Mix)",
+      "artist": "Kirkoid",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Kirkoid/43938",
+      "file": "assets/sounds/cx-43938.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-51643",
+      "title": "The Beautiful Rain",
+      "artist": "Kimy from Black Art",
+      "mood": "chill",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/kimy/51643",
+      "file": "assets/sounds/cx-51643.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-12238",
+      "title": "beeKoo mix",
+      "artist": "Lasswell",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/lazztunes07/12238",
+      "file": "assets/sounds/cx-12238.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-62739",
+      "title": "The night is calling",
+      "artist": "Kraftamt",
+      "mood": "chill",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/Karstenholymoly/62739",
+      "file": "assets/sounds/cx-62739.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-46165",
+      "title": "A Foolish Game (pell)",
+      "artist": "Madam Snowflake",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/snowflake/46165",
+      "file": "assets/sounds/cx-46165.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-62648",
+      "title": "Les mauvaises & le Reve",
+      "artist": "MalreDeszik",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/MalreDeszik/62648",
+      "file": "assets/sounds/cx-62648.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-56058",
+      "title": "Beginning of time",
+      "artist": "Marineguy",
+      "mood": "happy",
+      "license": "CC0 1.0",
+      "source": "https://ccmixter.org/files/Marineguy/56058",
+      "file": "assets/sounds/cx-56058.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
+    },
+    {
+      "id": "cx-61329",
+      "title": "Closed on Sundays",
+      "artist": "Mana Junkie",
+      "mood": "happy",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/mana_junkie/61329",
+      "file": "assets/sounds/cx-61329.mp3",
+      "via": "ccmixter.org",
+      "vocals": false
+    },
+    {
+      "id": "cx-28160",
+      "title": "Mr. Williams Blues",
+      "artist": "MC Jack in the Box",
+      "mood": "hype",
+      "license": "CC BY 3.0",
+      "source": "https://ccmixter.org/files/mcjackinthebox/28160",
+      "file": "assets/sounds/cx-28160.mp3",
+      "via": "ccmixter.org",
+      "vocals": true
     }
   ]
 }
