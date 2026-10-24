@@ -188,6 +188,7 @@ function html(ctx) {
         <select id="set-theme-pick"><option value="all">All songs in order</option><option value="shuffle">Shuffle</option>${THEME_TRACKS.map((t, i) => `<option value="${i}">${esc(t.title)}</option>`).join('')}</select>
         <div class="set-actions"><button class="btn btn-ghost" type="button" id="set-theme" data-theme-ctl>🎵 Play theme</button></div>
         <p class="muted small">${esc(PLAYLIST_CREDIT)}</p>
+        <a class="set-link" href="#/sounds">🎵 Kemy Sounds credits<span class="go" aria-hidden="true">›</span></a>
       </article>
       <article class="set-sec" data-sec="graphics" data-k="graphics quality fps performance screen size zoom low medium high saver battery pal effects helper team">
         <div class="set-head"><span class="set-ic" aria-hidden="true">✨</span><h2>Graphics &amp; Performance</h2></div>

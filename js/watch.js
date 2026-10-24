@@ -18,6 +18,7 @@ import { prefsStore as sharedPrefsStore } from './interests.js';
 import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from './autoplay.js';
 import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 import { faceName, adminNameClass } from './kemy-name.js';
+import { bindBed, setBedHear, showCredit } from './sounds.js';
 export const FEED_TABS = [['foryou', 'For You'], ['following', 'Following'], ['funny', 'Funny'], ['news', 'News'], ['dance', 'Dance'], ['music', 'Music'], ['trending', 'Trending']];
 const IC = {
   heart: '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>',
@@ -185,6 +186,7 @@ export function createWatch(ctx) {
             ${mine ? '' : `<button class="vfollow ${following ? 'on' : ''}" data-a="follow" data-uid="${esc(p.authorId)}" aria-pressed="${following}">${following ? 'Following' : 'Follow'}</button>`}
           </div>
           ${p.text ? `<p class="vcaption" data-a="more">${linkify(esc(p.text))}</p>` : ''}
+          ${p.sound && p.sound.id ? '<p class="ks-credit" data-ks-credit></p>' : ''}
           <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))} · ${views.viewsHtml(p.viewCount, p.id, 'vviews')}${catChip(p)}</p>
         </div>
         <div class="vrail">
@@ -274,8 +276,26 @@ export function createWatch(ctx) {
     const slides = [...feed.querySelectorAll('.vslide:not(.vdon)')];
     if (tab === 'foryou') window.kemyDonate?.feedSlides(feed, 25);
     const byId = new Map(posts.map((p) => [p.id, p]));
+    slides.forEach((sl) => {
+      const p = byId.get(sl.dataset.id);
+      if (!p || !p.sound || !p.sound.id) return;
+      const v = sl.querySelector('video');
+      if (v) bindBed(v, p.sound);
+      showCredit(sl, p.sound);
+    });
     let active = -1, sheetUnsub = null;
 
+    function hearVideo(v) {
+      if (!v) return;
+      if (v.dataset.kemyOrig === '0') v.muted = true;
+      else v.muted = muted;
+      if (!v.dataset.kemySound) return;
+      if (v.dataset.kemyOrig !== '0') {
+        const n = Number(v.dataset.kemyOrig);
+        if (n > 0 && n <= 1) v.volume = n;
+      }
+      setBedHear(v, !muted);
+    }
     const paintMute = () => {
       muteBtn.innerHTML = muted ? IC.muted : IC.sound;
       muteBtn.classList.toggle('is-muted', muted);
@@ -299,7 +319,7 @@ export function createWatch(ctx) {
       if (!muted) claimAudio('feed');
       v.defaultMuted = true; v.setAttribute('playsinline', ''); v.setAttribute('muted', '');
       if (!v.getAttribute('src')) { v.src = v.dataset.src; v.preload = 'auto'; }
-      v.muted = muted;
+      hearVideo(v);
       const sl = slides[active];
       v.play().then(() => sl.classList.remove('paused')).catch(() => {
         if (!v.muted) { muted = true; v.muted = true; paintMute(); v.play().then(() => sl.classList.remove('paused')).catch(() => sl.classList.add('paused')); }
@@ -479,7 +499,7 @@ export function createWatch(ctx) {
       onDoubleTap(sl, {
         ignore: (e) => !!e.target.closest('button, a, input, textarea, iframe, [data-a], .vrail, .vmeta, .vembed, .vcard, .vscrub'),
         single: v ? () => {
-          if (v.paused) { delete sl.dataset.userPaused; if (sl.classList.contains('movie')) sl.dataset.full = '1'; v.muted = muted; if (!muted) claimAudio('feed'); if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); sl.classList.remove('paused'); }
+          if (v.paused) { delete sl.dataset.userPaused; if (sl.classList.contains('movie')) sl.dataset.full = '1'; hearVideo(v); if (!muted) claimAudio('feed'); if (!v.getAttribute('src')) v.src = v.dataset.src; v.play().catch(() => {}); sl.classList.remove('paused'); }
           else { v.pause(); sl.classList.add('paused'); sl.dataset.userPaused = '1'; }
         } : null,
         double: (e) => {
@@ -578,7 +598,7 @@ export function createWatch(ctx) {
     muteBtn.onclick = () => {
       muted = !muted; paintMute(); setSoundOn(!muted);
       const v = vid(active);
-      if (v) { v.muted = muted; if (!muted) claimAudio('feed'); if (v.paused) playActive(true); }
+      if (v) { hearVideo(v); if (!muted) claimAudio('feed'); if (v.paused) playActive(true); }
       const fr = slides[active]?.querySelector('.vembed iframe');
       if (fr) { const pl = slides[active]._yt; try { if (pl && pl.mute) { if (muted) pl.mute(); else pl.unMute(); } else ytCmd(fr, muted ? 'mute' : 'unMute'); } catch { /* */ } if (!muted) claimAudio('feed'); }
     };
@@ -729,7 +749,7 @@ export function createWatch(ctx) {
     let wasBlocked = false;
     const overlayObs = new MutationObserver(() => { const b = blocked(); if (b === wasBlocked) return; wasBlocked = b; if (b) pauseActive(); else resumeActive(); });
     overlayObs.observe(document.body, { childList: true });
-    const onOtherMedia = (e) => { if (e.detail?.source !== 'feed') pauseActive(); };
+    const onOtherMedia = (e) => { const s = e.detail?.source; if (s !== 'feed' && s !== 'kemy-sound') pauseActive(); };
     const onBreak = () => { if (active >= 0) { judge(active); vid(active)?.pause(); closeEmbed(slides[active]); } active = -1; };
     window.addEventListener('kemy:feed-break', onBreak);
     window.addEventListener('kemy:pause-feed', pauseActive); window.addEventListener('kemy:media-play', onOtherMedia);

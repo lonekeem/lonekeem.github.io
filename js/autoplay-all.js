@@ -64,5 +64,5 @@ export function startAutoplayAll() {
   new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches?.(SEL)) scan(n.parentElement || document); else scan(n); } }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('visibilitychange', () => { if (document.hidden) current?._ap?.pause(); });
   // Something else (Kemy Radio, theme, a song) started: pause our muted video only if it has sound.
-  addEventListener('kemy:media-play', (e) => { const s = e.detail?.source; if (s && s !== 'feed' && current) { current._ap?.pause(); } });
+  addEventListener('kemy:media-play', (e) => { const s = e.detail?.source; if (s && s !== 'feed' && s !== 'kemy-sound' && current) { current._ap?.pause(); } });
 }

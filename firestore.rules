@@ -576,14 +576,24 @@ service cloud.firestore {
     function postCats() {
       return ['funny', 'news', 'music', 'gaming', 'pals', 'art', 'sports', 'movies', 'animals', 'food', 'dance', 'learning', 'other'];
     }
+    // Optional Kemy Sound on a post: id plus music and original volumes. Credit comes from the app manifest.
+    function validSound(d) {
+      return !('sound' in d)
+        || (d.sound is map
+            && d.sound.keys().hasOnly(['id', 'vol', 'orig'])
+            && d.sound.id.matches('^[a-z0-9-]{1,40}$')
+            && d.sound.vol is number && d.sound.vol >= 0 && d.sound.vol <= 1
+            && d.sound.orig is number && d.sound.orig >= 0 && d.sound.orig <= 1);
+    }
     function validNewPost(d) {
       let u = get(userPath(d.authorId)).data;
       return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                                'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                                'commentCount', 'lastCommentId', 'studio',
                                'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId',
-                               'keywords', 'hashtags', 'work', 'cat'])
+                               'keywords', 'hashtags', 'work', 'cat', 'sound'])
         && validPostSearch(d)
+        && validSound(d)
         && (!('cat' in d) || d.cat in postCats())
         && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
                             'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',

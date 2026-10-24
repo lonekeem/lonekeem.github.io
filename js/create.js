@@ -15,6 +15,7 @@ import { FX_DEFAULT } from './fx/looks.js';
 import { onDoubleTap } from './tapstar.js';
 import { stripExif, piiOk } from './safety.js';
 import { guardUpload, REVIEW_MSG } from './mediascan.js';
+import { mountSoundPicker, reviewUploadedSong } from './sounds.js';
 import { openEditor } from './snapedit.js';
 import { WORK_IC, DESC as WORK_DESC } from './works.js';
 
@@ -579,6 +580,7 @@ export function createComposer(ctx) {
         ${ready ? '' : notReadyNotice(true)}
         <label for="pv-caption" class="sr-only">Caption</label>
         <textarea id="pv-caption" maxlength="${LIMITS.captionMax}" rows="2" placeholder="Write a caption…"></textarea>
+        ${isVideo ? '<div class="ks-host" id="pv-sounds"></div>' : ''}
         ${catPickerHtml('pv-cat', '', esc)}
         <div class="pv-row small muted"><span>${isAdmin() ? '<label class="check pv-studio"><input type="checkbox" id="pv-studio"> <span>Post as <b>Lone Keem Studios</b></span></label>' : 'By posting you agree to the <a href="#/rules">Community Rules</a>. Photo location info is removed.'}</span><span><span id="pv-count">0</span>/${LIMITS.captionMax}</span></div>
         <div class="pv-progress" hidden aria-hidden="true"><span></span></div>
@@ -605,6 +607,7 @@ export function createComposer(ctx) {
       ${panel}
       ${inputsHtml}`, 'cam-preview' + (story ? ' is-story' : ''));
     wireInputs(el);
+    const soundCtl = isVideo && !story ? mountSoundPicker(el.querySelector('#pv-sounds')) : null;
     const media = el.querySelector('.pv-el');
     if (media && isVideo) {
       media.addEventListener('click', () => (media.paused ? media.play() : media.pause()));
@@ -620,7 +623,7 @@ export function createComposer(ctx) {
     const bar = el.querySelector('.pv-progress'), barIn = bar.querySelector('span'), status = el.querySelector('.pv-status'), err = el.querySelector('#pv-err');
     const postBtn = el.querySelector('#pv-post');
     const revoke = () => URL.revokeObjectURL(info.url);
-    cleanupFns.push(() => { if (xhr) xhr.abort(); revoke(); });
+    cleanupFns.push(() => { if (xhr) xhr.abort(); revoke(); soundCtl && soundCtl.destroy(); });
 
     el.querySelector('[data-a=retake]').onclick = () => {
       if (busy && !confirm('Stop uploading and go back?')) return;
@@ -641,6 +644,15 @@ export function createComposer(ctx) {
         if (!uploaded) {
           // on-device picture/video check + kind words on the caption (mediascan.js)
           await guardUpload(file, { where: story ? 'story' : 'post', caption: cap.value, onStatus: (t) => (status.textContent = t) });
+          // Song checker runs only when this upload still has the player's own audio.
+          // A Kemy Sound with "Your sound" at 0 is the only music, so that check is skipped.
+          let sound = null;
+          if (isVideo && !story && soundCtl) {
+            sound = soundCtl.get();
+            const rev = await reviewUploadedSong(file, sound);
+            if (rev && rev.action === 'cancel') { busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; return; }
+            if (rev && rev.action === 'hold') { busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; err.textContent = 'This sound needs review before it can be posted.'; return; }
+          }
           bar.hidden = false; status.textContent = 'Uploading… 0%';
           uploaded = await upload(file, (f) => { barIn.style.transform = `scaleX(${f})`; status.textContent = f >= 1 ? 'Processing…' : `Uploading… ${Math.round(f * 100)}%`; });
         }
@@ -654,7 +666,7 @@ export function createComposer(ctx) {
           return;
         }
         status.textContent = 'Saving your post…';
-        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat') });
+        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat'), sound: soundCtl ? soundCtl.get() : null });
         closeOverlay();
         dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 30 } }));
         if (S.lastHeld === id) { toast(REVIEW_MSG); location.hash = '#/post/' + id; return; }
