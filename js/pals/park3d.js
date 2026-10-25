@@ -469,6 +469,7 @@ export function createPark3D(ctx) {
     const link = createLink(); link.mount(document.querySelector('#park-cv') && view.querySelector('.k-link-slot'));
     const sigOf = (o) => [o.x, o.y, o.h, o.r, o.vx, o.vz, o.an, o.dn, o.d, o.e, o.say, o.in || '', o.c, o.pl || '', lookKey(o.pal)].join('|');
     const send = async (force) => {
+      if (roomState.inId) return; // indoor poses go to houseHere, not the outdoor park room
       const now = Date.now();
       if (sending) { dirty = true; return; }
       if (now < nextOk) return; // 120ms after the last ack: the rules reject a closer pair, and a retry must not strip dn
@@ -495,10 +496,11 @@ export function createPark3D(ctx) {
     // so a cell-only query would hide them. A failing cell query falls back to WIDE and is logged visibly.
     let wide = roomN <= 40; net.mode = () => (wide ? 'wide' : 'cells');
     const listen = () => { let first = true; const fresh = where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS * 3)); const qy = wide ? query(collection(db, 'parkRooms', room, 'p'), fresh) : query(collection(db, 'parkRooms', room, 'p'), where('c', 'in', cells9()), fresh); return onSnapshot(qy, (qs) => {
+      if (roomState.inId) return; // the house channel owns avatars until you step outside
       link.noteSnap(!!(qs.metadata && qs.metadata.hasPendingWrites));
-      if (first) { first = false; const cached = !!(qs.metadata && qs.metadata.fromCache); if (!cached) { const ids = new Set(qs.docs.map((d) => d.id)); for (const id of [...others.keys()]) if (!ids.has(id)) drop(id); } }
+      if (first) { first = false; const cached = !!(qs.metadata && qs.metadata.fromCache); if (!cached) { const ids = new Set(qs.docs.map((d) => d.id)); for (const id of [...others.keys()]) if (!ids.has(id) && !(others.get(id) && others.get(id).house)) drop(id); } }
       const now = Date.now(); net.snaps++; net.reads = (net.reads || 0) + Math.max(1, qs.docChanges().length);
-      qs.docChanges().forEach((ch) => { const id = ch.doc.id; if (id === S.user.uid) return; if (ch.type === 'removed') { drop(id); return; }
+      qs.docChanges().forEach((ch) => { const id = ch.doc.id; if (id === S.user.uid) return; if (ch.type === 'removed') { if (!(others.get(id) && others.get(id).house)) drop(id); return; }
         const d = ch.doc.data(); const at = d.at && d.at.toMillis ? d.at.toMillis() : now;
         if (now - at > 120000) { deleteDoc(ch.doc.ref).catch(() => {}); return; }
         const [x, z] = toW(d.x, d.y); let o = others.get(id);
@@ -705,7 +707,7 @@ export function createPark3D(ctx) {
         geos.forEach((g) => g.dispose()); out.computeBoundingSphere(); const mm = new THREE.Mesh(out, b.m); [mm.castShadow, mm.receiveShadow] = b.shadow; mm.name = 'park-merged'; parkG.add(mm); mergedInfo.before += b.parts.length; mergedInfo.after++; dead.push(...b.parts); }
       for (const o of dead) o.parent && o.parent.remove(o); }
     const parkCull = () => { const dx = Math.max(0, Math.abs(P.x) - (W + 30)), dz = Math.max(0, Math.abs(P.z) - (H + 30)), d = Math.hypot(dx, dz); parkG.visible = d < Q.draw * 0.8; parkDet.visible = d < 50; };
-    const W3 = attachWorld({ THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, db, toast, sky, sun, hemi, ground, cam, palObj, others, gaitFor, posePal3D, beatNow: () => beatNow(), proceduralTex, terrainMat: terrainM, tc, collide, floorAt, markDirty: () => { dirty = true; }, send: (f) => send(f), sync });
+    const W3 = attachWorld({ THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, db, toast, sky, sun, hemi, ground, cam, palObj, others, gaitFor, posePal3D, beatNow: () => beatNow(), proceduralTex, terrainMat: terrainM, tc, collide, floorAt, markDirty: () => { dirty = true; }, send: (f) => send(f), sync, quietPark: () => { for (const id of [...others.keys()]) if (!(others.get(id) && others.get(id).house)) drop(id); }, dropPal: (id) => drop(id) });
     const unWorld = registerWorld({
       active: () => document.body.contains(cv),
       driving: () => !!(W3.driving && W3.driving()),
@@ -785,19 +787,19 @@ export function createPark3D(ctx) {
       // others: interpolate, LOD (full rig near, simple pose far, hidden very far)
       svTick(dt); if (Math.hypot(SV.vx, SV.vz) > 18) { recFast += dt; if (recFast >= 0.25) { recFast = 0; recenter(); } } else recFast = 0; const nowMs = Date.now(); if (!(fr % 15) || !drawSet) { const L = [...others.values()].map((o) => [Math.hypot(o.x - P.x, o.z - P.z), o.uid]).sort((a, b) => a[0] - b[0]); drawSet = new Set(L.slice(0, MAX_DRAWN).map((q) => q[1])); } fr++;
       for (const o of others3D()) {
-        if (blocked.has(o.uid) || nowMs - o.at > STALE_MS) { drop(o.uid); continue; }
+        if (blocked.has(o.uid) || nowMs - o.at > (o.house ? 8000 : STALE_MS)) { drop(o.uid); continue; }
         if (o.obj && o.pal) { const lk = lookKey(o.pal); if (o.objKey && o.objKey !== lk) { scene.remove(o.obj); o.obj = null; } } // re-dress when they change outfit, colours, or accessories
         interp(o, dt); const nearD = Math.hypot((o.ix ?? o.x) - P.x, (o.iz ?? o.z) - P.z); if (!keepRemotePal(drawSet.has(o.uid), o.dn, nearD, LOW)) { o.x = o.ix; o.z = o.iz; if (o.obj) { scene.remove(o.obj); o.obj = null; o.objKey = null; } if (o.tag) o.tag.style.display = 'none'; continue; }
         if (!o.obj && o.pal) { try { o.obj = palObj(o.pal, !LOW); o.objKey = lookKey(o.pal); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
         const px = o.x, pz = o.z; o.x = o.ix; o.z = o.iz; o.jump = Math.max(o.jump || 0, Math.hypot(o.x - px, o.z - pz)); const mvd = o.buf && o.buf.length ? Math.hypot(o.ivx, o.ivz) : Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
-        const gy = floorAt(o.x, o.z, o.y + 0.3); o.y += ((o.th != null ? Math.max(o.th, gy - 0.05) : gy) - o.y) * Math.min(1, dt * 10);
+        const gy = floorAt(o.x, o.z, o.y + 0.3); const holdY = o.dn === 'sit' || o.dn === 'sleep'; const aimY = o.th != null ? (holdY ? o.th : Math.max(o.th, gy - 0.05)) : gy; o.y += (aimY - o.y) * Math.min(1, dt * 10);
         if (o.buf && o.buf.length) { let dy = o.iyaw - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (o.tr != null) { let dy = o.tr - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (mvd > 0.3) o.yaw = Math.atan2(o.x - px, o.z - pz);
         if (!o.obj) continue; const dist = Math.hypot(o.x - P.x, o.z - P.z); const riding = inVehicle(o.dn); o.obj.visible = dist < (riding ? (LOW ? 90 : 160) : (LOW ? 60 : 110)); o.obj.position.set(o.x, o.y, o.z); o.obj.rotation.y = o.yaw; if (!riding && o.fade < 1) { o.fade = Math.min(1, (o.fade || 0) + dt * 3); o.obj.scale.setScalar(0.2 + 0.8 * o.fade * o.fade * (3 - 2 * o.fade)); }
         const near = dist < (ULTRA ? 30 : LOW ? 12 : 20); o.t += dt * 60; o.lodN = (o.lodN || 0) + 1;
         if (o.obj.visible && (near || o.lodN % (dist > 45 ? 6 : 3) === 0)) { const air = o.th != null && o.th > gy + 0.3 && o.dn !== 'sit'; const dnDance = o.dn && o.dn[0] !== '~' ? o.dn : ''; const od = dnDance || ((o.dance && performance.now() < o.danceUntil) ? o.dance : '');
           const run2 = mvd > 2.6; const g2 = gaitFor(o.obj, mvd, run2); const s2 = { mode: air ? 'hop' : mvd > 0.6 ? (run2 ? 'run' : 'walk') : 'idle', t: o.t, dt60: dt * 60 * (near ? 1 : 3), speed: mvd > 0.6 ? g2.speed : 0, cadence: g2.cadence, stride: g2.stride, extra: run2 ? { cx: 0.22, nx: -0.08 } : null, jumpK: 0.5 }; if (od && mvd < 0.6 && !air) { s2.dance3d = od; s2.beat = bt.beat; s2.amt = 1; } posePal3D(o.obj.userData.m, s2); }
         if (o.shN !== near) { o.shN = near; o.obj.traverse((c) => { if (c.isMesh) c.castShadow = near && !LOW; }); }
-        const said = clean(o.say || ''); placeTag(o, o.x, o.y + HEIGHT + 0.35, o.z, muted.has(o.uid) || isHidden(hideKey('park', o.uid, said)) ? '' : said, o.sayAt || 0, !o.obj.visible || dist > 28); }
+        const said = clean(o.say || ''); placeTag(o, o.x, o.y + HEIGHT + 0.35, o.z, muted.has(o.uid) || isHidden(hideKey('park', o.uid, said)) ? '' : said, o.sayAt || 0, !o.obj.visible || dist > (roomState.inId ? 48 : 28)); }
       placeTag(meTag, P.x, P.y + HEIGHT + 0.35, P.z, P.say, P.sayAt, pov && Date.now() - P.sayAt > 7000);
       // treasures & portals
       for (const it of items) { if (found.has(it.id)) continue; it.m.rotation.y += dt * 2; it.m.position.y = ground(it.x, it.z) + 1 + Math.sin(now / 400 + it.x) * 0.15;

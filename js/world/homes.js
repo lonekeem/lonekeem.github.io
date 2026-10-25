@@ -56,14 +56,14 @@ export function attachHomes(api, W, K) {
 
   // ---------------------------------------------------------------- HUD: Go home button, second action button, panel
   const css = document.createElement('style'); css.textContent = `.kh-home{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 180px);pointer-events:auto;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(43,29,85,.75);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
-.kh-in{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(16px,env(safe-area-inset-bottom)) + 150px);pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;background:#0f766e;color:#fff;font:800 15px Inter,sans-serif;padding:0 18px;z-index:8}.kh-in[hidden],.kh-p[hidden]{display:none}
+.kh-in,.kh-fl{position:absolute;left:50%;transform:translateX(-50%);pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;color:#fff;font:800 15px Inter,sans-serif;padding:0 18px;z-index:8}.kh-in{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 150px);background:#0f766e}.kh-fl{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 206px);background:#7c3aed}.kh-in[hidden],.kh-fl[hidden],.kh-p[hidden]{display:none}
 .kh-p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,6,30,.55);pointer-events:auto;z-index:30}.kh-c{background:#fff;color:#111;border-radius:18px;padding:16px;width:min(92vw,380px);max-height:80vh;overflow:auto;font:500 14px Inter,sans-serif}
 .kh-c h3{margin:0 0 6px;font:800 18px Inter,sans-serif;color:#111}.kh-c button{margin:6px 6px 0 0;border:0;border-radius:12px;padding:10px 14px;font:800 14px Inter,sans-serif;background:#6d28d9;color:#fff}.kh-c button.g{background:#e5e7eb;color:#111}.kh-c .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;color:#111}.kh-c small{color:#444}
-@media (orientation:landscape) and (max-height:500px){.kh-home{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 300px)}.kh-in{bottom:110px}}`;
+@media (orientation:landscape) and (max-height:500px){.kh-home{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 300px)}.kh-in{bottom:110px}.kh-fl{bottom:164px}}`;
   document.head.appendChild(css);
-  const homeB = document.createElement('button'); homeB.className = 'kh-home'; homeB.textContent = '🏠 Home'; const inB = document.createElement('button'); inB.className = 'kh-in'; inB.hidden = true;
+  const homeB = document.createElement('button'); homeB.className = 'kh-home'; homeB.textContent = '🏠 Home'; const inB = document.createElement('button'); inB.className = 'kh-in'; inB.hidden = true; const flB = document.createElement('button'); flB.id = 'kh-floor'; flB.className = 'kh-fl'; flB.hidden = true; flB.type = 'button'; flB.textContent = '🪜 Upstairs';
   const pan = document.createElement('div'); pan.className = 'kh-p'; pan.hidden = true; pan.innerHTML = '<div class="kh-c"></div>'; const card = pan.firstChild;
-  pan.onclick = (e) => { if (e.target === pan) pan.hidden = true; }; const host = W.hud || view; host.append(homeB, inB, pan);
+  pan.onclick = (e) => { if (e.target === pan) pan.hidden = true; }; const host = W.hud || view; host.append(homeB, inB, flB, pan);
   function panel(html, wire) { card.innerHTML = html + '<div><button class="g" data-x>Close</button></div>'; card.querySelector('[data-x]').onclick = () => (pan.hidden = true); pan.hidden = false; if (wire) wire(card); }
   const busy = (b, t) => { b.disabled = true; b.textContent = t; };
 
@@ -191,8 +191,43 @@ export function attachHomes(api, W, K) {
   function placeAt(p) { if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return; P.sit = null; P.x = p.x; P.z = p.z; if (p.yaw != null) P.yaw = p.yaw; P.vy = 0; P.onGround = true; const gy = ground(p.x, p.z); let y = standY(Number.isFinite(gy) ? gy : FLAT, p.x, p.z); if (!Number.isFinite(y)) y = FLAT; P.y = y; try { if (p.cam != null && window.__p3 && window.__p3.setYaw) window.__p3.setYaw(((p.cam % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)); } catch { /* */ } api.markDirty && api.markDirty(); }
   function goIn(h) { if (!h) return; if (deco && deco.out) { say('Tap Done or Exit first. Outside decorating stays in the yard.'); return; } SC = scOf(h); if (!canEnter(h)) { say('🔒 Only the owner and invited friends can go inside'); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') return; const r = buildRoom(h); if (deco) endDeco(false); inside = h; roomState.box = { x0: r.cx - 5.6 * SC, x1: r.cx + 5.6 * SC, z0: r.cz - 5.6 * SC, z1: r.cz + 5.5 * SC };
     standUp(true); P.x = r.cx; P.z = r.cz + 4.6 * SC; P.yaw = Math.PI; P.y = FLAT; P.vy = 0; P.onGround = true; try { if (window.__p3 && window.__p3.setYaw) window.__p3.setYaw(0); } catch { /* */ } if (!roomLight) { roomLight = new THREE.PointLight('#fff1d6', LOW ? 22 : 32, 22, 1.6); scene.add(roomLight); } roomLight.position.set(r.cx - 3 * SC, FLAT + 2.7, r.cz + 1.5); roomLight.visible = true; if (!LOW) { if (!roomLight2) { roomLight2 = new THREE.PointLight('#fff1d6', 24, 20, 1.6); scene.add(roomLight2); } roomLight2.position.set(r.cx + 3.5 * SC, FLAT + 2.7, r.cz - 2); roomLight2.visible = true; }
-    roomState.inId = h.id; const ow = owners.get(h.id); if (ow && ow.owner && ow.owner !== uid) noteHouse(ow.owner, h.id, 'visit'); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); yardB.hidden = true; api.markDirty && api.markDirty(); }
-  function goOut(spot) { const h = inside; if (!h) { if (spot) placeAt(spot); return; } standUp(true); tvHide(); if (deco && !deco.out) endDeco(false); inside = null; roomState.box = null; roomState.inId = null; decB.hidden = true; if (rad && !radioBox.hidden) minimizeRadio(); if (roomLight2) roomLight2.visible = false; placeAt(spot || doorSpot(h)); if (roomLight) roomLight.visible = false; }
+    roomState.inId = h.id; const ow = owners.get(h.id); if (ow && ow.owner && ow.owner !== uid) noteHouse(ow.owner, h.id, 'visit'); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); yardB.hidden = true; api.markDirty && api.markDirty(); watchDecor(h.id); startParty(h, r); }
+  function goOut(spot) { const h = inside; if (!h) { if (spot) placeAt(spot); return; } standUp(true); stopParty(); watchDecor(null); flB.hidden = true; tvHide(); if (deco && !deco.out) endDeco(false); inside = null; roomState.box = null; roomState.inId = null; decB.hidden = true; if (rad && !radioBox.hidden) minimizeRadio(); if (roomLight2) roomLight2.visible = false; placeAt(spot || doorSpot(h)); if (roomLight) roomLight.visible = false; api.send && api.send(true); }
+  let partyP = null, party = null, decorUnsub = null;
+  function watchDecor(id) {
+    if (decorUnsub) { decorUnsub(); decorUnsub = null; }
+    if (!id || !db || !uid) return;
+    decorUnsub = onSnapshot(doc(db, 'homes', id), (snap) => {
+      if (!snap.exists() || !inside || inside.id !== id) return;
+      owners.set(id, snap.data());
+      applyDecor(id);
+    }, (e) => console.warn('house decor', e && e.code));
+  }
+  function stopParty() { partyP = null; if (party) { try { party.stop(); } catch { /* */ } party = null; } }
+  function startParty(h, r) {
+    stopParty();
+    if (!db || !uid || !api.others) return;
+    const job = partyP = import('./housemates.js').then((m) => {
+      if (partyP !== job || !inside || inside.id !== h.id) return;
+      party = m.startHouseParty({
+        db, uid, plot: h.id, cx: r.cx, cz: r.cz, P, S, others: api.others, say,
+        quietPark: api.quietPark, dropPal: api.dropPal,
+        onFull: () => { say('This house is full (12 Pals). Try again in a little bit.'); goOut(); }
+      });
+    }).catch((e) => console.warn('house party', e));
+  }
+  function changeFloor() {
+    if (!inside) return;
+    const r = rooms.get(inside.id); if (!r || !r.I.two) return;
+    standUp(true);
+    const sc = scOf(inside); const up = P.y <= FLAT + 2.5;
+    if (up) { P.x = r.cx + 3.3 * sc; P.z = r.cz - 1.4 * sc; P.y = FLAT + 3.4; P.yaw = Math.PI; }
+    else { P.x = r.cx + 0.2 * sc; P.z = r.cz + 4.2 * sc; P.y = FLAT; P.yaw = 0; }
+    P.vy = 0; P.onGround = true;
+    try { if (window.__p3 && window.__p3.setYaw) window.__p3.setYaw(up ? 0 : Math.PI); } catch { /* */ }
+    api.markDirty && api.markDirty();
+  }
+  flB.onclick = () => changeFloor();
 
   // ---------------------------------------------------------------- house radio (homes/{plot}.radio: Spotify/Apple/YouTube embed or Kemy Radio synced by startedAt)
   const css2 = document.createElement('style'); css2.textContent = `.kh-radio{position:absolute;left:50%;transform:translateX(-50%);top:calc(max(8px,env(safe-area-inset-top)) + 54px);width:min(92vw,340px);background:rgba(20,12,45,.88);color:#fff;border-radius:14px;padding:8px 10px;pointer-events:auto;z-index:9;font:600 13px Inter,sans-serif}.kh-radio[hidden],.kh-dbar[hidden],.kh-dec[hidden]{display:none}
@@ -939,19 +974,20 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (!inside && !promptNow) { if (driving) { if (Math.abs(m.speed) < 2 && ownHomes().some((q) => Math.hypot(q.x - m.x, q.z - m.z) < (q.estate ? 70 : 32))) promptNow = { id: 'kh:park', label: '🅿️ Park at home' }; }
       else { const n = nearMyCar(); if (n) { pendingTake = n; promptNow = { id: 'kh:take', label: '🚗 Drive ' + CAR[n.car.m].name }; } if (!promptNow && amAdmin) { const [sx, sz] = Lw(HOUSE_BY_ID[ADMIN_PLOT], PALACE_SIGN_AT.x, PALACE_SIGN_AT.z); if (Math.hypot(P.x - sx, P.z - sz) < 4.5) promptNow = { id: 'kh:sign', label: '✏️ Edit sign' }; } } }
     inB.hidden = !showIn; if (showIn) { inB.dataset.h = showIn.id; const ow = owners.get(showIn.id); inB.textContent = ow && ow.owner !== uid ? '🏠 Visit ' + String(ow.name || 'Pal').slice(0, 12) : '🏠 Go in'; }
+    const two = !!(inside && !deco && rooms.get(inside.id) && rooms.get(inside.id).I.two); flB.hidden = !two; if (two) flB.textContent = P.y <= FLAT + 2.5 ? '🪜 Upstairs' : '🪜 Downstairs';
     const mineH = myPlot && HOUSE_BY_ID[myPlot]; yardB.hidden = !!(inside || deco || driving || !mineH || Math.hypot(P.x - mineH.x, P.z - mineH.z) > (mineH.estate ? 55 : 28));
     if (inside && roomLight) { roomLight.intensity = (LOW ? 18 : 26); const r = rooms.get(inside.id); if (r) { r.I.update(dt, P); if (roomLight2) { const up = P.y > FLAT + 2.5; roomLight2.position.set(r.cx + 3.4, FLAT + (up ? 5.9 : 2.7), r.cz + (up ? -2.5 : -1)); } if (deco) decoTick(dt); } }
     const inviteLab = paintInvite(); if (inviteLab && !promptNow && !deco) promptNow = { id: 'kh:invite', label: inviteLab };
     persist(false);
-    window.__kh = Object.assign(window.__kh || {}, { myPlot, myTier, inside: inside && inside.id, owners: owners.size, cars: [...garages.values()].reduce((a, g) => a + g.carMs.length, 0), garages: garages.size, signs: signs.size, street: !!save.street, prompt: promptNow && promptNow.label, mini: radioBox.classList.contains('min'), dock: radioBox.classList.contains('dock'), radioOpen: !radioBox.hidden }); }
+    window.__kh = Object.assign(window.__kh || {}, { myPlot, myTier, inside: inside && inside.id, owners: owners.size, cars: [...garages.values()].reduce((a, g) => a + g.carMs.length, 0), garages: garages.size, signs: signs.size, street: !!save.street, prompt: promptNow && promptNow.label, mini: radioBox.classList.contains('min'), dock: radioBox.classList.contains('dock'), radioOpen: !radioBox.hidden, mates: party && party.state ? party.state.n : 0, floor: flB.hidden ? '' : flB.textContent }); }
   // debug only (kemy-pals-debug=1): pretend to own a plot locally to preview garages/interiors (no writes)
   const fakeOwn = (id, tier, cars, who) => { if (lsg('kemy-pals-debug') !== '1') return false; const h = HOUSE_BY_ID[id]; owners.set(id, { owner: who || uid, name: (who ? 'Pal ' + who : S.profile?.displayName) || 'Me', style: HOME_STYLES[h.style].key, garage: tier, ...(cars != null ? { cars } : {}) }); if (!who && !h.admin) { myPlot = id; myTier = tier; } drawSign(h); buildGarage(h); return true; };
   W.homeSpot = () => (myPlot ? homeFront(HOUSE_BY_ID[myPlot]) : null); W.leaveRoom = () => { if (inside) goOut(); };
   const life = attachHomeLife(api, { inside: () => inside, room: () => (inside && rooms.get(inside.id)) || null, say,
     sitAt: (o) => { P.sit = { x: o.x, z: o.z, y: o.y, yaw: o.yaw, seat: o.seat || null, back: o.back, off: () => (o.dn === 'sleep' ? life.act('wake') : null) }; P.x = o.x; P.z = o.z; P.yaw = o.yaw; api.markDirty && api.markDirty(); },
     unsit: () => { const st = P.sit; if (!st) return; P.sit = null; P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; api.markDirty && api.markDirty(); } });
-  window.__khApi = { life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
-  function destroy() { try { life.destroy(); } catch { /* */ } document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); pan.remove(); css.remove(); css2.remove(); }
+  window.__khApi = { life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, floor: () => changeFloor(), sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
+  function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); css.remove(); css2.remove(); }
   void Q; void K;
   return { update, destroy };
 }
