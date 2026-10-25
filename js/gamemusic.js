@@ -10,7 +10,8 @@ const ls = { get(k) { try { return localStorage.getItem(k); } catch { return nul
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const BASE = new URL('../', import.meta.url).href;
 const SRC = 'game-music';
-// Kemy Radio = the 'theme' station (js/theme.js TRACKS, files exactly as recorded, loaded only when played).
+// Kemy Radio = the 'theme' station (js/theme.js TRACKS in ORDER: Keep Building, Kemy on the Screen, ...; loaded only when played).
+// kemy-radio-track stores the TRACKS index (t.n), so saved picks survive reordering.
 // Compact pill (equalizer, scrolling title, prev/play/next) + a radio section in the panel. Remembered on this device.
 const RK = { shuf: 'kemy-radio-shuffle', rep: 'kemy-radio-repeat', trk: 'kemy-radio-track', off: 'kemy-radio-off' };
 // My Playlist: saved Spotify / Apple Music links (this device only), played in a mini card via the official embeds.
@@ -50,7 +51,7 @@ async function load() {
 async function kemyTracks() {
   if (kemySongs) return kemySongs;
   const list = [];
-  let themeOff = false; try { const th = await import('./theme.js'); themeOff = th.getMode() === 'off'; if (!themeOff) list.push({ title: th.THEME_TITLE, artist: th.THEME_ARTIST, url: th.THEME_SRC, theme: true }); } catch { /* */ }
+  let themeOff = false; try { const th = await import('./theme.js'); themeOff = th.getMode() === 'off'; if (!themeOff) { list.push({ title: th.KB_TITLE, artist: th.KB_ARTIST, url: th.KB_SRC, theme: true }); list.push({ title: th.THEME_TITLE, artist: th.THEME_ARTIST, url: th.THEME_SRC, theme: true }); } } catch { /* */ }
   try { const more = opts.kemySongs ? await opts.kemySongs() : []; more.forEach((s) => list.push(s)); } catch { /* offline */ }
   kemySongs = list; return list;
 }
@@ -67,7 +68,7 @@ function ensureAudio() {
 async function pick(id) {
   closeEmbed();
   st = stations.find((s) => s.id === id) || stations[0]; ls.set(K.st, st.id); idx = 0;
-  if (st.lazy === 'theme') { await loadTheme(); st.tracks = themeTracks; const t = parseInt(ls.get(RK.trk), 10); if (st.tracks[t]) idx = t; }
+  if (st.lazy === 'theme') { await loadTheme(); st.tracks = themeTracks; const t = parseInt(ls.get(RK.trk), 10); const j = st.tracks.findIndex((x) => x.n === t); if (j >= 0) idx = j; }
   else if (st.lazy) st.tracks = await kemyTracks();
   if (st.tracks.length > 1 && st.id !== 'kemy' && st.id !== 'theme') idx = Math.floor(Math.random() * st.tracks.length);
   paint();
@@ -75,7 +76,7 @@ async function pick(id) {
 function startTrack() {
   const t = st && st.tracks[idx]; if (!t) { paint(); return; }
   const a = ensureAudio(); a.volume = playVol(); a.loop = st.tracks.length === 1 || (isRadio() && repeatMode() === 'one');
-  if (isRadio()) { ls.set(RK.trk, String(idx)); ls.set(RK.off, '0'); if (lastToast !== t.url) { lastToast = t.url; toast(t); } }
+  if (isRadio()) { ls.set(RK.trk, String(t.n ?? idx)); ls.set(RK.off, '0'); if (lastToast !== t.url) { lastToast = t.url; toast(t); } }
   if (a.dataset.url !== t.url) { a.preload = 'none'; a.src = t.url; a.dataset.url = t.url; }
   wantPlay = true; a.play().catch(() => { wantPlay = false; paint(); });
 }
@@ -83,7 +84,7 @@ export async function play() { await load(); if (!st) await pick(ls.get(K.st) ||
 export function pause() { wantPlay = false; audio?.pause(); paint(); }
 export function next() { if (!st || !st.tracks.length) return; const n = st.tracks.length; if (isRadio() && shuffleOn() && n > 1) { let j; do j = Math.floor(Math.random() * n); while (j === idx); idx = j; } else idx = (idx + 1) % n; if (wantPlay || (audio && !audio.paused)) startTrack(); else paint(); }
 export function prev() { if (!st || !st.tracks.length) return; if (audio && !audio.paused && audio.currentTime > 3 && audio.dataset.url === st.tracks[idx]?.url) { audio.currentTime = 0; return; } idx = (idx - 1 + st.tracks.length) % st.tracks.length; if (wantPlay || (audio && !audio.paused)) startTrack(); else paint(); }
-async function loadTheme() { if (themeTracks.length) return; try { const th = await import('./theme.js'); themeTracks = th.TRACKS.map((t) => ({ title: t.title, artist: t.artist, url: t.src, dur: t.dur, cover: t.cover || '', credit: t.credit || '' })); } catch { themeTracks = []; } }
+async function loadTheme() { if (themeTracks.length) return; try { const th = await import('./theme.js'); themeTracks = th.ORDER.map((n) => { const t = th.TRACKS[n]; return { n, title: t.title, artist: t.artist, url: t.src, dur: t.dur, cover: t.cover || '', credit: t.credit || '' }; }); } catch { themeTracks = []; } }
 // Kemy Radio controls (also used by the pill / panel). i: track index in the theme playlist.
 export async function radioPlay(i = null) { await load(); closeEmbed(); if (!isRadio()) await pick('theme'); if (i != null && st.tracks[i]) idx = i; ls.set(RK.off, '0'); startTrack(); }
 export function radioToggle() { if (isPlaying()) pause(); else radioPlay(); }

@@ -1,7 +1,7 @@
 // Kemy Sounds: background music for a video or sound post.
 // Lone Keem Originals reuse js/theme.js (no extra audio files).
 // Free Music is data/sounds.json + assets/sounds (loaded only when a track is previewed or played).
-import { TRACKS } from './theme.js';
+import { TRACKS, ORDER } from './theme.js';
 import { soundOn } from './autoplay.js';
 
 const MOODS = [
@@ -28,7 +28,7 @@ let allP = null;
 function allTracks() {
   if (!allP) {
     allP = loadFree().then((free) => {
-      const originals = TRACKS.map((t, i) => ({
+      const originals = ORDER.map((i) => [TRACKS[i], i]).map(([t, i]) => ({
         id: 'keem-' + i, title: t.title, artist: 'Lone Keem', mood: 'originals', section: 'original',
         license: 'Lone Keem original', source: '', src: t.src,
       }));

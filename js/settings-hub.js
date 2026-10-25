@@ -5,7 +5,7 @@ import { signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth
 import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { loadSettings, saveSettings } from './controls.js';
 import { mountRemap } from './input.js';
-import { getVolume as themeVol, setVolume as setThemeVol, getMode as themeMode, setMode as setThemeMode, getPick as themePick, setPick as setThemePick, TRACKS as THEME_TRACKS, PLAYLIST_CREDIT, play as playTheme, stop as stopTheme, isPlaying as themePlaying } from './theme.js';
+import { getVolume as themeVol, setVolume as setThemeVol, getMode as themeMode, setMode as setThemeMode, getPick as themePick, setPick as setThemePick, TRACKS as THEME_TRACKS, ORDER as THEME_ORDER, PLAYLIST_CREDIT, play as playTheme, stop as stopTheme, isPlaying as themePlaying } from './theme.js';
 import { setVolume as setMusicVol, setRadioEnabled } from './gamemusic.js';
 import { masterVol, setMasterVol, sfxVol, setSfxVol } from './volume.js';
 import { walletState } from './wallet-chip.js';
@@ -185,7 +185,7 @@ function html(ctx) {
         <p class="muted small">Kemy’s theme plays softly on your profile and Pals, and stops for videos and games.</p>
         <div class="seg theme-seg" role="radiogroup" aria-label="Theme song">${[['play', '🎵 Play'], ['mute', '🔇 Mute'], ['off', 'Off']].map(([k, l]) => `<label><input type="radio" name="set-theme-mode" value="${k}" ${themeMode() === k || (k === 'mute' && !themeMode()) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
         <label for="set-theme-pick">Playlist</label>
-        <select id="set-theme-pick"><option value="all">All songs in order</option><option value="shuffle">Shuffle</option>${THEME_TRACKS.map((t, i) => `<option value="${i}">${esc(t.title)}</option>`).join('')}</select>
+        <select id="set-theme-pick"><option value="all">All songs in order</option><option value="shuffle">Shuffle</option>${THEME_ORDER.map((i) => `<option value="${i}">${esc(THEME_TRACKS[i].title)}</option>`).join('')}</select>
         <div class="set-actions"><button class="btn btn-ghost" type="button" id="set-theme" data-theme-ctl>🎵 Play theme</button></div>
         <p class="muted small">${esc(PLAYLIST_CREDIT)}</p>
         <a class="set-link" href="#/sounds">🎵 Kemy Sounds credits<span class="go" aria-hidden="true">›</span></a>

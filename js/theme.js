@@ -15,9 +15,13 @@ export const THEME4_TITLE = 'Keep Me Alive';
 export const THEME4_ARTIST = 'Keem';
 export const THEME5_TITLE = "You're the One";
 export const THEME5_ARTIST = 'Keem';
+// Keep Building plays first, right before Kemy on the Screen (see ORDER below).
+export const KB_TITLE = 'Keep Building';
+export const KB_ARTIST = 'Keem';
+export const KB_SRC = new URL('../assets/audio/keep-building.mp3?v=1', import.meta.url).href;
 export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
 const PRODUCED = 'Produced by Lone Keem';
-// Theme playlist (original song files, unchanged). Track 1 is always the welcome / hatch song.
+// Theme playlist (original song files, unchanged). ORDER[0] (Keep Building, then Kemy on the Screen) is the welcome / hatch start.
 // New tracks are appended so saved indexes (kemy-theme-track, kemy-radio-track) stay valid.
 export const TRACKS = [
   { title: THEME_TITLE, artist: 'Keem', src: THEME_SRC, dur: 124.8, credit: PRODUCED },
@@ -33,11 +37,17 @@ export const TRACKS = [
   { title: 'Stand Tall', artist: 'Keem', src: new URL('../assets/audio/stand-tall.m4a?v=1', import.meta.url).href, dur: 129.6, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Stand Up Strong', artist: 'Keem', src: new URL('../assets/audio/stand-up-strong.m4a?v=1', import.meta.url).href, dur: 103.2, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Stand Up', artist: 'Keem', src: new URL('../assets/audio/stand-up.m4a?v=1', import.meta.url).href, dur: 100.4, credit: 'Produced by Lone Keem · Made with Suno' },
+  { title: KB_TITLE, artist: KB_ARTIST, src: KB_SRC, dur: 189.6, credit: PRODUCED, lazy: true },
 ];
-export const PLAYLIST_CREDIT = TRACKS.map((t) => `${t.title} — ${t.credit}`).join('. ');
+// Play order (indexes into TRACKS; saved indexes and house radio picks stay valid): Keep Building first,
+// then Kemy on the Screen, then the rest in their usual order. "All songs in order" and the welcome / hatch start follow it.
+export const KB_INDEX = TRACKS.findIndex((t) => t.title === KB_TITLE);
+export const ORDER = [KB_INDEX, ...TRACKS.map((_, i) => i).filter((i) => i !== KB_INDEX)];
+export const FIRST = ORDER[0];
+export const PLAYLIST_CREDIT = ORDER.map((i) => TRACKS[i]).map((t) => `${t.title} — ${t.credit}`).join('. ');
 const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)
 export function getPick() { const v = ls.get(PICK); return v === 'shuffle' || (v && TRACKS[+v]) ? v : 'all'; }
-let cur = 0;
+let cur = FIRST;
 export const currentTrack = () => cur;
 
 const MODE = 'kemy-theme-mode', VOLK = 'kemy-theme-vol', OLD = 'kemy-theme-bgm';
@@ -88,7 +98,7 @@ export async function play({ fromStart = false, force = false } = {}) {
   if (document.hidden || otherMediaPlaying()) return false;
   if (!force && getMode() !== 'play') return false;
   const a = ensureEl(); clearTimeout(stopT); delete a.dataset.stopping;
-  if (fromStart) { if (cur !== 0) loadTrack(0); try { a.currentTime = 0; } catch { /* */ } }
+  if (fromStart) { if (cur !== FIRST) loadTrack(FIRST); try { a.currentTime = 0; } catch { /* */ } }
   else if (a.ended) { try { a.currentTime = 0; } catch { /* */ } }
   try { if (actx && actx.state !== 'running') await actx.resume(); } catch { /* */ }
   if (!actx) a.volume = 0; else gain.gain.value = Math.min(gain.gain.value, 0.0001);
@@ -107,7 +117,7 @@ export const silence = () => stop(0.25);
 // Welcome screen / egg hatch: play the full song from the start (asks first if never asked).
 export function playIntro() { const m = getMode(); if (m === '') { ask(); return Promise.resolve(false); } return m === 'play' ? play({ fromStart: true }) : Promise.resolve(false); }
 export const playShort = playIntro;
-function nextIndex() { const pk = getPick(); if (pk === 'shuffle') { if (TRACKS.length < 2) return 0; let n; do n = Math.floor(Math.random() * TRACKS.length); while (n === cur); return n; } if (pk !== 'all') return +pk; return (cur + 1) % TRACKS.length; }
+function nextIndex() { const pk = getPick(); if (pk === 'shuffle') { if (TRACKS.length < 2) return 0; let n; do n = Math.floor(Math.random() * TRACKS.length); while (n === cur); return n; } if (pk !== 'all') return +pk; return ORDER[(ORDER.indexOf(cur) + 1) % ORDER.length]; }
 // Lazy tracks (the mp3) stay unfetched until playback. fetch:false only remembers the index.
 function loadTrack(i, { fetch } = {}) {
   cur = i; const t = TRACKS[i]; const doFetch = fetch != null ? fetch : !t.lazy;
@@ -118,7 +128,7 @@ function loadTrack(i, { fetch } = {}) {
   emit();
 }
 // Settings: choose the playlist order or one track; starts it if the theme is on.
-export function setPick(v) { ls.set(PICK, v); const i = v === 'all' || v === 'shuffle' ? (v === 'shuffle' ? nextIndex() : 0) : +v; if (el) { const was = isPlaying(); loadTrack(i, { fetch: was }); if (was) { el.play().catch(() => {}); } } else cur = i; }
+export function setPick(v) { ls.set(PICK, v); const i = v === 'all' || v === 'shuffle' ? (v === 'shuffle' ? nextIndex() : FIRST) : +v; if (el) { const was = isPlaying(); loadTrack(i, { fetch: was }); if (was) { el.play().catch(() => {}); } } else cur = i; }
 export function skip() { if (!el) return; const was = isPlaying(); loadTrack(nextIndex(), { fetch: was }); if (was) el.play().catch(() => {}); }
 export function gainInfo() { return { track: cur, title: TRACKS[cur].title, currentTime: el ? el.currentTime : null, webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume(), duration: el ? el.duration : null, src: el ? el.currentSrc : null }; }
 

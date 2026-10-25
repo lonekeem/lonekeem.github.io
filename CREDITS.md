@@ -21,6 +21,8 @@ All tracks below are released under **CC0 1.0** (public domain dedication, https
 
 ## Theme
 
+"Keep Building" by Keem, produced by Lone Keem (Lone Keem Studios, made with Suno), `assets/audio/keep-building.mp3`. Plays first in the theme playlist, right before:
+
 "Kemy on the Screen" by Keem (Lone Keem Studios), `assets/audio/kemy-theme.m4a`.
 
 ## Outside players
