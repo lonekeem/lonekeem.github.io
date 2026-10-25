@@ -63,7 +63,7 @@ export const GAMES = [
   { id: 'starcards', name: 'Star Cards', blurb: 'Shed your hand first. Shout LAST STAR! at one card.', players: '2-6 players' },
   { id: 'pool', name: 'Star Pool', blurb: 'Gold rails, purple felt. Sink your group, then call the 8.', players: '2 players' },
   { id: 'chess', name: 'Chess', blurb: 'Gold vs purple. Full rules, optional clocks.', players: '2 players' },
-  { id: 'ludo', name: 'Ludo', blurb: 'Roll fair dice, race four tokens home.', players: '2-4 players' },
+  { id: 'ludo', name: 'Pal Ludo', blurb: 'Roll fair dice, race four tokens home.', players: '2-4 players' },
   { id: 'trivia', name: 'Studio Trivia', blurb: 'Fast party quiz: music, movies and more.', players: '2-8 players' },
   { id: 'klgrid', name: 'KL Grid', blurb: 'K vs L on a 3x3 grid, or go Ultimate 9x9.', players: '2 players' },
   { id: 'checkers', name: 'Checkers', blurb: 'Jump, crown and clear the purple board.', players: '2 players' }

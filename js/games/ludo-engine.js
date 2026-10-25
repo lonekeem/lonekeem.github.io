@@ -15,12 +15,21 @@ export const START = [0, 13, 26, 39];
 export const SAFE = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 export const HOME_COL = [[[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]], [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]], [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]], [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]]];
 export const YARD = [[[1.5, 1.5], [1.5, 3.5], [3.5, 1.5], [3.5, 3.5]], [[1.5, 10.5], [1.5, 12.5], [3.5, 10.5], [3.5, 12.5]], [[10.5, 10.5], [10.5, 12.5], [12.5, 10.5], [12.5, 12.5]], [[10.5, 1.5], [10.5, 3.5], [12.5, 1.5], [12.5, 3.5]]];
-export const COLORS = ['#8a2be2', '#f2b31b', '#2bb5a8', '#e2558f'];
-export const COLOR_NAMES = ['Purple', 'Gold', 'Teal', 'Rose'];
+// board corners: 0 top-left, 1 top-right, 2 bottom-right, 3 bottom-left (clockwise)
+export const COLORS = ['#2fbf5b', '#ffc21a', '#2f8cf0', '#ef4646'];
+export const COLOR_NAMES = ['Green', 'Gold', 'Blue', 'Red'];
+export const DARK = ['#1d8a3d', '#d39a00', '#1d62b8', '#b92b2b'];
 export const seatColors = (n) => (n === 2 ? [0, 2] : n === 3 ? [0, 1, 2] : [0, 1, 2, 3]);
 export const HOME = 56;
 
-export function newGame(n) { return { n, cols: seatColors(n), pos: Array.from({ length: n }, () => [-1, -1, -1, -1]), turn: 0, die: 0, six: 0, k: 0, winner: -1, last: null, msg: '' }; }
+// cols: optional board corner per seat. team (4 seats only): seats 0+2 vs 1+3, partners sit opposite and win together.
+export function newGame(n, cols, team) { const st = { n, cols: cols || seatColors(n), pos: Array.from({ length: n }, () => [-1, -1, -1, -1]), turn: 0, die: 0, six: 0, k: 0, winner: -1, last: null, msg: '' }; if (team && n === 4) st.team = true; return st; }
+export const partnerOf = (st, p) => (st.team ? (p + 2) % 4 : -1);
+export const isFoe = (st, me, p) => p !== me && p !== partnerOf(st, me);
+export const done = (st, p) => st.pos[p].every((r) => r === HOME);
+export const teamOf = (p) => p % 2;
+// next seat to play: in team mode a seat whose tokens are all home is skipped
+export function nextTurn(st, me) { for (let i = 1; i <= st.n; i++) { const p = (me + i) % st.n; if (!st.team || !done(st, p)) return p; } return me; }
 export const encodePos = (pos) => pos.flat().map((v) => (v < 0 ? '--' : String(v).padStart(2, '0'))).join('');
 export const decodePos = (s, n) => Array.from({ length: n }, (_, p) => [0, 1, 2, 3].map((t) => { const x = s.substr((p * 4 + t) * 2, 2); return x === '--' ? -1 : +x; }));
 // absolute track square of a token (or -1 if in yard / home stretch)
@@ -51,7 +60,7 @@ export function step(st, die, token) {
   if (token < 0 || !L.includes(token)) {
     if (L.length && token >= 0) throw new Error('illegal');
     s.msg = die === 6 && st.six >= 2 ? 'Three 6s in a row: turn lost.' : 'No move.';
-    s.six = 0; s.turn = (me + 1) % st.n;
+    s.six = 0; s.turn = nextTurn(st, me);
     return s;
   }
   const from = s.pos[me][token], to = from < 0 ? 0 : from + die;
@@ -59,16 +68,19 @@ export function step(st, die, token) {
   let cap = null;
   const abs = absOf(col, to);
   if (abs >= 0 && !SAFE.has(abs)) {
-    const rivals = occupants(s, abs).filter(([p]) => p !== me);
+    const rivals = occupants(s, abs).filter(([p]) => isFoe(st, me, p));
     const byP = {}; rivals.forEach(([p]) => { byP[p] = (byP[p] || 0) + 1; });
     for (const [p, t] of rivals) if (byP[p] === 1) { s.pos[p][t] = -1; cap = { p, t }; }
   }
   s.last = { p: me, t: token, from, to, cap };
-  if (s.pos[me].every((r) => r === HOME)) { s.winner = me; s.msg = 'All four tokens home!'; return s; }
+  if (done(s, me)) {
+    if (!st.team || done(s, partnerOf(st, me))) { s.winner = me; if (st.team) s.winTeam = teamOf(me); s.msg = st.team ? 'Both partners are home!' : 'All four tokens home!'; return s; }
+    s.msg = 'All four home! Cheer on your partner.'; s.six = 0; s.turn = nextTurn(s, me); return s;
+  }
   const bonus = die === 6 || cap || to === HOME;
   s.msg = cap ? 'Captured!' : to === HOME ? 'Token home!' : from < 0 ? 'Out of the yard.' : '';
   if (bonus) { s.six = die === 6 ? st.six + 1 : 0; if (s.msg === '' && die === 6) s.msg = 'Rolled a 6: roll again.'; }
-  else { s.six = 0; s.turn = (me + 1) % st.n; }
+  else { s.six = 0; s.turn = nextTurn(s, me); }
   return s;
 }
 export function dieFromHex(hx) { const m = /[0-5]/.exec(hx); return m ? +m[0] + 1 : 1 + (parseInt(hx.slice(0, 8), 16) % 6); }
@@ -77,7 +89,7 @@ export const rollFromRandom = (rand = Math.random) => 1 + Math.floor(rand() * 6)
 function danger(st, me, abs) {
   if (abs < 0 || SAFE.has(abs)) return 0;
   let d = 0;
-  st.pos.forEach((toks, p) => { if (p === me) return; toks.forEach((r) => { const b = absOf(st.cols[p], r); if (b < 0) return; const gap = (abs - b + 52) % 52; if (gap >= 1 && gap <= 6 && r + gap <= 50) d++; }); if (toks.some((r) => r < 0) && abs === START[st.cols[p]]) d++; });
+  st.pos.forEach((toks, p) => { if (!isFoe(st, me, p)) return; toks.forEach((r) => { const b = absOf(st.cols[p], r); if (b < 0) return; const gap = (abs - b + 52) % 52; if (gap >= 1 && gap <= 6 && r + gap <= 50) d++; }); if (toks.some((r) => r < 0) && abs === START[st.cols[p]]) d++; });
   return d;
 }
 const LUDO_W = {
@@ -96,7 +108,7 @@ export function aiPick(st, die, lvl = 'medium', rand = Math.random) {
     let sc = to / 4;
     if (to === HOME) sc += w.home;
     if (from < 0) sc += w.out;
-    if (abs >= 0 && !SAFE.has(abs) && occupants(st, abs).some(([p]) => p !== me)) sc += w.cap;
+    if (abs >= 0 && !SAFE.has(abs) && occupants(st, abs).some(([p]) => isFoe(st, me, p))) sc += w.cap;
     if (abs >= 0 && SAFE.has(abs)) sc += w.safe;
     if (to > 50 && from <= 50) sc += w.lane;
     sc -= danger(st, me, abs) * w.danger;

@@ -42,3 +42,7 @@ Apple Music links play through Apple’s official embed (embed.music.apple.com);
 - **Caller clips** (`assets/audio/bingo/*.mp3`, 81 clips: all 75 calls plus "Get ready!", 3, 2, 1, "Bingo!" and "We have a winner!") were generated offline by Lone Keem Studios with **Piper TTS** (https://github.com/OHF-Voice/piper1-gpl), a free, open-source neural text-to-speech engine. No cloud service was used.
 - **Voice**: `en_US-kristin-medium` from rhasspy/piper-voices (https://huggingface.co/rhasspy/piper-voices, repo license MIT). Voice trained by Bryce Beattie (https://brycebeattie.com/files/tts/) from LibriVox recordings, which are **public domain** (dataset license per the voice's MODEL_CARD).
 - The clips are trimmed, loudness-normalized, mono 40 kbps MP3s. If a clip can't load, the game falls back to the device's built-in speech voice.
+
+## Pal Ludo
+
+- **All Pal Ludo art is original**, drawn for Kemy by Lone Keem Studios in SVG and CSS: the 4-colour board, the Pal-eared tokens, the 3D cube die, the purple mode cards, the turn-timer rings and the Games hero card. No art, logos, characters, sounds or text from any other Ludo app were used; the sounds are Kemy's own synthesized effects.
