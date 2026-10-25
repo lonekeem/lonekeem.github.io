@@ -8,7 +8,7 @@ import { masterVol, sfxVol } from '../volume.js';
 import { watchGameRotate } from '../rotate.js';
 import {
   BOTS, LUCKY_BALLS, PATTERN_NAME, ballsFor, bingoCall, cardFor, cardMiss, cardSlots, dayKey, letterOf,
-  botReactMs, levelOf, luckyRound, markedWin, masksFor, patternFor, roundAt, roundSeed, weekId
+  botReactMs, levelOf, luckyRound, markedWin, masksFor, PICK_IDS, PICK_NAME, pickSeed, roomPick, roomPattern, roundAt, roundSeed, weekId
 } from './logic.js';
 
 const CSS = `.pb{max-width:1040px;margin:0 auto;padding:10px 10px 24px;color:#2b1d55;font-family:Inter,system-ui,sans-serif}
@@ -149,7 +149,21 @@ body:has(.pb-live) .toast{bottom:168px}
 @keyframes pbIn{from{transform:translate(-50%,-50%) scale(.5)}to{transform:translate(-50%,-50%) scale(1)}}
 .pb-callout,.pb-ready{animation:pbIn .28s ease-out}
 @media (orientation:landscape) and (max-height:520px){.pb-hero{height:120px}}
-@media (prefers-reduced-motion:reduce){.pb-cell.got,.pb-win b,.pb-orb.now,.pb-cell.pb-shake,.pb-callout,.pb-ready{animation:none}}`;
+.pb-ban{position:fixed;left:50%;top:max(70px,10vh);transform:translateX(-50%);z-index:86;display:flex;align-items:center;gap:14px;padding:12px 18px 12px 14px;border-radius:22px;background:linear-gradient(135deg,#7a4fd0,#3fa9ff);color:#fff;box-shadow:0 10px 28px rgba(43,29,85,.35),inset 0 0 0 3px rgba(255,255,255,.35);pointer-events:none;animation:pbBan 3s ease-in-out forwards;max-width:calc(100vw - 24px)}
+.pb-ban small{display:block;font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+.pb-ban b{display:block;font-size:clamp(26px,7.5vw,40px);line-height:1;font-weight:900;text-shadow:0 3px 0 rgba(43,29,85,.45);white-space:nowrap}
+.pb-mini{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;width:78px;height:78px;flex:none;padding:5px;border-radius:12px;background:#fff}
+.pb-mini i{border-radius:3px;background:#e9e1fb}.pb-mini i.on{background:#ff7ab8;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
+@keyframes pbBan{0%{opacity:0;transform:translate(-50%,-30px) scale(.8)}10%{opacity:1;transform:translate(-50%,0) scale(1.04)}16%{transform:translate(-50%,0) scale(1)}88%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-14px)}}
+@media (prefers-reduced-motion:reduce){.pb-cell.got,.pb-win b,.pb-orb.now,.pb-cell.pb-shake,.pb-callout,.pb-ready{animation:none}.pb-ban{animation:pbBanCalm 3s step-end forwards}}
+@keyframes pbBanCalm{100%{opacity:0}}
+.pb-pick{position:fixed;inset:0;z-index:110;display:grid;place-items:center;background:rgba(28,14,58,.55);padding:12px}
+.pb-pickc{width:min(460px,100%);max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#2b1d55;border-radius:22px;padding:16px;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+.pb-pickc h2{margin:0 0 2px}.pb-picks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.pb-picks button{display:flex;align-items:center;gap:8px;text-align:left;border:3px solid #e9e1fb;border-radius:16px;background:#faf7ff;padding:8px;font:800 14px Inter,system-ui,sans-serif;color:#2b1d55;cursor:pointer}
+.pb-picks button.on{border-color:#7a4fd0;background:#efe6ff}.pb-picks .pb-mini{width:46px;height:46px;padding:3px;gap:2px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 1px #e9e1fb}
+.pb-picks button:first-child{grid-column:1/-1}
+.pb-shelf{font-size:22px;letter-spacing:2px}`;
 
 const SCENE = `<svg viewBox="0 0 800 480" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="pbSkyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset=".5" stop-color="#bae6fd"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient><linearGradient id="pbGrassG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86efac"/><stop offset="1" stop-color="#15803d"/></linearGradient></defs><rect width="800" height="480" fill="url(#pbSkyG)"/><circle cx="110" cy="68" r="34" fill="#fde047"/><circle cx="98" cy="56" r="10" fill="#fffbeb" opacity=".85"/><ellipse cx="250" cy="78" rx="48" ry="16" fill="#fff"/><ellipse cx="286" cy="70" rx="30" ry="14" fill="#fff"/><ellipse cx="560" cy="96" rx="54" ry="16" fill="#fff" opacity=".95"/><ellipse cx="400" cy="440" rx="480" ry="130" fill="url(#pbGrassG)"/><path d="M20 392c90-34 130 28 210 4s130-40 210 6 150-28 220 8" fill="none" stroke="#38bdf8" stroke-width="18" stroke-linecap="round"/><path d="M20 392c90-34 130 28 210 4s130-40 210 6 150-28 220 8" fill="none" stroke="#e0f2fe" stroke-width="6" stroke-linecap="round"/><g><rect x="64" y="248" width="16" height="72" rx="4" fill="#92400e"/><polygon points="72,146 14,268 130,268" fill="#166534"/><polygon points="72,188 32,268 112,268" fill="#4ade80"/></g><g><rect x="700" y="228" width="18" height="84" rx="4" fill="#92400e"/><polygon points="709,118 640,248 778,248" fill="#14532d"/><polygon points="709,168 662,248 756,248" fill="#22c55e"/></g><g fill="#fbcfe8"><circle cx="190" cy="404" r="7"/><circle cx="178" cy="412" r="5"/><circle cx="202" cy="412" r="5"/></g><circle cx="190" cy="404" r="2.5" fill="#f59e0b"/><g fill="#fde68a"><circle cx="360" cy="424" r="6"/><circle cx="350" cy="432" r="4"/><circle cx="370" cy="432" r="4"/></g><circle cx="360" cy="424" r="2" fill="#ea580c"/><g fill="#fff"><circle cx="630" cy="412" r="6"/><circle cx="620" cy="420" r="4"/><circle cx="640" cy="420" r="4"/></g><circle cx="630" cy="412" r="2" fill="#f59e0b"/></svg>`;
 
@@ -160,6 +174,7 @@ const POWNAME = { free: 'Free daub', double: 'Double stars', peek: 'Peek next' }
 const FRESH = 25000;
 
 function css() { if (document.getElementById('pb-css')) return; const s = document.createElement('style'); s.id = 'pb-css'; s.textContent = CSS; document.head.appendChild(s); }
+const gameLabel = (p) => (p === 'mix' ? 'Mix' : p === 'line' ? 'Normal bingo' : PATTERN_NAME[p] || 'Bingo');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let audio = null;
 let saidReady = -1, saidBall = -1, saidCount = '', calloutUntil = 0, voicePick = null;
@@ -306,9 +321,9 @@ export function openBingo(ctx, q = {}) {
   let gifted = false;
   if (prog.day !== today) {
     prog.days = (prog.days | 0) + 1; prog.day = today; prog.gift = today;
-    prog.ch = { day: today, daub: 0, rounds: 0, corners: 0, got: {} }; persist(); gifted = true;
+    prog.ch = { day: today, daub: 0, rounds: 0, wins: 0, got: {} }; persist(); gifted = true;
   }
-  const ch = () => { if (!prog.ch || prog.ch.day !== today) prog.ch = { day: today, daub: 0, rounds: 0, corners: 0, got: {} }; return prog.ch; };
+  const ch = () => { if (!prog.ch || prog.ch.day !== today) prog.ch = { day: today, daub: 0, rounds: 0, wins: 0, got: {} }; return prog.ch; };
   const session0 = Date.now(); let broke = false;
   let dead = false, mode = 'lobby', roomId = '', room = null, seats = [], unsubR = null, unsubS = null, hb = 0;
   let claim = 0, emo = 0, lastSeat = 0, seatQ = Promise.resolve();
@@ -317,7 +332,7 @@ export function openBingo(ctx, q = {}) {
   const arm = () => { if (!dead) watchGameRotate(); };
 
   function grantCh() {
-    const c = ch(), goals = { daub: ['Daub 50 numbers', 50], corners: ['Win with four corners', 1], rounds: ['Play 2 rounds', 2] };
+    const c = ch(), goals = { daub: ['Daub 50 numbers', 50], wins: ['Win 1 round', 1], rounds: ['Play 2 rounds', 2] };
     for (const [k, [label, goal]] of Object.entries(goals)) {
       if ((c[k] || 0) >= goal && !c.got[k]) { c.got[k] = 1; prog.xp += 10; persist(); prize(8, 'for “' + label + '”'); toast('Challenge complete: ' + label); }
     }
@@ -352,10 +367,10 @@ export function openBingo(ctx, q = {}) {
     const id = roomId; roomId = ''; room = null; seats = [];
     if (id) deleteDoc(doc(db, 'bingoRooms', id, 'seats', uid)).catch(() => {});
   }
-  async function ensure(id, pub) {
+  async function ensure(id, pub, pick) {
     const ref = doc(db, 'bingoRooms', id);
     const s = await getDoc(ref); if (s.exists()) return;
-    const seed = 1 + Math.floor(Math.random() * 1e9);
+    const seed = pub ? 1 + Math.floor(Math.random() * 1e9) : pickSeed(Math.random() * 1999000, pick || 'line');
     try { await setDoc(ref, { host: uid, code: id, pub: !!pub, seed, start: serverTimestamp() }); }
     catch (e) { const again = await getDoc(ref); if (!again.exists()) throw e; }
   }
@@ -393,11 +408,21 @@ export function openBingo(ctx, q = {}) {
       toast('Public halls are full. Try a private room with friends.');
     } catch (e) { console.warn('bingo room', e && (e.code || e.message)); toast(friendlyError ? friendlyError(e) : 'Could not open the hall'); }
   }
-  async function makePrivate() {
+  function pickGame() {
+    document.querySelectorAll('.pb-pick').forEach((e) => e.remove());
+    const box = document.createElement('div'); box.className = 'pb-pick'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'Pick a game');
+    const mini = (id) => { const m = id === 'mix' ? null : id === 'line' ? masksFor('line')[2] : masksFor(id)[0]; return `<span class="pb-mini" aria-hidden="true">${Array.from({ length: 25 }, (_, i) => `<i class="${m ? (m[i] ? 'on' : '') : (i % 6 === 0 || i % 4 === 0 && i % 24 ? 'on' : '')}"></i>`).join('')}</span>`; };
+    box.innerHTML = `<div class="pb-pickc"><h2>Pick a game</h2><p class="pb-note">Everyone in your room plays this every round.</p><div class="pb-picks">${PICK_IDS.map((id, i) => `<button type="button" class="${i ? '' : 'on'}" data-pick="${id}">${mini(id)}<b>${esc(PICK_NAME[id])}</b></button>`).join('')}</div><div class="pb-row"><button type="button" class="alt" data-pk="x">Cancel</button><button type="button" data-pk="go">Make room</button></div></div>`;
+    let pick = 'line'; document.body.appendChild(box);
+    box.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { pick = b.dataset.pick; box.querySelectorAll('[data-pick]').forEach((x) => x.classList.toggle('on', x === b)); });
+    box.querySelector('[data-pk=x]').onclick = () => box.remove();
+    box.querySelector('[data-pk=go]').onclick = () => { box.remove(); makePrivate(pick); };
+  }
+  async function makePrivate(pick) {
     unlockVoice();
     const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let id = '';
     for (let i = 0; i < 5; i++) id += A[Math.floor(Math.random() * A.length)];
-    try { await ensure(id, false); listen(id); toast('Room code ' + id); } catch (e) { toast(friendlyError ? friendlyError(e) : 'Could not make a room'); }
+    try { await ensure(id, false, pick); listen(id); toast('Room code ' + id + ' · ' + gameLabel(pick || 'line')); } catch (e) { toast(friendlyError ? friendlyError(e) : 'Could not make a room'); }
   }
   async function joinCode(raw) {
     unlockVoice();
@@ -418,7 +443,7 @@ export function openBingo(ctx, q = {}) {
   function paintLobby() {
     mode = 'lobby'; const slotsN = slots(), lvN = lv();
     const c = ch();
-    const goals = [['daub', 'Daub 50 numbers', 50], ['corners', 'Win with four corners', 1], ['rounds', 'Play 2 rounds', 2]];
+    const goals = [['daub', 'Daub 50 numbers', 50], ['wins', 'Win 1 round', 1], ['rounds', 'Play 2 rounds', 2]];
     main.innerHTML = `<section class="pb theme-${esc(prog.theme)}" style="--daub:${esc((DAUBERS.find((d) => d.id === prog.dauber) || DAUBERS[0]).c)}">
       <div class="pb-top"><a href="#/arcade" aria-label="Back to arcade">←</a><h1>Pal Bingo ⭐<small>Cozy 75-ball rooms</small></h1><div data-k-rot></div><button class="pb-ico" type="button" data-mute aria-label="Sound">${sfx.muted ? '🔇' : '🔊'}</button></div>
       <div class="pb-hero pb-banner" aria-hidden="true">${SCENE}</div>
@@ -433,13 +458,14 @@ export function openBingo(ctx, q = {}) {
       </div>
       <div class="pb-box"><h2>Today’s challenges</h2><ul>${goals.map(([k, label, goal]) => `<li>${c.got && c.got[k] ? '✅' : '▫️'} ${esc(label)} (${Math.min(goal, c[k] || 0)}/${goal})</li>`).join('')}</ul><p class="pb-note">A new set each day you visit. Skipping a day just starts fresh.</p></div>
       <details class="pb-box"><summary><b>Sticker book</b></summary><p>Balls: ${LUCKY_BALLS.map((n) => prog.stickers.b.includes(n) ? n : '·').join(' ')}</p><p>Patterns: ${['line', 'corners', 'x', 'heart', 'star', 'crown', 'blackout'].map((id) => prog.stickers.p.includes(id) ? PATTERN_NAME[id] : '·').join(' · ')}</p></details>
+      <div class="pb-box"><h2>Trophy shelf</h2>${(() => { const t = prog.trophies || {}; const n = (t.g | 0) + (t.s | 0) + (t.b | 0); return n ? `<p class="pb-shelf">🥇 ${t.g | 0} · 🥈 ${t.s | 0} · 🥉 ${t.b | 0}</p>` : '<p class="pb-note">Win a round to earn your first trophy. Faster wins earn gold!</p>'; })()}</div>
       <div class="pb-box"><h2>This week</h2><div data-week>Loading…</div><p><a href="#/scores/bingo?tab=week">Full weekly board</a></p></div>
       <p class="pb-note">Each ball waits a few seconds so you can find it and tap it. Power-ups (free daub, double stars, peek) are earned by playing, not bought. Chat is quick phrases and emotes only.</p>
       <div class="pb-break" data-break hidden>You’ve been playing a while. A break is nice too — come back whenever you like.</div>
     </section>`;
     main.querySelector('[data-mute]').onclick = () => { sfx.muted = !sfx.muted; paintLobby(); };
     main.querySelector('[data-pub]').onclick = () => joinPublic();
-    main.querySelector('[data-priv]').onclick = () => makePrivate();
+    main.querySelector('[data-priv]').onclick = () => pickGame();
     main.querySelector('[data-code]').onsubmit = (e) => { e.preventDefault(); joinCode(e.target.querySelector('input').value); };
     main.querySelectorAll('[data-cards]').forEach((b) => b.onclick = () => { const n = +b.dataset.cards; if (n > slots()) { toast('Play a little more to unlock another card'); return; } prog.cards = n; persist(); paintLobby(); });
     main.querySelectorAll('[data-daub]').forEach((b) => b.onclick = () => { prog.dauber = b.dataset.daub; persist(); paintLobby(); });
@@ -498,7 +524,7 @@ export function openBingo(ctx, q = {}) {
   function liveRound() {
     const ck = clock(); if (!ck || !room) return null;
     const seed = roundSeed(room.seed || 1, ck.round);
-    const balls = ballsFor(seed); const pat = patternFor(ck.round); const masks = masksFor(pat);
+    const balls = ballsFor(seed); const pat = roomPattern(room, ck.round); const masks = masksFor(pat);
     const called = new Set(balls.slice(0, ck.called));
     const n = Math.min(slots(), Math.max(1, prog.cards | 0));
     const cards = Array.from({ length: n }, (_, i) => cardFor(seed, uid, i));
@@ -545,9 +571,49 @@ export function openBingo(ctx, q = {}) {
     let stars = earlier ? 5 : (lucky ? 18 : 12);
     if (!earlier && doubleOn) stars = Math.min(25, stars * 2);
     doubleOn = false;
-    if (paidRound !== st.ck.round) { paidRound = st.ck.round; prize(stars, earlier ? 'for a bingo' : 'for winning the round'); prog.xp += 20; ch().rounds += 1; if (st.pat === 'corners') ch().corners += 1; stickerPat(st.pat); persist(); grantCh(); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 12 } })); import('../leaderboard.js').then((m) => m.recordScore('bingo', { r: earlier ? 'l' : 'w', pts: stars })).catch(() => {}); }
+    let starP = Promise.resolve(-1);
+    if (paidRound !== st.ck.round) { paidRound = st.ck.round; starP = prize(stars, earlier ? 'for a bingo' : 'for winning the round'); prog.xp += 20; ch().rounds += 1; if (!earlier) ch().wins = (ch().wins | 0) + 1; stickerPat(st.pat); persist(); grantCh(); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 12 } })); import('../leaderboard.js').then((m) => m.recordScore('bingo', { r: earlier ? 'l' : 'w', pts: stars })).catch(() => {}); }
     winText = earlier ? 'You got BINGO too!' : (lucky ? 'Lucky Star win!' : 'You won this round!');
-    winUntil = Date.now() + 8000; sfx.play('win'); playClips(['bingo', 'winner'], ['Bingo!', 'We have a winner!']);
+    winUntil = Date.now() + 8000; sfx.play('win'); playClips(['bingo', 'winner'], ['Bingo!', 'We have a winner!']); const trophy = earlier ? '' : trophyFor(st.pat, C); if (trophy) { prog.trophies = { g: 0, s: 0, b: 0, ...(prog.trophies || {}) }; prog.trophies[trophy] += 1; persist(); }
+    winParty(stars, earlier ? 'You got it too!' : (lucky ? 'Lucky Star win!' : 'You win!'), { starP, boxP: winBox(earlier ? 1 : lucky ? 5 : 3), trophy, sticker: PATTERN_NAME[st.pat] });
+  }
+  // big "this round's pattern" banner with a mini card of the shape to cover (~3 s)
+  function showBanner(pat) {
+    document.querySelectorAll('.pb-ban').forEach((e) => e.remove());
+    const m = pat === 'line' ? masksFor('line')[2] : (masksFor(pat)[0] || []);
+    const el = document.createElement('div'); el.className = 'pb-ban'; el.setAttribute('role', 'status');
+    el.innerHTML = `<div class="pb-mini" aria-hidden="true">${Array.from({ length: 25 }, (_, i) => `<i class="${m[i] ? 'on' : ''}"></i>`).join('')}</div><div><small>${room && !room.pub && roomPick(room) !== 'mix' ? 'Room game · ' : ''}${pat === 'line' ? 'Any line: across, down or diagonal' : 'Cover this shape'}</small><b>${esc(pat === 'line' ? 'Normal bingo' : (PATTERN_NAME[pat] || 'Bingo'))}</b></div>`;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 3100);
+  }
+  // full-screen stadium party with the player's own Pal dancing (module loaded only on a win)
+  let party = null, bannerRound = -1, diaW = null, diaQ = Promise.resolve();
+  // speed trophy: gold / silver / bronze by how many balls were called (bigger shapes get more time)
+  const SPEED = { line: [16, 26], corners: [24, 38], x: [34, 48], heart: [38, 52], star: [36, 50], crown: [36, 50], blackout: [56, 66] };
+  function trophyFor(pat, called) { const [g, sv] = SPEED[pat] || SPEED.line; return called <= g ? 'g' : called <= sv ? 's' : 'b'; }
+  // the prize box: Kemy diamonds first (same diamond wallet + server caps as Pal Zombie Survival, plus a small bingo
+  // day cap), bonus stars when bingo diamonds are done for today. Infinity Pass shows ∞.
+  const DIA_DAY = 15;
+  async function winBox(n) {
+    try {
+      const d = prog.dia && prog.dia.day === today ? prog.dia : (prog.dia = { day: today, n: 0 });
+      const amt = Math.min(n, DIA_DAY - (d.n | 0));
+      if (amt > 0) {
+        if (!diaW) { const { createDiamonds } = await import('../pals/armory.js'); diaW = createDiamonds(db, uid); }
+        const w = await diaW.get(true); if (w.admin) return { inf: true };
+        d.n = (d.n | 0) + amt; persist();
+        // one diamond save at a time (the wallet allows one save per 45 s, so a quick second win just waits its turn)
+        const job = diaQ.then(() => diaW.earnRun(amt)).catch((e) => { console.warn('bingo diamonds', e && (e.code || e.message)); return 0; })
+          .then((got) => { if (got < amt) { d.n = Math.max(0, (d.n | 0) - (amt - got)); persist(); } if (dead || !got) return got; if (slow) toast(`💎 ${got} Diamonds saved!`); return got; });
+        diaQ = job; let slow = false;
+        const got = await Promise.race([job, new Promise((r) => setTimeout(() => r(-1), 2500))]);
+        if (got === -1) { slow = true; return { dia: amt, slow: true }; }
+        if (got > 0) return { dia: got };
+      }
+      const b = await prize(3, 'bonus prize'); return { stars: b, capped: !b };
+    } catch (e) { console.warn('bingo box', e && (e.code || e.message)); return { capped: true }; }
+  }
+  function winParty(stars, title, extra = {}) {
+    import('./celebrate.js').then((m) => { if (dead) return; party = m; m.celebrate({ ...extra, stars, title, muted: sfx.muted, ctx: actx(), vol: clipVol(), getPal: () => import('../pals/core.js').then((c) => c.getActivePal(db, uid)).catch(() => null), onClose: () => { winUntil = 0; } }); }).catch(() => {});
   }
   function botPlan(st) {
     const humans = seats.filter((s) => Date.now() - s.at < FRESH).length || 1;
@@ -598,6 +664,7 @@ export function openBingo(ctx, q = {}) {
     if (!st) return;
     if (st.ck.round !== lastRound) { lastRound = st.ck.round; botShown = -1; saidReady = -1; saidBall = -1; saidCount = ''; seenBall = -1; }
     if (st.ck.phase === 'ready' && st.ck.live && saidReady !== st.ck.round) { saidReady = st.ck.round; playClips(['get-ready'], ['Get ready!']); }
+    if (st.ck.live && bannerRound !== st.ck.round) { bannerRound = st.ck.round; showBanner(st.pat); }
     if (st.ck.phase === 'ready' && st.ck.live && st.ck.count && saidCount !== st.ck.round + ':' + st.ck.count) { saidCount = st.ck.round + ':' + st.ck.count; playClips([String(st.ck.count)], [String(st.ck.count)]); }
     if (seenBall !== st.ck.called) {
       const fresh = seenBall >= 0 || (st.ck.called > 0 && st.ck.nextIn > st.ck.call - 1600);
@@ -632,7 +699,7 @@ export function openBingo(ctx, q = {}) {
     if (leftEl) leftEl.textContent = !st.ck.live ? 'Next round' : st.ck.phase === 'ready' ? 'Get ready…' : `${75 - st.ck.called} balls left`;
     const patEl = main.querySelector('[data-pat]'); if (patEl) patEl.innerHTML = `${PATTERN_NAME[st.pat]}${luckyRound(st.ck.round) ? ' · <span class="lucky">Lucky Star</span>' : ''}`;
     const timeEl = main.querySelector('[data-time]'); if (timeEl) { const s = Math.ceil(st.ck.left / 1000); timeEl.textContent = st.ck.live ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Next round soon'; }
-    const codeEl = main.querySelector('[data-code]'); if (codeEl) codeEl.textContent = room && room.pub ? 'Public hall' : 'Code ' + roomId;
+    const codeEl = main.querySelector('[data-code]'); if (codeEl) codeEl.textContent = room && room.pub ? 'Public hall · Normal bingo' : 'Code ' + roomId + (room ? ' · ' + gameLabel(roomPick(room)) : '');
     const people = roomPeople();
     const countEl = main.querySelector('[data-count]'); if (countEl) countEl.textContent = '👤 ' + String(people.length).padStart(2, '0');
     const namesEl = main.querySelector('[data-names]'); if (namesEl) namesEl.textContent = people.map((p) => p.name).join(' · ');
@@ -661,9 +728,10 @@ export function openBingo(ctx, q = {}) {
     const cardHost = main.querySelector('[data-cards]');
     if (!st.ck.live && cardHost && cardHost.dataset.played === String(st.ck.round) && paidRound !== st.ck.round && daubed.size > 1) { paidRound = st.ck.round; ch().rounds += 1; persist(); prize(3, 'for playing the round'); grantCh(); }
     const win = main.querySelector('[data-win]');
-    if (win) { win.hidden = winUntil <= Date.now(); const t = win.querySelector('[data-wint]'); if (t) t.textContent = winText; if (!win.hidden && !win.dataset.fx) { win.dataset.fx = '1'; for (let i = 0; i < 14; i++) { const s = document.createElement('span'); s.textContent = '⭐'; s.style.left = (10 + Math.random() * 80) + '%'; s.style.top = (30 + Math.random() * 30) + '%'; win.appendChild(s); } } if (win.hidden) delete win.dataset.fx; }
+    if (win) { win.hidden = winUntil <= Date.now() || !!document.querySelector('.pbs'); const t = win.querySelector('[data-wint]'); if (t) t.textContent = winText; if (!win.hidden && !win.dataset.fx) { win.dataset.fx = '1'; for (let i = 0; i < 14; i++) { const s = document.createElement('span'); s.textContent = '⭐'; s.style.left = (10 + Math.random() * 80) + '%'; s.style.top = (30 + Math.random() * 30) + '%'; win.appendChild(s); } } if (win.hidden) delete win.dataset.fx; }
     breakNote();
     const go = main.querySelector('[data-bingo]'); if (go) go.disabled = !st.ck.live;
+    if (!window.__pbTest && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) window.__pbTest = { win: (o) => winParty(12, 'You win!', { starP: Promise.resolve(12), boxP: Promise.resolve({ dia: 3 }), trophy: 'g', sticker: 'Any line', ...(o || {}) }), banner: (p) => showBanner(p || st.pat), box: (n) => winBox(n || 3), trophyFor };
     window.__pb = { ready: st.ck.live && st.cards.some((card, ci) => cardMiss(card, st.called, st.masks, frees.has(ci) ? frees.get(ci) : -1) === 0), live: st.ck.live, celeb: winUntil > Date.now(), called: st.ck.called, round: st.ck.round, pat: st.pat, bots: roster().filter((p) => String(p.id).startsWith('bot-')).length, seats: seats.length, room: roomId };
   }
   function breakNote() {
@@ -685,6 +753,6 @@ export function openBingo(ctx, q = {}) {
     if (ball) { ball.className = 'pb-orb c' + L; ball.innerHTML = `<small>${L}</small>${n}`; }
     calloutUntil = Date.now() + 1700; el.hidden = false;
   }
-  function stop() { dead = true; clearInterval(iv); removeEventListener('hashchange', onHash); main.removeEventListener('click', onPow); hush(); dropSeat(); window.__pb = null; }
+  function stop() { dead = true; if (party) party.closeCelebration(); document.querySelectorAll('.pb-ban').forEach((e) => e.remove()); clearInterval(iv); removeEventListener('hashchange', onHash); main.removeEventListener('click', onPow); hush(); dropSeat(); window.__pb = null; window.__pbTest = null; }
   return { destroy: stop };
 }

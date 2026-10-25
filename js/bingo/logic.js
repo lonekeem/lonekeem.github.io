@@ -21,6 +21,13 @@ const LINES = (() => {
 })();
 export const masksFor = (id) => (id === 'line' ? LINES : [mask(PIC[id] || PIC.corners)]);
 export const patternFor = (round) => PATTERN_IDS[((round % PATTERN_IDS.length) + PATTERN_IDS.length) % PATTERN_IDS.length];
+// Room games: public halls are always normal bingo (any line). A private room's host picks one game for every
+// round; the pick rides in the room's seed (seed % 1000 = 900 + index) so every phone agrees with no extra field.
+export const PICK_IDS = ['line', 'corners', 'x', 'heart', 'star', 'crown', 'blackout', 'mix'];
+export const PICK_NAME = { ...PATTERN_NAME, line: 'Normal bingo (any line)', mix: 'Mix (new game each round)' };
+export const pickSeed = (rand, pick) => { const k = PICK_IDS.indexOf(pick); return Math.max(1, Math.floor(Math.abs(rand)) % 1999000) * 1000 + 900 + (k < 0 ? 0 : k); };
+export const roomPick = (room) => { if (!room || room.pub) return 'line'; const k = (room.seed | 0) % 1000 - 900; return k >= 0 && k < PICK_IDS.length ? PICK_IDS[k] : 'mix'; };
+export const roomPattern = (room, round) => { const p = roomPick(room); return p === 'mix' ? patternFor(round) : p; };
 export const luckyRound = (round) => round % 5 === 4;
 export const letterOf = (n) => 'BINGO'[Math.floor((n - 1) / 15)] || '';
 export const levelOf = (xp) => 1 + Math.floor(Math.max(0, xp) / 30);
