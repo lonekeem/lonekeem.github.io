@@ -1817,6 +1817,12 @@ service cloud.firestore {
             || (hp().level == 'mod' && isMod() && hp().by == me() && exists(livePost())
                 && hp().post == get(livePost()).data && !existsAfter(livePost())));
       allow delete: if signedIn() && (isMod() || resource.data.authorId == me());
+      // Poster appeals a song hold. Only the reason changes, and only from a song match.
+      allow update: if signedIn() && resource.data.authorId == me()
+        && changed().hasOnly(['reason'])
+        && resource.data.reason.matches('Song match:.*')
+        && request.resource.data.reason.matches('Own song:.+')
+        && isStr(request.resource.data.reason, 1, 200);
     }
     // One team note per minute. The player writes this stamp in the same batch as the note.
     match /feedbackQuota/{uid} {

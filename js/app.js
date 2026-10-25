@@ -330,7 +330,7 @@ function adminMediaCleanup(urls) {
 }
 let works = null;
 function getWorks() {
-  if (!works) works = createWorks({ holdOrSet: (b, r, d) => mod.holdOrSet(b, r, d, d.mediaUrl || (d.work && d.work.cover) ? takeHold() : null), db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
+  if (!works) works = createWorks({ holdOrSet: (b, r, d, songForce) => mod.holdOrSet(b, r, d, songForce && songForce.reason ? songForce : ((d.mediaUrl || (d.work && d.work.cover)) ? takeHold() : null)), db, fs: { doc, getDoc, getDocs, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, updateDoc }, S, esc, toast, friendlyError, isAdmin, requireAuth, avatar, badge, timeAgo, linkify, postAuthor, searchFields, likePost, isLiked, savePost, reportDialog, deletePost, recordView, stale, main, notify });
   return works;
 }
 const canDeletePost = (p) => !!(S.user && (p.authorId === S.user.uid || isAdmin()));
@@ -994,7 +994,7 @@ function textComposeForm(slot, open) {
 }
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
-async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound = null }) {
+async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound = null, song = null }) {
   if (!asStudio && !safety.canPostNow()) throw Object.assign(new Error('Posting photos and videos is off for this account.'), { code: 'kemy/young' });
   if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Slow down a bit 💜 Try posting again in a moment.'), { code: 'kemy/spam' });
   if (caption) safety.scanAge(caption, 'post');
@@ -1012,7 +1012,7 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound 
     cloudinaryPublicId: String(upload.public_id).slice(0, 255), ...(cat ? { cat } : {}), ...(sound ? { sound } : {}),
     ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
-  }, takeHold());
+  }, song && song.reason ? song : takeHold());
   const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
   await b.commit(); postDone(st);
   return ref.id;

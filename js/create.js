@@ -563,7 +563,7 @@ export function createComposer(ctx) {
 
   function openPreview(file, info, source, camMode) {
     const ready = uploadsReady();
-    let xhr = null, uploaded = null, busy = false;
+    let xhr = null, uploaded = null, busy = false, songForce = null;
     const isVideo = info.kind === 'video';
     const story = isStory();
     const panel = story ? `
@@ -654,9 +654,10 @@ export function createComposer(ctx) {
           let sound = null;
           if (isVideo && !story && soundCtl) {
             sound = soundCtl.get();
+            status.textContent = 'Checking the sound…';
             const snd = await loadSounds(); const rev = snd ? await snd.reviewUploadedSong(file, sound) : null;
-            if (rev && rev.action === 'cancel') { busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; return; }
-            if (rev && rev.action === 'hold') { busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; err.textContent = 'This sound needs review before it can be posted.'; return; }
+            songForce = rev && rev.action === 'hold' && rev.reason ? { reason: rev.reason } : null;
+            if (rev && rev.action === 'cancel') { busy = false; postBtn.disabled = false; postBtn.textContent = 'Post'; status.textContent = ''; return; }
           }
           bar.hidden = false; status.textContent = 'Uploading… 0%';
           uploaded = await upload(file, (f) => { barIn.style.transform = `scaleX(${f})`; status.textContent = f >= 1 ? 'Processing…' : `Uploading… ${Math.round(f * 100)}%`; });
@@ -671,7 +672,7 @@ export function createComposer(ctx) {
           return;
         }
         status.textContent = 'Saving your post…';
-        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat'), sound: soundCtl ? soundCtl.get() : null });
+        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat'), sound: soundCtl ? soundCtl.get() : null, song: songForce });
         closeOverlay();
         dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 30 } }));
         if (S.lastHeld === id) { toast(REVIEW_MSG); location.hash = '#/post/' + id; return; }

@@ -39,6 +39,10 @@ export const GIFS = {
   rating: 'pg'        // stricter than pg-13
 };
 
+// Public AcoustID application key (free fingerprint lookup). Safe to commit.
+// A private AcoustID key must never be added to this repo.
+export const ACOUSTID_CLIENT_KEY = 'zsvn4dw3t9';
+
 // Client-side limits (Cloudinary free plan caps: images 10 MB, videos 100 MB).
 export const LIMITS = {
   maxVideoSeconds: 600,      // library uploads: up to 10 minutes
