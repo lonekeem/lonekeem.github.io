@@ -4,7 +4,7 @@
 // 4/s (enforced by the rules), a 15 s heartbeat when idle, interpolation, and stale presence cleanup.
 import { spamOk } from '../spam.js';
 import { doc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp, addDoc }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from '../fsq.js';
 import { drawPal, star, heart, drawBubble } from './art.js';
 import { getActivePal } from './core.js';
 import { clean, checkInput } from './talk.js';
@@ -115,12 +115,15 @@ export function createPark(ctx) {
       panel.innerHTML = list.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + (kid ? `<p class="small" style="margin:8px 0 0">${esc(PHRASE_NOTE)}</p>` : `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`);
       const f = panel.querySelector('#pk-f'); if (f) f.onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
     panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
-    let lastSay = 0; function say(t) {
+    let lastSay = 0, sayT = 0, sayNext = ''; function say(t) {
       if (phraseOnly() && !isPhrase(t)) return toast(PHRASE_NOTE);
       const gate = window.kemyChatGate ? window.kemyChatGate(t, 'park', '') : { ok: true, text: t };
       if (!gate.ok) return;
       t = gate.text;
-      if (Date.now() - lastSay < 2000) return toast('Slow down a bit 💜'); if (!spamOk('park', t)) return; lastSay = Date.now(); P.say = t.slice(0, 60); P.sayAt = Date.now(); dirty = true; send(true);
+      if (!spamOk('park', t)) return;
+      // Lines said within 2 s wait their turn (the newest one wins) instead of being refused.
+      sayNext = t; const out = () => { sayT = 0; lastSay = Date.now(); P.say = sayNext.slice(0, 60); P.sayAt = Date.now(); dirty = true; try { send(true); } catch { /* left the park */ } };
+      const wait = 2000 - (Date.now() - lastSay); if (wait > 0) { if (!sayT) sayT = setTimeout(out, wait); return; } out();
     }
     function emote(x, tgt = '') { P.e = x; P.eAt = Date.now(); P.tgt = tgt; dirty = true; send(true); }
     let near = null; const actBtn = main.querySelector('#pk-act'); actBtn.onclick = () => act();

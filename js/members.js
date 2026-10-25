@@ -11,7 +11,7 @@ import { auth, db, ADMIN_EMAIL, EMU, app } from './firebase-init.js';
 import {
   collection, doc, getDoc, getDocs, getCountFromServer, onSnapshot, query, where, orderBy, limit,
   startAfter, setDoc, serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import { SPECIES, FOUNDER } from './pals/species.js';
 

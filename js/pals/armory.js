@@ -2,7 +2,7 @@
 // Prices: Diamonds (💎, earned in the game) or Star Coins (★). Both are checked server-side by firestore.rules
 // against config/palShop (prices / dprices), which the Admin page's "Publish shop prices" button writes.
 // Diamonds live in users/{uid}/pal/diamonds; owned items are users/{uid}/inv/z_* (same inventory as the Pal Store).
-import { doc, getDoc, setDoc, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, writeBatch, serverTimestamp } from '../fsq.js';
 import { addItems, addDiamondItems, DITEMS, dayNo } from './catalog.js';
 import { createEconomy, isAdminUid, ensureLive, buyError, ShopError } from './economy.js';
 export const ARMORY = [

@@ -3,7 +3,7 @@
 // garage (the roll-up door opens for the owner and closes after), "Park here" saves the car in that bay, your last
 // spot + a car left on the street are remembered (localStorage + a throttled private Firestore doc).
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
-import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, addDoc } from '../fsq.js';
 import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear, palaceBays, PALACE_SIGN, PALACE_SIGN_AT } from './layout.js';
 import { CAR, CARS, PAINTS, buildCar, poseCar, addPlate } from './cars.js';
 import { parseCar } from './drive.js';

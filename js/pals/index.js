@@ -8,7 +8,7 @@ import { createShopUI } from './shop.js';
 import { createPalStore } from './store.js';
 import { drawBg } from './bgs.js';
 import { openTalk } from './talk.js';
-import { doc as fdoc, getDoc as fget, setDoc as fset, serverTimestamp as fts } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc as fdoc, getDoc as fget, setDoc as fset, serverTimestamp as fts } from '../fsq.js';
 import { roomOf } from './economy.js';
 import { DECOR } from './wear.js';
 import { drawDancer, danceById } from './dance.js';

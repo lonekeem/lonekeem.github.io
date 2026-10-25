@@ -1,6 +1,6 @@
 // Kemy Pals overlays: the host's Pal on live screens, and occasional Pal pop-ups while scrolling videos.
 // Pure DOM/canvas overlays: nothing is drawn into the video stream.
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, onSnapshot, updateDoc, serverTimestamp } from '../fsq.js';
 import { drawPal, drawBubble, star, heart } from './art.js';
 import { getActivePal, liveStats, moodOf, patPal } from './core.js';
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;

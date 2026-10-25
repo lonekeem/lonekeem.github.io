@@ -1,7 +1,7 @@
 // Pal Games: real-time Pal vs Pal mini-games (Pal Race, Bubble Pop Battle, Star Catch, Dance-Off).
 // Both players play the same seeded course; each writes its own progress ~2x a second (palGames/{id}/live/{uid})
 // and the other's Pal is shown as a live ghost, interpolated. Wins go on the palStats leaderboard.
-import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, writeBatch, Timestamp, addDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, writeBatch, Timestamp, addDoc } from '../fsq.js';
 import { createLink } from '../games/link.js';
 import { PALS, faceSvg, normLevel, lastMode, saveMode, saveLevel, lastLevel, addBotRecord, whenOffer, offerHtml, COIN_BOT } from '../games/bots.js';
 import { drawPal, drawBubble, star } from './art.js';

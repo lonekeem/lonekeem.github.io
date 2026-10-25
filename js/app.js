@@ -27,14 +27,14 @@ import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy,
   limit, onSnapshot, writeBatch, serverTimestamp, increment, getCountFromServer, Timestamp,
   getAggregateFromServer, sum, limitToLast, deleteField
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 import { ICONS } from './icons.js';
 import { createModeration, BlockSet } from './moderation.js';
 import { initKindGuard } from './kindguard.js';
 import * as safety from './safety.js';
 import { nameOptionsHtml, safeNameOk } from './safe-names.js';
 import { hideKey, noteReport, watchHides } from './chat-hide.js';
-import { initSpam, spamOk, followOk, postStamp, postDone } from './spam.js';
+import { initSpam, spamOk, followWait, postStamp, postDone } from './spam.js';
 import { initMediaScan, takeHold } from './mediascan.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createDevices } from './devices.js';
@@ -144,6 +144,13 @@ function toast(msg) {
 startHelper({ toast });
 startMod();
 let busyAt = 0; window.kemyBusy = () => { if (Date.now() - busyAt > 60e3) { busyAt = Date.now(); toast(BUSY_MSG + ' (showing saved posts)'); } };
+// Retries an auth call quietly with backoff when the service is briefly busy (sign-up / log-in).
+async function quietRetry(fn, codes, waits = [1500, 4000, 8000]) {
+  for (let i = 0; ; i++) {
+    try { return await fn(); }
+    catch (e) { if (i >= waits.length || !codes.includes(e && e.code)) throw e; await new Promise((r) => setTimeout(r, waits[i])); }
+  }
+}
 function friendlyError(e) {
   const c = e && (e.code || '');
   const raw = e && (e.message || '');
@@ -155,11 +162,12 @@ function friendlyError(e) {
     'auth/invalid-credential': 'Wrong email or password.',
     'auth/wrong-password': 'Wrong email or password.',
     'auth/user-not-found': 'No account with that email.',
-    'auth/too-many-requests': 'Too many tries. Please wait a moment and try again.',
+    'auth/too-many-requests': 'Couldn’t reach sign-in just now. Tap to try again.',
     'auth/popup-closed-by-user': 'Sign-in window was closed.',
     'auth/network-request-failed': 'Network problem. Check your connection.',
     'resource-exhausted': 'Kemy is extra busy right now — try again in a bit 💜',
-    'permission-denied': 'You’re going a little fast, or that action isn’t allowed. Wait a few seconds and try again.'
+    // Timing limits are paced and retried quietly in js/fsq.js, so this only shows for a real, final no.
+    'permission-denied': 'Couldn’t save that. Tap to try again.'
   };
   if (!map[c] && e && /quota/i.test(e.message || '')) return map['resource-exhausted'];
   return map[c] || (e && e.message ? e.message.replace(/^Firebase: /, '') : 'Something went wrong.');
@@ -264,14 +272,24 @@ function openSnap(ref, m) {
 
 // ---------------------------------------------------------------- shared social actions
 // Used by post cards, the post page, profiles and the vertical video feed (js/watch.js).
-async function likePost(p, on) {
-  const b = writeBatch(db);
-  const likeRef = doc(db, 'posts', p.id, 'likes', S.user.uid);
-  if (on) b.set(likeRef, { uid: S.user.uid, createdAt: serverTimestamp() }); else b.delete(likeRef);
-  b.update(doc(db, 'posts', p.id), { likeCount: increment(on ? 1 : -1) });
-  await b.commit();
-  S.liked.set(p.id, on);
-  if (on) notify(p.authorId, 'like', { postId: p.id, text: p.text });
+// Rapid like / unlike taps are merged: one lane per post, and only the LAST wanted state is written
+// (a double "like" can never be sent twice and be refused).
+const likeLanes = new Map();
+function likePost(p, on) {
+  const L = likeLanes.get(p.id) || { want: on, run: Promise.resolve() };
+  likeLanes.set(p.id, L); L.want = on;
+  L.run = L.run.catch(() => {}).then(async () => {
+    const want = L.want;
+    if (S.liked.has(p.id) && !!S.liked.get(p.id) === want) return;
+    const b = writeBatch(db);
+    const likeRef = doc(db, 'posts', p.id, 'likes', S.user.uid);
+    if (want) b.set(likeRef, { uid: S.user.uid, createdAt: serverTimestamp() }); else b.delete(likeRef);
+    b.update(doc(db, 'posts', p.id), { likeCount: increment(want ? 1 : -1) });
+    await b.commit();
+    S.liked.set(p.id, want);
+    if (want) notify(p.authorId, 'like', { postId: p.id, text: p.text });
+  });
+  return L.run;
 }
 async function savePost(postId, on) {
   const ref = doc(db, 'users', S.user.uid, 'saved', postId);
@@ -282,10 +300,10 @@ async function followUser(uid, on) {
   const ref = doc(db, 'follows', `${S.user.uid}_${uid}`);
   if (on) {
     if (uid !== STUDIO_UID && safety.limited()) throw Object.assign(new Error('Friend requests are off on this account.'), { code: 'kemy/friends-off' });
-    if (!followOk()) throw Object.assign(new Error('Slow down a bit 💜'), { code: 'kemy/spam', quiet: true });
+    await followWait(); // bursts are spaced out, never refused
     const b = writeBatch(db); b.set(ref, { follower: S.user.uid, followee: uid, createdAt: serverTimestamp() });
     if (uid !== STUDIO_UID && !isAdmin()) b.update(doc(db, 'users', S.user.uid), { lastFollowAt: serverTimestamp() });
-    try { await b.commit(); } catch (e) { if (e.code === 'permission-denied') throw Object.assign(new Error('Slow down a bit 💜 Wait a second between follows.'), { code: 'kemy/spam' }); throw e; }
+    await b.commit(); // js/fsq.js waits out the rules' follow gap and retries quietly
     S.following.add(uid); notify(uid, 'follow');
   }
   else { await deleteDoc(ref); S.following.delete(uid); }
@@ -539,7 +557,7 @@ async function reportDialog(targetType, targetId, postId, excerpt, targetUid = '
       await b.commit();
       if (hideKeyId) noteReport(db, S.user.uid, hideKeyId).catch(() => {});
       closeModal(); toast('Thanks. The report was sent.');
-    } catch (e) { $('#report-err').textContent = e.code === 'permission-denied' ? 'Couldn’t send the report right now. Please try again in a minute.' : friendlyError(e); }
+    } catch (e) { $('#report-err').textContent = e.code === 'permission-denied' ? 'Couldn’t send the report. Tap Send to try again.' : friendlyError(e); }
   };
 }
 async function blockUser(uid, username) {
@@ -987,7 +1005,7 @@ function textComposeForm(slot, open) {
       toast(S.lastHeld === ref.id ? 'Your post is being reviewed 🕒' : 'Posted!');
       location.hash = '#/post/' + ref.id;
     } catch (e) {
-      err.textContent = e.code === 'permission-denied' ? 'Slow down a bit 💜 You can post once every 20 seconds (new accounts: 5 posts a day, no links for 3 days).' : friendlyError(e);
+      err.textContent = e.code === 'permission-denied' ? 'Couldn’t post that yet. New accounts can make 5 posts a day and add links after 3 days. Tap Post to try again.' : friendlyError(e);
       btn.disabled = false; btn.textContent = 'Post';
     }
   };
@@ -996,7 +1014,7 @@ function textComposeForm(slot, open) {
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
 async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound = null, song = null }) {
   if (!asStudio && !safety.canPostNow()) throw Object.assign(new Error('Posting photos and videos is off for this account.'), { code: 'kemy/young' });
-  if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Slow down a bit 💜 Try posting again in a moment.'), { code: 'kemy/spam' });
+  if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Please change the caption a little and try again.'), { code: 'kemy/spam', quiet: true });
   if (caption) safety.scanAge(caption, 'post');
   const urls = deliveryUrls(upload);
   const { authorId, author } = await postAuthor(asStudio);
@@ -1611,8 +1629,13 @@ async function pageSignup() {
     pendingBirthday = bd;
     googleSignIn();
   };
+  let signing = false; // double taps on Create account merge into one sign-up
   $('#signup-form').onsubmit = async (ev) => {
     ev.preventDefault();
+    if (signing) return; signing = true;
+    try { await signupSubmit(); } finally { signing = false; }
+  };
+  const signupSubmit = async () => {
     if (!(await safety.askAgeHonest())) return;
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
@@ -1632,7 +1655,7 @@ async function pageSignup() {
     try {
       if (await uidForUsername(username)) throw new Error('That username is taken. Try another.');
       pendingProfile = { displayName, username };
-      const cred = await createUserWithEmailAndPassword(auth, $('#p-email').value.trim(), $('#p-pass').value);
+      const cred = await quietRetry(() => createUserWithEmailAndPassword(auth, $('#p-email').value.trim(), $('#p-pass').value), ['auth/too-many-requests', 'auth/network-request-failed']);
       updateProfile(cred.user, { displayName }).catch(() => {});
       sendEmailVerification(cred.user).catch(() => {});
     } catch (e) { pendingProfile = null; err.textContent = friendlyError(e); btn.disabled = false; btn.textContent = 'Create account'; }
@@ -1649,8 +1672,14 @@ async function pageOnboard() {
     <p class="center small muted" style="margin-top:14px"><button class="link-btn" id="ob-out">Use a different account</button></p>`);
   $('#ob-out').onclick = () => signOut(auth);
   if (!pendingBirthday) { bindNameMode('obd'); safety.askAgeHonest(); }
+  let saving = false; // double taps on Continue merge into one profile save
   $('#onboard-form').onsubmit = async (ev) => {
     ev.preventDefault();
+    if (saving) return; saving = true;
+    const cbtn = ev.target.querySelector('button[type=submit]'); if (cbtn) cbtn.disabled = true;
+    try { await onboardSubmit(); } finally { saving = false; if (cbtn) cbtn.disabled = false; }
+  };
+  const onboardSubmit = async () => {
     if (!pendingBirthday && !(await safety.askAgeHonest())) return;
     const err = $('#p-err'); err.textContent = '';
     const { displayName, username } = readProfileForm();
@@ -1682,6 +1711,17 @@ async function pageReset() {
 }
 
 // Creates the profile, reserves the username, and auto-follows the studio, all in one batch.
+async function commitQuietly(batch, done) {
+  for (let i = 0; ; i++) {
+    try { await batch.commit(); return; }
+    catch (e) {
+      if (await done()) return;
+      if (i >= 3 || !['permission-denied', 'unavailable', 'aborted', 'deadline-exceeded'].includes(e.code)) throw e;
+      await new Promise((r) => setTimeout(r, [800, 2000, 4000][i]));
+      await S.user.getIdToken(true).catch(() => {});
+    }
+  }
+}
 async function createProfile(displayName, username) {
   const reserved = reservedNameMsg(displayName, username); if (reserved) throw new Error(reserved);
   if (await uidForUsername(username)) throw new Error('That username is taken. Try another.');
@@ -1702,14 +1742,25 @@ async function createProfile(displayName, username) {
     ...safety.ageHonestPatch(),
     createdAt: serverTimestamp(), welcomed: false
   });
-  b.set(doc(db, 'members', uid), {
+  // The profile and its username claim must land together (each rule checks the other). The member
+  // row + private email, and the studio follow, are separate writes after it, so a hiccup on an extra
+  // can never stop a new player's account from being made.
+  const rest = writeBatch(db);
+  rest.set(doc(db, 'members', uid), {
     displayName: name, username, displayNameLower: name.toLowerCase().slice(0, 100), color, photoURL: '',
     createdAt: serverTimestamp(), lastActive: serverTimestamp(), signup
   });
-  b.set(doc(db, 'members', uid, 'secret', 'email'), { email: String(S.user.email || '').slice(0, 200) });
+  rest.set(doc(db, 'members', uid, 'secret', 'email'), { email: String(S.user.email || '').slice(0, 200) });
   pendingBirthday = null;
-  b.set(doc(db, 'follows', `${uid}_${STUDIO_UID}`), { follower: uid, followee: STUDIO_UID, createdAt: serverTimestamp() });
-  await b.commit();
+  // Sign-up must never surface a timing error: a fresh account's token can take a moment to reach the
+  // database, so a refusal is retried quietly (with a fresh token) and an already-saved profile counts as done.
+  const saved = () => getDoc(doc(db, 'users', uid)).then((x) => x.exists()).catch(() => false);
+  await commitQuietly(b, saved);
+  // The extras never block sign-up: if they still miss after quiet retries, the session carries on.
+  try { await commitQuietly(rest, () => getDoc(doc(db, 'members', uid)).then((x) => x.exists()).catch(() => false)); }
+  catch (e) { console.warn('Kemy member row', e.code || e.message); }
+  setDoc(doc(db, 'follows', `${uid}_${STUDIO_UID}`), { follower: uid, followee: STUDIO_UID, createdAt: serverTimestamp() })
+    .catch((e) => console.warn('Kemy studio follow', e.code || e.message));
   safety.ageHonestSaved();
   try { const t = JSON.parse(sessionStorage.getItem('kemy-topics') || '[]'); if (t.length) { pickTopics(t); } sessionStorage.removeItem('kemy-topics'); } catch { /* */ }
   await loadSession();

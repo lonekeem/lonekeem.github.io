@@ -5,7 +5,7 @@
 // Billing shop: window.kemyParental.canPurchase() / requirePin(reason) -> Promise<boolean>.
 import { auth, db } from './firebase-init.js';
 import { onAuthStateChanged, EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp } from './fsq.js';
 
 { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = new URL('../css/parental.css', import.meta.url).href; document.head.appendChild(l); }
 export const DEFAULTS = { chat: true, dm: 'friends', live: true, cmt: true, buy: 'pin', time: 0, vis: 'public', safe: true };

@@ -2,7 +2,7 @@
 // The browser prompt runs only after Turn on notifications, in Settings or after a win.
 // Written by Lone Keem.
 import { app, db, EMU, VAPID_KEY, VAPID_READY } from './firebase-init.js';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from './fsq.js';
 import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-messaging.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import { deviceId, deviceLabel } from './devices.js';

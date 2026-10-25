@@ -2,7 +2,7 @@
 // Stars are prizes for playing (the shared daily win cap). Nothing here is a wager or a purchase.
 // Written by Lone Keem.
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot, query, where, orderBy, limit, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from '../fsq.js';
 import { sfx } from '../games/sfx.js';
 import { masterVol, sfxVol } from '../volume.js';
 import { watchGameRotate } from '../rotate.js';

@@ -2,7 +2,7 @@
 // checks are throttled. Notes go to helperReports with no names, emails, or exact trails.
 // Written by Lone Keem.
 import { auth, db } from '../firebase-init.js';
-import { doc, getDoc, writeBatch, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, writeBatch, collection, serverTimestamp } from '../fsq.js';
 import { scrub, gameId, deviceLabel, fingerprint, allowSend, markSent, turnOf, freshMem, TYPES, FIX_TOAST } from './core.js';
 
 const mem = freshMem();

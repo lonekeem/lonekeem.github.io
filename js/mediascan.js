@@ -9,7 +9,7 @@
 //   * videos from new accounts (< 3 days) or with fewer than N live posts wait for review
 // A determined person can skip a check that runs on their own phone, so reports + review stay on.
 // Written by Lone Keem
-import { doc, getDoc, setDoc, collection, query, where, getCountFromServer, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, collection, query, where, getCountFromServer, serverTimestamp } from './fsq.js';
 import { badWord, sneakyWord } from './kindguard.js';
 
 const TF_URL = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';

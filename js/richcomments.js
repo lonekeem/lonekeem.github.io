@@ -6,7 +6,7 @@
 import { CLOUDINARY, GIFS, uploadEndpoint, deliveryBase } from './media-config.js';
 import { drawPal, heart, star } from './pals/art.js';
 import { guardUpload } from './mediascan.js';
-import { doc, getDoc, getDocs, collection } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, getDocs, collection } from './fsq.js';
 
 export const POSES = [['wave', 'Wave', '👋'], ['love', 'Love', '😍'], ['laugh', 'Laugh', '😂'], ['cry', 'Cry', '😢'], ['wow', 'Wow', '😮'], ['dance', 'Dance', '💃'], ['sleepy', 'Sleepy', '😴']];
 const POSE_IDS = POSES.map((p) => p[0]);

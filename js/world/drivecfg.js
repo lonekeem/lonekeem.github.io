@@ -24,7 +24,7 @@ export const onCfg = (f) => (subs.add(f), () => subs.delete(f));
 export function applyPreset(id) { setCfg({ ...(PRESETS[id] || {}), preset: id }); }
 export function resetCfg() { cfg = { ...DEFAULTS }; setCfg({}); }
 // account sync (best-effort; the device copy always works)
-export async function linkAccount(db, uid) { if (!db || !uid || acct) return; try { const { doc, getDoc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js'); const ref = doc(db, 'users', uid, 'pal', 'drive');
+export async function linkAccount(db, uid) { if (!db || !uid || acct) return; try { const { doc, getDoc, setDoc, serverTimestamp } = await import('../fsq.js'); const ref = doc(db, 'users', uid, 'pal', 'drive');
     acct = { save: (c) => setDoc(ref, { cfg: JSON.stringify(c).slice(0, 4000), at: serverTimestamp() }).catch(() => {}) }; const d = await getDoc(ref); if (d.exists() && !lsg(KEY)) { try { setCfg(JSON.parse(d.data().cfg), true); } catch { /* */ } } } catch { /* */ } }
 
 // ---------------------------------------------------------------- the settings page (sections, short descriptions)

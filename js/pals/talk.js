@@ -2,7 +2,7 @@
 // (text.pollinations.ai, rate-limited per IP), with a friendly scripted personality as the fallback.
 // Kid-safe: input + output filters, a strict system prompt, short replies, and no personal info.
 import { drawBg } from './bgs.js';
-import { doc, getDoc, setDoc, serverTimestamp, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, serverTimestamp, deleteDoc } from '../fsq.js';
 import { SPEC, VIBES, drawPal } from './art.js';
 import { drawDancer } from './dance.js';
 import { liveStats, moodOf, formName } from './core.js';

@@ -224,7 +224,7 @@ export function createWorks(ctx) {
             createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false });
           const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
           await b.commit(); postDone(st); toast('Song shared!'); location.hash = '#/post/' + ref.id;
-        } catch (e) { go.disabled = false; err.textContent = e && e.code === 'permission-denied' ? 'You can post once every 20 seconds. Wait a moment and try again.' : friendlyError(e); }
+        } catch (e) { go.disabled = false; err.textContent = e && e.code === 'permission-denied' ? 'Couldn’t post that yet. Tap to try again.' : friendlyError(e); }
         return;
       }
       if (src() === 'youtube') {
@@ -282,7 +282,7 @@ export function createWorks(ctx) {
         location.hash = '#/post/' + ref.id;
       } catch (e) {
         go.disabled = false; status.textContent = '';
-        err.textContent = e && e.code === 'permission-denied' ? 'You can post once every 20 seconds. Wait a moment and try again.' : (e && e.message && !/firebase/i.test(e.message) ? e.message : friendlyError(e));
+        err.textContent = e && e.code === 'permission-denied' ? 'Couldn’t post that yet. Tap to try again.' : (e && e.message && !/firebase/i.test(e.message) ? e.message : friendlyError(e));
       }
     };
   }

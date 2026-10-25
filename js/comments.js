@@ -2,7 +2,7 @@
 // Shared by the post page and the video comment sheet.
 import {
   doc, getDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, writeBatch, serverTimestamp, increment, deleteField
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 import { fmtCount } from './views.js';
 import { hideKey, isHidden } from './chat-hide.js';
 import * as safety from './safety.js';
@@ -208,7 +208,7 @@ export function createComments(ctx) {
         safety.scanAge(text, 'comment', p.id, p.id);
         input.value = ''; rc && rc.clear(); setReply(null);
       } catch (e2) {
-        if (err) err.textContent = e2.code === 'permission-denied' ? 'Slow down a bit 💜 Please wait a few seconds between comments.' : e2.code === 'gone' ? 'That comment was deleted, so you can’t reply to it.' : friendlyError(e2);
+        if (err) err.textContent = e2.code === 'permission-denied' ? 'Couldn’t add that comment. Tap to try again.' : e2.code === 'gone' ? 'That comment was deleted, so you can’t reply to it.' : friendlyError(e2);
       }
       if (btn) btn.disabled = false;
     };

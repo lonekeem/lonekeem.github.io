@@ -1,13 +1,17 @@
 // Kemy anti-spam: cooldowns, daily post cap for new accounts, repeat / near-duplicate blocking,
 // link limits, caps / repeated letters / emoji walls, mass DMs and mass follows.
-// Friendly "Slow down a bit 💜" notes; repeat offenders get the same 1-hour auto pause + Mod Hub
-// report the kind-words filter uses (safety.autoPause). firestore.rules enforces the parts it can
-// (cooldowns, daily cap, links, follow / new-chat rate). Written by Lone Keem
+// Calm, specific notes only for things the player can change (links, CAPS, repeats, daily cap); repeat
+// offenders get the same 1-hour auto pause + Mod Hub report the kind-words filter uses (safety.autoPause).
+// Timing is never an error: cooldowns WAIT instead of blocking (js/fsq.js paces the server-limited writes,
+// spamPace / followWait below pace the rest), so nobody is ever told they are rushing.
+// firestore.rules enforces the parts it can (gaps, daily cap, links, follow / new-chat rate). Written by Lone Keem
 let C = null; // { S, toast, isAdmin, autoPause }
 export function initSpam(ctx) { C = ctx; }
 
 export const SPAM = {
-  cooldown: { post: 20e3, comment: 5e3, dm: 1.2e3, live: 2e3, park: 2e3, game: 1.5e3 },
+  // Client-side pacing for writes the server does NOT space out itself (posts, comments, DMs and live chat
+  // are paced against the rules by js/fsq.js). These wait; they never block.
+  cooldown: { park: 2e3, game: 1.5e3 },
   newAcctDays: 3, newDailyPosts: 5, maxLinks: 2,
   dupWindow: { post: 864e5, comment: 36e5, dm: 6e5, live: 6e5, park: 3e5, game: 0 },
   dmNewPeople: { n: 6, ms: 10 * 60e3 }, follows: [{ n: 6, ms: 30e3 }, { n: 30, ms: 10 * 60e3 }],
@@ -53,10 +57,23 @@ function strike(reason, text) {
   if (s.length >= SPAM.strikes.n && C.autoPause) { save(k, []); C.autoPause({ reason: 'Kept spamming: ' + reason, text, word: '' }); return true; }
   return false;
 }
-function slow(msg, text, isStrike = true) {
+function note(msg, text, isStrike = true) {
   const paused = isStrike && !exempt() && strike(msg, text);
-  if (!paused) C.toast('Slow down a bit 💜 ' + msg);
+  if (!paused) C.toast(msg);
   return false;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Waits out the client cooldown for a kind (park / game), then records the send. Never refuses.
+const paceQ = {};
+export function spamPace(kind) {
+  const cd = SPAM.cooldown[kind] || 0;
+  paceQ[kind] = (paceQ[kind] || Promise.resolve()).then(async () => {
+    if (!cd || exempt()) return;
+    const k = `last-${kind}-${uid()}`, wait = load(k, 0) + cd - now();
+    if (wait > 0) await sleep(Math.min(wait, cd));
+    save(k, now());
+  });
+  return paceQ[kind];
 }
 
 // Main gate before any write that carries text. kind: post | comment | dm | live | park | game.
@@ -64,14 +81,12 @@ function slow(msg, text, isStrike = true) {
 export function spamOk(kind, text = '', { to = '', linkUrl = '' } = {}) {
   if (exempt()) return true;
   const u = uid(), t = now();
-  const lastK = `last-${kind}-${u}`, last = load(lastK, 0), cd = SPAM.cooldown[kind] || 0;
-  if (cd && t - last < cd) return slow(`You can send again in ${Math.ceil((cd - (t - last)) / 1000)} s.`, text, false);
   if (kind === 'post' && isNewAccount()) {
     const day = Math.floor(t / 864e5), p = C.S.profile || {};
-    if (p.postDay === day && (p.postsToday || 0) >= SPAM.newDailyPosts) return slow(`New accounts can make ${SPAM.newDailyPosts} posts a day. More unlock after 3 days!`, text, false);
+    if (p.postDay === day && (p.postsToday || 0) >= SPAM.newDailyPosts) return note(`New accounts can make ${SPAM.newDailyPosts} posts a day. More unlock after 3 days!`, text, false);
   }
   const prob = textProblem(text + (linkUrl && isNewAccount() && !/youtu|tiktok/.test(linkUrl) ? ' ' + linkUrl : ''), { newAcct: isNewAccount(), kind });
-  if (prob) return slow(prob, text);
+  if (prob) return note(prob, text);
   const win = SPAM.dupWindow[kind] || 0;
   if (win && norm(text)) {
     const hk = `hist-${kind === 'post' || kind === 'comment' ? 'pc' : 'chat'}-${u}`;
@@ -79,23 +94,35 @@ export function spamOk(kind, text = '', { to = '', linkUrl = '' } = {}) {
     // posts / comments: no repeats; chat: the same line at most twice in the window
     const same = hist.filter((h) => similar(h.x, text));
     const tooMany = (kind === 'post' || kind === 'comment') ? same.length >= 1 : same.length >= 2;
-    if (tooMany) return slow('That looks like the same message again. Try saying something new!', text);
+    if (tooMany) return note('That looks like the same message again. Try saying something new!', text);
     hist.push({ t, x: String(text).slice(0, 300), to }); save(hk, hist.slice(-30));
   }
   if (kind === 'dm' && to) {
     const k = 'dmto-' + u, list = load(k, []).filter((x) => t - x.t < SPAM.dmNewPeople.ms);
-    if (!list.some((x) => x.to === to) && new Set(list.map((x) => x.to)).size >= SPAM.dmNewPeople.n) return slow('You’re messaging a lot of people at once. Take a short break!', text);
+    if (!list.some((x) => x.to === to) && new Set(list.map((x) => x.to)).size >= SPAM.dmNewPeople.n) return note('To keep Kemy safe, new chats with lots of different people are limited for a little while. You can keep chatting with people you already message.', text);
     list.push({ t, to }); save(k, list.slice(-50));
   }
-  save(lastK, t);
   return true;
 }
-export function followOk() {
-  if (exempt()) return true;
-  const k = 'follows-' + uid(), t = now(), list = load(k, []).filter((x) => t - x < 10 * 60e3);
-  for (const w of SPAM.follows) if (list.filter((x) => t - x < w.ms).length >= w.n) return slow('You’re following lots of people really fast. Take a short break!', '');
-  list.push(t); save(k, list); return true;
+// Pure: how long until one more follow fits every burst window (exported for tests).
+export function followDelay(list, t, wins = SPAM.follows) {
+  let wait = 0;
+  for (const w of wins) { const inWin = list.filter((x) => t - x < w.ms).sort((a, b) => a - b); if (inWin.length >= w.n) wait = Math.max(wait, inWin[inWin.length - w.n] + w.ms - t + 50); }
+  return wait;
 }
+// Follow bursts are spaced out (queued), never refused.
+let followQ = Promise.resolve();
+export function followWait() {
+  followQ = followQ.then(async () => {
+    if (exempt()) return;
+    const k = 'follows-' + uid(), t = now(), list = load(k, []).filter((x) => t - x < 10 * 60e3);
+    const wait = followDelay(list, t);
+    if (wait > 0) await sleep(wait);
+    list.push(now()); save(k, list);
+  });
+  return followQ;
+}
+export const followOk = () => true; // kept for old callers: follows now wait in followWait()
 // Fields to write with lastPostAt (daily cap counter, checked by firestore.rules).
 export function postStamp(authorId, ts) {
   const o = { lastPostAt: ts };

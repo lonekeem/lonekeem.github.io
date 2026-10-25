@@ -169,7 +169,7 @@ export function createLive(ctx) {
     const flush = async () => {
       t = 0; if (pending <= 0) return;
       const n = Math.min(20, pending); pending -= n;
-      try { await sendStars(id, n); sent += n; } catch { /* live ended or too fast: dropped */ }
+      try { await sendStars(id, n); sent += n; } catch { /* live ended: dropped (timing is paced by js/fsq.js) */ }
       if (pending > 0 && !t) t = setTimeout(flush, 1100);
     };
     return {
@@ -260,10 +260,9 @@ export function createLive(ctx) {
     form.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-phrase]'); if (!b) return;
       e.preventDefault();
-      if (Date.now() - last < 1100) { toast('Slow down a bit 💜'); return; }
-      last = Date.now();
+      last = Date.now(); // chat lines are spaced out by js/fsq.js, never refused for timing
       try { await sendChat(id, b.dataset.phrase); }
-      catch (err) { toast(err.code === 'permission-denied' ? 'Slow down a little, or this live has ended.' : friendlyError(err)); }
+      catch (err) { toast(err.code === 'permission-denied' ? 'Couldn’t send that. This live may have ended.' : friendlyError(err)); }
     });
     form.onsubmit = async (e) => {
       e.preventDefault();
@@ -271,11 +270,10 @@ export function createLive(ctx) {
       const input = form.querySelector('input'); if (!input) return;
       const text = input.value.trim(); if (!text) return;
       if (!isPhrase(text) && phraseOnly()) return;
-      if (Date.now() - last < 1100) { toast('Slow down a bit 💜'); return; }
       if (!spamOk('live', text)) return;
       last = Date.now(); input.value = '';
       try { await sendChat(id, text.slice(0, 150)); }
-      catch (err) { input.value = text; toast(err.code === 'permission-denied' ? 'Slow down a little, or this live has ended.' : friendlyError(err)); }
+      catch (err) { input.value = text; toast(err.code === 'permission-denied' ? 'Couldn’t send that. This live may have ended.' : friendlyError(err)); }
     };
   }
   async function waitIce(pc, ms = 3500) {
@@ -402,7 +400,7 @@ export function createLive(ctx) {
         startBroadcast(token);
       } catch (e) {
         btn.disabled = false;
-        $('#lv-err').textContent = e.code === 'permission-denied' ? 'Please wait a few seconds and try again (you just posted or went live).' : friendlyError(e);
+        $('#lv-err').textContent = e.code === 'permission-denied' ? 'Couldn’t start the live. Tap to try again.' : friendlyError(e);
       }
     };
     $('#lv-yt').addEventListener('input', () => { $('#lv-yterr').textContent = ''; });
@@ -417,7 +415,7 @@ export function createLive(ctx) {
         location.replace('#/live/' + id);
       } catch (e) {
         btn.disabled = false;
-        err.textContent = e.code === 'permission-denied' ? 'Please wait a few seconds and try again (you just posted or went live).' : friendlyError(e);
+        err.textContent = e.code === 'permission-denied' ? 'Couldn’t start the live. Tap to try again.' : friendlyError(e);
       }
     };
     startCam();

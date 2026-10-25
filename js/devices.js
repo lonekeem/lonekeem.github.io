@@ -8,7 +8,7 @@
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 
 const KEY = 'kemy-device-id';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -1,7 +1,7 @@
 // The visible side of Kemy Helper moderation: the warning popup, a report with
 // the recent chat, and a note the server can strike on. Written by Lone Keem.
 import { auth, db } from '../firebase-init.js';
-import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, writeBatch } from '../fsq.js';
 import { noteReport } from '../chat-hide.js';
 import { CARE_NOTE, WARN, nameProblem, scan, snapshot } from './mod-policy.js';
 

@@ -5,7 +5,7 @@ import { drawPal } from './art.js';
 import { drawDancer } from './dance.js';
 import { createEconomy } from './economy.js';
 import { HW_ON, HALLOWEEN } from './halloween.js';
-import { getAggregateFromServer, query, collection, where, sum } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { getAggregateFromServer, query, collection, where, sum } from '../fsq.js';
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function cvs(el, w, h) { const cv = document.createElement('canvas'); const d = Math.min(3, devicePixelRatio || 1); cv.width = w * d; cv.height = h * d; cv.style.width = w + 'px'; cv.style.height = h + 'px'; const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); el.innerHTML = ''; el.appendChild(cv); return { cv, c }; }
 function anim(cv, fn) { let t = 0; const f = () => { if (!document.body.contains(cv)) return; t++; fn(t); if (!RM()) requestAnimationFrame(f); }; f(); }

@@ -1,10 +1,10 @@
 // Firestore plumbing for Games: creating / joining games and rooms, quick match, heartbeats,
 // quick chat, invites and recording results. Turn-based and cheap on purpose (Spark plan).
-import { spamOk } from '../spam.js';
+import { spamOk, spamPace } from '../spam.js';
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, limitToLast, onSnapshot,
   writeBatch, serverTimestamp, runTransaction, addDoc, Timestamp, deleteField
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from '../fsq.js';
 import { ENGINES } from './boards.js';
 import { rack as poolRack, newState as poolState } from './pool-engine.js';
 import { START as CHESS_START, START_CX as CHESS_CX } from './chess-engine.js';
@@ -14,6 +14,12 @@ export const BOARD_TYPES = ['stardrop', 'klgrid', 'checkers'];
 export const ROOM_TYPES = ['trivia', 'starcards', 'ludo'];
 export const TWO_P = [...BOARD_TYPES, 'pool', 'chess'];
 export const CHESS_CLOCK = { 5: 300000, 10: 600000 };
+const DIGIT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+// Pure: 'ludo-2' -> 'ludo-two'. Always matches the gameQueue rule ^[a-z-]{3,30}$.
+export function queueIdOf(raw) {
+  const s = String(raw || '').toLowerCase().replace(/\d/g, (d) => DIGIT_WORDS[+d]).replace(/[^a-z-]/g, '-').slice(0, 30);
+  return s.length >= 3 ? s : (s + '---').slice(0, 3);
+}
 export const EMOTES = ['GG', 'Nice!', 'Wow', 'Oops', 'Good luck', 'Rematch?', '★', 'Hmm…', 'Ha!', 'Thanks'];
 export const TURN_SECONDS = 60;
 export const HB_MS = 20000;
@@ -81,9 +87,15 @@ export function createNet({ db, S }) {
   }
   // Quick match: one queue slot per game (and mode). If someone fresh is waiting, take their
   // game; otherwise open a game and wait in the slot.
+  // Queue doc ids must match the rules' ^[a-z-]{3,30}$ (no digits), so numeric modes are spelled out:
+  // ludo '2' -> 'ludo-two', chess '10' -> 'chess-onezero'. ('ludo-2' was denied: that was the
+  // generic permission-denied toast on Ludo Play Online.)
+  function queueId(type, mode) {
+    const raw = mode && mode !== 'classic' && (BOARD_TYPES.includes(type) || type === 'chess' || type === 'ludo') ? `${type}-${mode}` : String(type);
+    return queueIdOf(raw);
+  }
   async function quickMatch(type, mode) {
-    const qid = mode && mode !== 'classic' && (BOARD_TYPES.includes(type) || type === 'chess' || type === 'ludo') ? `${type}-${mode}` : type;
-    const qref = doc(db, 'gameQueue', qid);
+    const qref = doc(db, 'gameQueue', queueId(type, mode));
     const snap = await getDoc(qref).catch(() => null);
     const q = snap && snap.exists() ? snap.data() : null;
     if (q && q.uid && q.uid !== S.user.uid && q.gid && Date.now() - tsMs(q.at) < 90000) {
@@ -98,13 +110,17 @@ export function createNet({ db, S }) {
       } catch (e) { /* someone else took it: open our own */ }
     }
     const gid = await createGame(type, mode, { quick: true });
-    await setDoc(qref, { gid, uid: S.user.uid, at: serverTimestamp() });
+    // The game already exists, so a queue hiccup must never surface as an error: retry quietly, then
+    // just wait in our own room (friends can still join it).
+    for (let i = 0; i < 3; i++) {
+      try { await setDoc(qref, { gid, uid: S.user.uid, at: serverTimestamp() }); break; }
+      catch (e) { console.warn('Kemy queue retry', e && e.code); await new Promise((r) => setTimeout(r, 1200 * (i + 1))); }
+    }
     return gid;
   }
   async function leaveQueue(type, mode, gid) {
-    const qid = mode && mode !== 'classic' && (BOARD_TYPES.includes(type) || type === 'chess' || type === 'ludo') ? `${type}-${mode}` : type;
     try {
-      const qref = doc(db, 'gameQueue', qid);
+      const qref = doc(db, 'gameQueue', queueId(type, mode));
       const s = await getDoc(qref);
       if (s.exists() && s.data().gid === gid) await setDoc(qref, { gid: '', uid: '', at: serverTimestamp() });
     } catch { /* ignore */ }
@@ -205,7 +221,7 @@ export function createNet({ db, S }) {
     document.addEventListener('visibilitychange', vis);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
   }
-  const sendEmote = (gid, e) => !spamOk('game', '') ? Promise.resolve(null) : addDoc(collection(db, 'games', gid, 'chat'), { uid: S.user.uid, e, at: serverTimestamp() });
+  const sendEmote = async (gid, e) => { if (!spamOk('game', '')) return null; await spamPace('game'); return addDoc(collection(db, 'games', gid, 'chat'), { uid: S.user.uid, e, at: serverTimestamp() }); };
   const watchChat = (gid, cb) => onSnapshot(query(collection(db, 'games', gid, 'chat'), orderBy('at'), limitToLast(8)), (qs) => {
     qs.docChanges().forEach((c) => { if (c.type === 'added' && !c.doc.metadata.hasPendingWrites) cb({ id: c.doc.id, ...c.doc.data() }); });
   }, () => {});

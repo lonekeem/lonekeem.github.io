@@ -1,7 +1,7 @@
 // Shared live wallet chip: '⭐ 1,240 · 💎 35'. One onSnapshot per balance doc for the whole app
 // (users/{uid}/pal/wallet → coins, users/{uid}/pal/diamonds → d). Every chip on screen reads from this.
 // Admin or ∞ Pass holder (js/inf-pass.js) shows ∞. Logged out: no chip.
-import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, onSnapshot } from './fsq.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import { auth, db } from './firebase-init.js';
 import { isAdminUser, watchPass } from './inf-pass.js';

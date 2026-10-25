@@ -4,7 +4,7 @@
 // Movement writes wait 110ms (rules reject anything inside 90ms) and only while someone else is here.
 // Alone, the join doc is removed after a few seconds so an empty house does not keep writing.
 // A hidden tab or a closed page deletes the doc; everyone else drops the avatar within 8 seconds.
-import { collection, doc, onSnapshot, setDoc, deleteDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, serverTimestamp } from '../fsq.js';
 import { FLAT } from './layout.js';
 import { clean, checkInput } from '../pals/talk.js';
 import { getActivePal } from '../pals/core.js';

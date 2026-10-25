@@ -1,14 +1,14 @@
 // Star Coins + inventory (client side). The rules cap earning per source per day, check every
 // purchase against config/palShop and keep the balance from going negative.
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, deleteDoc }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from '../fsq.js';
 import { ITEM, EARN, dayNo, todaysDeals } from './catalog.js';
 import { isUnlimited } from '../inf-pass.js';
 // Unlimited (admin or ∞ Pass, js/inf-pass.js): balance shows Infinity ('∞'); purchases record ownership but don't deduct.
 export const isAdminUid = isUnlimited; // kept name for older imports (now async)
 // ---- live price check (config/palShop, admin-write only; the rules check every purchase against it)
-// A brand-new item whose price isn't published yet used to fail with a generic permission-denied ("going a little
-// fast"). Now: buys check the live doc first. For the admin, a registered hook auto-publishes the missing prices
+// A brand-new item whose price isn't published yet used to fail with a generic permission-denied error.
+// Now: buys check the live doc first. For the admin, a registered hook auto-publishes the missing prices
 // (merging, never removing anything) and the buy continues; everyone else gets a clear "not available yet".
 let SHOP = null, shopAt = 0, autoPub = null;
 export const setShopAutoPublish = (fn) => { autoPub = fn; };

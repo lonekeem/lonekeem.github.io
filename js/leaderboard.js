@@ -4,7 +4,7 @@
 import { auth, db, STUDIO_UID } from './firebase-init.js';
 import { faceName, adminNameClass, isAdminUid, ownerBadgeHtml } from './kemy-name.js';
 import { doc, getDoc, getDocs, setDoc, writeBatch, collection, query, where, orderBy, limit, startAfter, serverTimestamp, getCountFromServer }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from './fsq.js';
 
 export const LB_GAMES = [
   { id: 'all', name: 'Overall Kemy', emoji: '🏆', unit: 'pts' },

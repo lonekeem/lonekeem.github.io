@@ -4,7 +4,7 @@ const SDK = 'https://www.gstatic.com/firebasejs/12.4.0';
 let F = null;
 async function load() {
   if (F) return F;
-  const [{ auth, db }, A, S] = await Promise.all([import('../../firebase-init.js'), import(`${SDK}/firebase-auth.js`), import(`${SDK}/firebase-firestore.js`)]);
+  const [{ auth, db }, A, S] = await Promise.all([import('../../firebase-init.js'), import(`${SDK}/firebase-auth.js`), import("../../fsq.js")]);
   F = { auth, db, A, S, user: null, profile: null };
   await new Promise((res) => { const off = A.onAuthStateChanged(auth, async (u) => { F.user = u; F.profile = null;
     if (u) try { const s = await S.getDoc(S.doc(db, 'users', u.uid)); F.profile = s.exists() ? s.data() : null; } catch {}

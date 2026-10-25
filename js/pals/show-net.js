@@ -7,7 +7,7 @@
 //                         bots, results, diamonds. Host migration like Zombie co-op: if the host goes quiet for 8 s the
 //                         lowest fresh seat takes over (rules check it).
 import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, limit, onSnapshot, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from '../fsq.js';
 import { ZSAY, ZTABS, zSayIdx, zEmoteIdx, zEmoteOf, zText, palSnap, cleanCode } from './zombie-net.js';
 export { ZSAY, ZTABS, zSayIdx, zEmoteIdx, zEmoteOf, zText, palSnap, cleanCode };
 export const MAX_ROOM = 30, STALE_MS = 30 * 60e3, QUIET_MS = 8000;

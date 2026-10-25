@@ -1,7 +1,7 @@
 // Radial emote wheel (8 favourite slots the player picks) + tabbed quick-chat phrases. Shared by Pal Park,
 // Pal Zombie Survival and the Care stage. Pure DOM; the caller decides what an emote / phrase does (sync etc.).
 import { EMOTE_DANCES, allDances, ownsDance, setOwned, loadTrends } from './dance.js';
-import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { collection, getDocs } from '../fsq.js';
 // load which dances/emotes the player owns (inv dn_* and premium z_dn_*); cheap, cached per session
 let ownedP = null;
 export function loadOwnedEmotes(db, uid, force) { if (!uid || !db) return Promise.resolve(); if (!ownedP || force) ownedP = Promise.resolve().then(() => Promise.all([loadTrends(), getDocs(collection(db, 'users', uid, 'inv'))])).then(([, s]) => { setOwned(s.docs.filter((d) => (d.id.startsWith('dn_') || d.id.startsWith('z_dn_')) && (d.data().n || 0) > 0).map((d) => d.id)); }).catch(() => {}); return ownedP; }

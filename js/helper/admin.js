@@ -1,7 +1,7 @@
 // Admin list of Kemy Helper notes. Grouped, counted, and marked fixed. No player names.
 // Written by Lone Keem.
 import { auth, db } from '../firebase-init.js';
-import { collection, getDocs, query, where, limit, doc, writeBatch, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { collection, getDocs, query, where, limit, doc, writeBatch, serverTimestamp, setDoc } from '../fsq.js';
 import { groupKey, scrub } from './core.js';
 
 const LABEL = {

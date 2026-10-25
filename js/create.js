@@ -682,7 +682,7 @@ export function createComposer(ctx) {
         busy = false; postBtn.disabled = false; postBtn.textContent = 'Try again';
         status.textContent = uploaded ? 'Upload finished; the post wasn’t saved yet.' : '';
         if (!uploaded) { bar.hidden = true; barIn.style.transform = 'scaleX(0)'; }
-        err.textContent = e && e.code === 'permission-denied' ? 'You can post once every 20 seconds. Wait a moment and tap Try again.' : (e && e.userMessage) || friendlyError(e);
+        err.textContent = e && e.code === 'permission-denied' ? 'Couldn’t post that yet. Tap Try again.' : (e && e.userMessage) || friendlyError(e);
       }
     };
 

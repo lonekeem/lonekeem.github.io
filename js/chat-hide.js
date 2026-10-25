@@ -1,6 +1,6 @@
 // Hide a chat line after 3 different people report it. The count lives beside the
 // message, because live chat and park presence cannot be edited by other players.
-import { doc, getDoc, collection, query, where, limit, onSnapshot, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, collection, query, where, limit, onSnapshot, writeBatch, serverTimestamp } from './fsq.js';
 
 export const HIDE_AT = 3;
 const hidden = new Set();

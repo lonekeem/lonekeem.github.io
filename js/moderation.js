@@ -5,7 +5,7 @@
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy,
   limit, onSnapshot, serverTimestamp, Timestamp, writeBatch, collectionGroup, getCountFromServer
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 
 import { markUnder13, undoUnder13 } from './safety.js';
 import { STUDIO_UID } from './firebase-init.js';
@@ -660,20 +660,17 @@ export function createModeration(ctx) {
       e.preventDefault();
       const err = $('#fb-err'); err.textContent = '';
       const text = $('#fb-t').value.trim(); if (!text) return;
-      const wait = Number(sessionStorage.getItem('kemy-team-note') || 0);
-      if (Date.now() - wait < 60000) { err.textContent = 'Please wait a minute before sending another note.'; return; }
-      const btn = e.target.querySelector('button'); btn.disabled = true;
+      // Notes are queued: js/fsq.js spaces them a minute apart (the rules' limit) and sends them in the
+      // background, so the player is never told to wait.
+      const ta = $('#fb-t'); ta.value = '';
+      toast('Thanks, the Kemy team will get it');
       try {
         const b = writeBatch(db);
         const t = serverTimestamp();
         b.set(doc(collection(db, 'feedback')), { uid: S.user.uid, name: String((S.profile && S.profile.displayName) || '').slice(0, 60), kind: document.querySelector('input[name=fbk]:checked').value, text, page: String(location.hash || '').slice(0, 200), ua: (navigator.userAgent + ' · ' + innerWidth + 'x' + innerHeight).slice(0, 300), status: 'new', note: '', createdAt: t });
         b.set(doc(db, 'feedbackQuota', S.user.uid), { at: t });
         await b.commit();
-        sessionStorage.setItem('kemy-team-note', String(Date.now()));
-        $('#fb-t').value = '';
-        toast('Thanks, the Kemy team got it');
-      } catch (er) { err.textContent = er.code === 'permission-denied' ? 'Please wait a minute before sending another note.' : friendlyError(er); }
-      btn.disabled = false;
+      } catch (er) { if (document.body.contains(ta) && !ta.value) ta.value = text; err.textContent = 'Couldn’t send that note. Tap Send to try again.'; console.warn('team note', er && er.code); }
     };
   }
   function watchMyThread(cb) { if (!S.user) return; S.globalUnsubs && S.globalUnsubs.push(onSnapshot(doc(db, 'modThreads', S.user.uid), (s) => cb(!!(s.exists() && s.data().unreadUser), s.exists()), () => {})); }

@@ -1,6 +1,6 @@
 // Kemy safety: Community Rules agreement, birthday (13+) check, mod "under 13" flag,
 // personal-info warnings, age-clue review items, photo EXIF stripping. Written by Lone Keem
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, Timestamp } from './fsq.js';
 import { scan } from './helper/mod-policy.js';
 
 let C = null; // { S, db, esc, openModal, closeModal, toast, isAdmin, friendlyError }
@@ -151,9 +151,17 @@ export function rulesPage(main) {
   const b = document.getElementById('rules-agree');
   if (b) b.onclick = async () => { b.disabled = true; try { await saveAgree(); C.toast('Thanks for agreeing! 💜'); rulesPage(main); } catch (e) { b.disabled = false; C.toast(C.friendlyError(e)); } };
 }
-async function saveAgree() {
-  const S = C.S; await updateDoc(doc(C.db, 'users', S.user.uid), { rulesAt: serverTimestamp() });
-  S.profile.rulesAt = new Date();
+// One save no matter how many times "I agree" is tapped; an agreement already on file counts as done.
+let agreeing = null;
+function saveAgree() {
+  const S = C.S; if (S.profile && S.profile.rulesAt) return Promise.resolve();
+  agreeing = agreeing || (async () => {
+    const ref = doc(C.db, 'users', S.user.uid);
+    try { await updateDoc(ref, { rulesAt: serverTimestamp() }); }
+    catch (e) { const d = await getDoc(ref).catch(() => null); if (!(d && d.exists() && d.data().rulesAt)) throw e; }
+    S.profile.rulesAt = new Date();
+  })().finally(() => { agreeing = null; });
+  return agreeing;
 }
 
 // Ask once for birthday, then the rules. Resolves true only if the user may post/upload/comment/DM.
@@ -170,9 +178,11 @@ export async function gate() {
         <div class="btns"><button class="btn" type="submit">Save</button><button class="btn btn-ghost" type="button" data-close>Not now</button></div></form>`);
       const f = document.getElementById('bd-form');
       f.querySelector('[data-close]').addEventListener('click', () => res(false));
-      f.onsubmit = async (ev) => { ev.preventDefault(); const bd = readBirthday('gbd'); if (!bd) { document.getElementById('bd-err').textContent = 'Pick a month and a year.'; return; }
+      let busy = false;
+      f.onsubmit = async (ev) => { ev.preventDefault(); if (busy) return; const bd = readBirthday('gbd'); if (!bd) { document.getElementById('bd-err').textContent = 'Pick a month and a year.'; return; }
+        busy = true;
         try { await updateDoc(doc(C.db, 'users', S.user.uid), { ...bd, ...ageHonestPatch() }); Object.assign(S.profile, bd); ageHonestSaved(); C.closeModal(); res(true); }
-        catch (e) { document.getElementById('bd-err').textContent = C.friendlyError(e); } };
+        catch (e) { busy = false; document.getElementById('bd-err').textContent = C.friendlyError(e); } };
     });
     if (!ok) return false;
   }

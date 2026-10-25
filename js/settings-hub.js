@@ -2,7 +2,7 @@
 // Written by Lone Keem.
 import { auth, db } from './firebase-init.js';
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
-import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp } from './fsq.js';
 import { loadSettings, saveSettings } from './controls.js';
 import { mountRemap } from './input.js';
 import { getVolume as themeVol, setVolume as setThemeVol, getMode as themeMode, setMode as setThemeMode, getPick as themePick, setPick as setThemePick, TRACKS as THEME_TRACKS, ORDER as THEME_ORDER, PLAYLIST_CREDIT, play as playTheme, stop as stopTheme, isPlaying as themePlaying } from './theme.js';

@@ -1,6 +1,6 @@
 // Kemy Pals - data: Firestore users/{uid}/pets/{petId}, stats decay computed client-side.
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, increment, deleteDoc, deleteField }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from '../fsq.js';
 import { SPEC } from './art.js';
 export const MAX_PALS = 6;
 export const STATS = ['happy', 'hunger', 'energy', 'clean']; // hunger = fullness (100 = full)
@@ -80,11 +80,11 @@ export function createStore(db, uid) {
     async create(id, data) { await setDoc(ref(id), newPal(id, data)); return this.get(id); },
     // save stats/xp/look. xp gain per write is capped at 60 by the rules, and writes are 1s apart.
     // Saves are queued one at a time (rapid shop taps used to fire two writes inside the rules' 1 s window and get
-    // permission-denied = "going a little fast"); the gap is measured from when the last write FINISHED, and a write
+    // a generic permission-denied error); the gap is measured from when the last write FINISHED, and a write
     // that still lands too soon (network jitter, another tab) is retried after a short wait.
     save(p, patch = {}) { const run = () => this._save(p, patch); const pr = chain.then(run, run); chain = pr.catch(() => {}); return pr; },
     async _save(p, patch = {}) {
-      for (let tryN = 0; ; tryN++) { try { return await this._save1(p, patch); } catch (e) { if (e && e.code === 'permission-denied' && tryN < 2) { lastWrite = Date.now(); continue; } throw e; } }
+      for (let tryN = 0; ; tryN++) { try { return await this._save1(p, patch); } catch (e) { if (e && e.code === 'permission-denied' && tryN < 1) { lastWrite = Date.now(); continue; } throw e; } }
     },
     async _save1(p, patch = {}) {
       const steps = lookSteps(p, patch);
@@ -123,7 +123,7 @@ export async function firstPet(db, uid) { const s = await getDocs(collection(db,
 export const formName = (p) => { const sp = SPEC[p.species]; return sp ? sp.forms[p.level >= 12 ? 2 : p.level >= 5 ? 1 : 0] : ''; };
 export { deleteDoc };
 // ---- public read API (also for Phase 2: Pal vs Pal games and the Pal Park)
-import { query, where, limit } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { query, where, limit } from '../fsq.js';
 export async function listPals(db, uid) { const s = await getDocs(collection(db, 'users', uid, 'pets')); return s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); }
 // a user's active Pal (users/{uid}.activePet, else their first Pal), readable by anyone
 export async function getActivePal(db, uid) {

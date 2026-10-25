@@ -7,7 +7,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {
   doc, getDoc, getDocs, collection, collectionGroup, query, where, limit, writeBatch, increment, deleteDoc, deleteField, setDoc, serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 
 const PAGE = 300;          // docs fetched per query page
 const BATCH = 450;         // writes per batch (Firestore max is 500)

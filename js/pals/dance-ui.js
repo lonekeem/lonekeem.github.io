@@ -4,7 +4,7 @@ import { openBuySheet, coinBadge } from '../buy-sheet.js';
 import { EMOTE_DANCES, priceOf, BASIC, TRENDING, PRICE, RARITY_NAME, allDances, danceById, itemId, isFree, loadTrends, tiktok, setOwned, ownsDance, favOf, setFav, drawDancer, forcePreview, busState, isDancing, danceEnabled, BASIC as B0 } from './dance.js';
 import { addItems, addDiamondItems, ITEM, shopDoc } from './catalog.js';
 import { createDiamonds } from './armory.js';
-import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc } from '../fsq.js';
 
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const R2 = { c: 'c', r: 'r', l: 'l' };

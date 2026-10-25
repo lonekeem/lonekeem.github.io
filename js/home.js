@@ -7,7 +7,7 @@ import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.4.0/fi
 import {
   doc, getDoc, onSnapshot, writeBatch, setDoc, deleteDoc, serverTimestamp, increment,
   getDocs, collection, query, where, orderBy, limit
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = (n) => { const p = String(n || '?').trim().split(/\s+/); return ((p[0]?.[0] || '?') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); };

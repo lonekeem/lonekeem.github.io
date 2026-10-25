@@ -6,7 +6,7 @@
 // zLobbies/{CODE}/s/state    host-authoritative game state (~6 Hz): wave, zombies, score, kills + diamonds per player
 // Host migration: if the host's doc goes quiet for 8 s (or is deleted) the lowest seat takes over (rules check it).
 import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, limit, onSnapshot, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from '../fsq.js';
 export const MAX_TEAM = 4, STALE_MS = 30 * 60e3, QUIET_MS = 8000;
 export const EMOTES = ['👋 Hi!', '👍 Nice!', '🆘 Help!', '🤝 Revive me!', '🧟 Behind you!', '➡️ Follow me!', '⭐ Wow!', '🎉 GG!'];
 // em codec (int, rules allow -1..999): 0..499 = quick-chat phrase index into ZSAY (the 8 classics first, append-only),

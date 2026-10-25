@@ -632,7 +632,7 @@ export function createMovieMaker(ctx) {
         if (!id) { q('#mm-publish').disabled = false; bar.hidden = true; return; }
         if (sp && SER && S.lastHeld !== id) { try { const fresh = await SER.load(sp.series.id, true); await SER.save(fresh, { ai: { style: m.style, seed: m.seed, look: m.mode, cast: (m.cast || []).map((c) => ({ name: c.name, look: c.look, voice: c.voice })) } }); } catch { /* style memory is optional */ } }
         toast(S.lastHeld === id ? 'Your post is being reviewed 🕒' : 'Movie posted!'); location.hash = '#/post/' + id;
-      } catch (e2) { q('#mm-publish').disabled = false; err.textContent = e2?.code === 'permission-denied' ? 'You can post once every 20 seconds. Try again in a moment.' : (e2.message || friendlyError(e2)); }
+      } catch (e2) { q('#mm-publish').disabled = false; err.textContent = e2?.code === 'permission-denied' ? 'Couldn’t post that yet. Tap to try again.' : (e2.message || friendlyError(e2)); }
     };
   }
   window.__kemyMM = { get m() { return m; } };

@@ -4,7 +4,7 @@
 // once per device for signed-out visitors (localStorage guard; rules allow only viewCount +1).
 // Videos count after ~2.5 s of actual playback, photos / text posts after ~2 s on screen.
 import { auth, db } from './firebase-init.js';
-import { doc, writeBatch, updateDoc, serverTimestamp, increment } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, writeBatch, updateDoc, serverTimestamp, increment } from './fsq.js';
 
 export const VIDEO_VIEW_SECONDS = 2.5;
 export const PHOTO_VIEW_MS = 2000;

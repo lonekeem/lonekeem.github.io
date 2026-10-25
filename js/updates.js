@@ -3,7 +3,7 @@
 // The gold dot clears when this page is opened. Last seen is kept on the device and, if signed in, on the account.
 // Written by Lone Keem.
 import { auth, db, ADMIN_EMAIL } from './firebase-init.js';
-import { collection, doc, getDoc, getDocs, setDoc, query, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { collection, doc, getDoc, getDocs, setDoc, query, limit, serverTimestamp } from './fsq.js';
 
 const SEEN_KEY = 'kemy-updates-seen';
 const TYPES = { new: 'New', fix: 'Bug Fix', soon: 'Coming Soon' };

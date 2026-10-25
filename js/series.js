@@ -5,7 +5,7 @@
 // Studio-made series (ownerId 'studio') show as Lone Keem Studios Originals.
 import {
   doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where, orderBy, limit, writeBatch, serverTimestamp, increment
-} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+} from './fsq.js';
 import { GENRES, RATINGS, artOf, gradientCss, fmtRuntime, fmtDur } from './works.js';
 import { faceName, adminNameClass } from './kemy-name.js';
 

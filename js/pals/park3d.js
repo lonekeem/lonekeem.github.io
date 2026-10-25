@@ -10,7 +10,7 @@
 import { spamOk } from '../spam.js';
 import { createLink } from '../games/link.js';
 import { getCountFromServer, doc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp, addDoc }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from '../fsq.js';
 import { THREE, makePal3D, posePal3D, gfxLevel } from './pal3d.js';
 import { WALK_V } from './motion3d.js';
 import { getActivePal } from './core.js';
@@ -634,7 +634,7 @@ export function createPark3D(ctx) {
     }
     log.addEventListener('click', (e) => { if (e.target.closest('button')) return; log.classList.toggle('open'); });
     // chat input
-    let lastSay = 0, burst = [];
+    let lastSay = 0, burst = [], sayT = 0, sayNext = '';
     function applyPhrase() {
       const on = phraseOnly();
       const form = $('#p3-chat'); if (form) form.classList.toggle('phrases', on);
@@ -647,7 +647,14 @@ export function createPark3D(ctx) {
       const gate = window.kemyChatGate ? window.kemyChatGate(t, 'park', '') : { ok: true, text: t };
       if (!gate.ok) return false;
       t = gate.text;
-      const now = Date.now(); burst = burst.filter((x) => now - x < 30000); if (now - lastSay < 2500 || burst.length >= 6) { toast('Slow down a bit 💜'); return false; } if (!spamOk('park', t)) return false; lastSay = now; burst.push(now); P.say = clean(t).slice(0, 60); P.sayAt = now; dirty = true; send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color, { uid: S.user.uid }); return true;
+      if (!spamOk('park', t)) return false;
+      // Quick lines wait their turn (2.5 s apart, 6 per 30 s; the newest waiting line wins), never refused.
+      sayNext = t;
+      const out = () => { sayT = 0; const now = Date.now(); lastSay = now; burst.push(now); P.say = clean(sayNext).slice(0, 60); P.sayAt = now; dirty = true; try { send(true); logMsg(S.profile.displayName + ' (you)', P.say, S.profile.color, { uid: S.user.uid }); } catch { /* left the park */ } };
+      const now = Date.now(); burst = burst.filter((x) => now - x < 30000);
+      const wait = Math.max(2500 - (now - lastSay), burst.length >= 6 ? burst[burst.length - 6] + 30000 - now : 0);
+      if (wait > 0) { if (!sayT) sayT = setTimeout(out, wait); return true; }
+      out(); return true;
     }
     $('#p3-chat').onsubmit = (e) => { e.preventDefault(); if (phraseOnly()) { $('#p3-quick').click(); return; } const inp = $('#p3-t'); const v = inp.value.trim(); if (!v) { inp.blur(); return; } if (say(v)) { inp.value = ''; inp.blur(); } };
     const panel = $('#park-panel'); const toggle = (k) => { const open = panel.hidden || panel.dataset.k !== k; panel.hidden = !open; panel.dataset.k = k; return open; };

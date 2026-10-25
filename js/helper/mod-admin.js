@@ -1,7 +1,7 @@
 // Moderation queue on the admin page. Reports, strikes, and one-tap actions.
 // Dismiss, warn, mute, and ban are Keem's taps. The helper never bans. Written by Lone Keem.
 import { auth, db } from '../firebase-init.js';
-import { collection, deleteDoc, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc, where, Timestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { collection, deleteDoc, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc, where, Timestamp } from '../fsq.js';
 
 const HOUR = 3600e3;
 const DAY = 864e5;

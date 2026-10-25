@@ -1,6 +1,6 @@
 // 💜 Support Kemy: optional donation links, configured by the admin in config/donate.
 // Hidden when no links are set, and always hidden inside the Android app (TWA) for Google Play payment rules.
-import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, serverTimestamp } from './fsq.js';
 
 const TWA_KEY = 'kemy-twa';
 export function isTWA() {

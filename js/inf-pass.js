@@ -2,7 +2,7 @@
 // Unlimited = the verified admin account OR a player holding an ∞ Pass (infPass/{uid}, written ONLY by the
 // admin - enforced in firestore.rules unlimitedFor()). Purchases still need a real shop item; they just don't deduct.
 import { doc, getDoc, setDoc, deleteDoc, onSnapshot, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+  from './fsq.js';
 import { auth, db, ADMIN_EMAIL } from './firebase-init.js';
 export const isAdminUser = (u) => !!(u && u.email === ADMIN_EMAIL && u.emailVerified);
 const passRef = (uid) => doc(db, 'infPass', uid);
