@@ -2562,6 +2562,14 @@ service cloud.firestore {
       function inCellOk() { return pp().y < 10160 ? cellNo() == (pp().in.size() == 6 ? inNum() : inNum() - 1) % 180 + 1 : (mCell() >= 0 && mCell() < 7 && pp().in == ['h483', 'h484', 'h485', 'h486', 'h487', 'h488', 'h489'][mCell()]); }
       function hp(id) { return /databases/$(database)/documents/homes/$(id); }
       function homeOk(id) { return id == 'h489' || !exists(hp(id)) || get(hp(id)).data.owner == me() || get(hp(id)).data.get('open', false) == true || me() in get(hp(id)).data.get('inv', []); }
+      // Pose writes send say ''. The three scanners are only needed for real chat, and running
+      // them on every heartbeat exceeds the 1000-expression cap (the write is denied, pals vanish).
+      function sayClean() { return pp().say == '' || (kidSafe(pp().say) && contactFree(pp().say) && groomFree(pp().say)); }
+      function profOk() {
+        let d = get(userPath(uid)).data;
+        return pp().name == d.displayName && pp().uname == d.username
+          && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || !pcOff(d, 'chat'));
+      }
       allow read: if signedIn();
       allow create, update: if signedIn() && notBanned() && uid == me() && room.matches('^r[0-9]{1,2}$')
         && pp().keys().hasOnly(['x', 'y', 'd', 'e', 'eAt', 'say', 'sayAt', 'tgt', 'name', 'uname', 'color', 'pal', 'at', 'h', 'r', 'dn', 'v', 'in', 'c', 'vx', 'vz', 'ct', 'an', 'pl'])
@@ -2578,12 +2586,9 @@ service cloud.firestore {
         // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
         && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= -21000 && pp().x <= 10000 && pp().y is int && pp().y >= 0 && pp().y <= 60000
-        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && kidSafe(pp().say) && contactFree(pp().say) && groomFree(pp().say) && isStr(pp().tgt, 0, 128)
+        && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && sayClean() && isStr(pp().tgt, 0, 128)
         && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || chatFree(uid) || presetSay(pp().say))
-        && pp().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
-        && pp().uname == get(/databases/$(database)/documents/users/$(uid)).data.username
-        // Parental Controls: chat off means no new 'say' text (same profile doc as above, no extra lookup)
-        && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || !pcOff(get(/databases/$(database)/documents/users/$(uid)).data, 'chat'))
+        && profOk()
         && pp().pal is map && pp().at == request.time
         && (resource == null || resource.data.at + duration.value(70, 'ms') < request.time);
       allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(2, 'm'));

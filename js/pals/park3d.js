@@ -4,8 +4,9 @@
 // World: gentle-hill terrain, instanced trees (oak, pine, birch) with near/far LOD, swaying grass, flowers, a pond with
 // water shading, paths, benches, lamps, a playground, a fountain and the purple Kemy Studio. All original, built in code.
 // Multiplayer: Firestore presence in rooms of 25 (parkRooms/rN/p/{uid}). While moving, the next
-// write waits 120ms after the previous ack (the rules reject anything inside 70ms). Delta-skipped
-// when still, 15 s heartbeat, ~100 ms interpolation (longer while driving), stale cleanup. Chat via the safety filter.
+// write waits 120ms after the previous ack (80ms while driving or riding, about 12/s; the rules
+// reject anything inside 70ms). Delta-skipped when still, 5 s heartbeat, 20 s stale drop,
+// cars render ~130 ms behind with a short velocity extrapolation. Chat via the safety filter.
 import { spamOk } from '../spam.js';
 import { createLink } from '../games/link.js';
 import { getCountFromServer, doc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp, addDoc }
@@ -27,14 +28,14 @@ import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
 import { addParkHD } from './park-hd.js';
 import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; import { roomState } from '../world/layout.js'; // Kemy World: Kemy Street district etc. (own module)
-import { PRESENCE_GAP_MS, presenceDeny, afterPresenceDeny, presenceVelInt, extrapSec, keepRemotePal, inVehicle, lookKey } from './presence-sync.js';
+import { presenceGapMs, presenceDeny, afterPresenceDeny, presenceVelInt, extrapSec, keepRemotePal, inVehicle, lookKey, samplePose, takePose, HEARTBEAT_MS, STALE_PRESENCE_MS, RENDER_BEHIND_MS } from './presence-sync.js';
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
 import { attachRotate } from '../rotate.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
 const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX), Math.round(z * PX + CY)];
 const W = 100, H = 75;                                // world half-size (200 m x 150 m)
-const MAX_ROOM = 100, ROOMS = 20, CELL = 160, MAX_DRAWN = 30, HB_MS = 15000, STALE_MS = 10000;
+const MAX_ROOM = 100, ROOMS = 20, CELL = 160, MAX_DRAWN = 30, HB_MS = HEARTBEAT_MS, STALE_MS = STALE_PRESENCE_MS;
 const PORTAL_NAME = { race: 'Pal Race', bubbles: 'Bubble Pop', stars: 'Star Catch', dance: 'Dance-Off' };
 const EMO_DANCE = { '👋': 'wave', '💜': 'happyshimmy', '😂': 'bounce', '😮': 'woah', '🎉': 'groove', '😴': 'slowmo', '⭐': 'twirl', '🐾': 'hopclap' };
 const BPM = 112;
@@ -478,7 +479,7 @@ export function createPark3D(ctx) {
       if (!force && sig === lastSig && now - lastSend < HB_MS) { dirty = false; return; }
       sending = true; lastSend = now; dirty = false; SV.sx = SV.vx; SV.sz = SV.vz;
       const t0 = performance.now(); link.markWrite();
-      try { await setDoc(meRef, body); lastSig = sig; net.ok++; denyStreak = 0; nextOk = Date.now() + PRESENCE_GAP_MS; link.noteRtt(performance.now() - t0); }
+      try { await setDoc(meRef, body); lastSig = sig; net.ok++; denyStreak = 0; const fast = !!(sync.vel) || SV.an === 'drive' || (typeof P.dance === 'string' && P.dance[0] === '~'); nextOk = Date.now() + presenceGapMs(fast); link.noteRtt(performance.now() - t0); }
       catch (e) {
         net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; link.fail();
         try { const q = base(); delete q.at; net.last = JSON.stringify(q).slice(0, 600); } catch { /* */ }
@@ -487,10 +488,12 @@ export function createPark3D(ctx) {
         else nextOk = Date.now() + 200;
       }
       sending = false;
+      // A ride request can land while a write is already in flight. Flush it as soon as the rule allows, even if the next frame is late.
+      if (dirty) { const wait = Math.max(0, nextOk - Date.now()) + 15; setTimeout(() => { if (dirty && !sending) send(false); }, wait); }
     };
     await send(true);
     const others = new Map(); const blocked = S.blocked || new Set(); const MK = 'kemy-park-muted-' + S.user.uid; const muted = new Set(JSON.parse(lsg(MK) || '[]'));
-    // Presence: at most ~8 writes/s while the pose changes (120ms after each ack), only fresh docs, listener detaches while the tab is hidden.
+    // Presence: ~8 writes/s on foot, ~12/s while driving or riding (80ms after each ack). Only fresh docs. The listener detaches while the tab is hidden.
     // Your own pal is predicted locally and never corrected from this doc (that is what used to rubber-band).
     // WIDE mode (whole room, client-side nearest-30) unless the room is crowded: players on older cached builds don't send 'c',
     // so a cell-only query would hide them. A failing cell query falls back to WIDE and is logged visibly.
@@ -498,7 +501,7 @@ export function createPark3D(ctx) {
     const listen = () => { let first = true; const fresh = where('at', '>', Timestamp.fromMillis(Date.now() - STALE_MS * 3)); const qy = wide ? query(collection(db, 'parkRooms', room, 'p'), fresh) : query(collection(db, 'parkRooms', room, 'p'), where('c', 'in', cells9()), fresh); return onSnapshot(qy, (qs) => {
       if (roomState.inId) return; // the house channel owns avatars until you step outside
       link.noteSnap(!!(qs.metadata && qs.metadata.hasPendingWrites));
-      if (first) { first = false; const cached = !!(qs.metadata && qs.metadata.fromCache); if (!cached) { const ids = new Set(qs.docs.map((d) => d.id)); for (const id of [...others.keys()]) if (!ids.has(id) && !(others.get(id) && others.get(id).house)) drop(id); } }
+      if (first) { first = false; const cached = !!(qs.metadata && qs.metadata.fromCache); if (!cached) { const ids = new Set(qs.docs.map((d) => d.id)); for (const [id, o] of others) { if (ids.has(id) || o.house) continue; if (Math.hypot((o.x || 0) - P.x, (o.z || 0) - P.z) > CELL * 1.6) drop(id); } } }
       const now = Date.now(); net.snaps++; net.reads = (net.reads || 0) + Math.max(1, qs.docChanges().length);
       qs.docChanges().forEach((ch) => { const id = ch.doc.id; if (id === S.user.uid) return; if (ch.type === 'removed') { if (!(others.get(id) && others.get(id).house)) drop(id); return; }
         const d = ch.doc.data(); const at = d.at && d.at.toMillis ? d.at.toMillis() : now;
@@ -506,7 +509,7 @@ export function createPark3D(ctx) {
         const [x, z] = toW(d.x, d.y); let o = others.get(id);
         if (!o) { o = { uid: id, x, z, ix: x, iz: z, ivx: 0, ivz: 0, iyaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, dl: 120, fade: 0, y: typeof d.h === 'number' ? d.h / 10 : ground(x, z), yaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, seenS: d.sayAt || 0, seenE: d.eAt || 0, t: Math.random() * 100 }; others.set(id, o); }
         { const ct = typeof d.ct === 'number' ? d.ct : at; const off = Date.now() - ct; o.off = o.off == null ? off : Math.min(off, o.off + (off - o.off) * 0.1); const B = o.buf || (o.buf = []);
-          if (!B.length || ct > B[B.length - 1].t) { const st = B.length >= 4 ? B.shift() : {}; st.t = ct; st.x = x; st.z = z; st.yaw = typeof d.r === 'number' ? d.r * Math.PI / 180 : null; st.vx = (d.vx || 0) / 10; st.vz = (d.vz || 0) / 10; B.push(st); } o.an = d.an || ''; }
+          if (!B.length || ct > B[B.length - 1].t) { const st = B.length >= 8 ? B.shift() : {}; st.t = ct; st.x = x; st.z = z; st.yaw = typeof d.r === 'number' ? d.r * Math.PI / 180 : null; st.vx = (d.vx || 0) / 10; st.vz = (d.vz || 0) / 10; B.push(st); } o.an = d.an || ''; }
         if (d.name === KEMY_NAME) noteAdminUid(id);
         Object.assign(o, { tx: x, tz: z, th: typeof d.h === 'number' ? d.h / 10 : null, tr: typeof d.r === 'number' ? d.r * Math.PI / 180 : null, dn: d.dn || '', pl: d.pl || '', name: d.name, uname: d.uname, color: d.color, pal: d.pal, at, e: d.e, eAt: d.eAt, say: d.say, sayAt: d.sayAt, tgt: d.tgt });
         if (d.sayAt && d.sayAt > o.seenS && d.say && !isHidden(hideKey('park', id, clean(d.say)))) { o.seenS = d.sayAt; if (!muted.has(id) && !blocked.has(id)) logMsg(d.name, clean(d.say), d.color, { uid: id, uname: d.uname }); }
@@ -656,7 +659,7 @@ export function createPark3D(ctx) {
     // a wheel emote/dance: synced to everyone through the existing dance-name field (dn), cleared when it ends
     function emoteDance(id) { const d = EMOTE_BY_ID[id]; P.dance = id; P.danceUntil = Date.now() + emoteMs(id); P.tgt = ''; dirty = true; send(true); hint(`${(d && d.icon) || '💃'} ${(d && d.name) || 'Dance!'}`); paintDanceBtn(); }
     function paintDanceBtn() { const b = tc.root.querySelector('[data-b=dance]'); if (b) b.classList.toggle('lock', !!(P.dance && WORLD_DANCE_BY_ID[P.dance] && Date.now() < P.danceUntil)); }
-    function stopWorldDance() { if (P.dance === 'sit') return; P.dance = ''; P.danceUntil = 0; dirty = true; send(true); paintDanceBtn(); }
+    function stopWorldDance() { if (P.dance === 'sit' || (P.dance && P.dance[0] === '~')) return; P.dance = ''; P.danceUntil = 0; dirty = true; send(true); paintDanceBtn(); }
     function startWorldDance(id) { const d = WORLD_DANCE_BY_ID[id]; if (!d) return; P.dance = d.id; P.danceUntil = Date.now() + 864e5; P.tgt = ''; dirty = true; send(true); hint(`${d.icon} ${d.name}`); paintDanceBtn(); import('../gamemusic.js').then((gm) => { if (!gm.isPlaying()) gm.playStation('theme', { volume: 0.14 }); }).catch(() => {}); }
     function openDances() { if (!toggle('d')) return; const cur = P.dance; panel.innerHTML = `<div class="p3-dances">${WORLD_DANCES.map((d) => `<button type="button" data-wd="${d.id}" class="${cur === d.id ? 'on' : ''}"><span class="ic" aria-hidden="true">${d.icon}</span>${d.name}</button>`).join('')}<button type="button" data-wd-stop class="stop">Stop</button></div>`; }
     panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.wd) { startWorldDance(b.dataset.wd); panel.hidden = true; } if (b.dataset.wdStop != null) { stopWorldDance(); panel.hidden = true; hint('Dance stopped'); } if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
@@ -731,8 +734,17 @@ export function createPark3D(ctx) {
     const fpsEl = $('#p3-fps'); const dbgFps = lsg('kemy-pals-debug') === '1' || /fps/.test(location.hash + location.search); if (!(dbgFps || gfxShowFps())) fpsEl.hidden = true;
     $('#p3-load').remove(); hint('Drag to look around · 👁 switches camera');
     const others3D = () => others.values(); let drawSet = null, fr = 0, recFast = 0; const DELAY = 120;
-    // Play about 120 ms behind the sender (never more than 150). A short gap is extrapolated. Big jumps snap.
+    // On foot: play about 120 ms behind. In a car: a fixed 130 ms behind, linear between snapshots,
+    // dead-reckon only a short gap, and snap the shown pose only on a real teleport.
     function interp(o, dt) { const B = o.buf; if (!B || !B.length) { o.ix = o.tx; o.iz = o.tz; o.ivx = 0; o.ivz = 0; return; }
+      const veh = inVehicle(o.dn) || o.an === 'drive';
+      if (veh) {
+        o.dl = RENDER_BEHIND_MS;
+        const pose = samplePose(B, Date.now() - (o.off || 0), RENDER_BEHIND_MS, extrapSec(o.an, o.dn));
+        if (!pose) return;
+        const shown = takePose(o.ix == null ? null : { x: o.ix, z: o.iz, yaw: o.iyaw || 0 }, pose);
+        o.ix = shown.x; o.iz = shown.z; o.ivx = pose.vx; o.ivz = pose.vz; o.iyaw = shown.yaw; return;
+      }
       const span = B.length >= 2 ? B[B.length - 1].t - B[B.length - 2].t : 100;
       const want = Math.min(150, Math.max(DELAY, Math.min(150, span * 1.1)));
       o.dl = (o.dl ?? DELAY) + (want - (o.dl ?? DELAY)) * Math.min(1, dt * 8);
@@ -759,7 +771,7 @@ export function createPark3D(ctx) {
       const im = Math.min(1, Math.hypot(ix, iz)); const running = runT || mv.run || keys.shift; const sp = (running ? RUN_V : WALK_W) * im;
       if (im > 0.08) { const a = Math.atan2(ix, iz) + C.yaw - Math.PI; const want = Math.atan2(-Math.sin(a), -Math.cos(a)); const mx = Math.sin(want), mz = Math.cos(want);
         let nx = P.x + mx * sp * dt, nz = P.z + mz * sp * dt; [nx, nz] = collide(nx, nz, P.y); P.x = nx; P.z = nz;
-        if (!pov) { let dy = want - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); P.yaw += dy * Math.min(1, 12 * dt); } else P.yaw = C.yaw + Math.PI; P.d = mx >= 0 ? 1 : -1; dirty = true; if (P.dance !== 'sit') { P.dance = ''; P.danceUntil = 0; paintDanceBtn(); } }
+        if (!pov) { let dy = want - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); P.yaw += dy * Math.min(1, 12 * dt); } else P.yaw = C.yaw + Math.PI; P.d = mx >= 0 ? 1 : -1; dirty = true; if (P.dance !== 'sit' && !(P.dance && P.dance[0] === '~')) { P.dance = ''; P.danceUntil = 0; paintDanceBtn(); } }
       else if (pov) P.yaw = C.yaw + Math.PI;
       // gravity, ground, stairs and slopes
       const fl = floorAt(P.x, P.z, P.y);
@@ -770,7 +782,7 @@ export function createPark3D(ctx) {
       if (P.sit) { P.x = P.sit.x; P.z = P.sit.z; P.y = P.sit.y; P.yaw = P.sit.yaw; P.vy = 0; P.onGround = true; } // seated on a bed/chair/couch
       if (!P.onGround) dirty = true; // stream the jump arc (send() still caps it at ~4/s)
       if (P.danceUntil && Date.now() > P.danceUntil && P.dance) { P.dance = ''; dirty = true; } // tell others the dance ended
-      me.position.set(P.x, P.y, P.z); me.rotation.y = P.yaw;
+      const aboard = !!(W3.driving && W3.driving()); if (!aboard) { me.position.set(P.x, P.y, P.z); me.rotation.y = P.yaw; }
       // animation on the rig
       const bt = beatNow(); const dancing = P.dance && P.dance[0] !== '~' && Date.now() < P.danceUntil;
       P.t += dt * 60; const dt60 = dt * 60; const gv = sp; P.turnS = (P.turnS || 0) * 0.85 + (P.lastYaw != null ? Math.atan2(Math.sin(P.yaw - P.lastYaw), Math.cos(P.yaw - P.lastYaw)) / Math.max(dt, 1e-3) * 0.15 * 0.15 : 0); P.lastYaw = P.yaw;
@@ -789,12 +801,12 @@ export function createPark3D(ctx) {
       for (const o of others3D()) {
         if (blocked.has(o.uid) || nowMs - o.at > (o.house ? 8000 : STALE_MS)) { drop(o.uid); continue; }
         if (o.obj && o.pal) { const lk = lookKey(o.pal); if (o.objKey && o.objKey !== lk) { scene.remove(o.obj); o.obj = null; } } // re-dress when they change outfit, colours, or accessories
-        interp(o, dt); const nearD = Math.hypot((o.ix ?? o.x) - P.x, (o.iz ?? o.z) - P.z); if (!keepRemotePal(drawSet.has(o.uid), o.dn, nearD, LOW)) { o.x = o.ix; o.z = o.iz; if (o.obj) { scene.remove(o.obj); o.obj = null; o.objKey = null; } if (o.tag) o.tag.style.display = 'none'; continue; }
+        interp(o, dt); const nearD = Math.hypot((o.ix ?? o.x) - P.x, (o.iz ?? o.z) - P.z); if (!keepRemotePal(drawSet.has(o.uid), o.dn, nearD, LOW)) { o.x = o.ix; o.z = o.iz; if (o.obj) o.obj.visible = false; if (o.tag) o.tag.style.display = 'none'; o.hidAt = o.hidAt || nowMs; if (o.obj && nowMs - o.hidAt > 20000) { scene.remove(o.obj); o.obj = null; o.objKey = null; } continue; } o.hidAt = 0;
         if (!o.obj && o.pal) { try { o.obj = palObj(o.pal, !LOW); o.objKey = lookKey(o.pal); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
         const px = o.x, pz = o.z; o.x = o.ix; o.z = o.iz; o.jump = Math.max(o.jump || 0, Math.hypot(o.x - px, o.z - pz)); const mvd = o.buf && o.buf.length ? Math.hypot(o.ivx, o.ivz) : Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
         const gy = floorAt(o.x, o.z, o.y + 0.3); const holdY = o.dn === 'sit' || o.dn === 'sleep'; const aimY = o.th != null ? (holdY ? o.th : Math.max(o.th, gy - 0.05)) : gy; o.y += (aimY - o.y) * Math.min(1, dt * 10);
-        if (o.buf && o.buf.length) { let dy = o.iyaw - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (o.tr != null) { let dy = o.tr - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (mvd > 0.3) o.yaw = Math.atan2(o.x - px, o.z - pz);
-        if (!o.obj) continue; const dist = Math.hypot(o.x - P.x, o.z - P.z); const riding = inVehicle(o.dn); o.obj.visible = dist < (riding ? (LOW ? 90 : 160) : (LOW ? 60 : 110)); o.obj.position.set(o.x, o.y, o.z); o.obj.rotation.y = o.yaw; if (!riding && o.fade < 1) { o.fade = Math.min(1, (o.fade || 0) + dt * 3); o.obj.scale.setScalar(0.2 + 0.8 * o.fade * o.fade * (3 - 2 * o.fade)); }
+        const riding = inVehicle(o.dn); if (riding && o.iyaw != null) o.yaw = o.iyaw; else if (o.buf && o.buf.length) { let dy = o.iyaw - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (o.tr != null) { let dy = o.tr - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (mvd > 0.3) o.yaw = Math.atan2(o.x - px, o.z - pz);
+        if (!o.obj) continue; const dist = Math.hypot(o.x - P.x, o.z - P.z); const lim = riding ? (LOW ? 90 : 170) : (LOW ? 60 : 110); const showAt = o.obj.userData.on ? lim + 16 : lim - 8; o.obj.userData.on = dist < showAt; if (o.obj.parent === scene) { o.obj.visible = o.obj.userData.on; o.obj.position.set(o.x, o.y, o.z); o.obj.rotation.y = o.yaw; } if (!riding && o.fade < 1 && o.obj.parent === scene) { o.fade = Math.min(1, (o.fade || 0) + dt * 3); o.obj.scale.setScalar(0.2 + 0.8 * o.fade * o.fade * (3 - 2 * o.fade)); }
         const near = dist < (ULTRA ? 30 : LOW ? 12 : 20); o.t += dt * 60; o.lodN = (o.lodN || 0) + 1;
         if (o.obj.visible && (near || o.lodN % (dist > 45 ? 6 : 3) === 0)) { const air = o.th != null && o.th > gy + 0.3 && o.dn !== 'sit'; const dnDance = o.dn && o.dn[0] !== '~' ? o.dn : ''; const od = dnDance || ((o.dance && performance.now() < o.danceUntil) ? o.dance : '');
           const run2 = mvd > 2.6; const g2 = gaitFor(o.obj, mvd, run2); const s2 = { mode: air ? 'hop' : mvd > 0.6 ? (run2 ? 'run' : 'walk') : 'idle', t: o.t, dt60: dt * 60 * (near ? 1 : 3), speed: mvd > 0.6 ? g2.speed : 0, cadence: g2.cadence, stride: g2.stride, extra: run2 ? { cx: 0.22, nx: -0.08 } : null, jumpK: 0.5 }; if (od && mvd < 0.6 && !air) { s2.dance3d = od; s2.beat = bt.beat; s2.amt = 1; } posePal3D(o.obj.userData.m, s2); }
@@ -813,12 +825,12 @@ export function createPark3D(ctx) {
       if ((lodT += dt) > 0.6) { lodT = 0; lodTrees(P.x, P.z); } if (now - cullAt > 500) { cullAt = now; parkCull(); } // wall-clock: also right on a stuttering phone
       // shadows follow the player
       sun.target.position.set(P.x, P.y, P.z); sun.position.set(P.x + 40, P.y + 70, P.z + 25);
-      updateCam(dt); send(false);
+      if (!aboard) updateCam(dt); send(false);
       { const dv = !!W3.driving(); if (dv !== drvCls) { drvCls = dv; document.body.classList.toggle('p3-drive', dv); } }
       W3.update(dt, now); if (!R.shadowMap.autoUpdate) R.shadowMap.needsUpdate = (++shN % 3) === 0; R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, camState: () => ({ yaw: C.yaw, pitch: C.pitch, dist: C.dist }), gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; }, dance: () => P.dance };
+    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, camState: () => ({ yaw: C.yaw, pitch: C.pitch, dist: C.dist }), gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; dirty = true; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; }, dance: () => P.dance };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);

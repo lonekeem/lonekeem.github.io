@@ -5,9 +5,17 @@
 // without dn everyone else's car (and dance) disappears.
 
 export const PRESENCE_GAP_MS = 120;
+// Rules reject a second presence write until 70ms after the previous one.
+// 80ms after the ack is about 12 writes/s while driving (inside the 10–15/s window).
+export const PRESENCE_GAP_DRIVE_MS = 80;
 export const PRESENCE_DENY_MS = 300;
 export const EXTRAP_WALK = 0.22;
-export const EXTRAP_DRIVE = 0.55;
+export const EXTRAP_DRIVE = 0.28;
+// Heartbeat must land well before the local stale drop, or a still Pal (and their car) vanishes and pops back.
+export const HEARTBEAT_MS = 5000;
+export const STALE_PRESENCE_MS = 20000;
+export const RENDER_BEHIND_MS = 130;
+export const CAR_SNAP_M = 12;
 
 export function presenceDeny({ indoors, inDen } = {}) {
   if (indoors) {
@@ -26,8 +34,58 @@ export function afterPresenceDeny(streak, sendingPlate) {
 }
 
 export function extrapSec(an, dn) {
-  const car = an === 'drive' || (typeof dn === 'string' && dn.slice(0, 2) === '~c');
+  const car = an === 'drive' || inVehicle(dn);
   return car ? EXTRAP_DRIVE : EXTRAP_WALK;
+}
+
+export function presenceGapMs(driving) {
+  return driving ? PRESENCE_GAP_DRIVE_MS : PRESENCE_GAP_MS;
+}
+
+function angDelta(a, b) {
+  return Math.atan2(Math.sin(b - a), Math.cos(b - a));
+}
+
+// Render a pose buffer `delay` ms behind `now` (100–150ms). Between snapshots the
+// position and heading are linear, so a noisy velocity cannot bow the car off the
+// path. A short gap past the newest snapshot is dead-reckoned from velocity and
+// heading rate, then held.
+export function samplePose(buf, now, delay = RENDER_BEHIND_MS, extrap = EXTRAP_DRIVE) {
+  if (!buf || !buf.length || !Number.isFinite(now)) return null;
+  const rt = now - delay;
+  const n = buf.length;
+  const pose = (x, z, yaw, vx, vz) => ({ x, z, yaw: yaw || 0, vx: vx || 0, vz: vz || 0 });
+  if (rt <= buf[0].t) {
+    const a = buf[0];
+    return pose(a.x, a.z, a.yaw, a.vx, a.vz);
+  }
+  const last = buf[n - 1];
+  if (rt >= last.t) {
+    const ahead = (rt - last.t) / 1000;
+    const ah = Math.max(0, Math.min(extrap, ahead));
+    let w = 0;
+    if (n >= 2 && buf[n - 2].yaw != null && last.yaw != null) {
+      const prev = buf[n - 2];
+      w = angDelta(prev.yaw, last.yaw) / Math.max(0.001, (last.t - prev.t) / 1000);
+    }
+    const live = ahead <= extrap + 1e-6;
+    return pose(last.x + (last.vx || 0) * ah, last.z + (last.vz || 0) * ah, (last.yaw || 0) + w * ah, live ? last.vx : 0, live ? last.vz : 0);
+  }
+  let i = 0;
+  while (i < n - 2 && buf[i + 1].t < rt) i++;
+  const a = buf[i], b = buf[i + 1];
+  const span = Math.max(1, b.t - a.t);
+  const u = Math.max(0, Math.min(1, (rt - a.t) / span));
+  const yaw = a.yaw == null || b.yaw == null ? (a.yaw ?? b.yaw ?? 0) : a.yaw + angDelta(a.yaw, b.yaw) * u;
+  const s1 = Math.max(0.001, span / 1000);
+  return pose(a.x + (b.x - a.x) * u, a.z + (b.z - a.z) * u, yaw, (b.x - a.x) / s1, (b.z - a.z) / s1);
+}
+
+// Show the interpolated pose. Jump only when it is a real teleport, not a 1-frame correction.
+export function takePose(cur, next, snapM = CAR_SNAP_M) {
+  if (!next) return cur;
+  if (!cur || Math.hypot(next.x - cur.x, next.z - cur.z) > snapM) return { ...next, snap: true };
+  return { x: next.x, z: next.z, yaw: next.yaw, vx: next.vx, vz: next.vz, snap: false };
 }
 
 export function inVehicle(dn) {
@@ -36,11 +94,11 @@ export function inVehicle(dn) {
 }
 
 // The nearest-30 cap hides a driver while the car mesh still draws. Keep the pal
-// when they are in a car (or a passenger) and still inside the car's draw distance.
+// when they are in a car (or a passenger) out to the same distance the car stays drawn.
 export function keepRemotePal(inNearest, dn, dist, low) {
   if (inNearest) return true;
   if (!inVehicle(dn)) return false;
-  return dist < (low ? 90 : 160);
+  return dist < (low ? 110 : 190);
 }
 
 // Remote cars already follow an interpolated pose. Driving uses a higher gain so
