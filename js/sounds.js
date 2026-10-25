@@ -79,16 +79,16 @@ export function skipsSongCheck(sound) {
   return !!(sound && sound.id && !(Number(sound.orig) > 0));
 }
 
-// If the checker module isn't in this build, posting continues.
-// When both changes are combined, keep this skip in front of reviewSongFile.
-// A "hold" result is not published here: that build's claim path has to run instead.
+// The checker loads only for this call. If it isn't in the build, or it fails, posting continues.
+// "hold" means the caller saves a held post (off the feed). "cancel" means don't upload.
 export async function reviewUploadedSong(file, sound) {
   if (!file || skipsSongCheck(sound)) return { action: 'skip' };
   let mod;
   try { mod = await import('./songcheck.js'); }
   catch { return { action: 'ok' }; }
   if (typeof mod.reviewSongFile !== 'function') return { action: 'ok' };
-  return mod.reviewSongFile(file);
+  try { return await mod.reviewSongFile(file); }
+  catch { return { action: 'ok' }; }
 }
 
 // ---------------------------------------------------------------- picker

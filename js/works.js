@@ -247,10 +247,12 @@ export function createWorks(ctx) {
         let cover = '', poster = '', mediaUrl = '', mediaType = '';
         if (art) { status.textContent = 'Uploading artwork…'; const r = await upload(art, CLOUDINARY.uploadPreset, 'lks_work_art', prog(0, file ? 0.15 : 0.9)); cover = isSong ? squareUrl(r) : deliveryUrls(r).mediaUrl; if (!isSong) poster = deliveryUrls(r).posterUrl; }
         const sound = file ? soundCtl.get() : null;
+        let songForce = null;
         if (file) {
+          status.textContent = 'Checking the sound…';
           const snd = await loadSounds(); const rev = snd ? await snd.reviewUploadedSong(file, sound) : null;
-          if (rev && rev.action === 'cancel') { go.disabled = false; bar.hidden = true; return; }
-          if (rev && rev.action === 'hold') { go.disabled = false; bar.hidden = true; err.textContent = 'This sound needs review before it can be posted.'; return; }
+          songForce = rev && rev.action === 'hold' && rev.reason ? { reason: rev.reason } : null;
+          if (rev && rev.action === 'cancel') { go.disabled = false; bar.hidden = true; status.textContent = ''; return; }
           status.textContent = isSong ? 'Uploading your song…' : 'Uploading your movie…';
           const r = await upload(file, isSong ? (CLOUDINARY.songPreset || 'lks_songs') : CLOUDINARY.uploadPreset, isSong ? 'lks_song' : 'lks_movie', prog(art ? 0.15 : 0, art ? 0.8 : 0.95));
           if (isSong) { mediaUrl = audioUrl(r); mediaType = 'audio'; if (r.duration) runtime = Math.round(r.duration * 10) / 10; }
@@ -269,13 +271,14 @@ export function createWorks(ctx) {
           type: kind, text: desc.slice(0, 1000), linkUrl: yt ? `https://www.youtube.com/watch?v=${yt}` : '', mediaUrl, mediaType, poster: isSong ? '' : poster,
           work, ...(sound ? { sound } : {}), ...(pickedCat(main, 'w-cat') ? { cat: pickedCat(main, 'w-cat') } : {}), ...searchFields({ text: [title, desc, genre, work.artist || '', aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
           createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
-        });
+        }, songForce);
         const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
         await b.commit(); postDone(st);
         barIn.style.transform = 'scaleX(1)';
+        const held = S.lastHeld === ref.id;
         const sp = pickSeries();
-        if (sp) { status.textContent = 'Adding to your series…'; try { await series().addEpisode(sp.series, ref.id, sp.season, sp.ep, work.title); } catch (e) { toast('Shared, but it couldn’t be added to the series: ' + (e.message || '')); } }
-        toast(isSong ? 'Song shared!' : 'Movie shared!');
+        if (sp && !held) { status.textContent = 'Adding to your series…'; try { await series().addEpisode(sp.series, ref.id, sp.season, sp.ep, work.title); } catch (e) { toast('Shared, but it couldn’t be added to the series: ' + (e.message || '')); } }
+        toast(held ? 'Your post is being reviewed 🕒' : (isSong ? 'Song shared!' : 'Movie shared!'));
         location.hash = '#/post/' + ref.id;
       } catch (e) {
         go.disabled = false; status.textContent = '';
@@ -524,6 +527,11 @@ export function createWorks(ctx) {
     if (!requireAuth()) throw new Error('Sign in to post.');
     if (file.size > 100 * 1048576) throw new Error('Movies can be up to 100 MB.');
     if (runtime > 600.5) throw new Error('Uploads can be up to 10 minutes.');
+    let songForce = null;
+    const snd = await loadSounds();
+    const rev = snd ? await snd.reviewUploadedSong(file, null) : null;
+    if (rev && rev.action === 'cancel') return null;
+    songForce = rev && rev.action === 'hold' && rev.reason ? { reason: rev.reason } : null;
     const r = await upload(file, CLOUDINARY.uploadPreset, 'lks_movie', onProgress);
     const d = deliveryUrls(r);
     const rt = Math.min(601, Math.round((r.duration || runtime) * 10) / 10);
@@ -536,10 +544,10 @@ export function createWorks(ctx) {
       type: 'movie', text: String(desc).slice(0, 1000), linkUrl: '', mediaUrl: d.mediaUrl, mediaType: 'video', poster: d.posterUrl,
       work, ...searchFields({ text: [work.title, desc, work.genre, aiTools].join(' '), authorName: author.displayName, authorUsername: author.username }),
       createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: false
-    });
+    }, songForce);
     const st = postStamp(authorId, serverTimestamp()); b.update(doc(db, 'users', authorId), st);
     await b.commit(); postDone(st);
-    if (seriesPick) await series().addEpisode(seriesPick.series, ref.id, seriesPick.season, seriesPick.ep, work.title);
+    if (seriesPick && S.lastHeld !== ref.id) await series().addEpisode(seriesPick.series, ref.id, seriesPick.season, seriesPick.ep, work.title);
     return ref.id;
   }
   return { isWork, card, page, explore, grid, composePage, tile, player, publishMovie, series };

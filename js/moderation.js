@@ -385,10 +385,15 @@ export function createModeration(ctx) {
     if (isAdmin()) { const ms = await import('./mediascan.js'); const inp = $('#q-n'); ms.reviewConfig().then((c) => (inp.value = c.minApproved)); $('#q-n-save').onclick = async () => { try { inp.value = await ms.saveReviewConfig(inp.value); $('#q-n-msg').textContent = '✅ Saved'; } catch (er) { $('#q-n-msg').textContent = friendlyError(er); } }; }
     const list = $('#q-list');
     const draw = () => { list.innerHTML = items.length ? items.map((h) => { const p = h.post || {}; const media = p.poster || (p.mediaType === 'image' ? p.mediaUrl : '');
-      return `<div class="card pad mod-rep st-open" data-id="${esc(h.id)}"><div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag mod-type">${esc(p.type === 'media' ? (p.mediaType === 'video' ? 'Video' : 'Photo') : p.type || 'post')}</span><span class="mod-st">${h.level === 'bad' ? '🤖 Auto-flag · bad' : h.level === 'borderline' ? '🤖 Auto-flag · borderline' : '👀 Pulled by a moderator'}</span><span class="spacer"></span><span class="muted small">${esc(timeAgo(h.createdAt))}</span></div>
+      const why = String(h.reason || '');
+      const songAppeal = why.startsWith('Own song:');
+      const songHold = songAppeal || why.startsWith('Song match:');
+      const st = songAppeal ? '🎵 Own song appeal' : why.startsWith('Song match:') ? '🎵 Released song' : h.level === 'bad' ? '🤖 Auto-flag · bad' : h.level === 'borderline' ? '🤖 Auto-flag · borderline' : '👀 Pulled by a moderator';
+      return `<div class="card pad mod-rep st-open" data-id="${esc(h.id)}"><div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag mod-type">${esc(p.type === 'media' ? (p.mediaType === 'video' ? 'Video' : 'Photo') : p.type || 'post')}</span><span class="mod-st">${st}</span><span class="spacer"></span><span class="muted small">${esc(timeAgo(h.createdAt))}</span></div>
         <p style="margin:8px 0 4px"><b>Why:</b> ${esc(h.reason)}</p>
+        ${songAppeal ? '<p class="small">They say this is their own song, or they are singing it themselves. Approve publishes it. Leaving it here keeps it held.</p>' : ''}
         <div class="q-prev">${media ? `<img src="${esc(media)}" alt="" loading="lazy">` : ''}<div><b>${esc(p.authorName || '')}</b>${badge(h.authorId)} <span class="muted small">@${esc(p.authorUsername || '')}</span>${p.work && p.work.title ? `<p><b>${esc(p.work.title)}</b></p>` : ''}<blockquote class="mod-quote">${esc(p.text || '(no text)')}</blockquote>${p.mediaType === 'video' && p.mediaUrl ? `<video src="${esc(p.mediaUrl)}" controls playsinline preload="none" style="max-width:100%;border-radius:12px"></video>` : ''}</div></div>
-        <div class="mod-acts"><button class="btn btn-sm" data-q="restore">✅ Restore post</button><button class="btn btn-sm btn-danger" data-q="delete">🗑️ Delete post</button><button class="btn btn-sm btn-danger" data-q="warn">⚠️ Delete + Warn</button><button class="btn btn-sm btn-danger" data-q="ban">⛔ Suspend</button><button class="btn btn-sm btn-ghost" data-q="user">👤 User</button></div></div>`; }).join('') : '<div class="card empty">Nothing waiting for review. 🎉</div>'; };
+        <div class="mod-acts"><button class="btn btn-sm" data-q="restore">${songHold ? '✅ Approve and publish' : '✅ Restore post'}</button><button class="btn btn-sm btn-danger" data-q="delete">🗑️ Delete post</button><button class="btn btn-sm btn-danger" data-q="warn">⚠️ Delete + Warn</button><button class="btn btn-sm btn-danger" data-q="ban">⛔ Suspend</button><button class="btn btn-sm btn-ghost" data-q="user">👤 User</button></div></div>`; }).join('') : '<div class="card empty">Nothing waiting for review. 🎉</div>'; };
     draw();
     list.onclick = async (e) => {
       const b = e.target.closest('[data-q]'); if (!b) return; const id = b.closest('[data-id]').dataset.id; const h = items.find((x) => x.id === id); const p = h.post || {}; const a = b.dataset.q;
@@ -600,11 +605,44 @@ export function createModeration(ctx) {
     b.set(doc(db, 'heldPosts', ref.id), { post: data, reason: f.reason, level: f.level, authorId: data.authorId, createdAt: serverTimestamp() });
     S.lastHeld = ref.id; return f;
   }
+  async function freeSoundTip() {
+    try {
+      const r = await fetch(new URL('../data/sounds.json', import.meta.url));
+      if (!r.ok) return '';
+      const list = ((await r.json()).tracks || []);
+      const t = list.filter((x) => Number(x.trending) > 0).sort((a, b) => Number(a.trending) - Number(b.trending))[0] || list[0];
+      if (!t) return '';
+      return `<p>Try a free Kemy Sound instead: <a href="#/sounds"><b>${esc(t.title)}</b> by ${esc(t.artist)}</a>.</p>`;
+    } catch { return ''; }
+  }
   async function heldNotice(id) {
     if (!S.user) return '';
     const s = await getDoc(doc(db, 'heldPosts', id)).catch(() => null);
     if (!s || !s.exists() || s.data().authorId !== S.user.uid) return '';
-    return `<section class="card pad center mod-susp"><div style="font-size:2.6rem" aria-hidden="true">🕒</div><h1 class="page-title">Your post is being reviewed</h1><p>Kemy’s safety check spotted something it wasn’t sure about, so a moderator will look at your post soon. Only you can see this note. If it’s okay, it goes live.</p><blockquote class="mod-quote" style="text-align:left">${esc(s.data().post.text || '')}</blockquote><div class="btns" style="justify-content:center"><a class="btn btn-sm" href="#/watch">Back to Kemy</a><a class="btn btn-sm btn-ghost" href="guidelines.html">Kemy rules</a></div></section>`;
+    const d = s.data();
+    const reason = String(d.reason || '');
+    const song = reason.startsWith('Song match:');
+    const appealed = reason.startsWith('Own song:');
+    if (!song && !appealed) return `<section class="card pad center mod-susp"><div style="font-size:2.6rem" aria-hidden="true">🕒</div><h1 class="page-title">Your post is being reviewed</h1><p>Kemy’s safety check spotted something it wasn’t sure about, so a moderator will look at your post soon. Only you can see this note. If it’s okay, it goes live.</p><blockquote class="mod-quote" style="text-align:left">${esc(d.post && d.post.text || '')}</blockquote><div class="btns" style="justify-content:center"><a class="btn btn-sm" href="#/watch">Back to Kemy</a><a class="btn btn-sm btn-ghost" href="guidelines.html">Kemy rules</a></div></section>`;
+    const tip = await freeSoundTip();
+    if (song) {
+      const next = ('Own song: ' + reason.replace(/^Song match:\s*/, '')).slice(0, 200);
+      setTimeout(() => {
+        const btn = document.getElementById('song-appeal');
+        if (!btn || btn.dataset.wired) return;
+        btn.dataset.wired = '1';
+        btn.onclick = async () => {
+          btn.disabled = true;
+          try {
+            await updateDoc(doc(db, 'heldPosts', id), { reason: next });
+            toast('Sent to Keem for review');
+            const slot = btn.closest('section') && btn.closest('section').querySelector('.song-appeal-slot');
+            if (slot) slot.innerHTML = '<p>Sent to Keem. He can approve it so it goes live, or keep it held.</p>';
+          } catch (er) { btn.disabled = false; toast(friendlyError(er)); }
+        };
+      });
+    }
+    return `<section class="card pad center mod-susp"><div style="font-size:2.6rem" aria-hidden="true">🎵</div><h1 class="page-title">This post is held</h1><p>The audio matches a released song, so it stays off the feed. Only you can see this note.</p><p style="text-align:left"><b>Why:</b> ${esc(reason)}</p>${tip}<blockquote class="mod-quote" style="text-align:left">${esc(d.post && d.post.text || '')}</blockquote><div class="song-appeal-slot">${appealed ? '<p>Sent to Keem. He can approve it so it goes live, or keep it held.</p>' : '<button class="btn" type="button" id="song-appeal" style="white-space:normal;text-align:center;width:100%">It\'s my own song / I\'m singing it myself</button>'}</div><div class="btns" style="display:grid;gap:10px;margin-top:10px"><a class="btn btn-ghost" href="#/sounds">Use a Kemy Sound</a><a class="btn btn-sm" href="#/watch">Back to Kemy</a></div></section>`;
   }
   // ---- user-facing: Kemy Moderators thread + feedback form
   async function supportPage(main) {

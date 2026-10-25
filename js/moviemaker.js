@@ -629,8 +629,9 @@ export function createMovieMaker(ctx) {
       try {
         const sp = pickSeries();
         const id = await publishMovie({ file: m.file, title: title || m.title, desc, genre: q('#mm-pgenre').value, runtime: m.seconds, onProgress: (f) => (bi.style.transform = `scaleX(${f})`), seriesPick: sp });
-        if (sp && SER) { try { const fresh = await SER.load(sp.series.id, true); await SER.save(fresh, { ai: { style: m.style, seed: m.seed, look: m.mode, cast: (m.cast || []).map((c) => ({ name: c.name, look: c.look, voice: c.voice })) } }); } catch { /* style memory is optional */ } }
-        toast('Movie posted!'); location.hash = '#/post/' + id;
+        if (!id) { q('#mm-publish').disabled = false; bar.hidden = true; return; }
+        if (sp && SER && S.lastHeld !== id) { try { const fresh = await SER.load(sp.series.id, true); await SER.save(fresh, { ai: { style: m.style, seed: m.seed, look: m.mode, cast: (m.cast || []).map((c) => ({ name: c.name, look: c.look, voice: c.voice })) } }); } catch { /* style memory is optional */ } }
+        toast(S.lastHeld === id ? 'Your post is being reviewed 🕒' : 'Movie posted!'); location.hash = '#/post/' + id;
       } catch (e2) { q('#mm-publish').disabled = false; err.textContent = e2?.code === 'permission-denied' ? 'You can post once every 20 seconds. Try again in a moment.' : (e2.message || friendlyError(e2)); }
     };
   }
