@@ -2588,5 +2588,44 @@ service cloud.firestore {
         && (resource == null || resource.data.at + duration.value(70, 'ms') < request.time);
       allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(2, 'm'));
     }
+
+    // People standing in one house. Tiny on purpose: the park presence rules are already near the size cap.
+    // A missing home doc is a neighbor house (anyone who can open the door). h489 is the palace.
+    // Closed sale houses stay owner / open-house / invite only.
+    match /houseHere/{plot}/who/{uid} {
+      function hp() { return /databases/$(database)/documents/homes/$(plot); }
+      function houseOpen() {
+        return !exists(hp()) || plot == 'h489' || get(hp()).data.owner == me()
+          || get(hp()).data.get('open', false) == true || me() in get(hp()).data.get('inv', []);
+      }
+      function hh() {
+        let d = request.resource.data;
+        let meDoc = get(userPath(uid)).data;
+        return signedIn() && notBanned() && uid == me() && houseOpen()
+          && plot.matches('^h[0-9]{2,3}$|^hm[0-9]{4}$')
+          && d.keys().hasOnly(['x', 'z', 'y', 'f', 'a', 'n', 'u', 'e', 's', 'sa', 'dn', 'p', 'at'])
+          && d.x is int && d.x >= -1200 && d.x <= 1200
+          && d.z is int && d.z >= -1200 && d.z <= 1200
+          && d.y is int && d.y >= 0 && d.y <= 900
+          && d.f is int && d.f >= 0 && d.f < 360
+          && d.a in ['i', 'w', 'r', 's']
+          && d.n == meDoc.displayName && d.u == meDoc.username
+          && isStr(d.e, 0, 12) && isStr(d.s, 0, 60) && isStr(d.dn, 0, 20)
+          && d.sa is int && d.sa >= 0
+          && kidSafe(d.s) && contactFree(d.s) && groomFree(d.s)
+          && (d.s == '' || (resource != null && d.s == resource.data.get('s', '')) || chatFree(uid) || presetSay(d.s))
+          && (d.s == '' || (resource != null && d.s == resource.data.get('s', '')) || !pcOff(meDoc, 'chat'))
+          && (resource == null || d.s == resource.data.get('s', '') || d.sa >= resource.data.get('sa', 0) + 2000)
+          && d.p is map && d.p.size() <= 8
+          && d.p.keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'outfit', 'level', 'variant'])
+          && isStr(d.p.species, 1, 16) && isStr(d.p.name, 0, 24)
+          && d.p.level is int && d.p.colors is map && d.p.outfit is map
+          && d.at == request.time
+          && (resource == null || resource.data.at + duration.value(90, 'ms') < request.time);
+      }
+      allow read: if signedIn();
+      allow create, update: if hh();
+      allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(8, 's'));
+    }
   }
 }
