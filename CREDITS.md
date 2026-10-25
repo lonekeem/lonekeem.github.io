@@ -36,3 +36,9 @@ Apple Music links play through Apple’s official embed (embed.music.apple.com);
 - **three.js r170** (`js/vendor/three-0.170.0.module.min.js`), MIT License, © 2010-2024 three.js authors. License text: `js/vendor/three-LICENSE.txt`. Self-hosted, pinned.
 - **Pal models**: built procedurally in code (`js/pals/pal3d.js`) by Lone Keem Studios. No third-party model files are used.
 - **Dance animation**: keyframed by hand from human dance reference (`js/pals/dances3d.js`), with procedural weight shift, knee bounce and follow-through. No motion-capture files, no Mixamo, and no song audio. The trend moves are simplified, Pal-adapted versions of widely known dance moves. They don't copy any full choreography.
+
+## Pal Bingo caller voice
+
+- **Caller clips** (`assets/audio/bingo/*.mp3`, 81 clips: all 75 calls plus "Get ready!", 3, 2, 1, "Bingo!" and "We have a winner!") were generated offline by Lone Keem Studios with **Piper TTS** (https://github.com/OHF-Voice/piper1-gpl), a free, open-source neural text-to-speech engine. No cloud service was used.
+- **Voice**: `en_US-kristin-medium` from rhasspy/piper-voices (https://huggingface.co/rhasspy/piper-voices, repo license MIT). Voice trained by Bryce Beattie (https://brycebeattie.com/files/tts/) from LibriVox recordings, which are **public domain** (dataset license per the voice's MODEL_CARD).
+- The clips are trimmed, loudness-normalized, mono 40 kbps MP3s. If a clip can't load, the game falls back to the device's built-in speech voice.

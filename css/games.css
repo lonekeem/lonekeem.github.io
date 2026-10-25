@@ -491,3 +491,14 @@
   .g-actions { margin-top: 4px; }
   .g-actions .btn, .g-actions button, .g-actions a { min-height: 36px; }
 }
+
+/* Pal Bingo hero card (Games hub, under Pal Zombie Survival) */
+.bg-hero{background:radial-gradient(120% 100% at 85% 15%,#ffe27a 0,#ffb347 32%,#ff6f61 62%,#5a2a8a 100%);border-color:rgba(255,255,255,.55)}
+.bg-hero::after{background:repeating-linear-gradient(90deg,#ff4d6d 0 18px,#3fa9ff 18px 36px,#ffd23f 36px 54px,#4cd07d 54px 72px,#ff8a1f 72px 90px);opacity:.4;height:12px}
+.bg-hero .zf-txt b{text-shadow:0 2px 0 #7a2a1a,0 0 12px rgba(255,240,150,.7)}
+.bg-hero .zf-txt small{text-shadow:0 1px 2px rgba(60,20,40,.6);opacity:1}
+.bg-art{position:absolute;z-index:1;right:2%;bottom:14px;width:46%;max-width:230px;height:auto;max-height:calc(100% - 28px);filter:drop-shadow(0 6px 8px rgba(80,20,10,.45));animation:bgBob 3s ease-in-out infinite}
+@keyframes bgBob{50%{transform:translateY(-4px) rotate(1.5deg)}}
+.bg-play{background:linear-gradient(#7fd0ff,#2f8ce0)!important;color:#fff!important;text-shadow:0 1px 0 #1d4f9a;box-shadow:0 4px 0 #1d4f9a,0 6px 14px rgba(0,0,0,.4)!important}
+.bg-hero:active .bg-play{transform:translateY(3px);box-shadow:0 1px 0 #1d4f9a!important}
+@media (prefers-reduced-motion:reduce){.bg-art{animation:none}}

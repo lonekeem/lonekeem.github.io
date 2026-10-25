@@ -4,6 +4,7 @@
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot, query, where, orderBy, limit, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 import { sfx } from '../games/sfx.js';
+import { masterVol, sfxVol } from '../volume.js';
 import { watchGameRotate } from '../rotate.js';
 import {
   BOTS, LUCKY_BALLS, PATTERN_NAME, ballsFor, bingoCall, cardFor, cardMiss, cardSlots, dayKey, letterOf,
@@ -161,23 +162,85 @@ const FRESH = 25000;
 function css() { if (document.getElementById('pb-css')) return; const s = document.createElement('style'); s.id = 'pb-css'; s.textContent = CSS; document.head.appendChild(s); }
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let audio = null;
-let saidReady = -1, saidBall = -1, calloutUntil = 0, voicePick = null;
+let saidReady = -1, saidBall = -1, saidCount = '', calloutUntil = 0, voicePick = null;
 function hookVoices() {
   const s = window.speechSynthesis;
   if (!s || hookVoices.done) return;
   hookVoices.done = 1;
+  // Fallback only (the caller normally plays recorded clips). Prefer the nicest English voice the phone has.
   const pick = () => {
     let list = [];
     try { list = s.getVoices() || []; } catch { list = []; }
-    voicePick = list.find((v) => /^en/i.test(v.lang) && /samantha|karen|google|natural|female|zira/i.test(v.name))
-      || list.find((v) => /^en(-|_)?US/i.test(v.lang))
-      || list.find((v) => /^en/i.test(v.lang))
-      || null;
+    const en = list.filter((v) => /^en/i.test(v.lang));
+    const score = (v) => (/premium/i.test(v.name) ? 60 : 0) + (/enhanced/i.test(v.name) ? 50 : 0) + (/natural|neural/i.test(v.name) ? 45 : 0)
+      + (/samantha|ava|allison|susan|zoe|karen|serena|google us|aria|jenny|zira/i.test(v.name) ? 20 : 0) + (/^en(-|_)?US/i.test(v.lang) ? 8 : 0)
+      + (v.localService ? 2 : 0) - (/compact|eloquence|novelty|bad news|bells|boing|bubbles|cellos|whisper|zarvox|trinoids|albert|jester|organ|superstar|wobble/i.test(v.name) ? 80 : 0);
+    voicePick = en.sort((a, b) => score(b) - score(a))[0] || null;
   };
   try { s.addEventListener('voiceschanged', pick); } catch { /* old webkit */ }
   pick();
 }
+// Recorded caller clips (assets/audio/bingo, made offline with Piper TTS). Fetched only once a bingo game starts.
+const CLIP_DIR = 'assets/audio/bingo/';
+const clipBuf = new Map(), clipLoad = new Map();
+let clipSrc = null, clipQ = [], clipEpoch = 0;
+const clipVol = () => { try { return Math.max(0, Math.min(1, masterVol() * sfxVol())); } catch { return 1; } };
+function actx() {
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch { audio = null; }
+  return audio;
+}
+function loadClip(name) {
+  if (clipLoad.has(name)) return clipLoad.get(name);
+  const c = actx();
+  const pr = !c || !window.fetch ? Promise.resolve(null) : fetch(CLIP_DIR + name + '.mp3')
+    .then((r) => { if (!r.ok) throw new Error('clip ' + r.status); return r.arrayBuffer(); })
+    .then((ab) => new Promise((res, rej) => { const q = c.decodeAudioData(ab, res, rej); if (q && q.then) q.then(res, rej); }))
+    .then((buf) => { clipBuf.set(name, buf); return buf; })
+    .catch(() => { clipLoad.delete(name); clipBuf.delete(name); return null; });
+  clipLoad.set(name, pr);
+  return pr;
+}
+function preloadClips() {
+  if (preloadClips.done) return; preloadClips.done = 1;
+  const names = ['get-ready', '3', '2', '1', 'bingo', 'winner'];
+  for (let n = 1; n <= 75; n++) names.push('bingo'[Math.floor((n - 1) / 15)] + n);
+  let i = 0;
+  const next = () => { if (i < names.length) loadClip(names[i++]).then(next); };
+  for (let k = 0; k < 4; k++) next(); // a few at a time so the game stays snappy
+}
+function stopClip() { clipQ = []; clipEpoch++; try { clipSrc && clipSrc.stop(); } catch { /* already done */ } clipSrc = null; }
+function playClips(names, fallback) {
+  if (sfx.muted) return;
+  const c = actx(), v = clipVol();
+  if (v <= 0) return;
+  if (!c || names.some((n) => !clipBuf.has(n))) { names.forEach(loadClip); sayParts(fallback); return; }
+  try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch { /* ignore */ }
+  stopClip();
+  clipQ = names.slice();
+  const ep = clipEpoch;
+  const step = () => {
+    if (ep !== clipEpoch || sfx.muted) return;
+    const n = clipQ.shift(); if (!n) { clipSrc = null; return; }
+    try {
+      if (c.state === 'suspended') c.resume();
+      const src = c.createBufferSource(), g = c.createGain();
+      src.buffer = clipBuf.get(n); g.gain.value = v; src.connect(g).connect(c.destination);
+      src.onended = () => setTimeout(step, 120);
+      clipSrc = src; src.start();
+    } catch { sayParts(fallback); }
+  };
+  step();
+}
 function unlockVoice() {
+  // iOS: wake WebAudio inside the Play tap so recorded calls can play later, then start fetching the clips.
+  const c = actx();
+  if (c) {
+    try {
+      if (c.state === 'suspended') c.resume();
+      const b = c.createBuffer(1, 1, 22050), src = c.createBufferSource(); src.buffer = b; src.connect(c.destination); src.start(0);
+    } catch { /* ignore */ }
+  }
+  preloadClips();
   const s = window.speechSynthesis;
   if (!s || !window.SpeechSynthesisUtterance) return;
   hookVoices();
@@ -191,21 +254,22 @@ function unlockVoice() {
 function sayParts(parts) {
   const s = window.speechSynthesis;
   if (sfx.muted || !s || !window.SpeechSynthesisUtterance) return;
+  hookVoices();
   try {
     s.cancel();
     parts.forEach((text) => {
       const u = new SpeechSynthesisUtterance(text);
-      u.rate = 0.9; u.lang = 'en-US';
+      u.rate = 0.9; u.pitch = 1.05; u.lang = (voicePick && voicePick.lang) || 'en-US';
       if (voicePick) u.voice = voicePick;
       s.speak(u);
     });
   } catch { /* skip the caller if the browser refuses */ }
 }
-function hush() { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch { /* ignore */ } }
+function hush() { stopClip(); try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch { /* ignore */ } }
 function chirp() {
   if (sfx.muted) return;
   try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    audio = actx(); if (!audio) return;
     const t = audio.currentTime;
     [494, 740].forEach((f, i) => { const o = audio.createOscillator(), g = audio.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + i * 0.07); g.gain.exponentialRampToValueAtTime(0.07, t + i * 0.07 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.07 + 0.18); o.connect(g).connect(audio.destination); o.start(t + i * 0.07); o.stop(t + i * 0.07 + 0.2); });
   } catch { /* no audio */ }
@@ -302,6 +366,7 @@ export function openBingo(ctx, q = {}) {
     } catch { return 0; }
   }
   function listen(id) {
+    preloadClips();
     dropSeat(); roomId = id; mode = 'hall'; daubed = new Set(); frees = new Map(); seenBall = -1; botShown = -1; claim = 0; emo = 0;
     paintHall();
     unsubR = onSnapshot(doc(db, 'bingoRooms', id), (s) => { room = s.exists() ? s.data() : null; });
@@ -482,7 +547,7 @@ export function openBingo(ctx, q = {}) {
     doubleOn = false;
     if (paidRound !== st.ck.round) { paidRound = st.ck.round; prize(stars, earlier ? 'for a bingo' : 'for winning the round'); prog.xp += 20; ch().rounds += 1; if (st.pat === 'corners') ch().corners += 1; stickerPat(st.pat); persist(); grantCh(); dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 12 } })); import('../leaderboard.js').then((m) => m.recordScore('bingo', { r: earlier ? 'l' : 'w', pts: stars })).catch(() => {}); }
     winText = earlier ? 'You got BINGO too!' : (lucky ? 'Lucky Star win!' : 'You won this round!');
-    winUntil = Date.now() + 8000; sfx.play('win'); sayParts(['Bingo!']);
+    winUntil = Date.now() + 8000; sfx.play('win'); playClips(['bingo', 'winner'], ['Bingo!', 'We have a winner!']);
   }
   function botPlan(st) {
     const humans = seats.filter((s) => Date.now() - s.at < FRESH).length || 1;
@@ -531,14 +596,15 @@ export function openBingo(ctx, q = {}) {
     if (mode === 'lobby') return;
     const st = liveRound();
     if (!st) return;
-    if (st.ck.round !== lastRound) { lastRound = st.ck.round; botShown = -1; saidReady = -1; saidBall = -1; seenBall = -1; }
-    if (st.ck.phase === 'ready' && st.ck.live && saidReady !== st.ck.round) { saidReady = st.ck.round; sayParts(['Get ready!']); }
+    if (st.ck.round !== lastRound) { lastRound = st.ck.round; botShown = -1; saidReady = -1; saidBall = -1; saidCount = ''; seenBall = -1; }
+    if (st.ck.phase === 'ready' && st.ck.live && saidReady !== st.ck.round) { saidReady = st.ck.round; playClips(['get-ready'], ['Get ready!']); }
+    if (st.ck.phase === 'ready' && st.ck.live && st.ck.count && saidCount !== st.ck.round + ':' + st.ck.count) { saidCount = st.ck.round + ':' + st.ck.count; playClips([String(st.ck.count)], [String(st.ck.count)]); }
     if (seenBall !== st.ck.called) {
       const fresh = seenBall >= 0 || (st.ck.called > 0 && st.ck.nextIn > st.ck.call - 1600);
       if (fresh && st.ck.called > seenBall && st.ck.live && st.ck.phase !== 'ready') {
         chirp(); sfx.play('pop');
         const n = st.balls[st.ck.called - 1];
-        if (saidBall !== st.ck.called) { saidBall = st.ck.called; sayParts([letterOf(n), String(n)]); showCallout(n); }
+        if (saidBall !== st.ck.called) { saidBall = st.ck.called; playClips([letterOf(n).toLowerCase() + n], [letterOf(n) + '...', String(n)]); showCallout(n); }
       }
       seenBall = st.ck.called;
     }
@@ -591,7 +657,7 @@ export function openBingo(ctx, q = {}) {
     const one = st.cards.some((card, ci) => cardMiss(card, st.called, st.masks, frees.has(ci) ? frees.get(ci) : -1) === 1);
     if (one && st.ck.live && st.ck.nextIn < 800 && drum < 3) { drum++; sfx.play('tick'); } if (!one) drum = 0;
     const bot = botPlan(st);
-    if (bot && st.ck.t >= bot.tPress && st.ck.live && botShown !== st.ck.round) { botShown = st.ck.round; float(bot.name + ' called BINGO!'); sfx.play('star'); sayParts(['Bingo!']); }
+    if (bot && st.ck.t >= bot.tPress && st.ck.live && botShown !== st.ck.round) { botShown = st.ck.round; float(bot.name + ' called BINGO!'); sfx.play('star'); playClips(['bingo'], ['Bingo!']); }
     const cardHost = main.querySelector('[data-cards]');
     if (!st.ck.live && cardHost && cardHost.dataset.played === String(st.ck.round) && paidRound !== st.ck.round && daubed.size > 1) { paidRound = st.ck.round; ch().rounds += 1; persist(); prize(3, 'for playing the round'); grantCh(); }
     const win = main.querySelector('[data-win]');
