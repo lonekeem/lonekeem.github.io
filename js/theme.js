@@ -19,6 +19,9 @@ export const THEME5_ARTIST = 'Keem';
 export const KB_TITLE = 'Keep Building';
 export const KB_ARTIST = 'Keem';
 export const KB_SRC = new URL('../assets/audio/keep-building.mp3?v=1', import.meta.url).href;
+// Theme songs 2 and 3 (play right after Kemy on the Screen). Rename them by editing just these two title strings.
+export const SONG2_TITLE = 'Kemy Song 2';
+export const SONG3_TITLE = 'Kemy Song 3';
 export const THEME_SRC = new URL('../assets/audio/' + THEME_FILE, import.meta.url).href;
 const PRODUCED = 'Produced by Lone Keem';
 // Theme playlist (original song files, unchanged). ORDER[0] (Keep Building, then Kemy on the Screen) is the welcome / hatch start.
@@ -38,11 +41,15 @@ export const TRACKS = [
   { title: 'Stand Up Strong', artist: 'Keem', src: new URL('../assets/audio/stand-up-strong.m4a?v=1', import.meta.url).href, dur: 103.2, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Stand Up', artist: 'Keem', src: new URL('../assets/audio/stand-up.m4a?v=1', import.meta.url).href, dur: 100.4, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: KB_TITLE, artist: KB_ARTIST, src: KB_SRC, dur: 189.6, credit: PRODUCED, lazy: true },
+  { title: SONG2_TITLE, artist: 'Keem', src: new URL('../assets/audio/theme-song-2.mp3?v=1', import.meta.url).href, dur: 171.8, credit: PRODUCED, lazy: true, id: 'song2' },
+  { title: SONG3_TITLE, artist: 'Keem', src: new URL('../assets/audio/theme-song-3.mp3?v=1', import.meta.url).href, dur: 202.4, credit: PRODUCED, lazy: true, id: 'song3' },
 ];
 // Play order (indexes into TRACKS; saved indexes and house radio picks stay valid): Keep Building first,
-// then Kemy on the Screen, then the rest in their usual order. "All songs in order" and the welcome / hatch start follow it.
-export const KB_INDEX = TRACKS.findIndex((t) => t.title === KB_TITLE);
-export const ORDER = [KB_INDEX, ...TRACKS.map((_, i) => i).filter((i) => i !== KB_INDEX)];
+// then Kemy on the Screen, theme song 2, theme song 3, then the rest in their usual order (loops back to Keep Building).
+// "All songs in order" and the welcome / hatch start follow it.
+export const KB_INDEX = TRACKS.findIndex((t) => t.src === KB_SRC);
+const S2 = TRACKS.findIndex((t) => t.id === 'song2'), S3 = TRACKS.findIndex((t) => t.id === 'song3');
+export const ORDER = [KB_INDEX, 0, S2, S3, ...TRACKS.map((_, i) => i).filter((i) => ![KB_INDEX, 0, S2, S3].includes(i))];
 export const FIRST = ORDER[0];
 export const PLAYLIST_CREDIT = ORDER.map((i) => TRACKS[i]).map((t) => `${t.title} — ${t.credit}`).join('. ');
 const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)

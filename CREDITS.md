@@ -25,6 +25,8 @@ All tracks below are released under **CC0 1.0** (public domain dedication, https
 
 "Kemy on the Screen" by Keem (Lone Keem Studios), `assets/audio/kemy-theme.m4a`.
 
+Theme songs 2 and 3 by Keem, produced by Lone Keem (made with Suno): `assets/audio/theme-song-2.mp3`, `assets/audio/theme-song-3.mp3`. They play right after "Kemy on the Screen".
+
 ## Outside players
 
 Apple Music links play through Apple’s official embed (embed.music.apple.com); Apple search results and 30-second previews come from the public iTunes Search API. Spotify links play through Spotify’s official embed (open.spotify.com/embed). Nothing from these services is downloaded or re-hosted.

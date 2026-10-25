@@ -51,7 +51,7 @@ async function load() {
 async function kemyTracks() {
   if (kemySongs) return kemySongs;
   const list = [];
-  let themeOff = false; try { const th = await import('./theme.js'); themeOff = th.getMode() === 'off'; if (!themeOff) { list.push({ title: th.KB_TITLE, artist: th.KB_ARTIST, url: th.KB_SRC, theme: true }); list.push({ title: th.THEME_TITLE, artist: th.THEME_ARTIST, url: th.THEME_SRC, theme: true }); } } catch { /* */ }
+  let themeOff = false; try { const th = await import('./theme.js'); themeOff = th.getMode() === 'off'; if (!themeOff) th.ORDER.slice(0, 4).forEach((n) => { const t = th.TRACKS[n]; list.push({ title: t.title, artist: t.artist, url: t.src, theme: true }); }); } catch { /* */ }
   try { const more = opts.kemySongs ? await opts.kemySongs() : []; more.forEach((s) => list.push(s)); } catch { /* offline */ }
   kemySongs = list; return list;
 }
