@@ -2089,15 +2089,6 @@ service cloud.firestore {
 
     // ================= Kemy Pals economy: Star Coins, inventory, outfits (Spark-friendly, no functions)
     // Price catalog: only the admin writes it. Every purchase is checked against it.
-    // Support Kemy donation links: public read, admin-only write, https links only.
-    match /config/donate {
-      function okLink(k) { return !(k in request.resource.data) || request.resource.data[k] == '' || (request.resource.data[k] is string && request.resource.data[k].size() <= 300 && request.resource.data[k].matches('https://[^\\s]+')); }
-      allow read: if true;
-      allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['kofi', 'cashapp', 'paypal', 'bmac', 'other', 'otherLabel', 'updatedAt'])
-        && okLink('kofi') && okLink('cashapp') && okLink('paypal') && okLink('bmac') && okLink('other')
-        && (!('otherLabel' in request.resource.data) || isStr(request.resource.data.otherLabel, 0, 30));
-    }
     // New-account video check: how many live posts before videos skip review (admin only).
     match /config/mediaReview {
       allow read: if true;

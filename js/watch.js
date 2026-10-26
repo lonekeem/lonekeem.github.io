@@ -337,7 +337,6 @@ export function createWatch(ctx) {
     $('#vstory')?.addEventListener('click', () => openStory());
     const feed = $('#vfeed'), wrap = $('#vwrap'), muteBtn = $('#vmute'), hint = $('#vunmute-hint'), sheetRoot = $('#vsheet-root');
     const slides = [...feed.querySelectorAll('.vslide:not(.vdon)')];
-    if (tab === 'foryou') window.kemyDonate?.feedSlides(feed, 25);
     // Studio Original promo card: its own full-height card (never over a video). Episode 1 already plays as the
     // 4th item, so the card sits well after it (8 slides later) as a reminder, and is skipped in short feeds.
     const shAt = slides.findIndex((x) => x.dataset.id === 'sheriff-ep1');

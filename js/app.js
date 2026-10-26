@@ -47,7 +47,6 @@ import { burstStar, onDoubleTap } from './tapstar.js';
 import { CONTROLLER as GAMES_ICON } from './games/art.js';
 import { initInterests, interestsPage, learnTap, pickTopics, topicChips } from './interests.js';
 import { createMusic } from './music.js';
-import { createDonate } from './donate.js';
 import * as loadScreen from './loadscreen.js';
 import { gameName, GAMES } from './games/art.js';
 import { loadDiscover } from './discover.js';
@@ -648,7 +647,6 @@ function renderChrome(name) {
   const ha = document.getElementById('header-actions');
   const shareBtn = `<a class="icon-btn sk-nav" href="#/share" aria-label="Share Kemy">${ICONS.qr}</a>`;
   const searchBtn = `<a class="icon-btn" href="#/search" data-open-search aria-label="Search">${SEARCH_ICON}</a>`;
-  setTimeout(() => donate.mountPill(ha), 0);
   if (S.user && S.profile) {
     ha.innerHTML = `${shareBtn}${searchBtn}
       ${mod && mod.iAmMod() ? `<a class="mod-pill" href="#/mod" aria-label="Moderator Tools${mod.totalCount() ? `, ${mod.totalCount()} need attention` : ''}">🛡️<span class="mod-word"> Mod</span>${mod.totalCount() ? `<span class="mod-count">${mod.totalCount() > 99 ? '99+' : mod.totalCount()}</span>` : ''}</a>` : ''}
@@ -862,7 +860,6 @@ function palsOnRoute(hash) {
   if (/^#\/(pals|park|street|games\/pals)/.test(hash)) return go();
   setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(go, { timeout: 4000 }) : go()), 3500);
 }
-const donate = createDonate({ db, esc, toast, friendlyError, openModal: (...a) => openModal(...a), closeModal: () => closeModal(), isAdmin: () => isAdmin() });
 const park = lazyMod(() => import('./pals/park.js').then(({ createPark }) => createPark({ S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal })));
 const games = lazyMod(() => import('./games/index.js').then(({ createGames }) => createGames({ S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale, getProfile })));
 const search = createSearch({
@@ -875,11 +872,6 @@ const music = createMusic({ S, db, main, esc, openModal, stale, getWorks, gridTi
 
 // ---------------------------------------------------------------- pages: feed / explore
 const feedToggle = (active) => `<nav class="feed-toggle" aria-label="Feed"><a href="#/watch" class="${active === 'watch' ? 'active' : ''}">For You</a><a href="#/feed" class="${active === 'feed' ? 'active' : ''}">Posts</a></nav>`;
-function feedDonate() {
-  const box = $('#posts'); if (!box) return; const slot = document.createElement('div');
-  const kids = box.children; if (kids.length > 3) kids[2].after(slot); else box.append(slot);
-  donate.mountHome(slot);
-}
 async function pageFeed(token) {
   if (!S.user || !S.profile) {
     main.innerHTML = `${feedToggle('feed')}<a class="pk-quick" href="#/park" aria-label="Open Pal Park"><span class="pk-quick-ic" aria-hidden="true">🌳</span><span><b>Pal Park</b><small>Hang out with friends in 3D</small></span><span class="pk-quick-go">Play ›</span></a>
@@ -897,7 +889,6 @@ async function pageFeed(token) {
     const snap = await cachedQuery('feed:anon', query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20)), 600e3);
     if (stale(token)) return;
     renderPosts($('#posts'), snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'No posts yet.');
-    feedDonate();
     return;
   }
   const verified = S.user.emailVerified || S.user.providerData.some((p) => p.providerId === 'google.com');
@@ -918,7 +909,6 @@ async function pageFeed(token) {
   const ms = (p) => p.createdAt?.toMillis?.() || Date.now();
   const posts = results.flatMap((r) => r.docs.map((d) => ({ id: d.id, ...d.data() }))).sort((a, b) => ms(b) - ms(a)).slice(0, 30);
   renderPosts($('#posts'), posts, 'Your feed is empty. <a href="#/explore">Explore</a> to find people to follow, or <a href="#/new">make your first post</a>.');
-  feedDonate();
 }
 
 async function pageExplore(tab, token) {
@@ -1166,7 +1156,7 @@ async function pageProfile(username, tab, token) {
       <div id="pstories"></div>
       <div id="pgames"></div>
       <div class="profile-actions">
-        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine || uid === STUDIO_UID ? '<span id="p-donate"></span>' : ''}${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
+        <a class="btn btn-sm btn-ghost" href="#/scores" id="p-scores">🏆 Scoreboard</a>${mine && isAdmin() ? '<a class="btn btn-sm" href="#/admin" id="p-admin">🛡️ Admin</a>' : ''}${mine && mod.iAmMod() ? `<a class="btn btn-sm" href="#/mod" id="p-mod">🛡️ Moderator${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
         ${mine ? `<a class="btn btn-sm btn-ghost" href="#/settings/account">Edit profile</a><button class="btn btn-sm btn-ghost" id="signout">Log out</button>` : ''}
         ${!mine && !blocked && !safety.limited() && !kidProfile ? `<button class="btn btn-sm ${isFollowing ? 'btn-ghost' : ''}" id="follow">${isFollowing ? 'Following' : 'Follow'}</button>` : ''}
         ${!mine && S.user && uid !== STUDIO_UID ? `<button class="btn btn-sm btn-ghost" id="report-user">Report</button>` : ''}${!mine && isAdmin() && uid !== STUDIO_UID ? '<span id="p-modinv"></span>' : ''}
@@ -1177,7 +1167,6 @@ async function pageProfile(username, tab, token) {
     <nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/movies" class="${tab === 'movies' ? 'active' : ''}">Movies</a><a href="#/u/${esc(u.username)}/songs" class="${tab === 'songs' ? 'active' : ''}">Songs</a><a href="#/u/${esc(u.username)}/series" class="${tab === 'series' ? 'active' : ''}">Series</a>${mine ? `<a href="#/u/${esc(u.username)}/saved" class="${tab === 'saved' ? 'active' : ''}">Saved</a>` : ''}</nav>
     <div id="posts"><div class="spinner"></div></div>`;
   $('#add-bio')?.addEventListener('click', () => sessionStorage.setItem('lks-focus-bio', '1'));
-  donate.mountButton($('#p-donate'));
   $('#signout')?.addEventListener('click', async () => { await signOut(auth); location.hash = '#/feed'; });
   if (!blocked) stories.renderProfile($('#pav'), $('#pstories'), uid, u, token, stale);
   if (!blocked) games.renderProfile($('#pgames'), uid);
@@ -1280,7 +1269,6 @@ async function pageSettings() {
     <div class="row" style="gap:8px;align-items:center"><a class="icon-btn" href="#/settings" aria-label="Back to settings">←</a><h1 class="page-title" style="margin:0">Edit profile</h1></div>
     <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><a class="btn btn-sm btn-ghost" href="#/rules" id="set-rules">📜 Community Rules</a><a class="btn btn-sm btn-ghost" href="#/feedback" id="set-team">💬 Message the Kemy team</a><a class="btn btn-sm btn-ghost" href="#/support" id="set-support">🛡️ Messages from Kemy Moderators</a></div>
     ${mod.iAmMod() ? `<a class="btn btn-block mod-set-btn" href="#/mod" id="set-mod" style="margin-bottom:10px">🛡️ Mod Hub${mod.totalCount() ? ` <span class="mod-count">${mod.totalCount()}</span>` : ''}</a>` : ''}
-    <div id="set-donate"></div>
     ${safety.limited() ? `<section class="card pad" id="young-limits"><h2 style="font-size:1.05rem">Your safety limits</h2><p class="small">Because this account is under 13, or has no birthday yet, chat is phrases only. Photos, videos, voice, bios, and the public feed stay off. Your profile is private and friend requests are off. A parent PIN cannot turn these off.</p><p class="small"><a href="kids-safety.html">Kids safety and parents</a></p></section>` : ''}
     <form id="settings" class="card pad">
       <div class="av-edit" id="av-edit" ${safety.limited() ? 'hidden' : ''}>
@@ -1320,7 +1308,7 @@ async function pageSettings() {
       <p class="muted small">Permanently delete your profile, posts, stories, comments, follows, messages and login. This can’t be undone.</p>
       <button class="btn btn-sm btn-danger" id="s-delete" type="button">Delete my account and data</button>
     </section>`}`;
-  donate.mountSettings($('#set-donate')); devices.wireSettings();
+  devices.wireSettings();
   $('#s-autoplay').onchange = (e) => { setAutoplay(e.target.checked); $('#s-autoplay-wifi').disabled = !e.target.checked; toast(e.target.checked ? 'Autoplay on' : 'Autoplay off'); };
   $('#s-autoplay-wifi').onchange = (e) => { setWifiOnly(e.target.checked); };
   wireCounter($('#s-bio'), $('#s-bio-n'), 160); limitLines($('#s-bio'));
@@ -1486,7 +1474,6 @@ async function pageAdmin(token) {
     ${big('reindex', '🔎', 'Build search index', 'Adds search keywords and #hashtags to every post and profile that’s missing them.', '<button class="btn btn-sm" id="reindex">Build search index</button>')}
     ${big('studio', '🎬', 'Lone Keem Studios account', 'Private messages are off. You can still post as the studio and read studio notifications.', '<div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn btn-sm btn-ghost" href="#/notifications/studio">Studio notifications</a><a class="btn btn-sm btn-ghost" href="#/new">Post as the studio</a><a class="btn btn-sm btn-ghost" href="#/mod/bugs">Team notes</a></div>')}
     ${big('feat', '★', 'Feature posts (Studio Picks)', 'Open any movie, show or song and tap “Feature in Studio Picks” (tap again to unfeature).', '<a class="btn btn-sm btn-ghost" href="#/watch">Go to Watch</a>')}
-<div id="adm-donate"></div>
     <div id="adm-mods"></div>
     ${big('mod', '🗑️', 'Delete posts, comments and lives', 'Any post or comment has “Delete” in its menu for you. On a live you can tap “End live (guidelines)”. Reports are listed below.')}
     ${big('media', '🧹', 'Media cleanup', 'After you delete a post, Kemy shows a command to erase its files from Cloudinary on your computer (the key never goes in the app). For a full sweep run <code>node scripts/cloudinary-cleanup.mjs</code> (dry run first).')}
@@ -1498,7 +1485,6 @@ async function pageAdmin(token) {
       const k = 'kemy-founder-prev-' + p.id; let sp = 'founder'; if (on) { if (p.species !== 'founder') localStorage.setItem(k, p.species); } else { sp = localStorage.getItem(k) || 'kemy'; }
       await m.store.save(p, { species: sp }); dispatchEvent(new Event('kemy:pal-changed')); toast(on ? `${p.name} is now Kemy (Founder) 👑` : `${p.name} switched back`); } catch (e) { toast(friendlyError(e)); } };
   mod.adminSection($('#adm-mods'));
-  donate.mountAdmin($('#adm-donate'));
   import('./push.js').then((m) => { const h = document.getElementById('push-admin-host'); if (h) h.innerHTML = m.adminHtml(); m.wireAdmin(toast); }).catch(() => {});
   import('./helper/admin.js').then((m) => { if (!stale(token)) m.mountHelperAdmin(document.getElementById('kh-admin'), { stale, token, toast }); }).catch(() => {});
   import('./helper/mod-admin.js').then((m) => { if (!stale(token)) m.mountModAdmin(document.getElementById('mod-admin'), { toast }); }).catch(() => {});

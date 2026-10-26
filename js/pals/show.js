@@ -514,7 +514,6 @@ export function createShowGame(ctx) {
         <h2>🏆 Results</h2><div class="sg-res">${rows.slice(0, 12).map((r) => `<div class="${r.id === uid ? 'me' : ''}"><b>${r.place === 1 ? '👑' : '#' + r.place}</b><span>${esc(nameOf(r.id))}${r.id === uid ? ' (you)' : ''}</span></div>`).join('')}</div>
         <p>Rounds survived: <b>${survived}</b> · 💎 <b>${dia}</b></p><p class="small" data-dia style="opacity:.85">${dia ? 'Saving your Diamonds…' : ''}</p>
         <div class="row"><button data-again>🔁 New show</button><a class="b ghost" href="#/arcade">🎮 Arcade</a></div>`);
-      window.kemyDonate?.resultCard(d.querySelector('.row'));
       d.querySelector('[data-again]').onclick = () => { destroy(); location.hash = '#/arcade/show'; dispatchEvent(new HashChangeEvent('hashchange')); };
       d.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => destroy()));
       window.__show && (window.__show.result = { place: mine && mine.place, champ, dia, survived });

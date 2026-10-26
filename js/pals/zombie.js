@@ -462,7 +462,6 @@ export function createZombieGame(ctx) {
       const nb = { wave: Math.max(best.wave || 0, wave), score: Math.max(best.score || 0, score) }; try { localStorage.setItem(bestK, JSON.stringify(nb)); } catch { /* */ }
       const d = panel(`<h2>${quit ? '🚪 Run ended' : coop ? '😵 Team wiped!' : '😵 Splatted!'}</h2><p>${coop ? `Your team of ${teamN} survived to wave <b>${wave}</b>.` : `Your Pal survived to wave <b>${wave}</b>.`}</p><div class="zg-stats"><div>Score<b>${score}</b></div><div>Zombies poofed<b>${kills}</b></div><div>Diamonds<b>💎 ${dias}</b></div><div>Best wave<b>${nb.wave}</b></div><div>Splat coins<b>🪙 ${runCoins}</b></div><div>Wallet<b>🪙 ${coinsShown}</b></div></div>
         <p class="small" data-dia style="opacity:.85;margin-top:10px">${dias ? 'Saving your Diamonds…' : ''}</p><div class="row"><button data-again>🔁 Play again</button><button class="ghost" data-shop>🛒 Weapon Shop</button><a class="ghost" href="#/arcade/armory">🛡️ Armory</a><a class="ghost" href="#/arcade">🎮 Arcade</a></div><p class="small" style="opacity:.75;margin-top:8px">Written by Lone Keem</p>`);
-      window.kemyDonate?.resultCard(d.querySelector('.row'));
       d.querySelector('[data-shop]').onclick = () => openShop(false);
       d.querySelector('[data-again]').onclick = () => { destroy(); if (coop) { location.hash = '#/arcade/zombie'; dispatchEvent(new HashChangeEvent('hashchange')); } else open(); };
       d.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => destroy()));

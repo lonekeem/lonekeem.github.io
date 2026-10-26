@@ -33,7 +33,7 @@ body.pool-mode:has(#wallet-fab) .gm-bar{padding-left:136px}
   .header-actions .avatar.sm{width:28px;height:28px;font-size:.7rem}
 }
 .bs-ov .wchip{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);z-index:9001}
-@media (max-width:400px){.header-actions .wchip{font-size:12px;padding:3px 7px;gap:3px}.header-actions .don-pill{font-size:0;padding:5px 8px}.header-actions .don-pill::before{content:'💜';font-size:.85rem}.header-actions{gap:4px}}
+@media (max-width:400px){.header-actions .wchip{font-size:12px;padding:3px 7px;gap:3px}.header-actions{gap:4px}}
 @media (prefers-reduced-motion:reduce){.wc-pop{animation-duration:.01s}}`;
 function css() { if (document.getElementById('wchip-css')) return; const s = document.createElement('style'); s.id = 'wchip-css'; s.textContent = CSS; document.head.appendChild(s); }
 function paint(el) { el.hidden = !st.uid; el.innerHTML = `<span class="wc-s">⭐ ${fmt(st.c)}</span><span class="wc-x">·</span><span class="wc-d">💎 ${fmt(st.d)}</span>`;
@@ -66,8 +66,7 @@ function placeChip(where) {
   }
   const ha = document.getElementById('header-actions');
   if (!ha || ha.querySelector('.wchip')) return;
-  const el = walletChip(); const pill = ha.querySelector('.don-pill');
-  if (pill) pill.after(el); else ha.prepend(el);
+  ha.prepend(walletChip());
 }
 function syncBadges() {
   watchHeader(); css();
