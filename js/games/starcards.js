@@ -246,6 +246,7 @@ export function createStarCards(ctx) {
             if (extra.dealt) data.dealt = snap.hands[seat];
             hands.push([uid, data]);
           });
+          const late = hands.length > 4;
           await net.fs.runTransaction(db, async (tx) => {
             const cur = await tx.get(gameRef);
             const pv0 = cur.exists() ? cur.data().pv : null;
@@ -254,8 +255,10 @@ export function createStarCards(ctx) {
             const { dealt, ...gextra } = extra;
             tx.update(gameRef, { pv, turnAt: net.fs.serverTimestamp(), updatedAt: net.fs.serverTimestamp(), ...gextra });
             tx.set(net.fs.doc(db, 'games', gid, 'hands', '_dealer'), { s: JSON.stringify({ st: snap, seenI, seenC }) });
-            hands.forEach(([uid, data]) => tx.set(net.fs.doc(db, 'games', gid, 'hands', uid), data, { merge: true }));
+            if (!late) hands.forEach(([uid, data]) => tx.set(net.fs.doc(db, 'games', gid, 'hands', uid), data, { merge: true }));
           });
+          // 5-6 players: all hands in one transaction with the room update goes past the rules' 1000-expression cap, so write them right after
+          if (late) { const b = net.fs.writeBatch(db); hands.forEach(([uid, data]) => b.set(net.fs.doc(db, 'games', gid, 'hands', uid), data, { merge: true })); await b.commit(); }
         }).catch(async (e) => {
           console.warn('deal write', e.code || e.message); written = {};
           if (e && e.code === 'stale') { st = null; await ensure(); }

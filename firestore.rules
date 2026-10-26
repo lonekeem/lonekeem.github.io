@@ -1268,9 +1268,23 @@ service cloud.firestore {
                                      && nd().cx == 'w KQkq - 0 1' && nd().ml == '' && nd().turn == 0 && nd().moveNo == 0
                                      && nd().clk == (nd().mode == '5' ? [300000, 300000] : nd().mode == '10' ? [600000, 600000] : [])))
         && (nd().type != 'ludo' || (nd().mode in ['2', '3', '4'] && nd().lv == null && nd().rv == {} && nd().rk == {} && nd().left == [] && nd().moveNo == 0));
+      // room host runs Trivia / Star Cards / Ludo lobby (seats incl. computer players, rounds, scores)
+      function hostRun() {
+        return (member() && !gTwoP(od().type) && od().host == me() && od().status != 'done'
+            && nd().host == me() && nd().players[0] == od().players[0] && validNames(nd())
+            && (od().status == 'waiting' || (nd().players == od().players && nd().names == od().names))
+            && nd().status in ['waiting', 'active', 'done']
+            && (nd().status != 'done' || nd().winnerUid in nd().players || nd().winnerUid == 'draw')
+            && !changed().hasAny(['type', 'createdAt', 'from'])
+            && (od().type != 'ludo' || (od().status == 'waiting' && !changed().hasAny(['rv', 'rk', 'left'])
+                                        && (nd().status == 'waiting' || (nd().status == 'active' && gLStart(nd())))))
+            && (od().type != 'starcards' || !('pv' in nd()) || gCountsOk(od(), nd().pv)));
+      }
       function z42() { let tt = request.time; return signedIn() && (
+        // Star Cards host first: with 5-6 seats the full chain below hits the 1000-expression cap
+        (od().type == 'starcards' && hostRun())
         // heartbeat
-        (member() && hbOnly())
+        || (member() && hbOnly())
         // Chess move: only the side to move; shape checks on the board (one king each, the mover
         // keeps all pieces, the other side loses at most one), clock can't go up.
         || (od().type == 'chess' && member() && od().status == 'active' && od().players[od().turn] == me()
@@ -1365,15 +1379,7 @@ service cloud.firestore {
         || (member() && od().status == 'done' && changed().hasOnly(['rematch', 'updatedAt'])
             && od().rematch == '' && isStr(nd().rematch, 1, 40))
         // room host runs Trivia / Star Cards (lobby seats incl. computer players, rounds, scores)
-        || (member() && !gTwoP(od().type) && od().host == me() && od().status != 'done'
-            && nd().host == me() && nd().players[0] == od().players[0] && validNames(nd())
-            && (od().status == 'waiting' || (nd().players == od().players && nd().names == od().names))
-            && nd().status in ['waiting', 'active', 'done']
-            && (nd().status != 'done' || nd().winnerUid in nd().players || nd().winnerUid == 'draw')
-            && !changed().hasAny(['type', 'createdAt', 'from'])
-            && (od().type != 'ludo' || (od().status == 'waiting' && !changed().hasAny(['rv', 'rk', 'left'])
-                                        && (nd().status == 'waiting' || (nd().status == 'active' && gLStart(nd())))))
-            && (od().type != 'starcards' || !('pv' in nd()) || gCountsOk(od(), nd().pv)))
+        || hostRun()
         // host migration when the host's heartbeat is stale
         || (member() && !gTwoP(od().type) && od().status != 'done' && changed().hasOnly(['host', 'hb'])
             && nd().host == me() && od().hb[od().host] < tt - duration.value(30, 's')
