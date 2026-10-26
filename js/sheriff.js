@@ -48,7 +48,7 @@ const mins = (s) => `${Math.max(1, Math.round(s / 60))} min`;
 
 function loadCss() {
   if (document.getElementById('sheriff-css')) return;
-  const l = document.createElement('link'); l.id = 'sheriff-css'; l.rel = 'stylesheet'; l.href = 'css/sheriff.css?v=1'; document.head.appendChild(l);
+  const l = document.createElement('link'); l.id = 'sheriff-css'; l.rel = 'stylesheet'; l.href = 'css/sheriff.css?v=2'; document.head.appendChild(l);
 }
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>';
@@ -72,7 +72,7 @@ export function page(main, { ep, toast } = {}) {
           <span class="sb-series">LONE KEEM STUDIOS ORIGINAL</span>
           <h1 id="sh-title">${esc(SERIES.title)}</h1>
           <p class="ssub"><span class="sh-rating" title="Made for all ages">${esc(SERIES.rating)}</span> Western · ${EPISODES.length} episodes${soon ? ` · ${out === 1 ? 'Episode 1' : out + ' episodes'} out now` : ` · ${mins(total)}`} · No ads</p>
-          <p class="sh-tagline">${esc(SERIES.tagline)}</p>
+          <p class="sh-tagline">${esc(SERIES.tagline)}</p>${soon ? '' : '<p class="sh-more-badge"><span>🤠 More episodes coming soon</span></p>'}
           <div class="sacts"><a class="btn sh-play" id="sh-play" href="#/series/sheriff/${up.ep.n}">${PLAY}<span>${esc(label)}</span></a></div>
         </div>
       </section>
@@ -82,6 +82,7 @@ export function page(main, { ep, toast } = {}) {
         return `<li><a class="sep sh-ep ${r ? 'cont' : ''}" href="#/series/sheriff/${e.n}" data-ep="${e.n}" aria-label="Episode ${e.n}: ${esc(e.title)}, ${clock(e.dur)}${done ? ', watched' : r ? ', resume at ' + clock(r) : ''}">
           <span class="sep-th sh-th"><img src="${esc(e.poster)}" alt="" width="540" height="868" loading="lazy" decoding="async"><span class="sep-rt">${clock(e.dur)}</span>${pct ? `<span class="sep-pr"><span style="width:${Math.round(pct * 100)}%"></span></span>` : ''}${done ? '<span class="sh-check" aria-hidden="true">✓</span>' : ''}</span>
           <span class="sep-m"><span class="sep-l">Episode ${e.n}</span><b>${esc(e.title)}</b>${r ? `<span class="sep-cw">Resume at ${clock(r)}</span>` : done ? '<span class="sep-done">✓ Watched</span>' : ''}<small>${clock(e.dur)} · ${mins(e.dur)}</small><small class="sep-d">${esc(e.desc)}</small></span></a></li>`; }).join('')}</ol>
+      ${soon ? '' : `<section class="sh-more" aria-label="More episodes coming soon"><span class="sh-more-ic" aria-hidden="true">🤠</span><div><b>More episodes coming soon</b><p>That’s all of Season 1 for now. Gecko will be back in Lone Keem soon, so saddle up for more adventures.</p></div></section>`}
       <section class="sh-about">
         <h2 class="sseason-h">About the series</h2>
         <p>A western set in the dusty town of Lone Keem (pop. 42). Starring Gecko, a lizard sheriff with an eyepatch, with Big Mike, Mrs. Foster, Jimmy and Deputy John.</p>
@@ -135,7 +136,7 @@ function player(main, n, { toast } = {}) {
   function showEnd() {
     const nx = next(); end.hidden = false; nextBtn.hidden = true;
     if (!nx) {
-      end.innerHTML = `<div class="shp-end-in sh-complete"><small>Series complete</small><img class="shp-end-art" src="${esc(SERIES.hero)}" alt="" width="720" height="600"><b>You finished ${esc(SERIES.title)}!</b><p>That’s all ${EPISODES.length} episodes. Thanks for riding with Gecko!</p><p>Created by ${esc(SERIES.creator)} · ${esc(SERIES.studio)}</p>
+      end.innerHTML = `<div class="shp-end-in sh-complete"><small>Season 1 complete</small><img class="shp-end-art" src="${esc(SERIES.hero)}" alt="" width="720" height="600"><b>You finished ${esc(SERIES.title)}!</b><p>That’s all ${EPISODES.length} episodes of Season 1. Thanks for riding with Gecko!</p><p class="sh-more-l">More episodes coming soon! 🤠</p><p>Created by ${esc(SERIES.creator)} · ${esc(SERIES.studio)}</p>
         <div class="row"><a class="btn" href="#/series/sheriff" data-a="back">Back to series</a><button class="btn btn-ghost" type="button" data-a="again">Watch again</button></div></div>`;
       return;
     }

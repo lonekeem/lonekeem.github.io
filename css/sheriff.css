@@ -59,3 +59,12 @@ body.sh-playing .bottom-nav{visibility:hidden}
 .sh-soon-l{display:inline-block;align-self:flex-start;font:800 11px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#ffd9a0;border:1px solid rgba(255,217,160,.5);padding:1px 7px;border-radius:6px;margin:2px 0}
 .shp-next.shp-soon{background:rgba(30,18,50,.88);color:#ffd9a0;border:1px solid rgba(255,217,160,.45);cursor:default}
 .sh-end-locked{filter:grayscale(.5) brightness(.6)}
+
+/* More episodes coming soon */
+.sh-more-badge{margin:6px 0 0}
+.sh-more-badge span{display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(255,180,80,.18);border:1px solid rgba(255,200,120,.45);color:#ffd9a0;font-weight:700;font-size:.8rem}
+.sh-more{display:flex;align-items:center;gap:14px;margin:14px 0 4px;padding:14px 16px;border-radius:16px;border:1px dashed rgba(255,200,120,.55);background:linear-gradient(135deg,rgba(255,170,70,.16),rgba(160,90,255,.12))}
+.sh-more-ic{font-size:34px;line-height:1;flex:none}
+.sh-more b{display:block;font:700 17px/1.25 'Space Grotesk',sans-serif;color:#ffd9a0}
+.sh-more p{margin:4px 0 0;font-size:.88rem;opacity:.85}
+.shp-end-in p.sh-more-l{color:#ffd9a0;font-weight:700;font-size:1.05rem}
