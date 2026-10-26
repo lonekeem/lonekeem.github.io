@@ -25,7 +25,12 @@ export function createShopUI(ctx) {
       const sk = 'kemy-coins-stars-' + S.user.uid; const seen = localStorage.getItem(sk); localStorage.setItem(sk, String(total));
       if (seen !== null) { let left = Math.min(50, total - +seen); while (left > 0) { const g = await e.earn('stars', Math.min(5, left)); if (!g) break; left -= g; } } } catch {}
   }
-  async function earn(src, n, why) { const e = econ(); if (!e) return 0; const g = await e.earn(src, n); if (g && why) toast(`+${g} Star Coins ★ ${why}`); return g; }
+  async function earn(src, n, why) {
+    const e = econ(); if (!e) return 0; const g = await e.earn(src, n);
+    if (g && why) toast(`+${g} Star Coins ★ ${why}`);
+    else if (!g && why && src === 'win' && e.w && !e.w.admin && e.leftToday(src) <= 0) toast('Daily coin limit reached for wins. Come back tomorrow for more Star Coins ★');
+    return g;
+  }
   // ---------------------------------------------------------------- closet
   async function closet(p, save) {
     if (!requireAuth()) return; const e = econ(); const inv = await e.inventory(true); let looks = await e.looks().catch(() => []);

@@ -365,10 +365,11 @@ export function createLudo(ctx) {
       } catch (e) { toast(friendlyError(e)); }
       committing = false;
     }
+    let noChainSaid = false;   // say it once per game, not on every roll
     function reveal(k) {
       if (sentK >= k) return;
       if (!chain) chain = loadChain(gid, me());
-      if (!chain) { toast('This game was joined on another device, so your dice links aren’t here.'); return; }
+      if (!chain) { if (!noChainSaid) { noChainSaid = true; toast('This game was joined on another device, so your dice links aren’t here.'); } return; }
       sentK = k;
       net.update(gid, { [`rv.${me()}`]: chain[chain.length - 2 - k], [`rk.${me()}`]: k }).catch((e) => { sentK = k - 1; toast(friendlyError(e)); });
     }
@@ -423,7 +424,9 @@ export function createLudo(ctx) {
       const blockers = humans().filter((u) => u !== me() && ((rk[u] ?? -1) < k || (u === turnU && allRevealed(k))));
       const okMe = humans().filter((u) => !blockers.includes(u))[0] === me();
       if (!blockers.length || !okMe) return;
-      drop(blockers[0]);
+      // the roller reveals first and everyone else waits on them, so if the roller is stuck they are the one to replace
+      const R = roller();
+      drop(blockers.includes(R) && (rk[R] ?? -1) < k ? R : blockers[0]);
     }
     async function drop(uid) {
       const i = g.players.indexOf(uid); if (i < 0 || dropTried === uid + g.lv.k) return; dropTried = uid + g.lv.k;

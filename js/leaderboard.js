@@ -63,19 +63,31 @@ async function write(game, o) {
   if (wait(old) || wait(oa)) await new Promise((r) => setTimeout(r, 11500));
   b.set(allRef, all);
   await b.commit();
+  // after a loss or draw, give the winner's client a moment to save their points first, so we don't count ourselves above them
+  if (o.r !== 'w' && game !== 'quest') await new Promise((r) => setTimeout(r, 4000));
   return rankOf(game, n);
 }
+let lastTied = false;   // set by rankOf: someone else has exactly the same points and wins
 export async function rankOf(game, mine, week = false) {
-  if (!mine) return null;
+  if (!mine) return null; lastTied = false;
   const q = week ? query(collection(db, 'leaderboard'), where('game', '==', game), where('wk', '==', weekId()), where('wkScore', '>', mine.wkScore))
     : query(collection(db, 'leaderboard'), where('game', '==', game), where('score', '>', mine.score));
-  try { return (await getCountFromServer(q)).data().count + 1; } catch { return null; }
+  try {
+    let above = (await getCountFromServer(q)).data().count;
+    if (!week) {   // same points: the scoreboard lists more wins first
+      const t = await getDocs(query(collection(db, 'leaderboard'), where('game', '==', game), where('score', '==', mine.score), limit(300)));
+      const others = t.docs.map((d) => d.data()).filter((x) => x.uid !== mine.uid);
+      above += others.filter((x) => (x.wins || 0) > (mine.wins || 0)).length;
+      lastTied = others.some((x) => (x.wins || 0) === (mine.wins || 0));
+    }
+    return above + 1;
+  } catch { return null; }
 }
-// Shown on a game's end screen: "You ranked #12 in Chess" (appends to the open result modal, else a toast-like pill).
+// Shown on a game's end screen: "You're #12 on the Chess scoreboard" (all-time board, not this game's finishing place) (appends to the open result modal, else a toast-like pill).
 export function recordAndShow(game, o) {
   return recordScore(game, o).then((rank) => {
     if (!rank) return;
-    const html = `<a class="lb-rank" href="${location.pathname.endsWith('kemy-quest.html') ? 'app.html' : ''}#/scores/${game}">🏆 You ranked <b>#${rank}</b> in ${esc(lbName(game))} · Scoreboard</a>`;
+    const html = `<a class="lb-rank" href="${location.pathname.endsWith('kemy-quest.html') ? 'app.html' : ''}#/scores/${game}">🏆 You’re ${lastTied ? 'tied for ' : ''}<b>#${rank}</b> on the ${esc(lbName(game))} scoreboard · See it</a>`;
     const host = document.querySelector('.modal .g-result, .kq-clear, .modal');
     if (host) host.insertAdjacentHTML('beforeend', html);
     else { const d = document.createElement('div'); d.className = 'lb-rank-pill'; d.innerHTML = html; document.body.appendChild(d); setTimeout(() => d.remove(), 6000); }

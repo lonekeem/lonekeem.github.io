@@ -252,7 +252,12 @@ export function createNet({ db, S }) {
         }, { merge: true });
         b.set(doc(db, 'games', g.id, 'rec', uid), { at: serverTimestamp() });
       }
-      try { await b.commit(); } catch (e) { console.warn('record', e.code || e.message); if (all) return recordResult(g, false); }
+      try { await b.commit(); } catch (e) {
+        // another player's client saved the same result first (both write at game end): fall back to just ours, and stay quiet if ours is already saved
+        if (all) return recordResult(g, false);
+        const mine = await getDoc(doc(db, 'games', g.id, 'rec', S.user.uid)).catch(() => null);
+        if (!(mine && mine.exists())) console.warn('record', e.code || e.message);
+      }
     }
   }
   const getStats = async (uid) => { const s = await getDoc(doc(db, 'gameStats', uid)); return s.exists() ? s.data() : {}; };
