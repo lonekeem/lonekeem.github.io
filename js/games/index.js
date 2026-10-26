@@ -96,8 +96,9 @@ export function createGames(ctx) {
       setTimeout(() => { if (location.hash.split('?')[0] === here) { closeModal(); toast('Rematch! Joining the new game…'); location.hash = '#/game/' + seen; } }, 1500);
     };
   }
-  function resultModal({ title, sub, win, buttons, pts, spectator, vsBot, noReward }) {
-    openModal(`<div class="g-result ${win ? 'win' : ''}"><div class="g-result-star">${STAR()}</div><h2>${esc(title)}</h2><p>${esc(sub || '')}</p>
+  // html/cls (optional): a game can draw its own celebration (chess win screen); rewards stay on this path.
+  function resultModal({ title, sub, win, buttons, pts, spectator, vsBot, noReward, html, cls }) {
+    openModal(`<div class="g-result ${win ? 'win' : ''} ${cls || ''}">${html != null ? html : `<div class="g-result-star">${STAR()}</div><h2>${esc(title)}</h2><p>${esc(sub || '')}</p>`}
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
     const m = document.querySelector('.modal');
     buttons.forEach((b, i) => { if (b.onClick) { const el = m.querySelector(`[data-i="${i}"]`); if (el) el.onclick = () => { closeModal(); b.onClick(); }; } });
@@ -531,6 +532,7 @@ export function createGames(ctx) {
       if (a === 'ludo') return ludo.local(params);
     }
     if (a === 'ludo' && !b && !params.classic && !params.do) return ludo.modes(params);
+    if (a === 'chess' && !b && !params.classic && !params.do) return chess.lobby(params);
     return gamePage(a, params);
   }
   async function open(gid, token) {

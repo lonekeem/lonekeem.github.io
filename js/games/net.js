@@ -129,6 +129,7 @@ export function createNet({ db, S }) {
     let told = false;
     let last = Date.now();
     let restartT = 0;
+    let seenAt = 0;
     let gen = 0;
     const arm = () => {
       if (stopped) return;
@@ -141,8 +142,10 @@ export function createNet({ db, S }) {
         told = false;
         const pending = !!(s.metadata && s.metadata.hasPendingWrites);
         if (s.exists() && !pending) {
-          const u = s.data().updatedAt;
-          if (u && u.toMillis) link.noteServer(u.toMillis());
+          // clock skew: only a server stamp that just changed is "now" (heartbeats don't touch updatedAt)
+          const d = s.data(); let u = d.updatedAt && d.updatedAt.toMillis ? d.updatedAt.toMillis() : 0;
+          for (const v of Object.values(d.hb || {})) if (v && v.toMillis) u = Math.max(u, v.toMillis());
+          if (u && u !== seenAt) { seenAt = u; link.noteServer(u); }
         }
         link.noteSnap(pending);
         try {
