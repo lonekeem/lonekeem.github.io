@@ -1173,11 +1173,13 @@ service cloud.firestore {
     function gBoardType(t) { return t in ['stardrop', 'klgrid', 'checkers']; }
     function gTwoP(t) { return gBoardType(t) || t == 'pool' || t == 'chess'; }
     function gMax(t) { return gTwoP(t) ? 2 : t == 'trivia' ? 8 : t == 'ludo' ? 4 : 6; }
-    // Chess: clocks in ms; the mover's clock may only go down by at least the real elapsed time.
+    // Chess: clocks in ms; the mover's clock may only go down by at least the real elapsed time
+    // (White's clock starts with the first move, so move 1 only can't go up).
     function gClockOk(o, n) {
       return o.clk.size() == 0 ? n.clk == o.clk
         : (n.clk is list && n.clk.size() == 2 && n.clk[o.turn] is int && n.clk[o.turn] >= 0
-           && n.clk[o.turn] <= o.clk[o.turn] - (request.time.toMillis() - o.turnAt.toMillis()) + 3000
+           && (o.moveNo == 0 ? n.clk[o.turn] <= o.clk[o.turn]
+               : n.clk[o.turn] <= o.clk[o.turn] - (request.time.toMillis() - o.turnAt.toMillis()) + 3000)
            && n.clk[1 - o.turn] == o.clk[1 - o.turn]);
     }
     function gTurnUp(o) {

@@ -144,7 +144,7 @@ export function createChess(ctx) {
     const tick = setInterval(() => header(), 500);
     S.unsubs.push(() => { clearInterval(tick); clearTimeout(claimT); if (stopHb) stopHb(); });
     const elapsed = () => Math.max(0, net.serverNow() - (tsMs(g.turnAt) || net.serverNow()));
-    const clocks = () => { if (!timed()) return null; const c = [...g.clk]; if (g.status === 'active') c[g.turn] = Math.max(0, c[g.turn] - elapsed()); return c; };
+    const clocks = () => { if (!timed()) return null; const c = [...g.clk]; if (g.status === 'active' && (g.moveNo || 0) > 0) c[g.turn] = Math.max(0, c[g.turn] - elapsed()); return c; };
     function header() {
       if (!$('#g-players')) return;
       const ps = g.players.map((uid, i) => ({ uid, name: g.names[i], uname: g.unames[i], color: g.colors[i] }));
@@ -172,7 +172,7 @@ export function createChess(ctx) {
       const o = C.outcome(np, keys);
       const expect = g.moveNo || 0;
       const upd = { board: C.boardOf(np), cx: C.cxOf(np), ml: (g.ml ? g.ml + ' ' : '') + mstr, last: mstr, turn: 1 - g.turn, moveNo: expect + 1, turnAt: net.fs.serverTimestamp() };
-      if (timed()) { const c = [...g.clk]; c[me] = Math.max(0, Math.round(c[me] - elapsed())); upd.clk = c; }
+      if (timed()) { const c = [...g.clk]; if (expect > 0) c[me] = Math.max(0, Math.round(c[me] - elapsed())); upd.clk = c; } // clocks start after White's first move
       if (o.over) Object.assign(upd, o.winner === 'draw' ? { status: 'done', winnerUid: 'draw', endReason: 'draw' } : { status: 'done', winnerUid: ui.myUid(), endReason: 'win' });
       pendingNo = upd.moveNo;
       g = { ...g, ...upd, turnAt: { toMillis: () => Date.now() } };
@@ -222,6 +222,7 @@ export function createChess(ctx) {
       const tHb = hb ? hb + 48000 - Date.now() : Infinity;
       claimT = setTimeout(() => net.update(gid, { status: 'done', winnerUid: ui.myUid(), endReason: 'timeout' }).catch(() => { claimT = setTimeout(scheduleClaim, 4000); }), Math.max(1500, Math.min(tTurn, tHb)));
     }
+    const followRm = ui.rematchFollower(gid);
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
       serverG = ng;
@@ -236,6 +237,7 @@ export function createChess(ctx) {
       if (g.status === 'waiting' && ui.signedIn() && side() < 0 && !joinTried && (!g.invitee || g.invitee === ui.myUid())) { joinTried = true; net.join(gid).catch((e) => toast(friendlyError(e))); }
       draw(); scheduleClaim();
       if (g.status === 'done') onEnd();
+      followRm(g, side() >= 0);
     }, (e) => toast(friendlyError(e)));
     S.unsubs.push(unsub);
   }

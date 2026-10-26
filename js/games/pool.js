@@ -703,6 +703,7 @@ export function createPool(ctx) {
       claimT = setTimeout(() => net.update(gid, { status: 'done', winnerUid: ui.myUid(), endReason: 'timeout' }).catch(() => {}), Math.max(1500, Math.min(tTurn, tHb)));
     }
     let first = true;
+    const followRm = ui.rematchFollower(gid);
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
       serverG = ng;
@@ -718,6 +719,7 @@ export function createPool(ctx) {
       first = false;
       scheduleClaim();
       if (g.status === 'done' && !playing) onEnd();
+      followRm(g, mySide() >= 0);
     }, (e) => toast(friendlyError(e)));
     S.unsubs.push(unsub);
   }

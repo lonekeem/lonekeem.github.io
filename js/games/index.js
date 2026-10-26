@@ -85,6 +85,17 @@ export function createGames(ctx) {
     if (gid) S.unsubs.push(net.watchChat(gid, (m) => { if (m.uid === myUid()) return; if (m.e >= 100) { ge && ge.recv(m.uid, m.e, names(m.uid) || 'Player'); return; } floatEmote(host, m.e, names(m.uid)); }));
   }
   let curType = '', curPlayers = null;
+  // A friend tapped Rematch on a game we just finished together: follow them into the new room
+  // (only when the rematch shows up while we're watching, not when reopening an old game).
+  function rematchFollower(gid) {
+    let seen = null;
+    return (g, isPlayer) => {
+      const was = seen; seen = g.rematch || '';
+      if (was === null || was || !seen || !isPlayer || g.status !== 'done') return;
+      const here = '#/game/' + gid; // the player who tapped Rematch has already moved on by then
+      setTimeout(() => { if (location.hash.split('?')[0] === here) { closeModal(); toast('Rematch! Joining the new game…'); location.hash = '#/game/' + seen; } }, 1500);
+    };
+  }
   function resultModal({ title, sub, win, buttons, pts, spectator, vsBot, noReward }) {
     openModal(`<div class="g-result ${win ? 'win' : ''}"><div class="g-result-star">${STAR()}</div><h2>${esc(title)}</h2><p>${esc(sub || '')}</p>
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
@@ -94,7 +105,7 @@ export function createGames(ctx) {
     if (!vsBot && !noReward && curType && signedIn() && !spectator && (!curPlayers || curPlayers.includes(myUid())) && !/^Game cancelled/i.test(title)) recordAndShow(curType, { r: win ? 'w' : /^Draw/i.test(title) ? 'd' : 'l', pts });
     if (win) { burst(m, 18); sfx.play('win'); if (!noReward) dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: vsBot ? 12 : 25 } })); if (!noReward) dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: vsBot ? COIN_BOT : COIN_ONLINE, why: vsBot ? 'for beating a bot' : 'for winning' } })); } else sfx.play(title.startsWith('Draw') ? 'tap' : 'lose');
   }
-  const ui = { shell, chip, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
+  const ui = { shell, chip, rematchFollower, emoteBar, wireEmotes, burst, floatEmote, resultModal, link, net, signedIn, myUid, addCpuResult, sfx, STAR, CONTROLLER, wireMute, muteBtn };
   const trivia = createTrivia({ ...ctx, ui });
   const cards = createStarCards({ ...ctx, ui });
   const pool = createPool({ ...ctx, ui });
@@ -479,6 +490,7 @@ export function createGames(ctx) {
       const tHb = hb ? hb + 48000 - Date.now() : Infinity;
       claimTimer = setTimeout(async () => { await claim('timeout'); }, Math.max(1500, Math.min(tTurn, tHb)));
     }
+    const followRm = rematchFollower(gid);
     const unsub = net.watchGame(gid, (ng) => {
       if (!ng) { main.innerHTML = '<div class="empty">This game was removed. <a href="#/games">Games</a></div>'; return; }
       serverG = ng;
@@ -493,6 +505,7 @@ export function createGames(ctx) {
       if (g.status !== 'waiting' && prevStatus === 'waiting' && g.status === 'active') { sfx.play('star'); net.leaveQueue(type, g.mode, gid); }
       draw(); scheduleClaim();
       if (g.status === 'done') onEnd();
+      followRm(g, mySide() >= 0);
       // Signed-in visitor on a waiting game they're invited to (or an open one): offer to join.
       if (g.status === 'waiting' && signedIn() && mySide() < 0 && !joinedAsk && (g.invitee === myUid() || !g.invitee)) {
         joinedAsk = true; net.join(gid).catch((e) => toast(friendlyError(e)));
