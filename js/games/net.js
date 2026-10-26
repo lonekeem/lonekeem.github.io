@@ -47,23 +47,19 @@ export function createNet({ db, S }) {
     return g;
   }
   async function createGame(type, mode, { invitee = '', quick = false, from = '' } = {}) {
-    if (ROOM_TYPES.includes(type)) {
-      for (let i = 0; i < 5; i++) {
-        const code = newCode(); const ref = doc(db, 'games', code);
-        const g = baseGame(type, mode, { invitee, quick, from });
-        if (type === 'trivia') Object.assign(g, { round: -1, qs: [], roundLen: 15, scores: {} });
-        if (type === 'starcards') Object.assign(g, { intent: {}, call: {}, seedHash: '', seeds: [] });
-        if (type === 'ludo') Object.assign(g, { lv: null, rv: {}, rk: {}, left: [], moveNo: 0 });
-        try {
-          await runTransaction(db, async (tx) => { const s = await tx.get(ref); if (s.exists()) throw new Error('taken'); tx.set(ref, g); });
-          return code;
-        } catch (e) { if (e.message !== 'taken') throw e; }
-      }
-      throw new Error('Couldn’t make a room code. Try again.');
+    // Every game gets a short room code as its id, so a friend can type it into "Join with code".
+    for (let i = 0; i < 5; i++) {
+      const code = newCode(); const ref = doc(db, 'games', code);
+      const g = baseGame(type, mode, { invitee, quick, from });
+      if (type === 'trivia') Object.assign(g, { round: -1, qs: [], roundLen: 15, scores: {} });
+      if (type === 'starcards') Object.assign(g, { intent: {}, call: {}, seedHash: '', seeds: [] });
+      if (type === 'ludo') Object.assign(g, { lv: null, rv: {}, rk: {}, left: [], moveNo: 0 });
+      try {
+        await runTransaction(db, async (tx) => { const s = await tx.get(ref); if (s.exists()) throw new Error('taken'); tx.set(ref, g); });
+        return code;
+      } catch (e) { if (e.message !== 'taken') throw e; }
     }
-    const ref = doc(collection(db, 'games'));
-    await setDoc(ref, baseGame(type, mode, { invitee, quick, from }));
-    return ref.id;
+    throw new Error('Couldn’t make a room code. Try again.');
   }
   // Join a waiting game (board games start right away; rooms wait for the host).
   async function join(gid) {

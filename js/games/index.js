@@ -14,14 +14,17 @@ import { createChess } from './chess.js';
 import { createLudo, heroArt as ludoArt } from './ludo.js';
 import { lastMode, saveMode, lastLevel, saveLevel, PALS, faceSvg, ask, whenOffer, offerHtml, stopOffer, addBotRecord, botRecords, onlyBots, normLevel, COIN_ONLINE, COIN_BOT } from './bots.js';
 import { bindProfiles, syncPlates } from './plates.js';
+import { codeFormHtml, codeBoxHtml, wireCodeForms, wireCopyCode } from './code-join.js';
 
 export { CONTROLLER };
 
 export function createGames(ctx) {
   const { S, db, main, esc, $, avatar, toast, friendlyError, requireAuth, openModal, closeModal, stale } = ctx;
+  wireCopyCode(toast);
+  const joinCodes = (root, needAuth) => wireCodeForms(root, { db, getDoc: (r) => net.fs.getDoc(r), doc: (...a) => net.fs.doc(...a), uid: () => (S.user ? S.user.uid : ''), toast, needAuth: needAuth ? () => requireAuth() : null });
   bindProfiles(ctx.getProfile);
   if (!document.getElementById('games-css')) {
-    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=6'; document.head.appendChild(l);
+    const l = document.createElement('link'); l.id = 'games-css'; l.rel = 'stylesheet'; l.href = 'css/games.css?v=7'; document.head.appendChild(l);
   }
   const net = createNet({ db, S });
   const signedIn = () => !!(S.user && S.profile);
@@ -118,7 +121,7 @@ export function createGames(ctx) {
         <a class="g-qbtn" href="#/games/pick/cpu"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7.5" width="14" height="11" rx="3.4"/><path d="M12 7.5V4.6M9.4 12.4h.01M14.6 12.4h.01M9.6 15.6h4.8"/></svg></span>Play the computer</a>
       </div>
       <a class="g-scores" href="#/scores">🏆 <span><b>Scoreboards</b><small>Every game, every player, with their Pal</small></span></a>
-      <form class="g-code" id="g-code"><label for="g-code-in" class="sr-only">Room code</label><input id="g-code-in" maxlength="6" placeholder="Have a room code?" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Join</button></form>
+      <form class="g-code" id="g-code" data-joincode><label for="g-code-in" class="sr-only">Room code</label><input id="g-code-in" maxlength="7" placeholder="Have a room code? Join with code" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Join</button></form>
       <a class="g-palgames" href="#/games/pals"><span>🐾</span><div><b>Pal Games</b><small>Your Pal vs friends in real time: Pal Race, Bubble Pop Battle, Star Catch and Dance-Off</small></div><span class="g-tag">New</span></a>
       <h2 class="g-h2" id="g-all">All games</h2>
       <div class="g-cards"><a class="g-card" href="#/arcade/bingo"><span class="g-thumb"><img class="gcover" src="assets/bingo-cover.svg" alt="" width="120" height="80"><i class="g-new">NEW</i></span><div class="g-card-t"><b>Pal Bingo</b><span class="muted small">Call, tap and shout BINGO with friends. ⭐ prizes, never a bet.</span><span class="g-tag">Up to 20</span></div></a>${GAMES.map((g) => `<a class="g-card" href="#/games/${g.id}">${COVERS[g.id]}<div class="g-card-t"><b>${esc(g.name)}</b><span class="muted small">${esc(g.blurb)}</span><span class="g-tag">${esc(g.players)}</span></div></a>`).join('')}<a class="g-card" href="kemy-quest.html" data-game="kemy-quest"><img src="assets/kemy-quest/cover.svg" alt="" width="120" height="90" style="width:100%;height:auto;border-radius:14px"><div class="g-card-t"><b>Kemy's Bubble Quest</b><span class="muted small">Hop, swim and blow bubbles with Kemy the axolotl.</span><span class="g-tag">1 player</span></div></a></div>
@@ -131,7 +134,7 @@ export function createGames(ctx) {
     window.kemyDonate?.mountSlim(document.getElementById('g-donate'), 'Love Kemy games? Help Lone Keem Studios make Kemy even better.');
     import('../updates.js').then((m) => m.paintDots()).catch(() => {});
     wireMute(main);
-    $('#g-code').onsubmit = (e) => { e.preventDefault(); const c = $('#g-code-in').value.trim().toUpperCase(); if (/^[A-Z0-9]{6}$/.test(c)) location.hash = '#/game/' + c; else toast('Room codes are 6 letters and numbers'); };
+    joinCodes(main, false);
     const recRow = (id, on, off) => `<div class="g-rec-row"><b>${esc(gameName(id))}</b><span>${on ? `<i class="w">${on.w}W</i> <i class="l">${on.l}L</i>${on.d ? ` <i>${on.d}D</i>` : ''}` : '<span class="muted">-</span>'}</span><span class="muted small">${off ? `vs computer ${off.w}-${off.l}${off.d ? '-' + off.d : ''}` : ''}</span></div>`;
     const paintRec = (st) => { const box = $('#g-record'); if (!box) return; box.innerHTML = GAMES.map((g) => { const on = st && (st[g.id + '_w'] || st[g.id + '_l'] || st[g.id + '_d']) ? { w: st[g.id + '_w'] || 0, l: st[g.id + '_l'] || 0, d: st[g.id + '_d'] || 0 } : null; return recRow(g.id, on, rec[g.id]); }).join('') + (signedIn() ? '' : `<p class="muted small" style="margin:8px 0 0"><a href="#/login?next=%23%2Fgames">Sign in</a> to play online and get on the leaderboard.</p>`); };
     if (signedIn()) net.getStats(myUid()).then((st) => { if (!stale(token)) paintRec(st); }).catch(() => paintRec({}));
@@ -204,7 +207,9 @@ export function createGames(ctx) {
       }
       box.innerHTML = `<section class="card pad"><h2 class="g-h2" style="margin-top:0">A friend</h2>
         <form id="g-inv" class="g-inline"><label for="g-handle" class="sr-only">Friend's @handle</label><input id="g-handle" placeholder="@handle" autocapitalize="none" autocomplete="off" spellcheck="false"><button class="btn btn-sm" type="submit">Invite</button></form>
-        <p class="muted small">They get a notification. Or <button class="link-btn" id="g-link">${room ? 'open a room' : 'make a game'} and share the link</button>.</p></section>`;
+        <p class="muted small">They get a notification. Or <button class="link-btn" id="g-link">${room ? 'open a room' : 'make a game'} and share the code</button>.</p>
+        <h2 class="g-h2">Got a code?</h2>${codeFormHtml('g-joincode', 'Join with code')}<p class="muted small">Type the room code your friend sees on their screen.</p></section>`;
+      joinCodes(box, true);
       $('#g-link').onclick = async () => {
         if (!requireAuth()) return;
         try { const gid = await net.createGame(type, mode()); location.hash = '#/game/' + gid; } catch (e) { toast(friendlyError(e)); }
@@ -388,7 +393,7 @@ export function createGames(ctx) {
       const side = mySide();
       if (g.status === 'waiting') {
         const offer = side === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => draw());
-        box.innerHTML = `${side === 0 ? `<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>` : ''}${side < 0 && signedIn() ? '<button class="btn btn-sm" id="g-join">Join this game</button>' : ''}${!signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
+        box.innerHTML = `${side === 0 && !g.quick && !g.invitee ? codeBoxHtml(gid) : ''}${side === 0 ? `<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>` : ''}${side < 0 && signedIn() ? '<button class="btn btn-sm" id="g-join">Join this game</button>' : ''}${!signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
       } else if (g.status === 'active') {
         box.innerHTML = side >= 0 ? `<button class="btn btn-sm btn-danger" id="g-forfeit">Forfeit</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>` : `<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>`;
       } else {
@@ -419,7 +424,7 @@ export function createGames(ctx) {
       const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
       paintPlayers(type, ps, g.turn, left, done || g.status === 'waiting');
       const status = $('#g-status');
-      if (g.status === 'waiting') status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend to join…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
+      if (g.status === 'waiting') status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend to join…' : g.quick ? 'Looking for an opponent…' : 'Share the room code (below) or link so a friend can join') : 'Waiting for players';
       else if (done) status.textContent = g.endReason === 'cancelled' ? 'This game was cancelled' : g.winnerUid === 'draw' ? 'Draw!' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;
       else status.textContent = side === g.turn ? `Your turn (${pieceLabel(type, side)})${left <= 15 ? ` · ${left}s left` : ''}` : `${g.names[g.turn]}’s turn`;
       if (left != null && left <= 5 && side === g.turn && !full) sfx.play('tick');

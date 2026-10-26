@@ -4,6 +4,7 @@ import * as C from './chess-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
 import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
 import { syncPlates } from './plates.js';
+import { codeBoxHtml } from './code-join.js';
 
 // Original piece art: simple rounded silhouettes, gold (white) and purple (black), star on the king.
 const SHAPES = {
@@ -151,7 +152,7 @@ export function createChess(ctx) {
       const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
       paintBar(ps, g.turn, g.status !== 'active', clocks(), left);
       const st = $('#g-status'), me = side();
-      if (g.status === 'waiting') st.textContent = me === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players';
+      if (g.status === 'waiting') st.textContent = me === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the room code (below) or link so a friend can join') : 'Waiting for players';
       else if (g.status === 'done') st.textContent = g.endReason === 'cancelled' ? 'Cancelled' : g.winnerUid === 'draw' ? `Draw${g.why ? '' : ''}` : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (resigned)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`;
       else { const p = C.parse(g.board, g.cx); st.textContent = (C.inCheck(p) ? 'Check! ' : '') + (me === g.turn ? 'Your move' : `${g.names[g.turn]} to move`); }
     }
@@ -184,7 +185,7 @@ export function createChess(ctx) {
       const me = side();
       if (g.status === 'waiting') {
         const offer = me === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => actions());
-        box.innerHTML = `${me === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
+        box.innerHTML = `${me === 0 && !g.quick && !g.invitee ? codeBoxHtml(gid) : ''}${me === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
       }
       else if (g.status === 'active') box.innerHTML = me >= 0 ? '<button class="btn btn-sm btn-danger" id="g-forfeit">Resign</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>' : '<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>';
       else box.innerHTML = `${me >= 0 && g.endReason !== 'cancelled' ? (g.rematch ? `<a class="btn btn-sm" href="#/game/${esc(g.rematch)}">Go to rematch</a>` : '<button class="btn btn-sm" id="g-rematch">Rematch</button>') : ''}<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;

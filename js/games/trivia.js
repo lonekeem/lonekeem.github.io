@@ -196,7 +196,7 @@ export function createTrivia(ctx) {
       }
       box.dataset.lsig = sig;
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
-        <div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-ghost" id="tv-copy">Copy invite link</button></div>
+        <div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-copy-code="${esc(gid)}">📋 Copy code</button><button class="btn btn-sm btn-ghost" id="tv-copy">Copy invite link</button></div>
         <h3>${ps.length} / 8 players</h3><div class="g-seats">${ps.map((p) => ui.chip(p, p.uid === g.host ? 'host' : '')).join('')}</div>
         ${isHost() ? `${fillToggleHtml()}<button class="btn btn-block" id="tv-start">${humans < 2 && !fillBots() ? 'Waiting for a real player' : 'Start the quiz'}</button>${offer ? offerHtml() : ''}${g.quick && humans >= 2 ? '<p class="muted small center">Quick rooms start on their own in a few seconds.</p>' : ''}`
           : member() ? '<p class="muted center">Waiting for the host to start…</p>'

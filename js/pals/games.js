@@ -3,6 +3,7 @@
 // and the other's Pal is shown as a live ghost, interpolated. Wins go on the palStats leaderboard.
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp, writeBatch, Timestamp, addDoc } from '../fsq.js';
 import { createLink } from '../games/link.js';
+import { codeFormHtml, codeBoxHtml, wireCodeForms, wireCopyCode, newRoomCode } from '../games/code-join.js';
 import { PALS, faceSvg, normLevel, lastMode, saveMode, saveLevel, lastLevel, addBotRecord, whenOffer, offerHtml, COIN_BOT } from '../games/bots.js';
 import { drawPal, drawBubble, star } from './art.js';
 import { drawDancer } from './dance.js';
@@ -170,6 +171,7 @@ export function playGame(host, game, seed, { pal, oppPal, opp, onTick, sound }) 
 // ---------------------------------------------------------------- UI: lobby, CPU, online matches, leaderboard
 export function createPalGames(ctx) {
   const { S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal } = ctx;
+  wireCopyCode(toast);
   let AC = null; const sound = (k) => { try { AC = AC || new AudioContext(); const o = AC.createOscillator(), g = AC.createGain(); const f = { pop: 880, big: 1320, jump: 520, bonk: 160 }[k] || 600; o.type = k === 'bonk' ? 'square' : 'triangle'; o.frequency.setValueAtTime(f, AC.currentTime); o.frequency.exponentialRampToValueAtTime(f * (k === 'bonk' ? 0.6 : 1.6), AC.currentTime + 0.1); g.gain.setValueAtTime(0.08, AC.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.14); o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + 0.15); } catch {} };
   const me = () => S.user && S.user.uid;
   const reward = (win, cpu) => { dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: win ? (cpu ? 12 : 30) : 10 } })); if (win) dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'win', n: cpu ? COIN_BOT : 25, why: cpu ? 'for beating a bot' : 'for winning' } })); };
@@ -181,6 +183,7 @@ export function createPalGames(ctx) {
       <div class="pg-cards">${PAL_GAMES.map((g) => `<button class="pg-card ${g.id === sel ? 'on' : ''}" data-g="${g.id}"><span class="pg-ic">${g.icon}</span><b>${esc(g.name)}</b><small>${esc(g.blurb)}</small></button>`).join('')}</div>
       <div class="g-modes" role="tablist" aria-label="How to play"><button type="button" data-m="cpu" aria-pressed="${lastMode() === 'cpu'}">Play vs Computer</button><button type="button" data-m="quick" aria-pressed="${lastMode() === 'online'}">Play Online (real players)</button><button type="button" data-m="friend" aria-pressed="${lastMode() === 'friend'}">Play a Friend</button></div>
       <form class="pg-friend" id="pg-friend" hidden><input id="pg-handle" placeholder="@friend’s handle (or leave empty for a link)" autocomplete="off"><button class="btn btn-sm" type="submit">Create game</button></form>
+      ${codeFormHtml('pg-code', '🎟️ Join with code')}
       <h2 class="pal-sub">🏆 Top Pal players</h2><div id="pg-lb" class="card"><div class="spinner"></div></div></section>`;
     let g = sel; if (S.user) import('./game-emotes.js').then((m) => m.mountGameEmotes(main.firstElementChild, { db, uid: me(), toast })).catch(() => {});
     main.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { g = b.dataset.g; main.querySelectorAll('[data-g]').forEach((x) => x.classList.toggle('on', x === b)); });
@@ -191,6 +194,7 @@ export function createPalGames(ctx) {
       if (h) { const u = await getDoc(doc(db, 'usernames', h)).catch(() => null); if (!u || !u.exists()) return toast('No one with that handle'); inv = u.data().uid; }
       try { const gid = await create(g, { invitee: inv }); if (inv) await addDoc(collection(db, 'users', inv, 'notifications'), { type: 'game', fromUid: me(), fromName: S.profile.displayName, fromUsername: S.profile.username, postId: gid, text: `${GAME[g].name} (Pal Games)`, createdAt: serverTimestamp(), read: false }).catch(() => {});
         location.hash = '#/games/pals/' + gid; } catch (er) { toast(friendlyError(er)); } };
+    wireCodeForms(main, { db, getDoc, doc, uid: () => (S.user ? S.user.uid : ''), toast, needAuth: () => requireAuth() });
     leaderboard();
   }
   async function leaderboard() {
@@ -200,9 +204,15 @@ export function createPalGames(ctx) {
     } catch (e) { box.innerHTML = `<div class="empty">${esc(friendlyError(e))}</div>`; }
   }
   async function create(game, { invitee = '', quick = false } = {}) {
-    const ref = doc(collection(db, 'palGames')); const pal = await myPal();
-    await setDoc(ref, { game, status: 'waiting', players: [me()], names: [S.profile.displayName], unames: [S.profile.username], pals: [pal], host: me(), invitee, quick, seed: Math.floor(Math.random() * 1e9), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-    return ref.id;
+    const pal = await myPal();
+    const data = { game, status: 'waiting', players: [me()], names: [S.profile.displayName], unames: [S.profile.username], pals: [pal], host: me(), invitee, quick, seed: Math.floor(Math.random() * 1e9), createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+    // short room code as the id so a friend can type it into "Join with code"
+    for (let i = 0; i < 5; i++) {
+      const code = newRoomCode(); const ref = doc(db, 'palGames', code);
+      try { await runTransaction(db, async (tx) => { const [a, b] = [await tx.get(ref), await tx.get(doc(db, 'games', code))]; if (a.exists() || b.exists()) throw new Error('taken'); tx.set(ref, data); }); return code; }
+      catch (e) { if (e.message !== 'taken') throw e; }
+    }
+    throw new Error('Couldn’t make a room code. Try again.');
   }
   async function join(gid) {
     const ref = doc(db, 'palGames', gid); const pal = await myPal();
@@ -306,7 +316,7 @@ export function createPalGames(ctx) {
         const topHtml = `<b>${esc(GAME[g.game].name)}</b> · waiting for ${g.invitee ? 'your friend' : 'a player'}…`;
         putHtml(top, topHtml, topHtml);
         const ready = !g.invitee && whenOffer(gid, () => render());
-        const hostHtml = `<div class="pg-wait"><div class="spinner"></div><p>Send this link to a friend:</p><input readonly value="${esc(link)}" onclick="this.select()"><button class="btn btn-sm" id="pg-copy">Copy link</button><p class="small muted">${g.quick ? 'Looking for a real player…' : 'Waiting for your friend…'}</p>${ready ? offerHtml() : ''}</div>`;
+        const hostHtml = `<div class="pg-wait">${g.quick || g.invitee ? '' : codeBoxHtml(gid)}<div class="spinner"></div><p>Send this link to a friend:</p><input readonly value="${esc(link)}" onclick="this.select()"><button class="btn btn-sm" id="pg-copy">Copy link</button><p class="small muted">${g.quick ? 'Looking for a real player…' : 'Waiting for your friend…'}</p>${ready ? offerHtml() : ''}</div>`;
         if (putHtml(host, hostHtml, hostHtml)) {
           host.querySelector('#pg-copy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(link).then(() => toast('Link copied'));
           const yes = host.querySelector('[data-bot-yes]'); if (yes) yes.onclick = () => { updateDoc(doc(db, 'palGames', gid), { status: 'done', updatedAt: serverTimestamp() }).catch(() => {}); if (g.quick) setDoc(doc(db, 'gameQueue', 'pal-' + g.game), { gid: '', uid: '', at: serverTimestamp() }).catch(() => {}); difficulty(g.game); };

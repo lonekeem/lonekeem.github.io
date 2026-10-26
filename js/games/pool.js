@@ -7,6 +7,7 @@ import * as P from './pool-engine.js';
 import { tsMs, TURN_SECONDS } from './net.js';
 import { ask, palByLevel, normLevel, whenOffer, offerHtml, stopOffer, lastLevel, onlyBots } from './bots.js';
 import { syncPlates } from './plates.js';
+import { codeBoxHtml } from './code-join.js';
 import { onSample } from '../input.js';
 
 const COLORS = { 1: '#f2b31b', 2: '#3d7bff', 3: '#e2558f', 4: '#8a2be2', 5: '#ff7a2f', 6: '#2bb5a8', 7: '#9b1d3a' };
@@ -595,7 +596,7 @@ export function createPool(ctx) {
       const left = g.status === 'active' ? net.turnLeft(g.turnAt) : null;
       paintPlayers(ps, st, g.turn, balls, left, done);
       const status = $('#g-status');
-      if (g.status === 'waiting') { status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the link so a friend can join') : 'Waiting for players'; status.className = 'g-status wait'; }
+      if (g.status === 'waiting') { status.textContent = side === 0 ? (g.invitee ? 'Waiting for your friend…' : g.quick ? 'Looking for an opponent…' : 'Share the room code (below) or link so a friend can join') : 'Waiting for players'; status.className = 'g-status wait'; }
       else if (g.status === 'done') { status.textContent = g.endReason === 'cancelled' ? 'Cancelled' : `${names(g.winnerUid)} wins${g.endReason === 'forfeit' ? ' (forfeit)' : g.endReason === 'timeout' ? ' (time ran out)' : ''}`; status.className = 'g-status'; }
       else { status.textContent = statusLine(st, g.turn, side === g.turn, left, g.names[g.turn] || 'Opponent'); status.className = 'g-status' + (st.foul ? ' foul' : side === g.turn ? ' you' : ' wait'); }
     }
@@ -665,7 +666,7 @@ export function createPool(ctx) {
       const side = mySide();
       if (g.status === 'waiting') {
         const offer = side === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => actions());
-        box.innerHTML = `${side === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
+        box.innerHTML = `${side === 0 && !g.quick && !g.invitee ? codeBoxHtml(gid) : ''}${side === 0 ? '<button class="btn btn-sm btn-ghost" id="g-share">Copy invite link</button><button class="btn btn-sm btn-ghost" id="g-cancel">Cancel</button>' : ''}${!ui.signedIn() ? `<a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/game/' + gid)}">Sign in to play</a>` : ''}${offer ? offerHtml() : ''}`;
       }
       else if (g.status === 'active') box.innerHTML = side >= 0 ? '<button class="btn btn-sm btn-danger" id="g-forfeit">Forfeit</button><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>' : '<span class="muted small">You’re watching</span><button class="btn btn-sm btn-ghost" id="g-share">Share link</button>';
       else box.innerHTML = `${side >= 0 && g.endReason !== 'cancelled' ? (g.rematch ? `<a class="btn btn-sm" href="#/game/${esc(g.rematch)}">Go to rematch</a>` : '<button class="btn btn-sm" id="g-rematch">Rematch</button>') : ''}<a class="btn btn-sm btn-ghost" href="#/games">Games</a>`;

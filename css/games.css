@@ -605,3 +605,12 @@
 .lu-play{background:linear-gradient(#ffe36b,#f0a400)!important;color:#4a2a00!important;box-shadow:0 4px 0 #8a5a00,0 6px 14px rgba(0,0,0,.4)!important}
 .lu-hero:active .lu-play{transform:translateY(3px);box-shadow:0 1px 0 #8a5a00!important}
 @media (prefers-reduced-motion:reduce){.lu-hd1,.lu-hd2{animation:none}}
+/* Join with code + room code box (every online game) */
+.g-joincode { align-items: center; flex-wrap: wrap; }
+.g-joincode-l { font-weight: 700; white-space: nowrap; }
+.g-joincode input { text-transform: uppercase; letter-spacing: .14em; min-width: 110px; }
+.g-room-code { flex-basis: 100%; width: 100%; margin-bottom: 6px; }
+.g-room-code .g-roomcode { font-size: 2rem; user-select: all; }
+.lm-rooms { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+.lm-rooms span { flex-basis: 100%; text-align: center; font-weight: 700; font-size: .9rem; }
+.lm-online .g-joincode { margin: 4px 0 0; justify-content: center; }

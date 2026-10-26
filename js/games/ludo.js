@@ -7,6 +7,7 @@ import * as L from './ludo-engine.js';
 import { isBot, tsMs, TURN_SECONDS } from './net.js';
 import { ask, normLevel, saveLevel, botPlayer, faceSvg, seatName, fillToggleHtml, wireFill, fillBots, whenOffer, offerHtml, stopOffer, onlyBots, lastLevel } from './bots.js';
 import * as T from './ludo-turn.js';
+import { codeFormHtml, wireCodeForms } from './code-join.js';
 
 const CELL = 20;
 const PIPS = { 1: [[1, 1]], 2: [[0, 0], [2, 2]], 3: [[0, 0], [1, 1], [2, 2]], 4: [[0, 0], [2, 0], [0, 2], [2, 2]], 5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]], 6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]] };
@@ -442,7 +443,7 @@ export function createLudo(ctx) {
       }
       box.dataset.lsig = sig;
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
-        <button class="btn btn-sm btn-ghost" id="lu-copy">Copy invite link</button>
+        <div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-copy-code="${esc(gid)}">📋 Copy code</button><button class="btn btn-sm btn-ghost" id="lu-copy">Copy invite link</button></div>
         <p class="muted small">${maxSeats()} seats. Bots wear a Bot tag.</p>
         <h3>${ps.length} / ${maxSeats()} seats</h3><div class="g-seats">${ps.map((p, i) => `<div class="g-seat" style="--lc:${L.COLORS[L.seatColors(maxSeats())[i] ?? i]}">${ui.chip(p, p.uid === g.host ? 'host' : '')}${!isBot(p.uid) ? `<span class="muted small">${(g.rv || {})[p.uid] ? 'dice locked in' : 'locking dice…'}</span>` : ''}${isHost() && isBot(p.uid) ? `<button class="link-btn small" data-rm="${i}">remove</button>` : ''}</div>`).join('')}</div>
         ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="lu-bot" ${ps.length >= maxSeats() ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="lu-start" ${ready ? '' : 'disabled'}>Start game</button></div>${offer ? offerHtml() : ''}`
@@ -570,7 +571,8 @@ export function createLudo(ctx) {
       <div class="lm-online" id="lm-online" hidden>
         <button type="button" class="btn" data-q="2">⚡ Quick match 1 on 1</button>
         <button type="button" class="btn" data-q="4">⚡ Quick match 4 players</button>
-        <button type="button" class="btn btn-ghost" data-room="1">🔑 Make a room and share the code</button>
+        <div class="lm-rooms"><span>🔑 Make a room, share the code</span><button type="button" class="btn btn-ghost" data-room="2">1 on 1 room</button><button type="button" class="btn btn-ghost" data-room="4">4 player room</button></div>
+        ${codeFormHtml('lm-code', '🎟️ Join with code')}
       </div>
       <div class="lm-lvl" role="group" aria-label="Bot level"><span>Bot level</span>${PAL_LEVELS.map(([id, t]) => `<button type="button" data-lvl="${id}" class="${id === lvl ? 'on' : ''}">${t}</button>`).join('')}</div>
       <p class="lm-foot"><a href="#/games/ludo?classic=1">More ways to play · invite a friend · scoreboard</a></p></div>`, '#/games');
@@ -581,7 +583,8 @@ export function createLudo(ctx) {
     on.onclick = () => { panel.hidden = !panel.hidden; on.setAttribute('aria-expanded', String(!panel.hidden)); };
     const go = async (b, f) => { if (!ui.signedIn()) { ctx.requireAuth(); return; } b.disabled = true; try { location.hash = '#/game/' + await f(); } catch (e) { toast(friendlyError(e)); b.disabled = false; } };
     panel.querySelectorAll('[data-q]').forEach((b) => b.onclick = () => go(b, () => net.quickMatch('ludo', b.dataset.q)));
-    panel.querySelector('[data-room]').onclick = (e) => go(e.currentTarget, () => net.createGame('ludo', '4'));
+    panel.querySelectorAll('[data-room]').forEach((b) => b.onclick = () => go(b, () => net.createGame('ludo', b.dataset.room)));
+    wireCodeForms(panel, { db, getDoc: (r) => net.fs.getDoc(r), doc: (...a) => net.fs.doc(...a), uid: () => (S.user ? S.user.uid : ''), toast, needAuth: () => { if (ui.signedIn()) return true; ctx.requireAuth(); return false; } });
   }
   return { local, online, modes };
 }

@@ -362,7 +362,7 @@ export function createStarCards(ctx) {
       }
       box.dataset.lsig = sig;
       box.innerHTML = `<div class="g-room"><p class="muted small">Room code</p><div class="g-roomcode">${esc(gid)}</div>
-        <button class="btn btn-sm btn-ghost" id="sc-copy">Copy invite link</button>
+        <div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-copy-code="${esc(gid)}">📋 Copy code</button><button class="btn btn-sm btn-ghost" id="sc-copy">Copy invite link</button></div>
         <p class="muted small">${g.mode === 'round' ? 'Single round' : 'First to 500 points'}</p>
         <h3>${ps.length} / 6 seats</h3><div class="g-seats">${ps.map((p, i) => `<div class="g-seat">${ui.chip(p, p.uid === g.host ? 'host' : '')}${isHost() && isBot(p.uid) ? `<button class="link-btn small" data-rm="${i}">remove</button>` : ''}</div>`).join('')}</div>
         ${isHost() ? `${fillToggleHtml()}<div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px"><button class="btn btn-sm btn-ghost" id="sc-bot" ${ps.length >= 6 ? 'disabled' : ''}>+ Bot</button><button class="btn btn-sm" id="sc-start" ${ps.length < 2 && !fillBots() ? 'disabled' : ''}>Deal cards</button></div>${offer ? offerHtml() : ''}${g.quick && humans >= 2 ? '<p class="muted small center">Quick rooms deal on their own in a few seconds.</p>' : ''}`
