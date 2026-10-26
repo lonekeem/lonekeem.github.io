@@ -2553,10 +2553,11 @@ service cloud.firestore {
         && (!('items' in d) || isStr(d.items, 0, 2000)) && (!('ext' in d) || extOk(d.ext)) && (!('v' in d) || d.v is int); }
       // open house / invites (uids + usernames for display), house radio, decor: owner-only, size-limited
       function extrasOk() { return (!('open' in hd()) || hd().open is bool) && (!('inv' in hd()) || (hd().inv is list && hd().inv.size() <= 50)) && (!('invN' in hd()) || (hd().invN is list && hd().invN.size() <= 50))
-        && (!('radio' in hd()) || radioOk(hd().radio)) && (!('decor' in hd()) || decorOk(hd().decor)) && (!('cars' in hd()) || carsOk(hd().cars)); }
+        && (!('radio' in hd()) || radioOk(hd().radio)) && (!('decor' in hd()) || decorOk(hd().decor)) && (!('cars' in hd()) || carsOk(hd().cars))
+        && (!('door' in hd()) || (hd().door is map && hd().door.size() <= 20)); }
       // Gold palace sign. Only homes/h489, admin writes (update already requires isAdmin there). 24 letters on the client; 48 covers emoji.
       function signOk() { return !('sign' in hd()) || (plot == 'h489' && cleanStr(hd().sign, 1, 48) && kidSafe(hd().sign)); }
-      function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor', 'cars', 'sign']) && extrasOk() && signOk() && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 7
+      function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor', 'cars', 'sign', 'door']) && extrasOk() && signOk() && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 7
         && hd().name == get(/databases/$(database)/documents/users/$(me())).data.displayName && hd().at == request.time; }
       allow read: if signedIn();
       // 👑 h489 = the admin's palace: never for sale, only the admin account can create / change / remove it
@@ -2664,12 +2665,13 @@ service cloud.firestore {
 
     // People standing in one house. Tiny on purpose: the park presence rules are already near the size cap.
     // A missing home doc is a neighbor house (anyone who can open the door). h489 is the palace.
-    // Closed sale houses stay owner / open-house / invite only.
+    // Closed sale houses stay owner / open-house / invite only, plus a doorbell let-in (homes.door[uid] = until ms; never a blocked visitor).
     match /houseHere/{plot}/who/{uid} {
       function hp() { return /databases/$(database)/documents/homes/$(plot); }
       function houseOpen() {
         return !exists(hp()) || plot == 'h489' || get(hp()).data.owner == me()
-          || get(hp()).data.get('open', false) == true || me() in get(hp()).data.get('inv', []);
+          || get(hp()).data.get('open', false) == true || me() in get(hp()).data.get('inv', [])
+          || (get(hp()).data.get('door', {}).get(me(), 0) > request.time.toMillis() && !blockedBy(get(hp()).data.owner));
       }
       function hh() {
         let d = request.resource.data;

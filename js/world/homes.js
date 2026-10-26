@@ -11,6 +11,7 @@ import { GALLERY } from './cities.js';
 import { checkInput, clean } from '../pals/talk.js';
 import { ADMIN_EMAIL, EMU } from '../firebase-init.js';
 import { attachHomeLife } from './homelife.js';
+import { ringCard, isRing, forgetDoor, NO_MS } from './doorbell.js';
 export const plateBad = (t) => { const s = String(t || ''); return !!(checkInput(s) || checkInput(s.toLowerCase()) || checkInput(s.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').toLowerCase())); };
 import { buildInterior, SC as SC0, scOf, DECOR, decorItem, parseItems, defaultItems, placedItems, packLayout, unpackStash, WALL_SW, WALL_ROOMS, parseWalls, parseFloors, serFloors, hex6, EXT_SW, FLOORS, healItems, placeItem } from './interior.js';
 import { itemAabb, pickIndex, nearestReach, nudgePlan, screenStep, xzGap, stashOnRemove } from './decorate.js';
@@ -58,6 +59,8 @@ export function attachHomes(api, W, K) {
   const css = document.createElement('style'); css.textContent = `.kh-home{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 180px);pointer-events:auto;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(43,29,85,.75);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
 .kh-in,.kh-fl{position:absolute;left:50%;transform:translateX(-50%);pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;color:#fff;font:800 15px Inter,sans-serif;padding:0 18px;z-index:8}.kh-in{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 150px);background:#0f766e}.kh-fl{left:auto;right:max(12px,env(safe-area-inset-right));transform:none;bottom:calc(max(16px,env(safe-area-inset-bottom)) + 300px);background:#7c3aed;box-shadow:0 4px 14px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .18s}.kh-fl.on{opacity:1;pointer-events:auto}@media (prefers-reduced-motion:reduce){.kh-fl{transition:none}}.kh-in[hidden],.kh-fl[hidden],.kh-p[hidden]{display:none}
 .kh-p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,6,30,.55);pointer-events:auto;z-index:30}.kh-c{background:#fff;color:#111;border-radius:18px;padding:16px;width:min(92vw,380px);max-height:80vh;overflow:auto;font:500 14px Inter,sans-serif}
+.kh-wait,.kh-arr{position:absolute;left:50%;transform:translateX(-50%);top:calc(max(8px,env(safe-area-inset-top)) + 118px);z-index:9;pointer-events:auto;display:flex;align-items:center;gap:8px;border-radius:999px;padding:8px 10px 8px 16px;font:800 15px Inter,sans-serif;color:#fff;background:rgba(43,29,85,.88);box-shadow:0 4px 16px rgba(0,0,0,.3);white-space:nowrap;max-width:92vw}.kh-wait button{border:0;background:rgba(255,255,255,.2);color:#fff;border-radius:999px;width:30px;height:30px;font:800 14px Inter,sans-serif}
+.kh-arr{background:#0f766e;padding:8px 8px 8px 16px}.kh-arr button{border:0;border-radius:999px;background:#fff;color:#0f766e;font:800 15px Inter,sans-serif;padding:9px 14px}.kh-wait[hidden],.kh-arr[hidden]{display:none}.kh-vis{margin:8px 0;padding:8px 10px;border-radius:12px;background:#f5f3ff}
 .kh-c h3{margin:0 0 6px;font:800 18px Inter,sans-serif;color:#111}.kh-c button{margin:6px 6px 0 0;border:0;border-radius:12px;padding:10px 14px;font:800 14px Inter,sans-serif;background:#6d28d9;color:#fff}.kh-c button.g{background:#e5e7eb;color:#111}.kh-c .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;color:#111}.kh-c small{color:#444}
 @media (orientation:landscape) and (max-height:500px){.kh-home{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 300px)}.kh-in{bottom:110px}.kh-fl{right:max(8px,env(safe-area-inset-right));bottom:calc(max(8px,env(safe-area-inset-bottom)) + 190px)}}`;
   document.head.appendChild(css);
@@ -150,7 +153,15 @@ export function attachHomes(api, W, K) {
     const I = buildInterior(api, { put, flush, G, y: FLAT }, h, cx, cz, dec); root.add(I.g); const r0 = { g: I.g, cx, cz, I, h, dk: JSON.stringify(dec) }; rooms.set(h.id, r0); return r0; }
   function applyDecor(id) { const o = owners.get(id); const dec = (o && o.decor) || {}; if (W.paintHouse && paintsOutside(HOUSE_BY_ID[id])) W.paintHouse(id, dec.ext || null); const r = rooms.get(id); const k = JSON.stringify(dec);
     if (r && r.dk !== k && !(deco && inside && inside.id === id)) { r.dk = k; r.I.setWall(dec.wall, dec.walls); r.I.setFloor(dec.floor || r.I.S.floor, dec.floors || ''); r.I.setItems(placedItems(dec, r.h, r.I.two)); } }
-  const canEnter = (h) => { if (!h.sale) return true; const o = owners.get(h.id); if (!o) return false; return o.owner === uid || o.open === true || (Array.isArray(o.inv) && o.inv.includes(uid)); };
+  // 🔔 doorbell answers on the home doc (js/world/doorbell.js): door[uid] > now = let in (one visit), < 0 = "not now" / asked to leave for 10 min
+  const doorV = (o) => (o && o.door && typeof o.door[uid] === 'number' ? o.door[uid] : 0);
+  const doorNo = (o) => { const v = doorV(o); return v < 0 && Date.now() + v < NO_MS; };
+  // one visit per let-in, remembered across reloads (key = plot:expiry)
+  let viaDoor = null; const DU_KEY = 'kemy-door-used:' + uid; const doorUsed = new Set((() => { try { return JSON.parse(localStorage.getItem(DU_KEY) || '[]').filter((k) => Number(String(k).split(':')[1]) > Date.now()); } catch { return []; } })());
+  const useDoor = (k) => { doorUsed.add(k); try { localStorage.setItem(DU_KEY, JSON.stringify([...doorUsed].slice(-20))); } catch { /* */ } };
+  const doorOnly = (h) => { const o = owners.get(h.id); return !!(o && o.owner !== uid && o.open !== true && !(Array.isArray(o.inv) && o.inv.includes(uid)) && doorV(o) > Date.now()); };
+  const canEnter = (h) => { if (!h.sale) return true; const o = owners.get(h.id); if (!o) return false; if (o.owner === uid) return true; if (doorNo(o)) return false;
+    const v = doorV(o); return o.open === true || (Array.isArray(o.inv) && o.inv.includes(uid)) || (v > Date.now() && (!doorUsed.has(h.id + ':' + v) || viaDoor === h.id + ':' + v)); };
   // A doorbell or a visit on someone else's Kemy Street home. One note per owner per kind per half hour.
   const noted = new Map();
   function noteHouse(ownerUid, plot, kind) {
@@ -159,40 +170,68 @@ export function attachHomes(api, W, K) {
     if (now - (noted.get(key) || 0) < 30 * 60 * 1000) return;
     noted.set(key, now);
     const text = kind === 'ring' ? 'rang your doorbell on Kemy Street' : 'visited your home on Kemy Street';
-    addDoc(collection(db, 'users', ownerUid, 'notifications'), {
+    return addDoc(collection(db, 'users', ownerUid, 'notifications'), {
       type: 'house', fromUid: uid, fromName: S.profile.displayName, fromUsername: S.profile.username,
       postId: String(plot || '').slice(0, 40), text, createdAt: serverTimestamp(), read: false
-    }).catch((e) => console.warn('house note', e && e.code));
+    }).then(() => '', (e) => { console.warn('house note', e && e.code); if (e && e.code === 'permission-denied') noted.delete(key); return (e && e.code) || 'error'; });
   }
-  // Someone at the door. The owner's open page hears it from their notification inbox.
-  let pendingRing = null, ringBoot = true;
+  // Someone at the door. The owner hears it from their notification inbox: a pop-up card (anywhere in Kemy) with Let in / Not now.
+  let ringBoot = true;
   const rungAt = new Map();
+  // visitor side: waiting pill until the owner answers (3 min), then a let-in toast or a polite "not now"
+  let waitRing = null;
+  const waitEl = document.createElement('div'); waitEl.className = 'kh-wait'; waitEl.hidden = true; waitEl.setAttribute('role', 'status');
+  const arrEl = document.createElement('div'); arrEl.className = 'kh-arr'; arrEl.hidden = true; arrEl.setAttribute('role', 'alert'); host.append(waitEl, arrEl);
+  function stopWait() { waitRing = null; waitEl.hidden = true; }
   function ringDoor(id) {
     const h = HOUSE_BY_ID[id]; const o = h && owners.get(id);
     if (!h || !o || !o.owner || o.owner === uid || canEnter(h)) return;
+    if (S.blocked && S.blocked.has(o.owner)) { say('🔕 You blocked this player, so you can’t ring their bell.'); return; }
+    if (doorNo(o)) { say('🚪 The owner can’t let you in right now. Try again later.'); return; }
     const now = Date.now();
-    if (now - (rungAt.get(id) || 0) < 15000) { say('🔔 You already rang. The owner can invite you in.'); return; }
+    if (now - (rungAt.get(id) || 0) < 15000) { say('🔔 You already rang. Waiting for the owner…'); return; }
     rungAt.set(id, now);
-    try { dispatchEvent(new CustomEvent('kemy:house-ring', { detail: { plot: id } })); } catch { /* */ }
-    say('🔔 You rang the doorbell. The owner can invite you in.');
+    const sent = noteHouse(o.owner, id, 'ring');
+    waitRing = { plot: id, at: now, owner: o.owner, name: String(o.name || 'The owner').slice(0, 24) };
+    waitEl.innerHTML = '<span>🔔 Waiting for the owner…</span><button type="button" aria-label="Stop waiting">✕</button>'; waitEl.lastChild.onclick = stopWait; waitEl.hidden = false;
+    if (sent && sent.then) sent.then((code) => { if (code === 'permission-denied' && waitRing && waitRing.plot === id) { stopWait(); say('🔕 This doorbell isn’t working for you right now.'); } });
+    say('🔔 You rang the doorbell. Waiting for the owner…');
   }
   function considerRing(d) {
-    if (!d || d.type !== 'house' || !d.fromUid || d.fromUid === uid) return;
-    if (!/rang your doorbell/.test(String(d.text || ''))) return;
+    if (!isRing(d) || d.fromUid === uid) return;
     const plot = String(d.postId || '');
-    if (myPlot && plot && plot !== myPlot) return;
-    pendingRing = { uid: d.fromUid, name: String(d.fromName || 'A Pal').slice(0, 24), username: String(d.fromUsername || 'pal').replace(/[^a-z0-9_.]/gi, '').slice(0, 20) || 'pal', plot, at: Date.now() };
-    say(pendingRing.name + ' rang your doorbell');
-    paintInvite();
+    if (!plot || (myPlot && plot !== myPlot)) return;
+    ringCard({ uid: d.fromUid, name: String(d.fromName || 'A Pal').slice(0, 24), username: String(d.fromUsername || 'pal').replace(/[^a-z0-9_.]/gi, '').slice(0, 20) || 'pal', plot },
+      { db, S, toast: say });
   }
+  // visitor: a let-in for me appeared on a home doc (waiting or not) -> toast with Go inside, or walk right in if still at the door
+  const doorSeen = new Map(); let doorBoot = true, arrT = 0;
+  function letInArrived(h, o) {
+    const nm = String(o.name || 'The owner').slice(0, 24); const atDoor = !inside && Math.hypot(h.door.x - P.x, h.door.z - P.z) < 9 && !(D && D.mine && D.mine() && D.mine().state !== 'parked');
+    if (waitRing && waitRing.plot === h.id) stopWait();
+    arrEl.innerHTML = `<b>🏠 ${esc(nm)} let you in!</b><button type="button">Go inside</button>`; arrEl.hidden = false; clearTimeout(arrT); arrT = setTimeout(() => (arrEl.hidden = true), 20000);
+    arrEl.querySelector('button').onclick = () => { arrEl.hidden = true; if (inside && inside.id === h.id) return; if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; } if (inside) goOut(); goIn(h); };
+    try { api.sfx && api.sfx('coin'); } catch { /* */ }
+    if (atDoor && !inside) { goIn(h); setTimeout(() => { arrEl.hidden = true; }, 6000); }
+  }
+  function doorWatch() {
+    const now = Date.now();
+    for (const [id, o] of owners) { if (!o || o.owner === uid || !o.door) continue; const v = doorV(o); if (!v || doorSeen.get(id) === v) continue; doorSeen.set(id, v); const h = HOUSE_BY_ID[id]; if (!h) continue;
+      if (v > now && !doorUsed.has(id + ':' + v) && (!doorBoot || (waitRing && waitRing.plot === id))) letInArrived(h, o);
+      else if (v < 0 && doorNo(o) && waitRing && waitRing.plot === id && -v >= waitRing.at - 5000) { stopWait(); say('🚪 The owner can’t let you in right now. Maybe next time!'); } }
+    if (owners.size) doorBoot = false;
+    if (waitRing && now - waitRing.at > 3 * 60 * 1000) { stopWait(); say('🔔 No answer yet. The owner may be busy.'); }
+    if (inside && inside.sale && !canEnter(inside)) { const o = owners.get(inside.id); goOut(); say(doorNo(o) ? '👋 The owner asked you to leave for now' : doorV(o) > 0 ? '⏰ Your visit time is up. Ring again to come back!' : '🚪 The owner closed this home'); }
+  }
+  const doorT = setInterval(() => { try { if (waitRing || inside) doorWatch(); } catch { /* */ } }, 1000);
   if (window.__kemyHouseRing) removeEventListener('kemy:house-ring', window.__kemyHouseRing);
   window.__kemyHouseRing = (e) => { const plot = e.detail && e.detail.plot; const o = plot && owners.get(plot); if (o && o.owner) noteHouse(o.owner, plot, 'ring'); };
   addEventListener('kemy:house-ring', window.__kemyHouseRing);
   function placeAt(p) { if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return; P.sit = null; P.x = p.x; P.z = p.z; if (p.yaw != null) P.yaw = p.yaw; P.vy = 0; P.onGround = true; const gy = ground(p.x, p.z); let y = standY(Number.isFinite(gy) ? gy : FLAT, p.x, p.z); if (!Number.isFinite(y)) y = FLAT; P.y = y; try { if (p.cam != null && window.__p3 && window.__p3.setYaw) window.__p3.setYaw(((p.cam % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)); } catch { /* */ } api.markDirty && api.markDirty(); }
-  function goIn(h) { if (!h) return; if (deco && deco.out) { say('Tap Done or Exit first. Outside decorating stays in the yard.'); return; } SC = scOf(h); if (!canEnter(h)) { say('🔒 Only the owner and invited friends can go inside'); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') return; const r = buildRoom(h); if (deco) endDeco(false); inside = h; roomState.box = { x0: r.cx - 5.6 * SC, x1: r.cx + 5.6 * SC, z0: r.cz - 5.6 * SC, z1: r.cz + 5.5 * SC };
+  function goIn(h) { if (!h) return; if (deco && deco.out) { say('Tap Done or Exit first. Outside decorating stays in the yard.'); return; } SC = scOf(h); if (!canEnter(h)) { say(doorNo(owners.get(h.id)) ? '🚪 The owner can’t let you in right now' : '🔒 Only the owner and invited friends can go inside'); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') return; const r = buildRoom(h); if (deco) endDeco(false); inside = h; roomState.box = { x0: r.cx - 5.6 * SC, x1: r.cx + 5.6 * SC, z0: r.cz - 5.6 * SC, z1: r.cz + 5.5 * SC };
     standUp(true); P.x = r.cx; P.z = r.cz + 4.6 * SC; P.yaw = Math.PI; P.y = FLAT; P.vy = 0; P.onGround = true; try { if (window.__p3 && window.__p3.setYaw) window.__p3.setYaw(0); } catch { /* */ } if (!roomLight) { roomLight = new THREE.PointLight('#fff1d6', LOW ? 22 : 32, 22, 1.6); scene.add(roomLight); } roomLight.position.set(r.cx - 3 * SC, FLAT + 2.7, r.cz + 1.5); roomLight.visible = true; if (!LOW) { if (!roomLight2) { roomLight2 = new THREE.PointLight('#fff1d6', 24, 20, 1.6); scene.add(roomLight2); } roomLight2.position.set(r.cx + 3.5 * SC, FLAT + 2.7, r.cz - 2); roomLight2.visible = true; }
-    roomState.inId = h.id; const ow = owners.get(h.id); if (ow && ow.owner && ow.owner !== uid) noteHouse(ow.owner, h.id, 'visit'); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); yardB.hidden = true; api.markDirty && api.markDirty(); watchDecor(h.id); startParty(h, r); }
-  function goOut(spot) { const h = inside; if (!h) { if (spot) placeAt(spot); return; } standUp(true); stopParty(); watchDecor(null); flB.hidden = true; flB.classList.remove('on'); tvHide(); if (deco && !deco.out) endDeco(false); inside = null; roomState.box = null; roomState.inId = null; decB.hidden = true; if (rad && !radioBox.hidden) minimizeRadio(); if (roomLight2) roomLight2.visible = false; placeAt(spot || doorSpot(h)); if (roomLight) roomLight.visible = false; api.send && api.send(true); }
+    roomState.inId = h.id; const ow = owners.get(h.id); viaDoor = doorOnly(h) ? h.id + ':' + doorV(ow) : null; if (viaDoor) useDoor(viaDoor); if (ow && ow.owner && ow.owner !== uid) noteHouse(ow.owner, h.id, 'visit'); say(ow && ow.owner !== uid ? '🏠 Visiting ' + (ow.name || 'a Pal') + '’s home' : '🏠 Welcome in!' + (r.I.two ? ' Stairs to the 2nd floor are on the right.' : '')); radioOff = null; startRadio(); decB.hidden = !(ow && ow.owner === uid); yardB.hidden = true; api.markDirty && api.markDirty(); watchDecor(h.id); startParty(h, r); }
+  function goOut(spot) { const h = inside; if (!h) { if (spot) placeAt(spot); return; } viaDoor = null; standUp(true); stopParty(); watchDecor(null); flB.hidden = true; flB.classList.remove('on'); tvHide(); if (deco && !deco.out) endDeco(false); inside = null; roomState.box = null; roomState.inId = null; decB.hidden = true; if (rad && !radioBox.hidden) minimizeRadio(); if (roomLight2) roomLight2.visible = false; placeAt(spot || doorSpot(h)); if (roomLight) roomLight.visible = false; api.send && api.send(true); }
   let partyP = null, party = null, decorUnsub = null;
   function watchDecor(id) {
     if (decorUnsub) { decorUnsub(); decorUnsub = null; }
@@ -200,7 +239,7 @@ export function attachHomes(api, W, K) {
     decorUnsub = onSnapshot(doc(db, 'homes', id), (snap) => {
       if (!snap.exists() || !inside || inside.id !== id) return;
       owners.set(id, snap.data());
-      applyDecor(id);
+      applyDecor(id); doorWatch();
     }, (e) => console.warn('house decor', e && e.code));
   }
   function stopParty() { partyP = null; if (party) { try { party.stop(); } catch { /* */ } party = null; } }
@@ -547,29 +586,16 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
       <div class="row"><input data-n placeholder="@username" style="flex:1;min-height:38px;border-radius:10px;border:1px solid #ccc;padding:0 8px"><button data-a>Invite</button></div>${inv.map((u, i) => `<div class="row"><span>@${esc(invN[i] || 'pal')}</span><button class="g" data-r="${i}">Remove</button></div>`).join('') || '<p><small>No invites yet.</small></p>'}`,
     (c) => { c.querySelector('[data-o]').onclick = () => homeW({ open: !o.open }).then(() => { pan.hidden = true; say(o.open ? '🔒 Home closed to visitors' : '🚪 Open house! Anyone can visit'); }).catch(wErr);
       c.querySelector('[data-a]').onclick = async () => { const n = c.querySelector('[data-n]').value.trim().replace(/^@/, '').toLowerCase(); if (!/^[a-z0-9_.]{2,20}$/.test(n)) { say('Type a username'); return; } if (inv.length >= 50) { say('Max 50 invites'); return; }
-        try { const d = await getDoc(doc(db, 'usernames', n)); const u2 = d.exists() && d.data().uid; if (!u2) { say('No Pal named @' + n); return; } if (u2 === uid || inv.includes(u2)) { say('Already invited'); return; } await homeW({ inv: [...inv, u2], invN: [...invN, n] }); pan.hidden = true; say('✉️ Invited @' + n); } catch (e) { wErr(e); } };
+        try { const d = await getDoc(doc(db, 'usernames', n)); const u2 = d.exists() && d.data().uid; if (!u2) { say('No Pal named @' + n); return; } if (u2 === uid || inv.includes(u2)) { say('Already invited'); return; } await homeW({ inv: [...inv, u2], invN: [...invN, n] }); await forgetDoor(db, S, myPlot, o, u2).catch(() => {}); pan.hidden = true; say('✉️ Invited @' + n); } catch (e) { wErr(e); } };
       c.querySelectorAll('[data-r]').forEach((b) => (b.onclick = () => { const i = +b.dataset.r; homeW({ inv: inv.filter((_, j) => j !== i), invN: invN.filter((_, j) => j !== i) }).then(() => { pan.hidden = true; say('Removed'); }).catch(wErr); })); }); }
-  function ownerHere() {
-    if (!myPlot || (pendingRing && pendingRing.plot && pendingRing.plot !== myPlot)) return false;
-    if (inside && inside.id === myPlot) return true;
-    if (inside) return false;
-    const h = HOUSE_BY_ID[myPlot];
-    return !!(h && Math.hypot(h.door.x - P.x, h.door.z - P.z) < 18);
-  }
-  function paintInvite() {
-    const fresh = pendingRing && Date.now() - pendingRing.at < 3 * 60 * 1000 && ownerHere();
-    if (fresh) { const lab = '✉️ Invite ' + pendingRing.name.slice(0, 12); if (homeB.textContent !== lab) homeB.textContent = lab; homeB.dataset.ring = '1'; return lab; }
-    if (homeB.dataset.ring) { homeB.textContent = '🏠 Home'; delete homeB.dataset.ring; }
-    return '';
-  }
-  async function inviteRinger() {
-    const r = pendingRing; if (!r || !myPlot) return;
-    const o = owners.get(myPlot) || {}; const inv = Array.isArray(o.inv) ? o.inv.slice() : [], invN = Array.isArray(o.invN) ? o.invN.slice() : [];
-    if (inv.includes(r.uid)) { pendingRing = null; paintInvite(); say('✉️ ' + r.name + ' is already invited'); return; }
-    if (inv.length >= 50) { say('Max 50 invites'); return; }
-    try { await homeW({ inv: inv.concat(r.uid), invN: invN.concat(r.username || 'pal') }); pendingRing = null; paintInvite(); say('✉️ Invited ' + r.name + ' in'); }
-    catch (e) { wErr(e); }
-  }
+  // 👋 owner, inside their own home: visitors in the room, each with "Ask to leave" (10 min "not now" on the door)
+  function visitorsHere() { const out = []; if (!api.others || !myPlot) return out; for (const o of api.others.values()) if (o && o.house && o.uid && o.uid !== uid && (!o.plot || o.plot === myPlot)) out.push(o); return out; }
+  async function askLeave(who, name, btn) { if (btn) { btn.disabled = true; btn.textContent = 'Asking…'; }
+    try { const { answerDoor } = await import('./doorbell.js'); const res = await answerDoor(db, S, myPlot, who, false); if (res !== 'no') throw new Error(res);
+      const o = owners.get(myPlot) || {}; const inv = Array.isArray(o.inv) ? o.inv : []; const i = inv.indexOf(who);
+      if (i >= 0) { const invN = Array.isArray(o.invN) ? o.invN : []; await homeW({ inv: inv.filter((_, j) => j !== i), invN: invN.filter((_, j) => j !== i) }).catch(() => {}); }
+      if (btn) btn.textContent = 'Asked ✓'; say('👋 You asked ' + (name || 'your visitor') + ' to leave'); }
+    catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Ask to leave'; } wErr(e); } }
 
   // ---------------------------------------------------------------- 🛠️ Decorate mode (owner, inside): paint, floors, furniture on a 0.5 m grid
   let owned = null; async function loadOwned() { try { const { econ: e } = await shop(); owned = await e.inventory(true); } catch { owned = {}; } return owned; }
@@ -849,13 +875,13 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
   let mT = 0; function metroTick(dt) { if ((mT += dt) < 2) return; mT = 0; for (const c of METROS) if (!metroOn.has(c.id) && Math.abs(P.x - c.x) < c.hx + 260 && Math.abs(P.z - c.z) < c.hz + 260) metroSub(c.id); }
   if (uid && db) { listen('old', query(collection(db, 'homes'), where(documentId(), '<', 'hm'))); listen('mine', query(collection(db, 'homes'), where('owner', '==', uid)));
     try { subs.push(onSnapshot(query(collection(db, 'users', uid, 'notifications'), orderBy('createdAt', 'desc'), limit(5)), (qs) => {
-      if (ringBoot) { ringBoot = false; const d0 = qs.docs[0] && qs.docs[0].data(); const at = d0 && d0.createdAt && d0.createdAt.toMillis ? d0.createdAt.toMillis() : 0; if (d0 && d0.read !== true && at && Date.now() - at < 3 * 60 * 1000) considerRing(d0); return; }
+      if (ringBoot) { ringBoot = false; for (const x of qs.docs.slice().reverse()) { const d0 = x.data(); const at = d0 && d0.createdAt && d0.createdAt.toMillis ? d0.createdAt.toMillis() : 0; if (d0.read !== true && at && Date.now() - at < 10 * 60 * 1000) considerRing(d0); } return; }
       qs.docChanges().forEach((c) => { if (c.type === 'added') considerRing(c.doc.data()); });
     }, () => {})); } catch { /* */ } }
   function onOwners() { if (!parts.has('old')) return; const prev = new Map(owners); owners.clear(); for (const m of parts.values()) for (const [id, v] of m) owners.set(id, v); myPlot = null; myTier = 0;
       for (const [id, o] of owners) if (o.owner === uid && !HOUSE_BY_ID[id]?.admin) { myPlot = id; myTier = o.garage || 0; } if (amAdmin && owners.get(ADMIN_PLOT)?.owner === uid && !myPlot) { myPlot = ADMIN_PLOT; myTier = 0; }
       for (const id of new Set([...prev.keys(), ...owners.keys()])) { const h = HOUSE_BY_ID[id]; if (!h) continue; const a = prev.get(id), b = owners.get(id); if (h.sale && JSON.stringify(a) !== JSON.stringify(b)) drawSign(h); if (paintsOutside(h) && JSON.stringify((a || {}).decor) !== JSON.stringify((b || {}).decor)) applyDecor(id); }
-      if (inside && !canEnter(inside)) { goOut(); say('🚪 The owner closed this home'); } else if (inside && radioKey(prev.get(inside.id)) !== radioKey(owners.get(inside.id))) { radioOff = null; startRadio(); }
+      doorWatch(); if (inside && radioKey(prev.get(inside.id)) !== radioKey(owners.get(inside.id))) { radioOff = null; startRadio(); }
       syncCars(); ensurePalace(); healDecor(); if (!snapOk) { snapOk = true; firstSpawn(); } }
   let decorHealed = false;
   function healDecor() { if (decorHealed || !myPlot || !uid || !db || deco) return; const o = owners.get(myPlot); const h = HOUSE_BY_ID[myPlot]; if (!o || !h || !o.decor || typeof o.decor.items !== 'string') { decorHealed = true; return; }
@@ -873,8 +899,8 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
     catch (e) { btn.disabled = false; btn.textContent = 'Try again'; say(e.code === 'permission-denied' ? 'The shop isn’t open for garages yet (prices not published).' : e.message || 'Could not build'); } }
   async function moveOut(btn) { try { busy(btn, 'Moving out…'); const b = writeBatch(db); b.delete(doc(db, 'homes', myPlot)); b.delete(doc(db, 'users', uid, 'pal', 'home')); await b.commit(); save.cars = []; persist(true); pan.hidden = true; say('📦 Moved out. Your deed stays, so you can claim another house of that style for free.'); } catch (e) { btn.disabled = false; say(e.message || 'Could not move out'); } }
   function salePanel(h) { const st = HOME_STYLES[h.style]; panel(`<h3>🏷️ ${st.name}</h3><div class="row"><span>Plot ${h.id} · ${(h.town ? h.town : 'Kemy Street')}</span><b>${price(st)}</b></div><p><small>Living room, kitchen and bedroom inside. One home per player. Add a garage later.</small></p>${myPlot ? `<p><b>You already own ${myPlot}.</b></p>` : '<button data-b>Buy for ' + price(st) + '</button>'}`, (c) => { const b = c.querySelector('[data-b]'); if (b) b.onclick = () => buyHome(h, b); }); }
-  function myPanel() { const h = HOUSE_BY_ID[myPlot]; const st = HOME_STYLES[h.style]; const carNote = (() => { const G0 = garages.get(myPlot); const n = G0 ? G0.cars.length : 0; const ov = G0 ? G0.overflow : 0; if (h.admin) return `🚗 ${n} car${n === 1 ? '' : 's'} parked in the front yard for everyone to see. Walk up to one to drive it.`; return `🚗 ${n} car${n === 1 ? '' : 's'} parked here for everyone to see (garage holds ${garageCap(myTier)}, plus driveway${h.estate ? '' : ' + curb'} spots).${ov ? ` <b>${ov} more need a bigger garage.</b>` : ''} Walk up to a parked car to drive it; drive home and tap 🅿️ Park at home.`; })(); panel(`<h3>🏠 My ${h.admin ? h.spot : st.name}</h3>${h.admin ? '' : `<div class="row"><span>Garage</span><b>${myTier ? myTier + ' bay' + (myTier > 1 ? 's' : '') : 'none'}</b></div>`}` + GARAGES.filter((g) => g.tier > myTier && g.tier <= maxTier(h)).map((g) => `<div class="row"><span>${g.name}</span><button data-g="${g.tier}">${price(g)}</button></div>`).join('') + `<p><small>${carNote}</small></p><div><button data-gu>🚪 Open house & invites</button><button data-rd>📻 House radio</button><button data-dc>🛠️ Decorate inside</button><button data-yd>🎨 Decorate outside</button>${h.admin ? '<button data-sign>✏️ Edit sign</button>' : ''}</div><button class="g" data-m>Move out</button>${h.admin ? '' : ' <button class="g" data-sell>🏷️ Sell house</button>'}`,
-    (c) => { c.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => buyGarage(+b.dataset.g, b))); c.querySelector('[data-gu]').onclick = () => guestPanel(); c.querySelector('[data-rd]').onclick = () => radioPanel(); c.querySelector('[data-dc]').onclick = () => { pan.hidden = true; if (deco && deco.out) { say('Exit outside decorating first.'); return; } if (inside && inside.id === myPlot) startDeco('in'); else { goIn(HOUSE_BY_ID[myPlot]); setTimeout(() => startDeco('in'), 50); } }; const yd = c.querySelector('[data-yd]'); if (yd) yd.onclick = () => { pan.hidden = true; if (deco && !deco.out) endDeco(false); if (inside) goOut(); startDeco('out'); }; const sg = c.querySelector('[data-sign]'); if (sg) sg.onclick = () => signPanel(); c.querySelector('[data-m]').onclick = (e) => { if (e.target.dataset.sure) moveOut(e.target); else { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to move out'; } }; const sb = c.querySelector('[data-sell]'); if (sb) sb.onclick = () => sellPanel(); }); }
+  function myPanel() { const h = HOUSE_BY_ID[myPlot]; const st = HOME_STYLES[h.style]; const carNote = (() => { const G0 = garages.get(myPlot); const n = G0 ? G0.cars.length : 0; const ov = G0 ? G0.overflow : 0; if (h.admin) return `🚗 ${n} car${n === 1 ? '' : 's'} parked in the front yard for everyone to see. Walk up to one to drive it.`; return `🚗 ${n} car${n === 1 ? '' : 's'} parked here for everyone to see (garage holds ${garageCap(myTier)}, plus driveway${h.estate ? '' : ' + curb'} spots).${ov ? ` <b>${ov} more need a bigger garage.</b>` : ''} Walk up to a parked car to drive it; drive home and tap 🅿️ Park at home.`; })(); panel(`<h3>🏠 My ${h.admin ? h.spot : st.name}</h3>${h.admin ? '' : `<div class="row"><span>Garage</span><b>${myTier ? myTier + ' bay' + (myTier > 1 ? 's' : '') : 'none'}</b></div>`}` + GARAGES.filter((g) => g.tier > myTier && g.tier <= maxTier(h)).map((g) => `<div class="row"><span>${g.name}</span><button data-g="${g.tier}">${price(g)}</button></div>`).join('') + `<p><small>${carNote}</small></p>${(() => { const vs = inside && inside.id === myPlot ? visitorsHere() : []; return vs.length ? `<div class="kh-vis"><b>👋 Visitors here</b>${vs.map((o) => `<div class="row"><span>${esc(o.name || 'A Pal')}${o.uname ? ` <small>@${esc(o.uname)}</small>` : ''}</span><button class="g" data-lv="${esc(o.uid)}" data-lvn="${esc(o.name || '')}">Ask to leave</button></div>`).join('')}</div>` : ''; })()}<div><button data-gu>🚪 Open house & invites</button><button data-rd>📻 House radio</button><button data-dc>🛠️ Decorate inside</button><button data-yd>🎨 Decorate outside</button>${h.admin ? '<button data-sign>✏️ Edit sign</button>' : ''}</div><button class="g" data-m>Move out</button>${h.admin ? '' : ' <button class="g" data-sell>🏷️ Sell house</button>'}`,
+    (c) => { c.querySelectorAll('[data-g]').forEach((b) => (b.onclick = () => buyGarage(+b.dataset.g, b))); c.querySelectorAll('[data-lv]').forEach((b) => (b.onclick = () => askLeave(b.dataset.lv, b.dataset.lvn, b))); c.querySelector('[data-gu]').onclick = () => guestPanel(); c.querySelector('[data-rd]').onclick = () => radioPanel(); c.querySelector('[data-dc]').onclick = () => { pan.hidden = true; if (deco && deco.out) { say('Exit outside decorating first.'); return; } if (inside && inside.id === myPlot) startDeco('in'); else { goIn(HOUSE_BY_ID[myPlot]); setTimeout(() => startDeco('in'), 50); } }; const yd = c.querySelector('[data-yd]'); if (yd) yd.onclick = () => { pan.hidden = true; if (deco && !deco.out) endDeco(false); if (inside) goOut(); startDeco('out'); }; const sg = c.querySelector('[data-sign]'); if (sg) sg.onclick = () => signPanel(); c.querySelector('[data-m]').onclick = (e) => { if (e.target.dataset.sure) moveOut(e.target); else { e.target.dataset.sure = 1; e.target.textContent = 'Tap again to move out'; } }; const sb = c.querySelector('[data-sell]'); if (sb) sb.onclick = () => sellPanel(); }); }
   async function signAllowed(s) { if (!s || checkInput(s) || checkInput(s.toLowerCase()) || clean(s) !== s) return false; try { const { autoFlag } = await import('../moderation.js'); if (autoFlag(s)) return false; } catch { /* the word lists are the backup */ } return true; }
   function signPanel() { if (!amAdmin) return; const cur = signOf(owners.get(ADMIN_PLOT)); panel(`<h3>👑 Palace sign</h3><p><small>This is the gold sign out front. Everyone sees the same words. Up to 24 characters.</small></p><input id="kh-sign" maxlength="24" value="${esc(cur)}" style="width:100%;box-sizing:border-box;font:700 16px Inter,sans-serif;padding:8px;border-radius:10px;border:1px solid #ccc">`, (c) => { const b = document.createElement('button'); b.textContent = 'Save sign'; b.onclick = async () => { const raw = Array.from(c.querySelector('#kh-sign').value.replace(/\s+/g, ' ').trim()).slice(0, 24).join(''); const sign = raw || PALACE_SIGN; if (!(await signAllowed(sign))) { say('Let’s keep the sign friendly.'); return; } const o = owners.get(ADMIN_PLOT) || {}; try { await setDoc(doc(db, 'homes', ADMIN_PLOT), { owner: uid, name: S.profile.displayName, style: 'estate', garage: o.garage || 0, sign, at: serverTimestamp() }, { merge: true }); pan.hidden = true; say('👑 Sign updated'); } catch (e) { say(e && e.code === 'permission-denied' ? 'Only the admin can change this sign.' : 'Could not save the sign'); } }; c.insertBefore(b, c.querySelector('[data-x]').parentElement); }); }
   // 🏷️ sell back: a server function (sellHome) checks ownership + the deed and credits 60% in the same currency, once
@@ -891,7 +917,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
     catch (e) { btn.disabled = false; btn.textContent = 'Try again'; say((e && e.message) || 'Could not sell'); } }
   function homeFront(h) { return h ? doorSpot(h) : null; }
   function teleport(p) { if (deco && deco.out) endDeco(false); if (inside) goOut(p); else placeAt(p); }
-  homeB.onclick = () => { if (homeB.dataset.ring) { inviteRinger(); return; } if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
+  homeB.onclick = () => { if (D && D.mine && D.mine() && D.mine().state !== 'parked') { say('Park and get out first 🙂'); return; }
     if (myPlot) { teleport(homeFront(HOUSE_BY_ID[myPlot])); say('🏠 Home sweet home'); return; }
     findHome('all', 0); };
   const placeName = (h) => (h.estate ? h.spot : h.city ? CITY_BY_ID[h.city].name : h.town ? ({ down: '🏙️ Kemy Downtown', farm: '🌾 Clover Fields', snow: '❄️ Frostberry', desert: '🌵 Sunstone', lake: '🛶 Willow Lake', shore: '🏖️ Sunny Shore' }[h.town] || h.town) : '🎃 Kemy Street');
@@ -945,7 +971,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
   api.houseLocked = (id) => { const h = HOUSE_BY_ID[id]; return !!(h && h.sale); };
   let promptNow = null; const prevPrompt = api.prompt; api.prompt = () => { const p0 = prevPrompt && prevPrompt(); if (p0) return p0; return promptNow; };
   const prevAct = api.onAction; api.onAction = (a) => { if (a && a.startsWith('kh:')) act(a.slice(3)); else if (prevAct) prevAct(a); };
-  function act(a) { const [k, v] = a.split(':'); if (k === 'sale') salePanel(HOUSE_BY_ID[v]); else if (k === 'mine') myPanel(); else if (k === 'sign') signPanel(); else if (k === 'ring') ringDoor(v); else if (k === 'invite') inviteRinger(); else if (k === 'locked') { orphanCheck(v); say('🔒 ' + (owners.get(v)?.name || 'A Pal') + '’s home. Only the owner can go inside.'); } else if (k === 'out') goOut(); else if (k === 'sit') sitDown(+v); else if (k === 'stand') standUp(); else if (k === 'life') { if (v !== 'wait') life.act(v); } else if (k === 'tv') tvAct(); else if (k === 'park') parkHome(); else if (k === 'take') takeCar(pendingTake); }
+  function act(a) { const [k, v] = a.split(':'); if (k === 'sale') salePanel(HOUSE_BY_ID[v]); else if (k === 'mine') myPanel(); else if (k === 'sign') signPanel(); else if (k === 'ring') ringDoor(v); else if (k === 'locked') { orphanCheck(v); say('🔒 ' + (owners.get(v)?.name || 'A Pal') + '’s home. Only the owner can go inside.'); } else if (k === 'out') goOut(); else if (k === 'sit') sitDown(+v); else if (k === 'stand') standUp(); else if (k === 'life') { if (v !== 'wait') life.act(v); } else if (k === 'tv') tvAct(); else if (k === 'park') parkHome(); else if (k === 'take') takeCar(pendingTake); }
   inB.onclick = () => { const h = HOUSE_BY_ID[inB.dataset.h]; if (h) goIn(h); };
   // my cars at home: walk up to any parked car to drive it; drive back home and tap Park to put it away (it reappears in its spot)
   const ownHomes = () => [...owners.entries()].filter(([, o]) => o.owner === uid).map(([id]) => HOUSE_BY_ID[id]).filter(Boolean);
@@ -1010,7 +1036,6 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
       if (near) { const t = up ? '🪜 Downstairs' : '🪜 Upstairs'; if (flB.textContent !== t) flB.textContent = t; } }
     const mineH = myPlot && HOUSE_BY_ID[myPlot]; yardB.hidden = !!(inside || deco || driving || !mineH || Math.hypot(P.x - mineH.x, P.z - mineH.z) > (mineH.estate ? 55 : 28));
     if (inside && roomLight) { roomLight.intensity = (LOW ? 18 : 26); const r = rooms.get(inside.id); if (r) { r.I.update(dt, P); if (roomLight2) { const up = P.y > FLAT + 2.5; roomLight2.position.set(r.cx + 3.4, FLAT + (up ? 5.9 : 2.7), r.cz + (up ? -2.5 : -1)); } if (deco) decoTick(dt); } }
-    const inviteLab = paintInvite(); if (inviteLab && !promptNow && !deco) promptNow = { id: 'kh:invite', label: inviteLab };
     persist(false);
     window.__kh = Object.assign(window.__kh || {}, { myPlot, myTier, inside: inside && inside.id, owners: owners.size, cars: [...garages.values()].reduce((a, g) => a + g.carMs.length, 0), garages: garages.size, signs: signs.size, street: !!save.street, prompt: promptNow && promptNow.label, mini: radioBox.classList.contains('min'), dock: radioBox.classList.contains('dock'), radioOpen: !radioBox.hidden, mates: party && party.state ? party.state.n : 0, floor: flB.hidden || !flB.classList.contains('on') ? '' : flB.textContent }); }
   // debug only (kemy-pals-debug=1): pretend to own a plot locally to preview garages/interiors (no writes)
@@ -1019,8 +1044,8 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
   const life = attachHomeLife(api, { inside: () => inside, room: () => (inside && rooms.get(inside.id)) || null, say,
     sitAt: (o) => { P.sit = { x: o.x, z: o.z, y: o.y, yaw: o.yaw, seat: o.seat || null, back: o.back, off: () => (o.dn === 'sleep' ? life.act('wake') : null) }; P.x = o.x; P.z = o.z; P.yaw = o.yaw; api.markDirty && api.markDirty(); },
     unsit: () => { const st = P.sit; if (!st) return; P.sit = null; P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; api.markDirty && api.markDirty(); } });
-  window.__khApi = { tvAudio: () => (rad && rad.au) || null, tvCanvas: () => tvC, life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, floor: () => changeFloor(), sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
-  function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('kemy:media-play', onEmbPlay); removeEventListener('kemy:media-stop', onEmbStop); embAud.paused = true; if (window.__kemyAud) window.__kemyAud.delete(embAud); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); css.remove(); css2.remove(); }
+  window.__khApi = { ringDoor, considerRing, doorWatch, visitorsHere, askLeave, waiting: () => (waitRing ? { ...waitRing } : null), tvAudio: () => (rad && rad.au) || null, tvCanvas: () => tvC, life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, floor: () => changeFloor(), sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
+  function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('kemy:media-play', onEmbPlay); removeEventListener('kemy:media-stop', onEmbStop); embAud.paused = true; if (window.__kemyAud) window.__kemyAud.delete(embAud); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); clearInterval(doorT); clearTimeout(arrT); waitEl.remove(); arrEl.remove(); css.remove(); css2.remove(); }
   void Q; void K;
   return { update, destroy };
 }

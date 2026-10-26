@@ -1,0 +1,32 @@
+// Rules tests: 🔔 doorbell let-in (homes/{plot}.door). Owner-only answers; a let-in opens houseHere until it runs out;
+// "not now" (negative) and blocked visitors stay outside. Run:
+// firebase emulators:exec --config firebase.emu.json --only firestore "node tests/world/doorbell-rules.test.mjs"
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+const env = await initializeTestEnvironment({ projectId: 'demo-bell', firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, String(e.message).slice(0, 300)); } };
+await env.withSecurityRulesDisabled(async (c) => { const d = c.firestore();
+  for (const [u, n] of [['owner', 'Olive'], ['kid', 'Kid'], ['pal', 'Pal'], ['meanie', 'Meanie']]) await setDoc(doc(d, `users/${u}`), { displayName: n, username: u });
+  await setDoc(doc(d, 'users/owner/blocks/meanie'), { at: 1 });
+  await setDoc(doc(d, 'homes/h05'), { owner: 'owner', name: 'Olive', style: 'cottage', garage: 0, at: new Date() }); });
+const OWN = env.authenticatedContext('owner').firestore(); const KID = env.authenticatedContext('kid').firestore();
+const PAL = env.authenticatedContext('pal').firestore(); const MEAN = env.authenticatedContext('meanie').firestore();
+const door = (db, name, d) => updateDoc(doc(db, 'homes/h05'), { door: d, name, at: serverTimestamp() });
+const here = (db, u, n) => setDoc(doc(db, `houseHere/h05/who/${u}`), { x: 10, z: 10, y: 0, f: 0, a: 'i', n, u, e: '', s: '', sa: 0, dn: '', p: { species: 'tiger', name: 'Bloop', level: 1, colors: {}, outfit: {} }, at: serverTimestamp() });
+const later = Date.now() + 30 * 60 * 1000;
+await ok('closed house: kid cannot walk in', assertFails(here(KID, 'kid', 'Kid')));
+await ok('visitor cannot let themselves in', assertFails(door(KID, 'Kid', { kid: later })));
+await ok('owner lets kid in', assertSucceeds(door(OWN, 'Olive', { kid: later, pal: -Date.now(), meanie: later })));
+await ok('let-in kid can go inside', assertSucceeds(here(KID, 'kid', 'Kid')));
+await ok('"not now" pal stays outside', assertFails(here(PAL, 'pal', 'Pal')));
+await ok('blocked visitor stays outside even if let in', assertFails(here(MEAN, 'meanie', 'Meanie')));
+await ok('control: pal let in can enter', assertSucceeds((async () => { await door(OWN, 'Olive', { kid: later, pal: later, meanie: later }); await here(PAL, 'pal', 'Pal'); })()));
+await ok('control: meanie unblocked can enter', assertSucceeds((async () => { await env.withSecurityRulesDisabled(async (c) => { const { deleteDoc } = await import('firebase/firestore'); await deleteDoc(doc(c.firestore(), 'users/owner/blocks/meanie')); }); await here(MEAN, 'meanie', 'Meanie'); })()));
+await ok('door with 21 entries rejected', assertFails(door(OWN, 'Olive', Object.fromEntries(Array.from({ length: 21 }, (_, i) => ['u' + String.fromCharCode(97 + i), later])))));
+await ok('door must be a map', assertFails(door(OWN, 'Olive', ['kid'])));
+await ok('visitor cannot edit decor', assertFails(updateDoc(doc(KID, 'homes/h05'), { decor: { wall: '#fff' }, name: 'Kid', at: serverTimestamp() })));
+await ok('let-in runs out (expired value)', assertSucceeds(door(OWN, 'Olive', { kid: Date.now() - 1000 })));
+await ok('expired let-in: kid cannot re-enter', assertFails((async () => { await new Promise((r) => setTimeout(r, 300)); await here(KID, 'kid', 'Kid'); })()));
+await ok('owner still walks in', assertSucceeds(here(OWN, 'owner', 'Olive')));
+console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

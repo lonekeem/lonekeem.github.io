@@ -1422,12 +1422,40 @@ async function pageNotifications(asStudio, token) {
     if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings/account"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if ((n.type === 'friend' || n.type === 'friend_ok') && owner === S.user.uid && window.kemyFriends) return window.kemyFriends.noteHtml(n, avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false), shown(n.fromUid, n.fromName), timeAgo(n.createdAt));
+    // 🔔 doorbell: answer right here, even away from Pal Park (js/world/doorbell.js)
+    if (owner === S.user.uid && n.type === 'house' && n.fromUid && /rang your doorbell/.test(String(n.text || '')) && /^h[0-9]{2,3}$|^hm[0-9]{4}$/.test(String(n.postId || ''))) {
+      return `<div class="list-item bell-note ${n.read ? '' : 'unread'}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
+      <div class="meta" style="flex:1;min-width:0"><div>🔔 <b class="${nameCls('', n.fromUid)}">${shown(n.fromUid, n.fromName)}</b> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p><a href="#/street">${esc(n.text)}</a></p>
+      <div class="bell-acts" data-bell="${esc(n.fromUid)}" data-plot="${esc(n.postId)}" data-name="${esc(String(n.fromName || 'A Pal').slice(0, 24))}" style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn bell-yes" style="flex:1;min-height:48px;font-size:16px;font-weight:800">Let them in</button><button type="button" class="btn btn-ghost bell-no" style="flex:1;min-height:48px;font-size:16px;font-weight:800">Not now</button></div></div></div>`;
+    }
     const href = n.type === 'message' ? '#/messages' : n.type === 'game' ? (String(n.text || '').includes('Pal Games') ? `#/games/pals/${esc(n.postId)}` : `#/game/${esc(n.postId)}`) : n.type === 'house' ? '#/street' : n.type === 'daily' ? '#/pals' : n.type === 'announce' ? (String(n.postId || '').startsWith('#/') ? esc(n.postId) : '#/feed') : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b class="${nameCls('', n.fromUid)}">${shown(n.fromUid, n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
   }).join('') : '<div class="empty">No notifications yet.</div>';
   window.kemyFriends?.wireNotes($('#notes'));
   items.filter((n) => !n.read).forEach((n) => updateDoc(doc(db, 'users', owner, 'notifications', n.id), { read: true }).catch(() => {}));
+  wireBells($('#notes'), token);
+}
+// Doorbell notes: show what was already answered (homes/{plot}.door), then Let them in / Not now
+async function wireBells(root, token) {
+  const els = [...root.querySelectorAll('[data-bell]')]; if (!els.length) return;
+  const B = await import('./world/doorbell.js'); const homes = new Map();
+  for (const p of new Set(els.map((e) => e.dataset.plot))) { try { const h = await getDoc(doc(db, 'homes', p)); homes.set(p, h.exists() ? h.data() : null); } catch { homes.set(p, null); } }
+  if (stale(token)) return;
+  const paint = (who, plot, st) => els.filter((e) => e.dataset.bell === who && e.dataset.plot === plot).forEach((e) => { const y = e.querySelector('.bell-yes'), n = e.querySelector('.bell-no'); if (!y || !n) return;
+    y.textContent = st === 'in' ? 'Let in ✓' : 'Let them in'; y.disabled = st === 'in'; n.textContent = st === 'no' ? 'Not now ✓' : 'Not now'; n.disabled = st === 'no'; });
+  els.forEach((e) => { const who = e.dataset.bell, plot = e.dataset.plot, h = homes.get(plot);
+    if (!h || h.owner !== S.user.uid) { e.innerHTML = '<span class="muted small">This home isn’t yours anymore.</span>'; return; }
+    if (S.blocked.has(who)) { e.remove(); return; }
+    paint(who, plot, B.doorState(h, who));
+    const go = async (yes) => { const y = e.querySelector('.bell-yes'), n = e.querySelector('.bell-no'); y.disabled = n.disabled = true; (yes ? y : n).textContent = yes ? 'Letting in…' : '…';
+      try { const res = await B.answerDoor(db, S, plot, who, yes);
+        if (res === 'in' || res === 'no') { paint(who, plot, res); if (res === 'in') toast(`🏠 You let ${e.dataset.name || 'them'} in. They can come inside for 30 minutes.`); }
+        else { paint(who, plot, ''); toast(res === 'blocked' ? 'You blocked this player.' : 'That home isn’t yours anymore.'); } }
+      catch (err) { paint(who, plot, ''); toast(err && err.code === 'permission-denied' ? 'Could not open the door. Try again in a moment.' : 'Could not answer the door'); } };
+    e.querySelector('.bell-yes').onclick = (ev) => { ev.preventDefault(); go(true); };
+    e.querySelector('.bell-no').onclick = (ev) => { ev.preventDefault(); go(false); };
+  });
 }
 
 // ---------------------------------------------------------------- admin
@@ -1832,7 +1860,11 @@ async function loadSession() {
   let inboxBoot = true;
   S.globalUnsubs.push(onSnapshot(query(collection(db, 'users', uid, 'notifications'), orderBy('createdAt', 'desc'), limit(5)), (qs) => {
     if (inboxBoot) { inboxBoot = false; return; }
-    if (qs.docChanges().some((c) => c.type === 'added' && c.doc.data().read !== true)) {
+    const fresh = qs.docChanges().filter((c) => c.type === 'added' && c.doc.data().read !== true).map((c) => c.doc.data());
+    const rings = fresh.filter((n) => n.type === 'house' && n.fromUid && !S.blocked.has(n.fromUid) && /rang your doorbell/.test(String(n.text || '')));
+    // 🔔 a doorbell pops a Let in / Not now card (with its own ding-dong) wherever you are in Kemy
+    if (rings.length) import('./world/doorbell.js').then((B) => rings.forEach((n) => B.ringCard({ uid: n.fromUid, name: String(n.fromName || 'A Pal').slice(0, 24), username: String(n.fromUsername || 'pal').replace(/[^a-z0-9_.]/gi, '').slice(0, 20) || 'pal', plot: String(n.postId || '') }, { db, S, toast }))).catch(() => {});
+    if (fresh.length > rings.length) {
       import('./chime.js').then((m) => m.playChime()).catch(() => {});
     }
   }, () => {}));
