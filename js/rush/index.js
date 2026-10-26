@@ -6,7 +6,7 @@ import { KEMY, CAPY, snap } from './driver.js';
 
 export function loadCss() {
   if (document.getElementById('rush-css')) return;
-  const l = document.createElement('link'); l.id = 'rush-css'; l.rel = 'stylesheet'; l.href = 'css/rush.css?v=1'; document.head.appendChild(l);
+  const l = document.createElement('link'); l.id = 'rush-css'; l.rel = 'stylesheet'; l.href = 'css/rush.css?v=2'; document.head.appendChild(l);
 }
 export function music() { import('../gamemusic.js').then(async (m) => { try { await m.mountGameMusic({ corner: 'top-right' }); if (!m.isPlaying()) m.playStation('theme', { volume: 0.18 }); } catch { /* optional */ } }).catch(() => {}); }
 const PAL_TTL = 60000; let palCache = { uid: '', at: 0, pal: null };
@@ -24,17 +24,25 @@ export function paint(cv, o) {
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); try { drawScene(c, r.width, r.height, o); } catch (e) { console.warn('rush scene', e); } return true; };
   if (!go()) requestAnimationFrame(() => go());
 }
+// Admin / ∞ Pass in Hill Rush. Same trusted check as the shared wallets (inf-pass.js: verified admin account, or the
+// infPass/{uid} doc that only the admin can write). Returns '' | 'admin' | 'inf'. Only ever true for the signed-in user.
+export async function passOf(uid) {
+  if (!uid) return '';
+  try { const [m, f] = await Promise.all([import('../inf-pass.js'), import('../firebase-init.js')]); const u = f.auth.currentUser;
+    if (!u || u.uid !== uid) return ''; if (m.isAdminUser(u)) return 'admin'; return (await m.hasPass(uid)) ? 'inf' : ''; } catch { return ''; }
+}
+export const PASS_LABEL = { admin: '👑 Admin pass', inf: '♾️ ∞ Pass' };
 const STAT = (v) => [['Power', v.torque / 60], ['Speed', v.speed / 48], ['Grip', v.grip / 1.5], ['Fuel', v.fuel / 70], ['Air control', v.air / 7], ['Bounce', v.hz / 6.5]];
-const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+const fmt = (n) => (n === Infinity ? '∞' : Number(n || 0).toLocaleString('en-US'));
 
 const REASON = { fuel: ['⛽ Out of fuel!', 'Grab the fuel cans to keep going.'], crash: ['💫 Bonk!', 'Your Pal bumped their head. Land on your wheels!'], quit: ['Run over', ''], finish: ['🏁 Finish!', ''], time: ['⏱️ Time!', ''] };
 export async function page(ctx, b, params, token) {
   const { ui, esc, toast, main } = ctx; loadCss(); music();
   const uid = ui.myUid ? ui.myUid() : (ctx.S.user && ctx.S.user.uid) || '';
   const st = rushStore(uid);
-  let pal = await myPal(ctx); if (ctx.stale && ctx.stale(token)) return;
+  const [pass, pal0] = await Promise.all([passOf(uid), myPal(ctx)]); let pal = pal0; if (ctx.stale && ctx.stale(token)) return; st.setPass(pass);
   const D = () => st.d; const $ = (s) => main.querySelector(s);
-  const bank = () => `<span class="rush-bank" title="Rush Stars buy cars, upgrades and stages">⭐ ${fmt(D().stars)} <small>Rush Stars</small></span>`;
+  const bank = () => `<span class="rush-bank" title="Rush Stars buy cars, upgrades and stages">⭐ ${fmt(D().stars)} <small>Rush Stars</small></span>${pass ? `<span class="rush-pass" title="Every car and stage is open, upgrades are free">${PASS_LABEL[pass]} · all open</span>` : ''}`;
   const tap = () => ui.sfx.play('tap');
   if (b === 'garage') return garage(); if (b === 'stages') return stages();
   return menu();
@@ -79,8 +87,8 @@ export async function page(ctx, b, params, token) {
   }
 
   function stages() {
-    ui.shell('Stages', `<div class="rush-page"><div class="rush-top">${bank()}<span class="muted small">Earn Rush Stars to unlock new worlds.</span></div>
-      <div class="rush-grid" id="rush-sg">${STAGES.map((s) => { const open = D().stages.includes(s.id); return `<button type="button" class="rush-card2 ${open ? '' : 'lock'} ${D().stage === s.id ? 'sel' : ''}" data-s="${s.id}" aria-label="${esc(s.name)}${open ? '' : ', locked, ' + s.cost + ' stars'}">
+    ui.shell('Stages', `<div class="rush-page"><div class="rush-top">${bank()}<span class="muted small">${st.pass ? 'Every world is open with your pass.' : 'Earn Rush Stars to unlock new worlds.'}</span></div>
+      <div class="rush-grid" id="rush-sg">${STAGES.map((s) => { const open = st.opened(s.id); return `<button type="button" class="rush-card2 ${open ? '' : 'lock'} ${D().stage === s.id ? 'sel' : ''}" data-s="${s.id}" aria-label="${esc(s.name)}${open ? '' : ', locked, ' + s.cost + ' stars'}">
         <canvas></canvas>${open ? '' : `<span class="lk">🔒 ⭐ ${fmt(s.cost)}</span>`}<b>${s.emoji} ${esc(s.name)}</b><small>${esc(s.quirk)}</small>
         <span class="best">${open ? (st.best(s.id) ? '🏁 Best ' + fmt(st.best(s.id)) + ' m' : 'Not driven yet') : esc(s.blurb)}</span></button>`; }).join('')}</div>
       <a class="btn btn-ghost btn-block" href="#/games/rush">⬅ Back</a></div>`, '#/games/rush');
@@ -88,24 +96,25 @@ export async function page(ctx, b, params, token) {
     const next = () => { if (i >= cards.length || !document.body.contains(cards[0])) return; const el = cards[i++], s = STAGE[el.dataset.s]; paint(el.querySelector('canvas'), { stage: s, camX: 30, ppm: 0, ax: 0.42, ay: 0.66, t: 3, cars: [{ vid: D().vid, pal, x: 30, ups: st.ups(D().vid) }], items: [{ t: 'star', x: 35 }, { t: 'dia', x: 38 }] }); setTimeout(next, 16); };
     next();
     cards.forEach((el) => el.onclick = () => { const s = STAGE[el.dataset.s];
-      if (D().stages.includes(s.id)) { st.pick('stage', s.id); tap(); location.hash = '#/games/rush'; return; }
+      if (st.opened(s.id)) { st.pick('stage', s.id); tap(); location.hash = '#/games/rush'; return; }
       if (D().stars < s.cost) { ui.sfx.play('wrong'); toast(`You need ⭐ ${fmt(s.cost - D().stars)} more Rush Stars for ${s.name}.`); return; }
       if (!confirm(`Unlock ${s.name} for ⭐ ${fmt(s.cost)} Rush Stars?`)) return;
       if (st.unlockStage(s.id)) { ui.sfx.play('cheer'); toast(`${s.emoji} ${s.name} unlocked!`); stages(); } });
   }
 
   function garage() {
-    const vid = params.v && VEHICLE[params.v] ? params.v : D().vid; const v = VEHICLE[vid], own = D().owned.includes(vid), tv = tuned(vid, st.ups(vid));
+    const vid = params.v && VEHICLE[params.v] ? params.v : D().vid; const v = VEHICLE[vid], own = st.owns(vid), tv = tuned(vid, st.ups(vid));
     ui.shell('Garage', `<div class="rush-page"><div class="rush-top">${bank()}<span class="muted small">Pick a car, then tune it up.</span></div>
       <div class="rush-hero"><canvas id="rush-gc"></canvas></div>
       <div><h3 class="rush-h">${esc(v.name)} <small class="muted">${esc(v.type)}</small></h3>
         <div class="rush-stats">${STAT(tv).map(([n, f]) => `<div><span style="width:78px">${n}</span><b><s style="width:${Math.round(Math.max(0.06, Math.min(1, f)) * 100)}%"></s></b></div>`).join('')}</div></div>
       ${own ? `<div class="rush-ups">${UPGRADES.map((u) => { const l = st.lv(vid, u.id), c = upgradeCost(vid, u.id, l); return `<div class="rush-up"><span style="font-size:24px">${u.icon}</span><span><b>${u.name}</b> <small class="muted">${u.what}</small><span class="pips">${Array.from({ length: MAX_LV }, (_, k) => `<i class="${k < l ? 'on' : ''}"></i>`).join('')}</span></span>
-        ${l >= MAX_LV ? '<span class="btn btn-sm btn-ghost" aria-disabled="true">MAX</span>' : `<button type="button" class="btn btn-sm" data-up="${u.id}" ${D().stars < c ? 'aria-disabled="true"' : ''}>⭐ ${fmt(c)}</button>`}</div>`; }).join('')}</div>
+        ${l >= MAX_LV ? '<span class="btn btn-sm btn-ghost" aria-disabled="true">MAX</span>' : `<button type="button" class="btn btn-sm" data-up="${u.id}" ${st.canPay(c) ? '' : 'aria-disabled="true"'}>${pass ? 'Free' : '⭐ ' + fmt(c)}</button>`}</div>`; }).join('')}
+        ${pass && UPGRADES.some((u) => st.lv(vid, u.id) < MAX_LV) ? '<button type="button" class="btn btn-ghost btn-block" id="rush-max">⚡ Max every upgrade (free with your pass)</button>' : ''}</div>
         ${D().vid === vid ? '<p class="muted small">✅ You are driving this one.</p>' : `<button type="button" class="btn btn-block" id="rush-use">Drive the ${esc(v.name)}</button>`}`
         : `<button type="button" class="btn btn-block" id="rush-buy">🔓 Unlock for ⭐ ${fmt(v.cost)}</button>`}
       <h3 class="rush-h">All cars</h3>
-      <div class="rush-grid" id="rush-vg">${VEHICLES.map((x) => { const o = D().owned.includes(x.id); return `<button type="button" class="rush-card2 ${o ? '' : 'lock'} ${x.id === vid ? 'sel' : ''}" data-v="${x.id}"><canvas></canvas>${o ? '' : `<span class="lk">🔒 ⭐ ${fmt(x.cost)}</span>`}<b>${esc(x.name)}</b><small>${esc(x.type)}</small>${D().vid === x.id ? '<span class="best">Driving</span>' : ''}</button>`; }).join('')}</div>
+      <div class="rush-grid" id="rush-vg">${VEHICLES.map((x) => { const o = st.owns(x.id); return `<button type="button" class="rush-card2 ${o ? '' : 'lock'} ${x.id === vid ? 'sel' : ''}" data-v="${x.id}"><canvas></canvas>${o ? '' : `<span class="lk">🔒 ⭐ ${fmt(x.cost)}</span>`}<b>${esc(x.name)}</b><small>${esc(x.type)}</small>${D().vid === x.id ? '<span class="best">Driving</span>' : ''}</button>`; }).join('')}</div>
       <a class="btn btn-ghost btn-block" href="#/games/rush">⬅ Back</a></div>`, '#/games/rush');
     paint($('#rush-gc'), { stage: STAGE[D().stage], camX: 30, ax: 0.5, ay: 0.7, ppm: 0, t: 1, cars: [{ vid, pal, x: 30, ups: st.ups(vid), mood: own ? 'happy' : 'idle', s: 1.15 }] });
     const cards = [...main.querySelectorAll('.rush-page [data-v]')]; let i = 0;
@@ -113,10 +122,11 @@ export async function page(ctx, b, params, token) {
     next();
     cards.forEach((el) => el.onclick = () => { tap(); params = { ...params, v: el.dataset.v }; garage(); scrollTo(0, 0); });
     main.querySelectorAll('.rush-page [data-up]').forEach((el) => el.onclick = () => { const u = el.dataset.up, c = upgradeCost(vid, u, st.lv(vid, u));
-      if (D().stars < c) { ui.sfx.play('wrong'); toast(`You need ⭐ ${fmt(c - D().stars)} more Rush Stars.`); return; }
+      if (!st.canPay(c)) { ui.sfx.play('wrong'); toast(`You need ⭐ ${fmt(c - D().stars)} more Rush Stars.`); return; }
       if (st.upgrade(vid, u)) { ui.sfx.play('star'); garage(); } });
     const buy = $('#rush-buy'); if (buy) buy.onclick = () => { if (D().stars < v.cost) { ui.sfx.play('wrong'); toast(`You need ⭐ ${fmt(v.cost - D().stars)} more Rush Stars. Drive to earn more!`); return; }
       if (!confirm(`Unlock the ${v.name} for ⭐ ${fmt(v.cost)} Rush Stars?`)) return; if (st.buyVehicle(vid)) { ui.sfx.play('cheer'); toast(`${v.name} is yours!`); garage(); } };
+    const mx = $('#rush-max'); if (mx) mx.onclick = () => { if (st.maxAll(vid, UPGRADES.map((u) => u.id))) { ui.sfx.play('cheer'); garage(); } };
     const use = $('#rush-use'); if (use) use.onclick = () => { st.pick('vid', vid); tap(); garage(); };
   }
 
@@ -125,7 +135,7 @@ export async function page(ctx, b, params, token) {
     const { startRun } = await import('./game.js');
     const s = STAGE[D().stage], vid = D().vid; pal = await myPal(ctx);
     const bots = mode === 'cpu' ? botField(s) : [];
-    const g = await startRun({ stage: s, vid, ups: st.ups(vid), pal: pal || KEMY, name: mode === 'cpu' ? 'You' : myName(ctx), seed: (Math.random() * 1e9) | 0, mode, raceLen: RACE_LEN.sprint, timeLimit: mode === 'cpu' ? 150 : 0, bots,
+    const g = await startRun({ stage: s, vid, ups: st.ups(vid), pal: pal || KEMY, name: mode === 'cpu' ? 'You' : myName(ctx), seed: (Math.random() * 1e9) | 0, mode, raceLen: RACE_LEN.sprint, timeLimit: mode === 'cpu' ? 150 : 0, bots, diaCap: pass ? Infinity : DIA_RUN_CAP,
       startAt: mode === 'cpu' ? Date.now() + 3200 : 0, sfx: ui.sfx,
       onQuit: () => menu(), onRestart: () => run(mode), onEnd: (r) => { g.stop(); mode === 'cpu' ? cpuEnd(r) : soloEnd(r, s); } });
   }
@@ -141,14 +151,16 @@ export async function page(ctx, b, params, token) {
   async function soloEnd(r, s) {
     const nb = st.best(s.id, r.dist); const got = st.addStars(r.stars);
     // real wallets: Star Coins for a good run, diamonds found on the road (both capped per run and per day)
-    let coins = 0, dias = 0; const signed = ui.signedIn();
+    // pass holders already have ∞ Star Coins + diamonds (the wallets skip earning for them), so nothing is sent
+    let coins = 0, dias = 0; const signed = ui.signedIn() && !pass;
     if (signed && r.dist >= 150) coins = st.take('coin', Math.min(COIN_RUN_CAP, 1 + Math.floor(r.dist / 200)), COIN_DAY_CAP);
     if (signed && r.dias) dias = st.take('dia', Math.min(DIA_RUN_CAP, r.dias), DIA_DAY_CAP);
-    const rows = [['Distance', fmt(r.dist) + ' m' + (nb ? ' · NEW BEST!' : '')], ['Best on ' + s.name, fmt(st.best(s.id)) + ' m'], ['Rush Stars', '⭐ +' + fmt(got)], ['Flips', r.flips], ['Best air', (r.air || 0).toFixed(1) + ' s'], ['Checkpoints', r.checks]];
+    const rows = [['Distance', fmt(r.dist) + ' m' + (nb ? ' · NEW BEST!' : '')], ['Best on ' + s.name, fmt(st.best(s.id)) + ' m'], ['Rush Stars', pass ? '⭐ ∞ (+' + fmt(got) + ')' : '⭐ +' + fmt(got)], ['Flips', r.flips], ['Best air', (r.air || 0).toFixed(1) + ' s'], ['Checkpoints', r.checks]];
     if (coins) rows.push(['Kemy Star Coins', '🪙 +' + coins]); if (dias) rows.push(['Diamonds', '💎 +' + dias]);
-    if (!signed) rows.push(['Sign in', 'to also earn Star Coins and diamonds']);
+    if (pass) rows.push(['Diamonds found', '💎 ' + (r.dias | 0) + ' · wallet ∞'], [PASS_LABEL[pass], 'all cars, stages, upgrades']);
+    else if (!signed) rows.push(['Sign in', 'to earn coins + 💎']);
     const [t, sub] = REASON[r.reason] || REASON.quit;
-    ui.resultModal({ title: t, win: nb && r.dist > 30, noReward: true, html: `<h2>${t}</h2><p>${sub}</p><div class="rush-res">${rows.map(([a, b]) => `<div><span>${a}</span><span>${b}</span></div>`).join('')}</div>`,
+    ui.resultModal({ title: t, win: nb && r.dist > 30, noReward: true, cls: 'rush-result', html: `<h2>${t}</h2><p>${sub}</p><div class="rush-res">${rows.map(([a, b]) => `<div><span>${a}</span><span>${b}</span></div>`).join('')}</div>`,
       buttons: [{ label: '▶ Drive again', onClick: () => run('solo') }, { label: '🔧 Garage', href: '#/games/rush/garage' }, { label: 'Menu', onClick: () => menu() }] });
     menu();
     if (coins) { try { const { createEconomy } = await import('../pals/economy.js'); const econ = createEconomy(ctx.db, uid); await econ.earn('win', coins); } catch (e) { st.give('coin', coins); console.warn('rush coins', e); } }
@@ -159,15 +171,15 @@ export async function page(ctx, b, params, token) {
     const got = st.addStars(Math.round(r.stars + (r.fin ? [0, 60, 35, 20, 10][place] || 0 : 0)));
     if (ui.addCpuResult) try { ui.addCpuResult('rush', win ? 'w' : 'l'); } catch { /* optional */ }
     const ORD = ['', '1st', '2nd', '3rd', '4th'];
-    ui.resultModal({ title: win ? 'You win!' : ORD[place] + ' place', win, vsBot: true, noReward: !win,
+    ui.resultModal({ title: win ? 'You win!' : ORD[place] + ' place', win, vsBot: true, noReward: !win, cls: 'rush-result',
       html: `<h2>${win ? '🏆 You win!' : `🏁 You came ${ORD[place]}`}</h2><p>${r.fin ? 'Finished in ' + r.ft.toFixed(1) + ' s' : 'Out of time at ' + fmt(r.dist) + ' m'}</p>
-        <div class="rush-res">${field.map((x, i) => `<div class="${x.me ? 'me' : ''}"><span>${ORD[i + 1]} · ${esc(x.name)}</span><span>${x.fin ? x.ft.toFixed(1) + ' s' : fmt(x.d) + ' m'}</span></div>`).join('')}<div><span>Rush Stars</span><span>⭐ +${got}</span></div></div>`,
+        <div class="rush-res">${field.map((x, i) => `<div class="${x.me ? 'me' : ''}"><span>${ORD[i + 1]} · ${esc(x.name)}</span><span>${x.fin ? x.ft.toFixed(1) + ' s' : fmt(x.d) + ' m'}</span></div>`).join('')}<div><span>Rush Stars</span><span>${pass ? '⭐ ∞' : '⭐ +' + got}</span></div></div>`,
       buttons: [{ label: '▶ Race again', onClick: () => run('cpu') }, { label: 'Menu', onClick: () => menu() }] });
     menu();
   }
 }
 // Diamonds found in an online race: same per-run and per-day caps as solo, same queued wallet save.
-export function rushDias(ctx, st, uid, n) { const d = st.take('dia', Math.min(DIA_RUN_CAP, n | 0), DIA_DAY_CAP);
+export function rushDias(ctx, st, uid, n) { if (st.pass) return 0; const d = st.take('dia', Math.min(DIA_RUN_CAP, n | 0), DIA_DAY_CAP);
   if (d) import('../pals/armory.js').then(({ createDiamonds }) => queueDias(createDiamonds(ctx.db, uid), d)).catch((e) => console.warn('rush diamonds', e)); return d; }
 // One diamond save at a time (the wallet allows one save every ~46 s), kept alive across runs.
 let diaQ = Promise.resolve();

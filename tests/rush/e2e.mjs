@@ -50,7 +50,8 @@ if (part === 'solo' || part === 'all') {
   await go('a', '#/games/rush/stages'); await P.a.waitForSelector('#rush-sg'); await W('a', 900); await P.a.screenshot({ path: dir + 'stages.png' });
   await go('a', '#/games/rush/garage'); await P.a.waitForSelector('#rush-gc'); await W('a', 900); await P.a.screenshot({ path: dir + 'garage.png' }); await P.a.screenshot({ path: dir + 'garage-full.png', fullPage: true });
   await go('a', '#/games/rush'); await P.a.waitForSelector('#rush-go'); await P.a.click('#rush-go'); await P.a.waitForSelector('.rush-run canvas'); await W('a', 1500);
-  out.soloMs = await drive('a', 150000, { ms: 5000, f: 'gameplay-portrait.png' }); await W('a', 900);
+  out.soloMs = await drive('a', 90000, { ms: 5000, f: 'gameplay-portrait.png' }); await W('a', 900);
+  if (!(await P.a.$('#modal-root .rush-res'))) { out.soloStillDriving = (await hud('a')).d; await P.a.click('.rush-pause'); await W('a', 400); await P.a.click('[data-a=quit]'); await W('a', 1500); } // still going (fuel cans kept it alive): quit for the card
   out.soloResult = await modal('a'); await P.a.screenshot({ path: dir + 'results.png' });
   // landscape
   await go('a', '#/games/rush'); await P.a.setViewportSize({ width: 844, height: 390 }); await P.a.waitForSelector('#rush-go'); await W('a', 500); await P.a.screenshot({ path: dir + 'menu-landscape.png' });

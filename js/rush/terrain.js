@@ -82,10 +82,13 @@ export function makeTerrain(seed, stage) {
     const r = rng(seed * 31 + i * 7919 + 17), out = [], x0 = i * CHUNK;
     if (x0 < START_FLAT) return out;
     const n = r() < 0.75 ? 1 : 2;
-    for (let k = 0; k < n; k++) { const sx = x0 + 4 + r() * (CHUNK - 14), m = 3 + Math.floor(r() * 4); for (let j = 0; j < m; j++) { const x = sx + j * 1.3; out.push({ t: 'star', x, y: at(x) + 1.1 + Math.sin((j / Math.max(1, m - 1)) * Math.PI) * 0.9 }); } }
-    if (r() < 0.12 + Math.min(0.1, x0 / 20000)) { const x = x0 + 8 + r() * (CHUNK - 16); out.push({ t: 'dia', x, y: at(x) + 2.6 + r() * 1.5 }); }
+    for (let k = 0; k < n; k++) { const sx = x0 + 4 + r() * (CHUNK - 14), m = 3 + Math.floor(r() * 4); for (let j = 0; j < m; j++) { const x = sx + j * 1.3; out.push({ t: 'star', x, y: path(x) + 0.95 + Math.sin((j / Math.max(1, m - 1)) * Math.PI) * 0.35 }); } }
+    if (r() < 0.12 + Math.min(0.1, x0 / 20000)) { const x = x0 + 8 + r() * (CHUNK - 16); const lift = r(), y0 = path(x), crest = at(x) - (at(x - 3) + at(x + 3)) / 2 > 0.25;
+      out.push({ t: 'dia', x, y: y0 + 1.0 + (crest ? 0.3 + lift * 0.4 : lift * 0.15) }); }
     return out;
   }
+  // where the car body actually travels: the ground, or the line across a pit/gap the car jumps over
+  function path(x) { const g = at(x), l = at(x - 3), rr = at(x + 3); return g < Math.min(l, rr) - 0.6 ? (l + rr) / 2 : g; }
   function fuelXs(upto) { const r = rng(seed ^ 0xf00d), xs = []; let x = 120; while (x < upto) { xs.push(x); x += 150 + Math.min(110, x / 40) + r() * 50; } return xs; }
-  return { y: at, at, base, slope, zoneAt, zonesIn, poolTop, buildings, pickups, fuelXs };
+  return { y: at, at, path, base, slope, zoneAt, zonesIn, poolTop, buildings, pickups, fuelXs };
 }

@@ -39,7 +39,18 @@ export function makeDriver(pal, v, cache = new Map()) {
 }
 
 // Draw the whole vehicle + driver in vehicle coords. o: { wheels:[{x,y,a}], lean, bob, mood, t, night }
+// suspension strut + coil from the body mount down to the (moving) wheel hub, drawn behind the body so travel is visible
+function drawStrut(c, w, hx, hy) { const top = w.y - Math.max(0.32, w.r * 0.9), n = 6, L = hy - top;
+  c.lineCap = 'round'; c.strokeStyle = '#3b3550'; c.lineWidth = 0.09; c.beginPath(); c.moveTo(w.x, top); c.lineTo(hx, hy); c.stroke();
+  c.strokeStyle = '#c9c3dc'; c.lineWidth = 0.035; c.beginPath(); c.moveTo(w.x, top);
+  for (let i = 1; i <= n; i++) { const u = i / n; c.lineTo(w.x + (hx - w.x) * u + (i % 2 ? 0.07 : -0.07), top + L * u * 0.85); } c.stroke(); }
 export function drawVehicle(c, v, drv, o = {}) {
+  const ws = o.wheels || v.wheels.map((w) => ({ x: w.x, y: w.y, a: 0 }));
+  // visual body pitch (squat under throttle, dive under braking) around the axle midpoint; wheels stay put.
+  // Struts are drawn in the pitched body frame (hub mapped into it) so their tops stay bolted to the body.
+  const pitch = o.pitch || 0, pcx = (v.wheels[0].x + v.wheels[v.wheels.length - 1].x) / 2, pcy = v.wheels[0].y, pc = Math.cos(pitch), ps = Math.sin(pitch);
+  c.save(); if (pitch) { c.translate(pcx, pcy); c.rotate(-pitch); c.translate(-pcx, -pcy); }
+  v.wheels.forEach((w, i) => { const dx = ws[i].x - pcx, dy = ws[i].y - pcy; drawStrut(c, w, pcx + dx * pc - dy * ps, pcy + dx * ps + dy * pc); });
   drawBack(c, v);
   if (drv) {
     const s = v.seat, sp = drv.spr[o.mood || 'idle'] || drv.spr.idle, lean = (s.lean || 0) + (o.lean || 0), bob = o.bob || 0;
@@ -60,7 +71,7 @@ export function drawVehicle(c, v, drv, o = {}) {
     c.beginPath(); c.moveTo(shW.x, shW.y); c.quadraticCurveTo((shW.x + x) / 2, shW.y + 0.12, x - 0.03, y + 0.08); c.stroke();
     for (const dy of [-0.13, 0.11]) { c.beginPath(); c.ellipse(x + 0.02, y + dy, 0.075, 0.065, 0, 0, 7); c.fillStyle = drv.paw; c.fill(); c.lineWidth = 0.025; c.strokeStyle = 'rgba(43,29,74,.6)'; c.stroke(); } }
   drawFront(c, v, o);
-  const ws = o.wheels || v.wheels.map((w) => ({ x: w.x, y: w.y, a: 0 }));
+  c.restore();
   v.wheels.forEach((w, i) => drawWheel(c, v, ws[i].x, ws[i].y, w.r, ws[i].a));
 }
 function drawStar(c, x, y, r) { c.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); c.fillStyle = '#ffd23f'; c.fill(); c.lineWidth = 0.02; c.strokeStyle = '#b8860b'; c.stroke(); }

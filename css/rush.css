@@ -63,7 +63,7 @@ html.rush-on .gm-music, html.rush-on #gm-music { z-index: 10010; }
 .rush-mode.go { background: linear-gradient(#b8ffe6, #2ed3b7); }
 .rush-mode.on { background: linear-gradient(#ffe0ec, #ff9ec4); }
 .rush-mode.cpu { background: linear-gradient(#fff6c6, #ffd23f); }
-.rush-h { margin: 6px 0 0; font-size: 18px; color: var(--ink, #2b1d4a); }
+.rush-h { margin: 6px 0 0; font-size: 18px; color: var(--text, #f4f1fa); }
 .rush-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .rush-card2 { position: relative; display: grid; gap: 6px; padding: 8px; border-radius: 20px; border: 3px solid #2b1d4a; background: #fff; box-shadow: 0 4px 0 #2b1d4a; color: #2b1d4a; font: inherit; text-align: left; cursor: pointer; }
 .rush-card2 canvas { width: 100%; aspect-ratio: 16/10; border-radius: 14px; display: block; background: #e8f4ff; }
@@ -75,12 +75,43 @@ html.rush-on .gm-music, html.rush-on #gm-music { z-index: 10010; }
 .rush-ups { display: grid; gap: 8px; }
 .rush-up { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 16px; border: 3px solid #2b1d4a; background: #fff; color: #2b1d4a; }
 .rush-up .pips { display: flex; gap: 3px; margin-top: 3px; } .rush-up .pips i { width: 16px; height: 8px; border-radius: 4px; background: #ddd3f5; } .rush-up .pips i.on { background: #2ed3b7; }
-.rush-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 12px; font-size: 13px; color: var(--ink, #2b1d4a); }
+.rush-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 12px; font-size: 13px; color: var(--text, #f4f1fa); }
 .rush-stats div { display: flex; align-items: center; gap: 6px; } .rush-stats b { flex: 1; height: 8px; border-radius: 4px; background: #ddd3f5; overflow: hidden; } .rush-stats s { display: block; height: 100%; background: #ffb13b; }
 .rush-res { display: grid; gap: 6px; text-align: left; }
-.rush-res div { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 12px; background: #f4efff; font-weight: 700; }
-.rush-res div.me { background: #d9fff2; }
+.rush-res div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px; border-radius: 12px; background: #f4efff; font-weight: 700; color: #2b1d4a; -webkit-text-fill-color: #2b1d4a; border: 2px solid rgba(43,29,74,.18); }
+.rush-res div span { color: inherit; -webkit-text-fill-color: inherit; min-width: 0; overflow-wrap: anywhere; } .rush-res div span:last-child { text-align: right; white-space: nowrap; }
+.rush-res div.me { background: #d9fff2; border-color: #2ed3b7; }
 .rush-wait { display: grid; gap: 10px; }
 .rush-seat { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 16px; border: 3px solid #2b1d4a; background: #fff; color: #2b1d4a; font-weight: 800; }
 .rush-seat canvas { width: 54px; height: 54px; }
 .rush-code { font-size: 28px; font-weight: 900; letter-spacing: .14em; padding: 6px 14px; border-radius: 14px; background: #fff; border: 3px dashed #8a55dc; color: #2b1d4a; }
+
+/* ---- results card (fix2): readable rows on iOS in any theme, fits short landscape screens */
+.modal-backdrop:has(.rush-result) { padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.modal:has(.rush-result) { display: flex; flex-direction: column; overflow: hidden; padding: 18px 16px 14px; max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom))); }
+.modal > .rush-result { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+.rush-result h2 { margin: 0 0 4px; flex: none; }
+.rush-result > p { margin: 0 0 10px; color: #cfc6e2; -webkit-text-fill-color: #cfc6e2; flex: none; }
+.rush-result .rush-res { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; align-content: start; padding: 2px; }
+.rush-result .btns { flex: none; margin-top: 12px; position: sticky; bottom: 0; }
+.rush-result .kf-row { flex: none; } /* ➕ Add friend row (js/friends.js) stays visible; the result rows scroll instead */
+.rush-pass { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; background: linear-gradient(90deg, #ffd23f, #ffb13b); color: #2b1d4a; -webkit-text-fill-color: #2b1d4a; font-weight: 800; font-size: 12px; border: 2px solid #2b1d4a; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .modal:has(.rush-result) { max-width: min(760px, 100%); padding: 10px 14px 10px; border-radius: 20px; }
+  .modal:has(.rush-result) .close { top: 4px; right: 4px; }
+  .rush-result h2 { font-size: 1.15rem; margin: 0 28px 2px; }
+  .rush-result > p { margin: 0 0 6px; font-size: .85rem; }
+  .rush-result .rush-res { grid-template-columns: 1fr 1fr; gap: 4px 6px; }
+  .rush-result .rush-res div { padding: 4px 9px; font-size: .86rem; border-radius: 10px; }
+  .rush-result .btns { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+  .rush-result .kf-row { margin: 6px 0 0; padding: 4px 6px; gap: 4px; font-size: .8rem; }
+  .rush-result .kf-row-h { width: auto; font-size: 12px; }
+  .rush-result .btns .btn { padding: 8px 6px; font-size: .86rem; min-height: 38px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rush-pausebox { padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  .rush-card { max-height: calc(100dvh - 16px); padding: 12px; gap: 8px; border-radius: 20px; }
+  .rush-card h3 { font-size: 20px; }
+  .rush-card .btn { padding: 8px 10px; min-height: 40px; }
+  .rush-hero { aspect-ratio: auto; height: min(55vh, calc((100vw - 32px) / 2)); height: min(55dvh, calc((100vw - 32px) / 2)); }
+}
+@media (orientation: landscape) and (max-height: 340px) { .rush-result .rush-res div { padding: 3px 8px; font-size: .8rem; } .rush-result h2 { font-size: 1.02rem; } }

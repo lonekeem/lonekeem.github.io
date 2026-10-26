@@ -3,7 +3,7 @@
 import { STAGES, STAGE, VEHICLE, RACE_LEN } from './data.js';
 import { rushStore } from './store.js';
 import { KEMY } from './driver.js';
-import { loadCss, music, myPal, paint, rushDias } from './index.js';
+import { loadCss, music, myPal, paint, rushDias, passOf } from './index.js';
 import { codeBoxHtml } from '../games/code-join.js';
 
 const CD = 4000; const LIMIT = { sprint: 150, classic: 260 }; const ORD = ['', '1st', '2nd', '3rd', '4th'];
@@ -14,7 +14,7 @@ const order = (rows, winner) => { const o = rows.slice().sort((a, b) => (b.fin -
 export async function online(ctx, g0, token) {
   const { ui, esc, toast, main, S, db } = ctx; const net = ui.net, fs = net.fs; loadCss(); music();
   const gid = g0.id, me = ui.myUid(); let g = g0, cars = {}, game = null, finalS = null, finalOk = false, soonT = 0, stopHb = null, ended = false, shown = false, joinTried = false, myRes = null, sendT = 0, lastSend = 0, sending = false, queueT = 0, autoT = 0, twoAt = 0, doneT = 0, postN = 1, alive = true;
-  const st = rushStore(me); const pal = (await myPal(ctx)) || KEMY; if (ctx.stale && ctx.stale(token)) return;
+  const st = rushStore(me); const [pass, pal0] = await Promise.all([passOf(me), myPal(ctx)]); const pal = pal0 || KEMY; if (ctx.stale && ctx.stale(token)) return; st.setPass(pass);
   const member = () => g.players.includes(me), isHost = () => g.host === me;
   const carRef = (u) => fs.doc(db, 'games', gid, 'car', u);
   S.unsubs.push(() => { alive = false; clearInterval(sendT); clearInterval(queueT); clearTimeout(autoT); clearTimeout(doneT); clearTimeout(soonT); if (stopHb) stopHb(); if (game) game.stop(); });
@@ -39,7 +39,7 @@ export async function online(ctx, g0, token) {
         <div class="rush-hero" style="aspect-ratio:16/6"><canvas id="rw-hc"></canvas></div>
         <p><b>${s.emoji} ${esc(s.name)}</b> · ${RACE_LEN[m.len]} m race · <span class="muted">${esc(s.quirk)}</span></p>
         ${host ? `<label class="muted small" for="rw-st">Stage (you pick for everyone)</label>
-          <select id="rw-st" class="input">${STAGES.filter((x) => st.d.stages.includes(x.id) || x.id === m.stage).map((x) => `<option value="${x.id}" ${x.id === m.stage ? 'selected' : ''}>${x.emoji} ${esc(x.name)}</option>`).join('')}</select>
+          <select id="rw-st" class="input">${STAGES.filter((x) => st.opened(x.id) || x.id === m.stage).map((x) => `<option value="${x.id}" ${x.id === m.stage ? 'selected' : ''}>${x.emoji} ${esc(x.name)}</option>`).join('')}</select>
           <div class="rush-modes"><button type="button" class="btn btn-sm ${m.len === 'sprint' ? '' : 'btn-ghost'}" data-len="sprint">Sprint ${RACE_LEN.sprint} m</button><button type="button" class="btn btn-sm ${m.len === 'classic' ? '' : 'btn-ghost'}" data-len="classic">Long ${RACE_LEN.classic} m</button></div>` : ''}
         <h3 class="rush-h">Racers ${g.players.length} / 4</h3>
         <div class="rush-wait" id="rw-seats">${g.players.map((u, i) => `<div class="rush-seat"${u !== me ? ` data-kf-uid="${esc(u)}" data-kf-name="${esc(g.names[i] || '')}"` : ''}><canvas data-u="${u}"></canvas><span>${esc(g.names[i])}${u === g.host ? ' 👑' : ''}${u === me ? ' (you)' : ''}<br><small class="muted">${esc((VEHICLE[(cars[u] || {}).vid] || VEHICLE.scout).name)}</small></span></div>`).join('')}</div>
@@ -73,7 +73,7 @@ export async function online(ctx, g0, token) {
   async function race() {
     const m = parseMode(g.mode), s = STAGE[m.stage]; const { startRun } = await import('./game.js'); if (!alive || game) return;
     const startAt = Date.now() + (ms(g.roundAt) + CD - net.serverNow()); const lim = LIMIT[m.len];
-    game = await startRun({ stage: s, vid: st.d.vid, ups: st.ups(st.d.vid), pal, name: 'You', seed: g.round | 0, mode: 'online', raceLen: RACE_LEN[m.len], timeLimit: lim, startAt: Math.max(Date.now() + 800, startAt), sfx: ui.sfx, lag: 520,
+    game = await startRun({ stage: s, vid: st.d.vid, ups: st.ups(st.d.vid), pal, diaCap: pass ? Infinity : undefined, name: 'You', seed: g.round | 0, mode: 'online', raceLen: RACE_LEN[m.len], timeLimit: lim, startAt: Math.max(Date.now() + 800, startAt), sfx: ui.sfx, lag: 520,
       onQuit: () => { location.hash = '#/games/rush'; }, onRestart: () => { location.hash = '#/games/rush'; },
       onEnd: (r) => { myRes = r; finalS = game ? game.state() : null; sendFinal(); if (game) game.pop(r.fin ? 'Waiting for the others…' : 'Race over!', 'big'); maybeFinish(); } });
     g.players.forEach((u, i) => { if (u === me) return; const c = cars[u] || {}; game.setRemote(u, { name: g.names[i] || 'Racer', pal: c.pal || KEMY, vid: VEHICLE[c.vid] ? c.vid : 'scout', i }); if (c.at) game.pushSample(u, c); });
@@ -97,9 +97,9 @@ export async function online(ctx, g0, token) {
     const got = st.addStars(Math.round((myRes ? myRes.stars : 0) + ([0, 60, 35, 20, 10][place] || 0))); const dias = !local && ui.signedIn() && myRes && myRes.dias ? rushDias(ctx, st, me, myRes.dias) : 0;
     if (game) { game.stop(); game = null; }
     if (g.status === 'done' && !local) setTimeout(() => net.recordResult(g), 1500);
-    ui.resultModal({ title: win ? 'You win!' : `${ORD[place]} place`, win, pts: myRes ? myRes.dist : 0, noReward: !!local,
+    ui.resultModal({ title: win ? 'You win!' : `${ORD[place]} place`, win, pts: myRes ? myRes.dist : 0, noReward: !!local, cls: 'rush-result',
       html: `<h2>${win ? '🏆 You win!' : `🏁 You came ${ORD[place]}`}</h2><p>${esc(STAGE[parseMode(g.mode).stage].name)} · ${RACE_LEN[parseMode(g.mode).len]} m</p>
-        <div class="rush-res">${o.map((r, i) => `<div class="${r.uid === me ? 'me' : ''}"><span>${ORD[i + 1]} · ${esc(r.name)}${r.uid === me ? ' (you)' : ''}</span><span>${r.fin ? r.ft.toFixed(2) + ' s' : (r.d | 0) + ' m'}</span></div>`).join('')}<div><span>Rush Stars</span><span>⭐ +${got}</span></div>${dias ? `<div><span>Diamonds</span><span>💎 +${dias}</span></div>` : ''}</div>`,
+        <div class="rush-res">${o.map((r, i) => `<div class="${r.uid === me ? 'me' : ''}"><span>${ORD[i + 1]} · ${esc(r.name)}${r.uid === me ? ' (you)' : ''}</span><span>${r.fin ? r.ft.toFixed(2) + ' s' : (r.d | 0) + ' m'}</span></div>`).join('')}<div><span>Rush Stars</span><span>${pass ? '⭐ ∞' : '⭐ +' + got}</span></div>${dias ? `<div><span>Diamonds</span><span>💎 +${dias}</span></div>` : pass && myRes && myRes.dias ? `<div><span>Diamonds found</span><span>💎 ${myRes.dias | 0} · wallet ∞</span></div>` : ''}</div>`,
       buttons: [{ label: '🔁 New room', onClick: async () => { try { location.hash = '#/game/' + await net.createGame('rush', g.mode); } catch (e) { toast(ctx.friendlyError(e)); } } }, { label: 'Menu', href: '#/games/rush' }] });
     main.innerHTML = '<div class="empty">Race over. <a href="#/games/rush">Back to Kemy Hill Rush</a></div>';
   }
