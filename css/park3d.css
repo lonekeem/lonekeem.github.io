@@ -30,6 +30,8 @@ body.p3-on .gm.top-right { z-index: 95; }
 .p3-chat input::placeholder { color: rgba(255,255,255,.75); }
 .p3-send { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 0; background: #7c3aed; color: #fff; font-size: 16px; cursor: pointer; }
 .p3-chat.phrases input, .p3-chat.phrases .p3-send { display: none !important; }
+.p3-chat .p3-type[hidden] { display: none !important; }
+.p3-chat.phrases .p3-type { flex: none; }
 .p3-chat.phrases #p3-quick { width: auto; min-width: 132px; border-radius: 999px; padding: 0 16px; font: 800 15px Inter, system-ui, sans-serif; background: #7c3aed; }
 .p3-joy { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: calc(max(18px, env(safe-area-inset-bottom)) + 48px); width: 128px; height: 128px; border-radius: 50%; background: rgba(30,16,60,.28); border: 2px solid rgba(255,255,255,.55); touch-action: none; }
 .p3-joy i { position: absolute; left: 39px; top: 39px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.9); box-shadow: 0 3px 10px rgba(0,0,0,.3); pointer-events: none; }

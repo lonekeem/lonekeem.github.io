@@ -11,7 +11,7 @@ import { clean, checkInput } from './talk.js';
 import { DECOR } from './wear.js';
 import { drawDancer } from './dance.js';
 import { createPark3D } from './park3d.js';
-import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-chat.js';
+import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase, needsBirthday, unlockTyping, BIRTHDAY_NOTE } from '../safe-chat.js';
 import { hideKey, isHidden } from '../chat-hide.js';
 import { webglOK } from './pal3d.js';
 export const WORLD = { w: 3200, h: 2400 };
@@ -112,9 +112,9 @@ export function createPark(ctx) {
     main.querySelector('#pk-chat').onclick = () => { if (!toggle('c')) return;
       const kid = phraseOnly();
       const list = kid ? SAFE_SAY : PHRASES;
-      panel.innerHTML = list.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + (kid ? `<p class="small" style="margin:8px 0 0">${esc(PHRASE_NOTE)}</p>` : `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`);
+      panel.innerHTML = list.map((x) => `<button class="pal-chip" data-say="${esc(x)}">${esc(x)}</button>`).join('') + (kid ? `<p class="small" style="margin:8px 0 0">${esc(PHRASE_NOTE)}</p>${needsBirthday() ? `<button type="button" class="pal-chip" data-type="1">✏️ ${esc(BIRTHDAY_NOTE)}</button>` : ''}` : `<form id="pk-f" class="pk-f"><input id="pk-t" maxlength="40" placeholder="Say something nice…" autocomplete="off"><button class="btn btn-sm">Say</button></form>`);
       const f = panel.querySelector('#pk-f'); if (f) f.onsubmit = (e) => { e.preventDefault(); const v = panel.querySelector('#pk-t').value.trim(); if (!v) return; if (checkInput(v)) { toast('Let’s keep Pal Park friendly and private 💜'); return; } say(clean(v)); panel.hidden = true; }; };
-    panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } });
+    panel.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.e) { emote(b.dataset.e); panel.hidden = true; } if (b.dataset.say) { say(b.dataset.say); panel.hidden = true; } if (b.dataset.type) { panel.hidden = true; unlockTyping().then((ok) => { if (ok) { toast('You can type now 💜'); main.querySelector('#pk-chat').click(); } }); } });
     let lastSay = 0, sayT = 0, sayNext = ''; function say(t) {
       if (phraseOnly() && !isPhrase(t)) return toast(PHRASE_NOTE);
       const gate = window.kemyChatGate ? window.kemyChatGate(t, 'park', '') : { ok: true, text: t };

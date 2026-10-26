@@ -19,7 +19,7 @@ import { treasures, EMOTES, PHRASES, PORTALS } from './park.js';
 import { createControls } from '../controls.js';
 import { registerWorld } from '../input.js';
 import { openWheel, renderQuickChat, loadOwnedEmotes } from './emote-wheel.js';
-import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-chat.js';
+import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase, needsBirthday, unlockTyping, BIRTHDAY_NOTE } from '../safe-chat.js';
 import { hideKey, isHidden } from '../chat-hide.js';
 import { KEMY_NAME, faceName, isAdminUid, noteAdminUid } from '../kemy-name.js';
 import { emoteMs, EMOTE_BY_ID } from './emotes.js';
@@ -74,7 +74,7 @@ export function createPark3D(ctx) {
       <div class="p3-top"><a class="p3-b" href="#/pals" aria-label="Leave Pal Park">✕</a><b>🌳 Pal Park</b><span id="park-room" class="p3-room"></span><span class="k-link-slot"></span><span id="park-found" class="p3-found"></span><span class="p3-fps" id="p3-fps"></span></div><button class="p3-b" id="p3-rot" type="button" aria-label="Rotate. Tap for landscape">🔄</button><button class="p3-b" id="p3-set" aria-label="Control settings">⚙️</button>
       <div class="p3-log" id="p3-log" aria-live="polite"></div>
       <div class="p3-tags" id="p3-tags"></div>
-      <form class="p3-chat" id="p3-chat"><input id="p3-t" maxlength="60" placeholder="Say something nice…" autocomplete="off" enterkeyhint="send" aria-label="Chat message"><button class="p3-send" aria-label="Send">➤</button><button type="button" class="p3-b" id="p3-quick" aria-label="Quick phrases">💬</button></form>
+      <form class="p3-chat" id="p3-chat"><input id="p3-t" maxlength="60" placeholder="Say something nice…" autocomplete="off" enterkeyhint="send" aria-label="Chat message"><button class="p3-send" aria-label="Send">➤</button><button type="button" class="p3-b" id="p3-quick" aria-label="Quick phrases">💬</button><button type="button" class="p3-b p3-type" id="p3-type" hidden aria-label="Type your own words. Add your birthday first">✏️</button></form>
       <div class="p3-panel" id="park-panel" hidden></div><div class="p3-hint" id="p3-hint"></div><button type="button" class="p3-rotip" id="p3-rotip" hidden>📱 Tip: Turn your phone sideways for a bigger view, or tap 🔄 to rotate!</button><div class="p3-load" id="p3-load">Building the park…</div></div></section>`;
     document.body.classList.add('p3-on');
     const view = main.querySelector('#p3-view'), cv = main.querySelector('#park-cv');
@@ -639,7 +639,9 @@ export function createPark3D(ctx) {
       const on = phraseOnly();
       const form = $('#p3-chat'); if (form) form.classList.toggle('phrases', on);
       const b = $('#p3-quick'); if (b) { b.textContent = on ? 'Say' : '💬'; b.setAttribute('aria-label', on ? 'Pick a phrase' : 'Quick phrases'); }
+      const ty = $('#p3-type'); if (ty) ty.hidden = !needsBirthday();
     }
+    $('#p3-type').onclick = async () => { const pn = $('#park-panel'); if (pn) pn.hidden = true; if (await unlockTyping()) { applyPhrase(); toast('You can type now 💜'); const i = $('#p3-t'); if (i) i.focus(); } else applyPhrase(); };
     applyPhrase();
     addEventListener('kemy:chat-mode', applyPhrase);
     function say(t) {

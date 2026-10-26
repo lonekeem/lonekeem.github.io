@@ -12,7 +12,7 @@ import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
 import { FX_DEFAULT } from './fx/looks.js';
 import { emojiPicker, insertAtCursor } from './richcomments.js';
-import { PHRASES, phraseOnly, isPhrase } from './safe-chat.js';
+import { PHRASES, phraseOnly, isPhrase, needsBirthday, unlockTyping, BIRTHDAY_NOTE } from './safe-chat.js';
 import { hideKey, isHidden } from './chat-hide.js';
 import { faceName, adminNameClass } from './kemy-name.js';
 // Emoji in live chat (all live layouts share the .lv-form markup).
@@ -247,9 +247,9 @@ export function createLive(ctx) {
     const paint = () => {
       if (!document.body.contains(form)) return;
       const on = phraseOnly();
-      if (on && form.dataset.phrases !== '1') {
-        form.dataset.phrases = '1';
-        form.innerHTML = `<div class="safe-phrases" role="group" aria-label="Pick a phrase">${PHRASES.map((p) => `<button type="button" data-phrase="${esc(p)}">${esc(p)}</button>`).join('')}</div>`;
+      if (on && (form.dataset.phrases !== '1' || form.dataset.bd !== String(needsBirthday()))) {
+        form.dataset.phrases = '1'; form.dataset.bd = String(needsBirthday());
+        form.innerHTML = `<div class="safe-phrases" role="group" aria-label="Pick a phrase">${PHRASES.map((p) => `<button type="button" data-phrase="${esc(p)}">${esc(p)}</button>`).join('')}${needsBirthday() ? `<button type="button" data-type="1">✏️ ${esc(BIRTHDAY_NOTE)}</button>` : ''}</div>`;
       } else if (!on && form.dataset.phrases === '1') {
         form.dataset.phrases = '';
         form.innerHTML = original;
@@ -258,6 +258,7 @@ export function createLive(ctx) {
     paint();
     addEventListener('kemy:chat-mode', paint);
     form.addEventListener('click', async (e) => {
+      if (e.target.closest('[data-type]')) { e.preventDefault(); if (await unlockTyping()) { paint(); toast('You can type now 💜'); } return; }
       const b = e.target.closest('[data-phrase]'); if (!b) return;
       e.preventDefault();
       last = Date.now(); // chat lines are spaced out by js/fsq.js, never refused for timing

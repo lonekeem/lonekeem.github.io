@@ -36,4 +36,8 @@ export const PHRASES = [
 ];
 
 export const phraseOnly = () => window.kemyPhraseOnly !== false;
+// Phrases only because there is no birthday on file yet; unlockTyping() asks for it (js/safety.js).
+export const BIRTHDAY_NOTE = 'Want to type your own words? Add your birthday';
+export const needsBirthday = () => !!(phraseOnly() && window.kemyNeedsBirthday && window.kemyNeedsBirthday());
+export const unlockTyping = () => (window.kemyUnlockTyping ? window.kemyUnlockTyping() : Promise.resolve(false));
 export const isPhrase = (t) => PHRASES.includes(String(t || ''));

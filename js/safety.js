@@ -38,7 +38,20 @@ export function syncChatMode() {
   const known = !!(user && S.profile && Number.isInteger(S.profile.birthY) && flagCache.uid === user.uid && flagCache.v !== null);
   const young = !known || !is13(S.profile) || flagCache.v === true;
   window.kemyPhraseOnly = admin ? false : young;
+  window.kemyNeedsBirthday = needsBirthday; window.kemyUnlockTyping = unlockTyping;
   try { dispatchEvent(new Event('kemy:chat-mode')); } catch { /* no window yet */ }
+}
+
+// Phrase-only just because no birthday is on file (older accounts, e.g. made before the birthday step):
+// the game chat bars offer the same birthday + rules step as posting, which unlocks typing for 13+.
+export function needsBirthday() {
+  const S = C && C.S;
+  return !!(S && S.user && S.profile && !(C.isAdmin && C.isAdmin()) && !Number.isInteger(S.profile.birthY) && !(flagCache.uid === S.user.uid && flagCache.v === true));
+}
+export async function unlockTyping() {
+  if (!needsBirthday()) { syncChatMode(); return window.kemyPhraseOnly === false; }
+  let ok = false; try { ok = await gate(); } catch { ok = false; }
+  syncChatMode(); return ok && window.kemyPhraseOnly === false;
 }
 
 // ---- mod-controlled "under 13" flag (underage/{uid}); cached per session
