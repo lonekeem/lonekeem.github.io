@@ -193,7 +193,7 @@ export function createZombieGame(ctx) {
     // ------------------------------------------------------------ state
     const ammo = {}; for (const id of ownedIds(prog, inv)) ammo[id] = WEAPONS[id].melee ? 0 : modsOf(id).mag;
     const me = { down: false, rev: '', em: -1, emAt: 0, x: coop ? rnd(-3, 3) : 0, z: 4, y: 0, vy: 0, yaw: Math.PI, face: Math.PI, hp: up.hp, inv: 0, dodge: 0, dodgeCd: 0, dx: 0, dz: 0, fireCd: 0, reload: 0, swing: 0, t: 0, bombs: starBomb ? 3 : 0, queue: [], spin: 0 };
-    let zid = 0, teamN = coop ? Math.max(1, Math.min(4, (net.state && net.state.n) || Object.keys(net.players).length || 1)) : 1, kmap = {}, dmap = {}, hitSeq = 0, myHits = [], slamSeq = 0, sendT = 0, stateT = 0, migT = 0, revT = 0, downT = 0, wipeT = 0, lastWaveSeen = 0;
+    let zid = 0, teamN = coop ? Math.max(1, Math.min(4, (net.state && net.state.n) || Object.keys(net.players).length || 1)) : 1, kmap = {}, dmap = {}, hitSeq = 0, hitSent = 0, myHits = [], slamSeq = 0, sendT = 0, stateT = 0, migT = 0, revT = 0, downT = 0, wipeT = 0, lastWaveSeen = 0;
     const team = new Map();
     let pitch = 0.32, pov = false, zs = [], projs = [], pickups = [], bomb = null, wave = 0, toSpawn = 0, spawnT = 0, breakT = 2.5, score = 0, kills = 0, dias = 0, over = false, paused = false, buffs = { zoom: 0, shield: 0, dia2: 0 }, boss = null, msgT = 0, lastGroan = 0;
     const dbg = { fps: 0, frames: 0 }; window.__zombie = { get state() { return { wave, score, kills, dias, coins: coinsShown, loadout: bars().slice(), hp: Math.round(me.hp), down: me.down, zombies: zs.length, fps: dbg.fps, pr, over, weapon: cur, coop, host: isHost(), team: [...team.values()].map((t) => ({ name: t.name, hp: Math.round(t.hp), down: t.down, x: +t.x.toFixed(1), z: +t.z.toFixed(1), emo: performance.now() < (t.emoUntil || 0) ? t.emo : '', em: t.emSeen })), emo: performance.now() < (me.emoUntil || 0) ? me.emo : '' }; }, game: null };
@@ -273,7 +273,12 @@ export function createZombieGame(ctx) {
       for (const z of zs) { if (p.life <= 0 || z.dead || z.rise > 0) continue; if (p.w.pattern === 'lob' && p.y > 1.25) continue; if (p.hitSet && p.hitSet.has(z)) continue; const rr = 0.55 * z.t.sc + (p.w.r || 0.2); if ((z.x - p.x) ** 2 + (z.z - p.z) ** 2 < rr * rr) onProjHit(p, z); }
     }
     function throwBomb() { me.bombs--; const [ax, az] = aimDir(); bomb = { x: me.x, y: 1.2, z: me.z, vx: ax * 11, vy: 6, vz: az * 11 }; bombM.visible = true; snd('pick'); hud(); }
-    function hit(z, dmg, kx = 0, kz = 0, w, who = uid) { if (!isHost()) { z.flash = 0.1; if (myHits.length < 39) myHits.push(++hitSeq, z.id, Math.round(dmg) * 10 + fxCode(w)); return; } z.last = who; z.hp -= dmg; z.flash = 0.1; z.kx += kx * 0.25; z.kz += kz * 0.25; if (w && w.freeze) z.frozen = Math.max(z.frozen || 0, w.freeze); if (w && w.lift && z.t !== ZT.boss) z.lift = Math.max(z.lift || 0, 1.2); if (w && w.burn) { z.burn = Math.max(z.burn || 0, w.burn); z.burnDps = w.burnDps || 8; } if (z.hp <= 0) kill(z); }
+    function hit(z, dmg, kx = 0, kz = 0, w, who = uid) { if (!isHost()) { z.flash = 0.1; queueHit(z, dmg, w); return; } z.last = who; z.hp -= dmg; z.flash = 0.1; z.kx += kx * 0.25; z.kz += kz * 0.25; if (w && w.freeze) z.frozen = Math.max(z.frozen || 0, w.freeze); if (w && w.lift && z.t !== ZT.boss) z.lift = Math.max(z.lift || 0, 1.2); if (w && w.burn) { z.burn = Math.max(z.burn || 0, w.burn); z.burnDps = w.burnDps || 8; } if (z.hp <= 0) kill(z); }
+    // guest: hits ride a rolling window (last 13 triples) on our player doc; the host dedupes by sequence number.
+    // Unsent hits on the same zombie + effect merge so bursts don't push older damage out of the window.
+    function queueHit(z, dmg, w) { const d = Math.max(1, Math.round(dmg)), code = fxCode(w);
+      for (let i = myHits.length - 3; i >= 0; i -= 3) { if (myHits[i] <= hitSent) break; if (myHits[i + 1] === z.id && myHits[i + 2] % 10 === code) { myHits[i + 2] += d * 10; return; } }
+      myHits.push(++hitSeq, z.id, d * 10 + code); if (myHits.length > 39) myHits.splice(0, myHits.length - 39); }
     function kill(z) { if (z.dead) return; z.dead = true; poof(z); if (!isHost()) return; const who = z.last || uid; kmap[who] = (kmap[who] || 0) + 1; if (who === uid) { kills++; grant(killCoins(zKind(z), wave)); } score += z.t.pts + wave * 2; if (who === uid) addDia(z.t.dia); else dmap[who] = Math.min(RUN_CAP, (dmap[who] || 0) + z.t.dia); }
     function poof(z) { snd('poof'); buzz(z.t === ZT.boss ? 60 : 12);
       burst(z.x, 1.2 * z.t.sc, z.z, z.t === ZT.boss ? 80 : 22, ['#9dff6a', '#ffe14a', '#ffffff', '#b48cff'], z.t === ZT.boss ? 7 : 4);
@@ -327,8 +332,7 @@ export function createZombieGame(ctx) {
       const ids = [uid, ...team.keys()].slice(0, 4); const pick = (m) => Object.fromEntries(ids.filter((u) => m[u]).map((u) => [u, Math.round(m[u])]));
       net.sendState({ wave, zs: flat, score: Math.round(score), kills: pick(kmap), dia: pick(dmap), over: !!final, slam: slamRing.visible ? [Math.round(slamRing.userData.x * 10), Math.round(slamRing.userData.z * 10), slamSeq] : [], seq: (pushState.n = (pushState.n || 0) + 1), n: teamN, ts: toSpawn, brk: Math.max(0, Math.round(breakT * 10) / 10), bm: boss ? Math.round(boss.max) : 0 }); }
     function sendMe(force) { const busy = C.down('fire') || C.move.mag > 0.05 || me.y > 0 || myHits.length; if (!force && performance.now() - sendT < (busy ? 120 : 1000)) return; sendT = performance.now();
-      net.send({ x: +me.x.toFixed(2), y: +me.y.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), a: +me.yaw.toFixed(2), fire: !!C.down('fire') && !me.down, w: cur, hp: Math.max(0, Math.round(me.hp / up.hp * 100)), down: me.down, rev: me.rev, em: me.em, emAt: me.emAt, hits: myHits.slice(-39), hs: hitSeq });
-      if (myHits.length > 39) myHits = myHits.slice(-39); }
+      net.send({ x: +me.x.toFixed(2), y: +me.y.toFixed(2), z: +me.z.toFixed(2), f: +me.face.toFixed(2), a: +me.yaw.toFixed(2), fire: !!C.down('fire') && !me.down, w: cur, hp: Math.max(0, Math.round(me.hp / up.hp * 100)), down: me.down, rev: me.rev, em: me.em, emAt: me.emAt, hits: myHits.slice(-39), hs: hitSeq }); hitSent = hitSeq; }
     function reviveTarget() { if (!coop || me.down) return null; for (const [u, t] of team) if (t.down && Math.hypot(t.x - me.x, t.z - me.z) < 2.2) return u; return null; }
     let netWall = 0;
     function netStep(dt0) { const nw = performance.now(); const dt = netWall ? Math.min(0.25, (nw - netWall) / 1000) : dt0; netWall = nw; // revive timers use real time so slow phones are not penalized
