@@ -290,9 +290,11 @@ export function createPool(ctx) {
         const [x, y] = T(V.balls[0].x, V.balls[0].y);
         g.strokeStyle = '#ffc83d'; g.lineWidth = 2; g.setLineDash([4, 3]); g.beginPath(); g.arc(x, y, 32, 0, 7); g.stroke(); g.setLineDash([]);
         const label = V.kitchen ? 'Drag the cue ball behind the line' : 'Drag the cue ball';
-        g.font = '700 13px "Space Grotesk", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        const maxW = cv.width / V.dpr - 14; let fs = 13; // narrow phone tables: shrink the hint so it fits inside the rails
+        do { g.font = `700 ${fs}px "Space Grotesk", system-ui, sans-serif`; } while (g.measureText(label).width > maxW && --fs >= 10);
+        g.textAlign = 'center'; g.textBaseline = 'middle';
         const lx = cv.width / V.dpr / 2, ly = Math.min(cv.height / V.dpr - 18, Math.max(18, y + 46));
-        g.lineWidth = 3; g.strokeStyle = '#140a24'; g.strokeText(label, lx, ly); g.fillStyle = '#fff6d4'; g.fillText(label, lx, ly);
+        g.lineWidth = 3; g.strokeStyle = '#140a24'; g.strokeText(label, lx, ly, maxW); g.fillStyle = '#fff6d4'; g.fillText(label, lx, ly, maxW);
       }
       paintPower();
     }

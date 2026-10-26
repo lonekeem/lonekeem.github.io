@@ -168,7 +168,7 @@ function paint() {
 
 // Show on game screens; hidden (and stopped) elsewhere.
 export async function mountGameMusic(o = {}) {
-  opts = { ...opts, ...o };
+  opts = { ...opts, ...o, corner: o.corner || '' }; // corner is per screen: Pal Park / Zombie's top-right must not stick to later game pages
   await load(); await loadTheme();
   if (!document.getElementById('gm-css')) { const l = document.createElement('link'); l.id = 'gm-css'; l.rel = 'stylesheet'; l.href = BASE + 'css/gamemusic.css'; document.head.appendChild(l); }
   if (!root) {
@@ -229,7 +229,7 @@ export async function mountGameMusic(o = {}) {
     document.addEventListener('visibilitychange', () => { if (document.hidden) { resume = isPlaying(); if (resume) audio.pause(); } else if (resume) { resume = false; startTrack(); } });
     await pick(ls.get(K.st) || 'chill'); drawPl();
   }
-  root.hidden = false; root.classList.toggle('top-right', opts.corner === 'top-right'); paint();
+  root.hidden = false; root.classList.toggle('top-right', opts.corner === 'top-right'); if (opts.corner !== 'top-right') root.style.zIndex = ''; paint();
   return root;
 }
 export function hideGameMusic() { if (!root) return; pause(); volOverride = null; closeEmbed(); root.hidden = true; }
