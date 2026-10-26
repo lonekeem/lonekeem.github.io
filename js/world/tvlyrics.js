@@ -1,14 +1,13 @@
-// House TV karaoke lyrics: only for the three new Kemy theme songs (Keep Building, Kemy Song 2, Kemy Song 3).
-// Lazy: homes.js imports this file (and fetches one small JSON) only when the TV plays one of them.
-// Lyric files: assets/lyrics/<key>.json = [{ t: start seconds, e: end seconds, line }], timed to the original audio.
+// House TV karaoke lyrics for every Kemy song in theme.js TRACKS (instrumentals show the title + ♪ instrumental ♪).
+// Lazy: homes.js imports this file (and fetches one small JSON) only when a TV plays a Kemy song.
+// Lyric files: assets/lyrics/<key>.json = { bpm, beats, instrumental?, lines: [{ t: start seconds, e: end seconds, line }] }, timed to
+// the original audio (old files were a plain lines array; both load). The same file carries the beat grid the Pals dance to.
 // Synced to the TV's own <audio>.currentTime every frame, so pause / seek / loop / track change just follow the audio.
-const FILES = { 'keep-building.mp3': 'keep-building', 'theme-song-2.mp3': 'kemy-song-2', 'theme-song-3.mp3': 'kemy-song-3' };
-export function lyricsKey(src) { const f = String(src || '').split('?')[0].split('/').pop(); return FILES[f] || null; }
-const cache = new Map();
-export function loadLyrics(key) {
-  if (!cache.has(key)) cache.set(key, fetch(new URL(`../../assets/lyrics/${key}.json?v=1`, import.meta.url)).then((r) => (r.ok ? r.json() : [])).then((a) => (Array.isArray(a) ? a.filter((l) => l && typeof l.t === 'number' && l.line).sort((x, y) => x.t - y.t) : [])).catch(() => { cache.delete(key); return []; }));
-  return cache.get(key);
-}
+import { trackKey, loadTrack } from '../pals/musicbeat.js';
+export function lyricsKey(src) { return trackKey(src); }
+// { lines, instrumental } for a song key (one cached fetch per song, shared with the dance beat)
+export function loadSong(key) { return loadTrack(key).then((d) => ({ lines: d.lines, instrumental: d.instrumental })); }
+export function loadLyrics(key) { return loadSong(key).then((d) => d.lines); }
 const NOTE = '♪  ♪  ♪', FADE = 0.4, GAP = 2.5;
 // What to show at time `now`: { cur, next, at } where at = when `cur` started (for the slide-in).
 export function lyricAt(L, now) {
@@ -29,6 +28,13 @@ function line(g, text, y, size, weight, color, alpha, glow, w) {
 const ease = (p) => 1 - Math.pow(1 - p, 3);
 // Draws the lyric layer (title on top, current line big + highlighted, next line dimmed below, smooth slide-up).
 export function drawLyrics(g, Wc, Hc, L, now, pal, title, sub) {
+  if (!L || !L.length) { // instrumental: just the title + a gently pulsing ♪ instrumental ♪
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = pal.main; g.font = '800 19px Inter, Arial, sans-serif'; g.shadowColor = pal.main; g.shadowBlur = 8; g.fillText('🎵 ' + title + (sub ? '  ·  ' + sub : ''), Wc / 2, 30, Wc - 50); g.shadowBlur = 0;
+    line(g, title, 112, 38, 900, '#ffffff', 1, pal.alt, Wc - 56);
+    line(g, '♪ instrumental ♪', 186, 28, 800, pal.alt, 0.7 + 0.3 * Math.sin(now * 2.4), pal.alt, Wc - 56);
+    return { cur: '♪ instrumental ♪', next: '', at: 0, i: -1 };
+  }
   const st = lyricAt(L, now), p = ease(Math.max(0, Math.min(1, (now - st.at) / FADE))), w = Wc - 56;
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillStyle = pal.main; g.font = '800 19px Inter, Arial, sans-serif'; g.shadowColor = pal.main; g.shadowBlur = 8; g.fillText('🎵 ' + title + (sub ? '  ·  ' + sub : ''), Wc / 2, 30, Wc - 50); g.shadowBlur = 0;

@@ -324,7 +324,13 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     radioBox.innerHTML = `<div class="kh-rh"><b class="kh-title"></b><span class="kh-ract"><button type="button" data-pp hidden aria-label="Pause">⏸</button><button type="button" data-min aria-label="Minimize">Minimize</button><button type="button" data-ex hidden aria-label="Expand">Expand</button><button type="button" data-s aria-label="Close">✕</button></span></div><div class="kh-rb"></div>`;
     setRadioTitle(title); syncChrome();
   }
-  function markPaused(p) { if (!rad) return; rad.paused = !!p; syncChrome(); }
+  // a YouTube / Spotify / Apple house radio has no <audio> we can read: this stand-in tells the dance beat it is playing (steady default tempo)
+  const embAud = { embed: true, paused: true, volume: 1, __kbAt: 0 };
+  const embOn = (on) => { embAud.paused = !on; if (on) { embAud.__kbAt = performance.now(); (window.__kemyAud || (window.__kemyAud = new Set())).add(embAud); } };
+  const onEmbPlay = (ev) => { const d = ev.detail || {}; if (d.source === 'house-radio' && rad && rad.emb) embOn(true); };
+  const onEmbStop = (ev) => { const d = ev.detail || {}; if (d.source === 'house-radio') embOn(false); };
+  addEventListener('kemy:media-play', onEmbPlay); addEventListener('kemy:media-stop', onEmbStop);
+  function markPaused(p) { if (!rad) return; rad.paused = !!p; if (rad.emb) embOn(!p); syncChrome(); }
   function controlPads() {
     const w = innerWidth, h = innerHeight;
     // The walking joystick sits in the lower-left corner and the action buttons sit lower-right, even before a thumb shows the knob.
@@ -507,14 +513,17 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
       const tb = body.querySelector('[data-p]');
       const go = () => { if (!au.getAttribute('src')) { au.preload = 'none'; au.src = t.src; } sync(); au.play().then(() => { tb.hidden = true; markPaused(false); dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'house-radio' } })); }).catch(() => { tb.hidden = false; markPaused(true); }); };
       tb.onclick = go; au.addEventListener('loadedmetadata', sync, { once: true }); go(); setRadioTitle(t.title); me0.tvArtist = t.artist || '';
-      // karaoke lyrics on the TV for the three new Kemy songs (module + small JSON loaded only now)
-      import('./tvlyrics.js').then((Ly) => { const k = Ly.lyricsKey(t.src); if (!k || rad !== me0) return; return Ly.loadLyrics(k).then((L) => { if (rad === me0 && L.length) { me0.lyr = { L, draw: Ly.drawLyrics }; if (window.__kh) window.__kh.lyrics = k; } }); }).catch(() => {});
+      // the Pals dance to this TV's beat (js/pals/musicbeat.js reads the shared set)
+      (window.__kemyAud || (window.__kemyAud = new Set())).add(au); au.addEventListener('playing', () => { au.__kbAt = performance.now(); });
+      // karaoke lyrics on every TV in the house for every Kemy song (module + one small JSON loaded only now)
+      import('./tvlyrics.js').then((Ly) => { const k = Ly.lyricsKey(t.src); if (!k || rad !== me0) return; return Ly.loadSong(k).then((d) => { if (rad === me0 && (d.lines.length || d.instrumental)) { me0.lyr = { L: d.lines, draw: Ly.drawLyrics }; if (window.__kh) window.__kh.lyrics = k; } }); }).catch(() => {});
     }
     if (rad !== me0) return;
     syncChrome(); tvShow(me0.tvTitle, o.name); if (window.__kh) window.__kh.radio = Rd.k;
   }
   function stopRadio() {
     tvHide();
+    embAud.paused = true; if (rad && rad.au && window.__kemyAud) window.__kemyAud.delete(rad.au);
     if (rad) { try { if (rad.emb) rad.emb.destroy(); } catch { /* */ } if (rad.au) { try { rad.au.pause(); rad.au.removeAttribute('src'); rad.au.load(); } catch { /* */ } dispatchEvent(new CustomEvent('kemy:media-stop', { detail: { source: 'house-radio' } })); } }
     rad = null; miniAt = null; drag = null; radioBox.classList.remove('min', 'dock'); radioBox.removeAttribute('aria-hidden');
     noteBtn.hidden = true; noteBtn.classList.remove('on');
@@ -996,7 +1005,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     sitAt: (o) => { P.sit = { x: o.x, z: o.z, y: o.y, yaw: o.yaw, seat: o.seat || null, back: o.back, off: () => (o.dn === 'sleep' ? life.act('wake') : null) }; P.x = o.x; P.z = o.z; P.yaw = o.yaw; api.markDirty && api.markDirty(); },
     unsit: () => { const st = P.sit; if (!st) return; P.sit = null; P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; api.markDirty && api.markDirty(); } });
   window.__khApi = { tvAudio: () => (rad && rad.au) || null, tvCanvas: () => tvC, life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, floor: () => changeFloor(), sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
-  function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); css.remove(); css2.remove(); }
+  function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('kemy:media-play', onEmbPlay); removeEventListener('kemy:media-stop', onEmbStop); embAud.paused = true; if (window.__kemyAud) window.__kemyAud.delete(embAud); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); css.remove(); css2.remove(); }
   void Q; void K;
   return { update, destroy };
 }
