@@ -701,7 +701,9 @@ export function openBingo(ctx, q = {}) {
     if (leftEl) leftEl.textContent = !st.ck.live ? 'Next round' : st.ck.phase === 'ready' ? 'Get ready…' : `${75 - st.ck.called} balls left`;
     const patEl = main.querySelector('[data-pat]'); if (patEl) patEl.innerHTML = `${PATTERN_NAME[st.pat]}${luckyRound(st.ck.round) ? ' · <span class="lucky">Lucky Star</span>' : ''}`;
     const timeEl = main.querySelector('[data-time]'); if (timeEl) { const s = Math.ceil(st.ck.left / 1000); timeEl.textContent = st.ck.live ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Next round soon'; }
-    const codeEl = main.querySelector('[data-code]'); if (codeEl) codeEl.textContent = room && room.pub ? 'Public hall · Normal bingo' : 'Code ' + roomId + (room ? ' · ' + gameLabel(roomPick(room)) : '');
+    const codeEl = main.querySelector('[data-code]'); if (codeEl) { const priv = !(room && room.pub); codeEl.textContent = !priv ? 'Public hall · Normal bingo' : 'Code ' + roomId + (room ? ' · ' + gameLabel(roomPick(room)) : '') + ' · 📋 Copy';
+      // private rooms: tap the code to copy it for friends ("Friend code" box in the lobby)
+      if (priv) { codeEl.setAttribute('role', 'button'); codeEl.style.cursor = 'pointer'; codeEl.title = 'Copy room code'; codeEl.onclick = () => { navigator.clipboard?.writeText(roomId).then(() => toast('Code copied: ' + roomId), () => toast('Code: ' + roomId)); }; } else { codeEl.removeAttribute('role'); codeEl.onclick = null; } }
     const people = roomPeople();
     const countEl = main.querySelector('[data-count]'); if (countEl) countEl.textContent = '👤 ' + String(people.length).padStart(2, '0');
     const namesEl = main.querySelector('[data-names]'); if (namesEl) namesEl.textContent = people.map((p) => p.name).join(' · ');
