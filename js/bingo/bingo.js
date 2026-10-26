@@ -563,6 +563,8 @@ export function openBingo(ctx, q = {}) {
     });
     if (needMark && !win) { toast('Stamp the called numbers first'); return; }
     if (!win) { missUntil = Date.now() + 1600; sfx.play('lose'); toast(one ? 'So close — one number away' : 'Not yet. Keep going!'); return; }
+    // one win per round: a second tap used to re-run the prize box (extra diamonds, and a racing wallet write the rules reject)
+    if (paidRound === st.ck.round) { toast('You already have BINGO this round. Next round soon!'); return; }
     const C = st.ck.called;
     const bot = botPlan(st);
     const earlier = seats.some((s) => s.id !== uid && s.claim > 0 && s.claim < C) || !!(bot && st.ck.t >= bot.tPress);
