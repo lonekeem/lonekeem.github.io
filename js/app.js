@@ -586,9 +586,10 @@ async function unblockUser(uid, username) {
 }
 
 // ---------------------------------------------------------------- modal
-function openModal(inner, { dismissable = true } = {}) {
+// cls 'modal-split': inner is .modal-body (scrolls) + .modal-foot (buttons, always on screen), or one <form> holding both.
+function openModal(inner, { dismissable = true, cls = '' } = {}) {
   const root = document.getElementById('modal-root');
-  root.innerHTML = `<div class="modal-backdrop" role="dialog" aria-modal="true"${dismissable ? '' : ' data-lock="1"'}><div class="card modal">${inner}</div></div>`;
+  root.innerHTML = `<div class="modal-backdrop" role="dialog" aria-modal="true"${dismissable ? '' : ' data-lock="1"'}><div class="card modal${cls ? ' ' + cls : ''}">${inner}</div></div>`;
   const bd = $('.modal-backdrop', root);
   if (dismissable) bd.addEventListener('click', (e) => { if (e.target === bd || e.target.closest('[data-close]')) closeModal(); });
   setTimeout(() => $('.modal input, .modal textarea, .modal .btn', root)?.focus(), 30);

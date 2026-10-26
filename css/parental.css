@@ -22,6 +22,8 @@ body.pc-nolive a[href="#/live/new"] { display: none !important; }
 .pc-err { color: #b0003a; font-weight: 600; min-height: 1em; margin: 8px 0 0; }
 .pc-modal, .pc-timeup { position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(8, 2, 16, .82); padding: 20px; }
 .pc-timeup { background: radial-gradient(circle at 50% 30%, #3a1670, #0b0414 70%); }
+.pc-modal, .pc-timeup { padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+.pc-box { max-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: manipulation; }
 .pc-box { background: #120720; color: #f3ecff; border: 2px solid #6a2fd0; border-radius: 22px; padding: 22px 20px; width: min(360px, 100%); text-align: center; box-shadow: 0 10px 40px rgba(106, 47, 208, .45); box-sizing: border-box; }
 .pc-box h2 { margin: 0 0 6px; color: #fff; }
 .pc-sub { color: #d9c8ff; margin: 0 0 12px; }

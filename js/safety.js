@@ -196,9 +196,9 @@ export async function gate() {
   if (!Number.isInteger(S.profile.birthY)) {
     if (!(await askAgeHonest())) return false;
     const ok = await new Promise((res) => {
-      C.openModal(`<h2 style="font-size:1.25rem">Quick safety check 🎂</h2><p>Before you post, tell us your birthday. This keeps Kemy safe for kids and teens.</p>
-        <form id="bd-form" style="text-align:left">${birthdayFields('gbd')}<p class="form-error" id="bd-err"></p>
-        <div class="btns"><button class="btn" type="submit">Save</button><button class="btn btn-ghost" type="button" data-close>Not now</button></div></form>`);
+      C.openModal(`<form id="bd-form"><div class="modal-body"><h2 style="font-size:1.25rem">Quick safety check 🎂</h2><p>Before you post, tell us your birthday. This keeps Kemy safe for kids and teens.</p>
+        <div style="text-align:left">${birthdayFields('gbd')}</div><p class="form-error" id="bd-err"></p></div>
+        <div class="btns modal-foot"><button class="btn" type="submit">Save</button><button class="btn btn-ghost" type="button" data-close>Not now</button></div></form>`, { cls: 'modal-split' });
       const f = document.getElementById('bd-form');
       f.querySelector('[data-close]').addEventListener('click', () => res(false));
       let busy = false;
@@ -212,8 +212,8 @@ export async function gate() {
   if (!is13(S.profile)) { await applyYoungFlag(); showBlocked(false); return false; }
   if (!S.profile.rulesAt) {
     const ok = await new Promise((res) => {
-      C.openModal(`<h2 style="font-size:1.25rem">📜 Kemy Community Rules</h2><p>Please read these once before your first post.</p>${rulesHtml()}<p class="form-error" id="ra-err"></p>
-        <div class="btns"><button class="btn" id="ra-yes">I agree</button><button class="btn btn-ghost" type="button" data-close id="ra-no">Not now</button></div>`);
+      C.openModal(`<div class="modal-body" id="ra-body"><h2 style="font-size:1.25rem">📜 Kemy Community Rules</h2><p>Please read these once before your first post.</p>${rulesHtml()}</div>
+        <div class="btns modal-foot"><p class="form-error" id="ra-err"></p><button class="btn" id="ra-yes">I agree</button><button class="btn btn-ghost" type="button" data-close id="ra-no">Not now</button></div>`, { cls: 'modal-split' });
       document.getElementById('ra-no').addEventListener('click', () => res(false));
       document.getElementById('ra-yes').onclick = async () => { try { await saveAgree(); C.closeModal(); res(true); } catch (e) { document.getElementById('ra-err').textContent = C.friendlyError(e); } };
     });

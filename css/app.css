@@ -207,6 +207,27 @@ textarea { resize: vertical; min-height: 96px; }
 .modal p { color: var(--muted); margin: 12px 0 22px; }
 .modal .btns { display: grid; gap: 10px; }
 .modal .close { position: absolute; top: 10px; right: 10px; }
+/* Every modal fits the screen (iPhone portrait + landscape, PWA safe areas) and scrolls inside itself.
+   .modal-split: a scrolling .modal-body plus a .modal-foot whose buttons always stay on screen (rules / birthday). */
+.modal-backdrop { --m-pad-t: max(12px, env(safe-area-inset-top, 0px)); --m-pad-b: max(12px, env(safe-area-inset-bottom, 0px));
+  padding: var(--m-pad-t) max(12px, env(safe-area-inset-right, 0px)) var(--m-pad-b) max(12px, env(safe-area-inset-left, 0px)); overscroll-behavior: contain; }
+.modal { --m-max-h: calc(100vh - var(--m-pad-t, 12px) - var(--m-pad-b, 12px)); max-height: var(--m-max-h); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: manipulation; }
+@supports (height: 100dvh) { .modal { --m-max-h: calc(100dvh - var(--m-pad-t, 12px) - var(--m-pad-b, 12px)); } }
+.modal.modal-split { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.modal-split > form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin: 0; }
+.modal-split .modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: manipulation; padding: 26px 22px 6px; }
+.modal-split .modal-foot { flex: none; padding: 12px 22px 18px; border-top: 1px solid var(--border); background: rgba(18, 10, 32, .96); }
+.modal-split .modal-foot .form-error { margin: 0; }
+.modal-split .modal-foot .form-error:empty { display: none; }
+.modal-split .modal-body > p:last-child { margin-bottom: 10px; }
+/* a toast that lands on top of a modal's buttons (short landscape screens) never eats the tap */
+body:has(#modal-root .modal) .toast { pointer-events: none; }
+@media (max-height: 520px) {
+  .modal-split .modal-body { padding: 16px 20px 4px; }
+  .modal-split .modal-foot { padding: 10px 20px 12px; grid-template-columns: 1fr 1fr; }
+  .modal-split .modal-foot .form-error { grid-column: 1 / -1; }
+  .modal-split .modal-foot .btn { padding-top: 10px; padding-bottom: 10px; }
+}
 
 /* Toast */
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bottom-h) + 20px + env(safe-area-inset-bottom)); z-index: 320; background: #1b1428; border: 1px solid var(--border); padding: 10px 18px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: .92rem; max-width: calc(100% - 32px); }
