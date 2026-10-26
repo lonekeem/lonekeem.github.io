@@ -68,3 +68,16 @@ body.sh-playing .bottom-nav{visibility:hidden}
 .sh-more b{display:block;font:700 17px/1.25 'Space Grotesk',sans-serif;color:#ffd9a0}
 .sh-more p{margin:4px 0 0;font-size:.88rem;opacity:.85}
 .shp-end-in p.sh-more-l{color:#ffd9a0;font-weight:700;font-size:1.05rem}
+/* Stars + comments rail (right edge, vertically centred: clear of the native controls bar and the Next button) */
+.shp-rail{position:absolute;right:calc(env(safe-area-inset-right) + 8px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:14px;z-index:3}
+.shp-rail[hidden]{display:none}
+.shp-rail .vact{color:#fff}
+.shp-sheet{z-index:6}
+.shp-sheet .vsheet{max-width:560px;margin:0 auto}
+.shp-sheet-ep{color:var(--muted,#aaa);font-weight:500;font-size:.8rem}
+@media (orientation:landscape) and (max-height:500px){.shp-rail{gap:6px}.shp-rail .vact svg{width:42px;height:42px;padding:9px}.shp-sheet .vsheet{height:86%}}
+/* Modals (report, block) and toasts sit above the full-screen player */
+body.sh-playing .modal-backdrop{z-index:2147480100}
+body.sh-playing .toast{z-index:2147480200}
+/* Episode card counts */
+.sh-soc{display:flex;gap:10px;margin:2px 0 0;font-size:.78rem;color:var(--muted,#aaa)}

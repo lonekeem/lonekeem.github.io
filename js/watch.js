@@ -19,6 +19,7 @@ import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from '
 import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 import { faceName, adminNameClass } from './kemy-name.js';
 import { sheriffCard, sheriffFeedPost, SHERIFF_COUNT } from './sheriff-card.js';
+import { isSheriffPost, sheriffEpOf, sheriffPostId } from './sheriff-data.js';
 let soundMod = null, sounds = null;
 function loadSounds() {
   if (!soundMod) soundMod = import('./sounds.js').then((m) => { sounds = m; return m; }).catch(() => null);
@@ -80,14 +81,14 @@ export function createWatch(ctx) {
     const [v, im, l] = await Promise.all([q('mediaType', 'video'), q('mediaType', 'image'), q('type', 'link')]);
     const seen = new Map();
     [...v.docs, ...im.docs, ...l.docs].forEach((d) => seen.set(d.id, { id: d.id, ...d.data() }));
-    postCache = [...seen.values()].filter((p) => kindOf(p)).sort((a, b) => ms(b) - ms(a)); postCacheAt = [v, im, l].some((x) => x.timedOut) ? 0 : Date.now();
+    postCache = [...seen.values()].filter((p) => kindOf(p) && !isSheriffPost(p)).sort((a, b) => ms(b) - ms(a)); postCacheAt = [v, im, l].some((x) => x.timedOut) ? 0 : Date.now();
     return postCache.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !window.kemyParental?.hidePost?.(p));
   }
   async function followingPosts(own) {
     const ids = [...S.following].filter((u) => !S.blocked.has(u));
     const out = new Map(own.filter((p) => S.following.has(p.authorId)).map((p) => [p.id, p]));
     for (let i = 0; i < Math.min(ids.length, 30); i += 10) {
-      try { (await getDocs(query(collection(db, 'posts'), where('authorId', 'in', ids.slice(i, i + 10)), limit(40)))).docs.forEach((d) => { const p = { id: d.id, ...d.data() }; if (kindOf(p)) out.set(p.id, p); }); } catch { /* keep what we have */ }
+      try { (await getDocs(query(collection(db, 'posts'), where('authorId', 'in', ids.slice(i, i + 10)), limit(40)))).docs.forEach((d) => { const p = { id: d.id, ...d.data() }; if (kindOf(p) && !isSheriffPost(p)) out.set(p.id, p); }); } catch { /* keep what we have */ }
     }
     return [...out.values()].sort((a, b) => ms(b) - ms(a));
   }
@@ -179,9 +180,13 @@ export function createWatch(ctx) {
           <a class="btn btn-sm vsh-cta" href="#/series/sheriff" data-a="series">▶ Watch the full series</a>
         </div>
         <div class="vrail">
-          <a class="vact" href="#/series/sheriff/1" data-a="series" aria-label="Watch Episode 1 full screen"><span class="vext-ic" aria-hidden="true">▶</span><span>Ep 1</span></a>
+          ${p.social ? `<button class="vact like" data-a="like" aria-pressed="false" aria-label="Give a star">${IC.heart}<span class="n">${fmt(p.likeCount)}</span></button>
+          <button class="vact" data-a="comment" aria-label="Comments">${IC.comment}<span class="c">${fmt(p.commentCount)}</span></button>
+          <button class="vact save" data-a="save" aria-pressed="${S.saved.has(p.id)}" aria-label="Save">${IC.save}<span>${S.saved.has(p.id) ? 'Saved' : 'Save'}</span></button>`
+          : `<a class="vact vsh-ep1" href="#/series/sheriff/1" data-a="series" aria-label="Watch Episode 1 full screen"><span class="vext-ic" aria-hidden="true">▶</span><span>Ep 1</span></a>`}
           <a class="vact" href="#/series/sheriff" data-a="series" aria-label="Open the series"><span class="vext-ic" aria-hidden="true">📺</span><span>Series</span></a>
           <button class="vact" data-a="share" aria-label="Share">${IC.share}<span>Share</span></button>
+          ${p.social && S.user ? `<button class="vact vmore" data-a="menu" aria-label="More options" aria-haspopup="dialog">${IC.more}</button>` : ''}
         </div>
       </section>`;
   }
@@ -273,15 +278,28 @@ export function createWatch(ctx) {
     return true;
   }
 
+  // posts/sheriff-ep1 (counts only; ~1 read per feed open, null if missing / offline / hidden by reports).
+  function sheriffDoc() {
+    const get = getDoc(doc(db, 'posts', sheriffPostId(1))).then((d) => {
+      if (!d.exists()) return null; const p = { id: d.id, ...d.data() };
+      return window.kemyReportHidden?.(p) ? null : p;
+    }).catch(() => null);
+    return Promise.race([get, new Promise((r) => setTimeout(() => r(null), 4000))]);
+  }
+
   // ------------------------------------------------------------ main render
   async function render(postId, token, tab = 'foryou') {
     if (!FEED_TABS.some(([t]) => t === tab)) tab = 'foryou';
+    // Studio Original Ep 1 (4th item in For You) is the real posts/sheriff-ep1 doc, so stars / comments work.
+    const shDoc = tab === 'foryou' ? sheriffDoc() : null;
     const posts = (await buildTab(tab)).filter((p) => !(p.ytBlocked || isYtBlocked(p.ytId || (p.linkUrl && youTubeId(p.linkUrl)))));
-    const shp = tab === 'foryou' ? sheriffFeedPost(STUDIO_UID) : null;   // Studio Original Ep 1: 4th item in For You
+    const shReal = shDoc ? await shDoc : null;
+    const shp = tab === 'foryou' ? sheriffFeedPost(STUDIO_UID, shReal) : null;
     if (shp && !window.kemyParental?.hidePost?.(shp)) posts.splice(Math.min(3, posts.length), 0, shp);
     if (stale(token)) return;
     const st = prefsStore();
     let startId = postId || '';
+    if (postId && isSheriffPost(postId) && !posts.some((p) => p.id === postId)) { location.replace('#/series/sheriff/' + sheriffEpOf(postId)); return; }
     if (postId && /^(yt|news|sheriff)-/.test(postId) && !posts.some((p) => p.id === postId)) startId = '';
     else if (postId && !posts.some((p) => p.id === postId)) {
       const snap = await getDoc(doc(db, 'posts', postId));
@@ -669,10 +687,10 @@ export function createWatch(ctx) {
       } catch { /* already counted on another device */ }
     }
     async function share(p) {
-      const url = p.external ? (p.kind === 'news' ? p.url : p.linkUrl) : location.origin + location.pathname + '#/watch/' + p.id;
+      const url = p.sheriff ? p.linkUrl : p.external ? (p.kind === 'news' ? p.url : p.linkUrl) : location.origin + location.pathname + '#/watch/' + p.id;
       const title = p.sheriff ? 'The Sheriff of Lone Keem, a Lone Keem Studios Original on Kemy' : p.external ? `${p.text.slice(0, 80)} (${p.source})` : `${p.authorName} on Lone Keem Studios`;
       if (navigator.share) {
-        try { await navigator.share({ title, text: p.external ? '' : (p.text || '').slice(0, 120), url }); countShare(p); return; }
+        try { await navigator.share({ title, text: p.external || p.sheriff ? '' : (p.text || '').slice(0, 120), url }); countShare(p); return; }
         catch (e) { if (e && e.name === 'AbortError') return; }
       }
       try { await navigator.clipboard.writeText(url); toast('Link copied'); countShare(p); }

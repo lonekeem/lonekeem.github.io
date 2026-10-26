@@ -4,7 +4,7 @@
 // "metadata", never in the service worker cache). Watch progress stays on this device in localStorage.
 // Routes: #/series/sheriff (series page) and #/series/sheriff/<n> (full-screen player). Written by Lone Keem.
 import { claimAudio } from './autoplay.js';
-import { SHERIFF_EPISODES, SHERIFF_PROGRESS_KEY, isOut } from './sheriff-data.js';
+import { SHERIFF_EPISODES, SHERIFF_PROGRESS_KEY, isOut, sheriffPostId } from './sheriff-data.js';
 
 const DIR = 'assets/series/sheriff/';
 export const SERIES = {
@@ -48,16 +48,19 @@ const mins = (s) => `${Math.max(1, Math.round(s / 60))} min`;
 
 function loadCss() {
   if (document.getElementById('sheriff-css')) return;
-  const l = document.createElement('link'); l.id = 'sheriff-css'; l.rel = 'stylesheet'; l.href = 'css/sheriff.css?v=2'; document.head.appendChild(l);
+  const l = document.createElement('link'); l.id = 'sheriff-css'; l.rel = 'stylesheet'; l.href = 'css/sheriff.css?v=3'; document.head.appendChild(l);
 }
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11-6.86a1 1 0 0 0 0-1.7l-11-6.86A1 1 0 0 0 8 5.14z"/></svg>';
+const STAR = '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l2.83 5.74 6.33.92-4.58 4.47 1.08 6.3L12 17.15l-5.66 2.98 1.08-6.3-4.58-4.47 6.33-.92z"/></svg>';
+const CMT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-5A8 8 0 1 1 21 12z"/></svg>';
+const XIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 const BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
 
 // ------------------------------------------------------------ series page
-export function page(main, { ep, toast } = {}) {
+export function page(main, { ep, toast, social } = {}) {
   loadCss();
-  if (ep) return player(main, Number(ep), { toast });
+  if (ep) return player(main, Number(ep), { toast, social });
   document.body.classList.remove('sh-playing');
   addEventListener('hashchange', () => { fromSeries = /^#\/series\/sheriff\/\d$/.test(location.hash); }, { once: true });
   const prog = readProgress(); const up = nextUp(prog);
@@ -89,6 +92,18 @@ export function page(main, { ep, toast } = {}) {
         <p class="small muted">Created by ${esc(SERIES.creator)} · A ${esc(SERIES.studio)} production · Rated ${esc(SERIES.rating)} · Edited to be clean for all ages · No ads</p>
       </section>
     </div>`;
+  if (social) cardCounts(main, social);
+}
+// Small star / comment counts on the episode cards (one read per released episode).
+function cardCounts(main, so) {
+  OUT().forEach((e) => {
+    so.fs.getDoc(so.fs.doc(so.db, 'posts', sheriffPostId(e.n))).then((d) => {
+      if (!d.exists() || !main.contains(main.querySelector('.sh-page'))) return;
+      const x = d.data(); if (so.hidden({ id: d.id, ...x })) return;
+      const m = main.querySelector(`.sh-ep[data-ep="${e.n}"] .sep-m small`); if (!m || m.parentNode.querySelector('.sh-soc')) return;
+      m.insertAdjacentHTML('afterend', `<span class="sh-soc" aria-label="${Number(x.likeCount) || 0} stars, ${Number(x.commentCount) || 0} comments"><span>⭐ ${so.fmt(x.likeCount)}</span><span>💬 ${so.fmt(x.commentCount)}</span></span>`);
+    }).catch(() => {});
+  });
 }
 
 // Not released yet: poster + title, no link, no play.
@@ -99,7 +114,7 @@ const lockedCard = (e) => `<li><div class="sep sh-ep sh-locked" data-ep="${e.n}"
 // ------------------------------------------------------------ full-screen vertical player
 let cur = null; // { cleanup } of the open player
 let fromSeries = false; // the player was opened from the series page, so Back can just go back in history
-function player(main, n, { toast } = {}) {
+function player(main, n, { toast, social } = {}) {
   if (cur) cur.cleanup();
   const canBack = fromSeries; fromSeries = false;
   let ep = EPISODES.find((e) => e.n === n);
@@ -114,11 +129,17 @@ function player(main, n, { toast } = {}) {
       </div>
       <button class="shp-bigplay" type="button" data-a="play" aria-label="Play" hidden>${PLAY}</button>
       <button class="btn shp-next" type="button" data-a="next" hidden></button>
+      <div class="shp-rail" id="shp-rail" hidden>
+        <button class="vact like shp-act" type="button" data-a="star" aria-pressed="false" aria-label="Give a star">${STAR}<span class="n">0</span></button>
+        <button class="vact shp-act" type="button" data-a="cmt" aria-label="Comments">${CMT}<span class="c">0</span></button>
+      </div>
       <div class="shp-end" id="shp-end" hidden></div>
+      <div class="vsheet-root shp-sheet" id="shp-sheet"></div>
     </div>`;
   const root = main.querySelector('#shp'), v = root.querySelector('video'), nextBtn = root.querySelector('.shp-next'),
     end = root.querySelector('#shp-end'), big = root.querySelector('.shp-bigplay'), name = root.querySelector('#shp-name');
   let timer = null, lastSave = 0, cancelled = false;
+  const soc = socialRail(root, social, () => ep, v);
   const next = () => EPISODES.find((e) => e.n === ep.n + 1);
   const save = (done) => { if (v.currentTime > 0 || done) writeProgress(ep.n, done ? (v.duration || ep.dur) : v.currentTime, v.duration || ep.dur, done || (v.duration && v.duration - v.currentTime <= DONE_LEFT)); };
   const stopCountdown = () => { clearInterval(timer); timer = null; };
@@ -128,7 +149,7 @@ function player(main, n, { toast } = {}) {
     end.hidden = true; end.innerHTML = ''; nextBtn.hidden = true;
     name.textContent = `Episode ${e.n} · ${e.title}`; document.title = `${e.title} · ${SERIES.title} | Kemy`;
     history.replaceState(null, '', '#/series/sheriff/' + e.n);
-    v.poster = e.poster; v.src = e.src;
+    v.poster = e.poster; v.src = e.src; soc.bind(e.n);
     const at = resumeAt(readProgress()[e.n]);
     if (at) { v.addEventListener('loadedmetadata', () => { try { v.currentTime = at; } catch { /* */ } }, { once: true }); toast?.(`Resuming Episode ${e.n} at ${clock(at)}`); }
     if (auto) tryPlay(); else big.hidden = false;
@@ -180,12 +201,94 @@ function player(main, n, { toast } = {}) {
     else if (a === 'back') { e.preventDefault(); goBack(); }
   });
   function goBack() { save(); if (canBack && history.length > 1) history.back(); else location.hash = '#/series/sheriff'; }
-  const onKey = (e) => { if (e.key === 'Escape' && document.getElementById('shp')) goBack(); };
+  const onKey = (e) => { if (e.key === 'Escape' && document.getElementById('shp')) { if (soc.close()) return; goBack(); } };
   const onHide = () => { if (document.hidden) save(); };
-  const cleanup = () => { stopCountdown(); try { save(); v.pause(); } catch { /* */ } removeEventListener('hashchange', onHash); removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onHide); removeEventListener('pagehide', save0); document.body.classList.remove('sh-playing'); cur = null; };
+  const cleanup = () => { stopCountdown(); soc.stop(); try { save(); v.pause(); } catch { /* */ } removeEventListener('hashchange', onHash); removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onHide); removeEventListener('pagehide', save0); document.body.classList.remove('sh-playing'); cur = null; };
   const save0 = () => save();
   const onHash = () => { if (!/^#\/series\/sheriff\/\d/.test(location.hash)) cleanup(); };
   addEventListener('hashchange', onHash); addEventListener('keydown', onKey); document.addEventListener('visibilitychange', onHide); addEventListener('pagehide', save0);
   cur = { cleanup };
   load(ep, true);
+}
+
+// ------------------------------------------------------------ stars + comments in the player
+// Each episode is the real post posts/sheriff-ep<n> (Lone Keem Studios), so this is Kemy's shared star
+// action (likePost) and comment list / form / report / block / safety filters (comments.mount).
+function socialRail(root, so, curEp, v) {
+  const rail = root.querySelector('#shp-rail'), sheet = root.querySelector('#shp-sheet');
+  const star = rail.querySelector('[data-a=star]'), sn = star.querySelector('.n'), cn = rail.querySelector('[data-a=cmt] .c');
+  let p = null, unsub = null, sheetUnsub = null, wasPlaying = false, n = 0, busy = false;
+  const noop = { bind() {}, stop() {}, close: () => false };
+  if (!so) return noop;
+  const paintStar = (on) => { star.classList.toggle('on', on); star.setAttribute('aria-pressed', String(on)); star.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); };
+  const paint = () => { sn.textContent = so.fmt(p.likeCount); cn.textContent = so.fmt(p.commentCount); };
+  function bind(epN) {
+    if (epN === n && p) return; n = epN; stopDoc(); closeSheet(true); rail.hidden = true; p = null;
+    const id = sheriffPostId(epN);
+    unsub = so.fs.onSnapshot(so.fs.doc(so.db, 'posts', id), (d) => {
+      if (n !== epN) return;
+      if (!d.exists()) { rail.hidden = true; p = null; return; }
+      const x = { id: d.id, ...d.data() };
+      if (so.hidden(x)) { rail.hidden = true; p = null; return; }
+      const first = !p; p = Object.assign(p || {}, x); if (!busy) paint(); rail.hidden = false;
+      if (first) so.isLiked(id).then((on) => { if (n === epN) paintStar(on); }).catch(() => {});
+    }, () => { rail.hidden = true; });
+  }
+  function stopDoc() { if (unsub) { unsub(); unsub = null; } }
+  function signIn(what) {
+    if (so.S.user && !so.S.profile) { location.hash = '#/onboard'; return; }
+    openSheet(`<div class="vsheet-backdrop" data-close-sheet></div>
+      <section class="vsheet shp-signin" role="dialog" aria-modal="true" aria-label="Sign in">
+        <div class="vsheet-grab" aria-hidden="true"></div>
+        <header><h2>Sign in to ${so.esc(what)}</h2><button class="icon-btn" data-close-sheet aria-label="Close">${XIC}</button></header>
+        <div class="vsheet-signin"><p class="small">Watching is free. Create a free account to give stars and comment.</p><a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/series/sheriff/' + n)}">Log in</a><a class="btn btn-sm btn-ghost" href="#/signup">Sign up</a></div>
+      </section>`);
+  }
+  const signedIn = () => !!(so.S.user && so.S.profile);
+  function openSheet(html) {
+    closeSheet(true); wasPlaying = !v.paused && !v.ended; if (wasPlaying) v.pause();
+    sheet.innerHTML = html; requestAnimationFrame(() => sheet.classList.add('open'));
+    sheet.querySelectorAll('[data-close-sheet]').forEach((b) => (b.onclick = () => closeSheet()));
+  }
+  function closeSheet(quiet) {
+    if (sheetUnsub) { sheetUnsub(); sheetUnsub = null; }
+    if (!sheet.innerHTML) return false;
+    sheet.classList.remove('open'); sheet.innerHTML = '';
+    if (!quiet && wasPlaying) v.play().catch(() => {});
+    wasPlaying = false; return true;
+  }
+  function openComments() {
+    const c = Number(p.commentCount) || 0;
+    openSheet(`<div class="vsheet-backdrop" data-close-sheet></div>
+      <section class="vsheet" role="dialog" aria-modal="true" aria-labelledby="shp-sheet-title">
+        <div class="vsheet-grab" aria-hidden="true"></div>
+        <header><h2 id="shp-sheet-title"><span class="vsc">${so.fmt(c)}</span> <span class="vsw">${c === 1 ? 'comment' : 'comments'}</span> <small class="shp-sheet-ep">· Episode ${n}</small></h2>
+          <button class="icon-btn" data-close-sheet aria-label="Close comments">${XIC}</button></header>
+        <div class="vsheet-list" id="shp-sheet-list"><div class="spinner"></div></div>
+        ${signedIn()
+          ? `<form class="comment-form vsheet-form" id="shp-sheet-form"><label for="shp-sheet-text" class="sr-only">Add a comment</label><input id="shp-sheet-text" type="text" maxlength="500" placeholder="Add a comment…" autocomplete="off"><button class="btn btn-sm" type="submit">Send</button></form><p class="form-error" id="shp-sheet-err"></p>`
+          : `<div class="vsheet-signin"><p class="small">Sign in to join the conversation.</p><a class="btn btn-sm" href="#/login?next=${encodeURIComponent('#/series/sheriff/' + n)}">Log in</a><a class="btn btn-sm btn-ghost" href="#/signup">Sign up</a></div>`}
+      </section>`);
+    const form = sheet.querySelector('#shp-sheet-form');
+    sheetUnsub = so.comments.mount({
+      p, box: sheet.querySelector('#shp-sheet-list'), form, input: form && form.querySelector('input'), err: sheet.querySelector('#shp-sheet-err'),
+      onCount: (k) => {
+        p.commentCount = k; cn.textContent = so.fmt(k);
+        const h = sheet.querySelector('.vsc'); if (h) { h.textContent = so.fmt(k); sheet.querySelector('.vsw').textContent = k === 1 ? 'comment' : 'comments'; }
+      }
+    });
+  }
+  rail.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-a]'); if (!b || !p) return;
+    e.stopPropagation();
+    if (b.dataset.a === 'cmt') return openComments();
+    if (!signedIn()) return signIn('give stars');
+    if (busy) return;
+    const on = !star.classList.contains('on'), was = Number(p.likeCount) || 0;
+    busy = true; paintStar(on); p.likeCount = Math.max(0, was + (on ? 1 : -1)); sn.textContent = so.fmt(p.likeCount);
+    if (on) { star.classList.remove('pop'); void star.offsetWidth; star.classList.add('pop'); }
+    try { await so.likePost(p, on); } catch (err) { paintStar(!on); p.likeCount = was; sn.textContent = so.fmt(was); so.toast?.(so.friendlyError(err)); }
+    busy = false;
+  });
+  return { bind, stop() { stopDoc(); closeSheet(true); }, close: () => closeSheet() };
 }

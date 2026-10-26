@@ -13,6 +13,7 @@ import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
 import { sheriffCard, sheriffStudio, sheriffGridTiles } from './sheriff-card.js';
+import { isSheriffPost, sheriffEpOf } from './sheriff-data.js';
 import { deliveryUrls, LIMITS, safePhotoURL, keepTrying } from './media-config.js';
 import { createStories } from './stories.js';
 import { createSearch, SEARCH_ICON } from './search.js';
@@ -501,7 +502,8 @@ document.addEventListener('click', closeMenus);
 
 function renderPosts(container, posts, emptyMsg) {
   container.innerHTML = '';
-  const visible = posts.filter((p) => !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !parental.hidePost(p));
+  // Sheriff episode posts (stars / comments only) have their own series cards, so they skip normal lists.
+  const visible = posts.filter((p) => !isSheriffPost(p) && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !parental.hidePost(p));
   if (!visible.length) { container.innerHTML = `<div class="empty">${emptyMsg}</div>`; return; }
   visible.forEach((p) => container.appendChild(postCard(p)));
 }
@@ -598,7 +600,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !documen
 async function newestStudioVideo() {
   try {
     const snap = await getDocs(query(collection(db, 'posts'), where('authorId', '==', STUDIO_UID), orderBy('createdAt', 'desc'), limit(10)));
-    const v = snap.docs.find((d) => d.data().mediaType === 'video' || d.data().linkUrl);
+    const v = snap.docs.find((d) => !isSheriffPost(d.id) && (d.data().mediaType === 'video' || d.data().linkUrl));
     return v ? v.id : 'stand-up-strong';
   } catch { return 'stand-up-strong'; }
 }
@@ -678,7 +680,7 @@ const routes = [
   [/^#\/series\/new$/, gated((t) => getWorks().series().editPage(null, t)), 'explore'],
   [/^#\/series\/([\w-]+)\/edit$/, (id, t) => getWorks().series().editPage(id, t), 'explore'],
   // Studio Original mini-series (static files, js/sheriff.js loads only on this route).
-  [/^#\/series\/sheriff(?:\/([1-9]))?$/, (ep) => import('./sheriff.js').then((m) => m.page(main, { ep, toast })), 'explore'],
+  [/^#\/series\/sheriff(?:\/([1-9]))?$/, (ep) => import('./sheriff.js').then((m) => m.page(main, { ep, toast, social: sheriffSocial })), 'explore'],
   [/^#\/series\/([\w-]+)$/, (id, t) => getWorks().series().page(id, t), 'explore'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
@@ -826,6 +828,12 @@ const watch = createWatch({
   views: { viewsHtml, trackVideo, trackVisible },
   fs: { doc, getDoc, getDocs, collection, query, where, limit, onSnapshot, orderBy, writeBatch, serverTimestamp, increment, setDoc }
 });
+// Stars + comments inside the Sheriff series player: the same shared actions as the feed and post page.
+const sheriffSocial = {
+  S, db, esc, toast: (m) => toast(m), fs: { doc, getDoc, onSnapshot }, isLiked, likePost, comments, friendlyError: (e) => friendlyError(e), reportDialog: (...x) => reportDialog(...x),
+  fmt: (n) => { n = Number(n) || 0; return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n); },
+  hidden: (p) => !!window.kemyReportHidden?.(p)
+};
 async function pageWatch(tab, postId, token) { return watch.render(postId, token, tab || 'foryou'); }
 const stories = createStories({
   S, db, esc, avatar, badge, timeAgo, toast, friendlyError, requireAuth, STUDIO_UID, isAdmin,
@@ -1202,7 +1210,7 @@ async function pageProfile(username, tab, token) {
   } else {
     const ps = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(40)));
     if (stale(token)) return;
-    renderGrid($('#posts'), ps.docs.map((d) => ({ id: d.id, ...d.data() })), mine ? 'You haven’t posted yet. <a href="#/new">Make your first post</a>.' : 'No posts yet.');
+    renderGrid($('#posts'), ps.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => !isSheriffPost(p)), mine ? 'You haven’t posted yet. <a href="#/new">Make your first post</a>.' : 'No posts yet.');
     if (uid === STUDIO_UID) studioEpisodeTiles($('#posts'));
   }
 }
@@ -1225,7 +1233,7 @@ function gridTile(p) {
   const kind = p.mediaUrl && p.mediaType === 'video' ? 'video' : p.mediaUrl && p.mediaType === 'image' ? 'image'
     : yt && /^[\w-]+$/.test(yt) ? 'youtube' : p.linkUrl && tikTokId(p.linkUrl) ? 'tiktok' : 'text';
   const thumb = kind === 'video' ? (p.posterUrl || p.poster) : kind === 'image' ? (p.posterUrl || p.mediaUrl) : kind === 'youtube' ? `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` : '';
-  const href = kind === 'text' ? `#/post/${esc(p.id)}` : `#/watch/${esc(p.id)}`;
+  const href = isSheriffPost(p) ? `#/series/sheriff/${sheriffEpOf(p)}` : kind === 'text' ? `#/post/${esc(p.id)}` : `#/watch/${esc(p.id)}`;
   const label = `${kind === 'video' ? 'Video' : kind === 'image' ? 'Photo' : kind === 'text' ? 'Post' : 'Video link'}${p.text ? ': ' + p.text.slice(0, 60) : ''}`;
   const inner = thumb ? `<img src="${esc(thumb)}" alt="" loading="lazy" decoding="async">`
     : kind === 'video' ? `<video src="${esc(p.mediaUrl)}#t=0.5" preload="metadata" muted playsinline tabindex="-1" aria-hidden="true"></video>`

@@ -59,15 +59,21 @@ export function sheriffGridTiles() {
 }
 
 /** For You: Episode 1 as a normal (static-file) feed video, attributed to the studio. */
-export function sheriffFeedPost(studioUid = 'studio') {
+// `real` = the posts/sheriff-ep1 doc data (stars, comments, views). Without it the item still plays,
+// just without the social buttons' counts (external).
+export function sheriffFeedPost(studioUid = 'studio', real = null) {
   const e = SHERIFF_EPISODES.find((x) => x.n === 1 && isOut(x));
   if (!e) return null;
-  return {
+  const base = {
     id: 'sheriff-ep1', external: true, sheriff: true, kind: 'sheriff', mediaType: 'video',
     mediaUrl: ART + 'ep1.mp4', poster: ART + 'ep1.webp', authorId: studioUid, authorName: 'Lone Keem Studios',
     authorUsername: 'lonekeemstudios', source: 'Lone Keem Studios', cat: '', dur: e.dur,
     text: `The Sheriff of Lone Keem · Episode 1: ${e.title}`,
     linkUrl: location.origin + location.pathname + '#/series/sheriff', published: '2026-10-26T12:00:00Z'
   };
+  if (!real) return base;
+  // Real post: Kemy's own like / comment / save / report code runs on it. Playback stays on the static file.
+  return { ...real, ...base, external: false, social: true, likeCount: Number(real.likeCount) || 0, commentCount: Number(real.commentCount) || 0,
+    viewCount: real.viewCount || 0, createdAt: real.createdAt, authorColor: real.authorColor, studio: true };
 }
 export const SHERIFF_COUNT = () => SHERIFF_EPISODES.filter(isOut).length;

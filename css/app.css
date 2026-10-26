@@ -1952,4 +1952,4 @@ button.nm-back { background: none; border: 0; padding: 0; font: inherit; cursor:
 .vsh-epn { font: 800 10.5px Inter, sans-serif; letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.18); color: #fff; padding: 2px 7px; border-radius: 6px; }
 .vsh-cta { margin-top: 8px; pointer-events: auto; }
 .vsh-ep a.vact { text-decoration: none; color: #fff; }
-@media (orientation: landscape) and (max-height: 500px) { .vsh-ep .vsh-tags { margin-bottom: 2px; } .vsh-ep .vcaption { display: none; } .vsh-ep .vsh-cta { margin-top: 4px; } .vsh-ep .vrail > a[href$='/1'] { display: none; } }
+@media (orientation: landscape) and (max-height: 500px) { .vsh-ep .vsh-tags { margin-bottom: 2px; } .vsh-ep .vcaption { display: none; } .vsh-ep .vsh-cta { margin-top: 4px; } .vsh-ep .vrail > a[href$='/1'], .vsh-ep .vrail > a[href$='/sheriff'], .vsh-ep .vrail > .save { display: none; } .vsh-ep .vrail { gap: 6px; } .vsh-ep .vact svg { width: 40px; height: 40px; padding: 8px; } }
