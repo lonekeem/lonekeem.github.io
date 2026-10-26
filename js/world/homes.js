@@ -506,7 +506,9 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
       body.innerHTML = `<div class="kh-now">${t.cover ? `<img src="${esc(t.cover)}" alt="" width="44" height="44">` : ''}<div><b>🎵 ${esc(t.title)}</b><small>${esc(t.artist)}${t.credit ? ` · ${esc(t.credit)}` : ''}</small><small class="kh-note">Everyone inside hears the same spot.</small></div></div><button type="button" data-p hidden>Tap to listen 🎵</button>`;
       const tb = body.querySelector('[data-p]');
       const go = () => { if (!au.getAttribute('src')) { au.preload = 'none'; au.src = t.src; } sync(); au.play().then(() => { tb.hidden = true; markPaused(false); dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'house-radio' } })); }).catch(() => { tb.hidden = false; markPaused(true); }); };
-      tb.onclick = go; au.addEventListener('loadedmetadata', sync, { once: true }); go(); setRadioTitle(t.title);
+      tb.onclick = go; au.addEventListener('loadedmetadata', sync, { once: true }); go(); setRadioTitle(t.title); me0.tvArtist = t.artist || '';
+      // karaoke lyrics on the TV for the three new Kemy songs (module + small JSON loaded only now)
+      import('./tvlyrics.js').then((Ly) => { const k = Ly.lyricsKey(t.src); if (!k || rad !== me0) return; return Ly.loadLyrics(k).then((L) => { if (rad === me0 && L.length) { me0.lyr = { L, draw: Ly.drawLyrics }; if (window.__kh) window.__kh.lyrics = k; } }); }).catch(() => {});
     }
     if (rad !== me0) return;
     syncChrome(); tvShow(me0.tvTitle, o.name); if (window.__kh) window.__kh.radio = Rd.k;
@@ -517,7 +519,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     rad = null; miniAt = null; drag = null; radioBox.classList.remove('min', 'dock'); radioBox.removeAttribute('aria-hidden');
     noteBtn.hidden = true; noteBtn.classList.remove('on');
     radioBox.style.left = radioBox.style.top = radioBox.style.right = radioBox.style.bottom = radioBox.style.transform = '';
-    radioBox.hidden = true; radioBox.innerHTML = ''; if (window.__kh) window.__kh.radio = null;
+    radioBox.hidden = true; radioBox.innerHTML = ''; if (window.__kh) { window.__kh.radio = null; window.__kh.lyrics = null; window.__kh.tvLine = null; }
   }
   // owner writes (merge; rules re-check owner/name/garage/at on every write)
   const homeW = (patch) => { const o = owners.get(myPlot); return setDoc(doc(db, 'homes', myPlot), { ...patch, owner: uid, name: S.profile.displayName, style: o.style, garage: o.garage || 0, at: serverTimestamp() }, { merge: true }); };
@@ -898,13 +900,16 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     // LED strip: dots chase around the edge
     const per = 2 * (Wc + Hc), n = 64; for (let i = 0; i < n; i++) { let d = (i / n) * per; let x, y; if (d < Wc) { x = d; y = 6; } else if ((d -= Wc) < Hc) { x = Wc - 6; y = d; } else if ((d -= Hc) < Wc) { x = Wc - d; y = Hc - 6; } else { x = 6; y = Hc - (d - Wc); }
       const on = 0.35 + 0.65 * Math.max(0, Math.sin(t * 5 - i * 0.45)); g.globalAlpha = on; g.fillStyle = am && i % 2 ? pal.alt : pal.main; g.shadowColor = pal.main; g.shadowBlur = 10; g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill(); } g.globalAlpha = 1;
+    const ly = rad && rad.lyr && rad.au && inside && rad.plot === inside.id ? rad.lyr : null;
+    if (ly) { const st = ly.draw(g, Wc, Hc, ly.L, rad.au.currentTime || 0, pal, tvTitle || 'Music', tvBy ? tvBy + '’s TV' : rad.tvArtist || '');
+      if (window.__kh) window.__kh.tvLine = st.cur; if (tvTex) tvTex.needsUpdate = true; return; }
     // equalizer
     const bars = 24, bw = (Wc - 80) / bars; for (let i = 0; i < bars; i++) { const v = 0.15 + 0.85 * Math.abs(Math.sin(t * (2.6 + (i % 7) * 0.55) + i * 1.3)) * (0.6 + 0.4 * Math.sin(t * 1.3 + i)); const bh = v * 70;
       const eg = g.createLinearGradient(0, Hc - 26 - bh, 0, Hc - 26); eg.addColorStop(0, pal.alt); eg.addColorStop(1, pal.main); g.fillStyle = eg; g.shadowColor = pal.main; g.shadowBlur = 14; g.fillRect(40 + i * bw + 2, Hc - 26 - bh, bw - 4, bh); }
     // the label (text only) with a soft neon glow
     g.textAlign = 'center'; g.textBaseline = 'middle'; const lab = tvTitle || 'Music'; g.font = `900 ${Math.min(64, (Wc - 70) * 1.7 / Math.max(6, lab.length))}px Inter, Arial, sans-serif`;
     g.shadowColor = pal.main; g.shadowBlur = 22 + Math.sin(t * 3) * 6; g.fillStyle = pal.main; g.fillText(lab, Wc / 2, 82); g.shadowBlur = 0; g.fillStyle = 'rgba(255,255,255,.9)'; g.font = '600 20px Inter, Arial, sans-serif';
-    g.fillText('Now playing' + (tvBy ? ' · ' + tvBy + '’s TV' : ''), Wc / 2, 128, Wc - 60); g.shadowBlur = 0; if (tvTex) tvTex.needsUpdate = true; }
+    g.fillText((rad && rad.tvArtist && tvTitle === (rad.tvTitle || '').slice(0, 28) ? rad.tvArtist + ' · ' : '') + 'Now playing' + (tvBy ? ' · ' + tvBy + '’s TV' : ''), Wc / 2, 128, Wc - 60); g.shadowBlur = 0; if (tvTex) tvTex.needsUpdate = true; }
   function tvAct() { if (!inside) return; const o = owners.get(inside.id); if (o && o.owner === uid && inside.id === myPlot) { radioPanel(); return; }
     if (rad) { if (radioOff === inside.id) { radioOff = null; startRadio(); } else say('📺 ' + (o && o.name ? o.name : 'The owner') + ' picks the music on this TV'); } else if (radioOff === inside.id) { radioOff = null; startRadio(); } else say('📺 The TV is off. Only ' + (o && o.name ? o.name : 'the owner') + ' can pick the music.'); }
   function nearTV() { const r = inside && rooms.get(inside.id); for (const sc of (r && r.I.screens ? r.I.screens() : [])) { if (Math.abs(P.y - sc.fl) > 1.2) continue; const dx = P.x - sc.x, dz = P.z - sc.z; const fwd = dx * Math.sin(sc.yaw) + dz * Math.cos(sc.yaw); if (Math.hypot(dx, dz) < 2.6 && fwd > -0.2) return true; } return false; }
@@ -962,7 +967,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   if (!uid) setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 50); setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 6000);
 
   // ---------------------------------------------------------------- per-frame: prompts, garage doors, light
-  function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * 8); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
+  function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * (rad && rad.lyr ? 30 : 8)); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
     if (inside && (!Number.isFinite(P.y) || P.y < FLAT - 0.25)) { const r = rooms.get(inside.id); if (r) { P.x = r.cx; P.z = r.cz + 4.6 * SC; } P.y = FLAT; P.vy = 0; P.onGround = true; }
     if (deco && deco.out) { const y = standY(ground(P.x, P.z), P.x, P.z); if (inside || positionBad(P.x, P.z) || !Number.isFinite(P.y) || P.y < y - 0.45) placeAt(deco.spot); }
     if (driving && rad && !radioBox.hidden) { if (radioBox.classList.contains('dock')) placeNote(); else if (!radioBox.classList.contains('min')) dockRadio(); else { const rr = radioBox.getBoundingClientRect(); if (hitsPad({ l: rr.left, t: rr.top, r: rr.right, b: rr.bottom })) dockRadio(); } }
@@ -990,7 +995,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   const life = attachHomeLife(api, { inside: () => inside, room: () => (inside && rooms.get(inside.id)) || null, say,
     sitAt: (o) => { P.sit = { x: o.x, z: o.z, y: o.y, yaw: o.yaw, seat: o.seat || null, back: o.back, off: () => (o.dn === 'sleep' ? life.act('wake') : null) }; P.x = o.x; P.z = o.z; P.yaw = o.yaw; api.markDirty && api.markDirty(); },
     unsit: () => { const st = P.sit; if (!st) return; P.sit = null; P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; api.markDirty && api.markDirty(); } });
-  window.__khApi = { life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, floor: () => changeFloor(), sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
+  window.__khApi = { tvAudio: () => (rad && rad.au) || null, tvCanvas: () => tvC, life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, floor: () => changeFloor(), sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
   function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); css.remove(); css2.remove(); }
   void Q; void K;
   return { update, destroy };
