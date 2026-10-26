@@ -234,7 +234,8 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     kbar.hidden = !(rider && my && my.state === 'drive');
     for (const [u, t] of asked) if (nowMs - t > 30000) asked.delete(u);
     // third parties: parent other passengers to the car they named
-    for (const o of api.others.values()) { if (!o.obj || !o.dn || o.dn.slice(0, 2) !== '~r' || o.dn.slice(2) === me8) continue; let held = false; for (const [du, R] of remote) if (U8(du) === o.dn.slice(2) && riderOf(api.others.get(du)?.dn) === U8(o.uid)) { mountIn(o.obj, R.m); sitPose(o.obj, dt); held = true; } if (held) o.rideHold = nowMs; else if (o.obj.parent !== scene && nowMs - (o.rideHold || 0) > 600) unmount(o.obj); }
+    // (a passenger who hopped out has dn '' or another code: still check them, or they stay seated in the car as a ghost on everyone else's screen)
+    for (const o of api.others.values()) { if (!o.obj) continue; const rd = o.dn && o.dn.slice(0, 2) === '~r' ? o.dn.slice(2) : ''; if (rd === me8 || (!rd && !o.rideMounted)) continue; let held = false; if (rd) for (const [du, R] of remote) if (U8(du) === rd && riderOf(api.others.get(du)?.dn) === U8(o.uid)) { mountIn(o.obj, R.m); sitPose(o.obj, dt); held = true; } if (held) { o.rideHold = nowMs; o.rideMounted = true; } else if (nowMs - (o.rideHold || 0) > 600) { if (o.obj.parent !== scene) unmount(o.obj); o.rideMounted = false; } }
     // passenger side
     if (!ride) return; const o = api.others.get(ride.drv); const R = remote.get(ride.drv); const okd = !!(o && riderOf(o.dn) === me8);
     if (ride.st === 'ask') { if (okd && R) { ride.st = 'on'; ride.bad = 0; pushDn('~r' + U8(ride.drv)); rbar.hidden = false; say('🚗 Riding with ' + (o.name || 'a Pal') + ' · 🎥 to switch view · 🚪 to hop out'); } else if (nowMs - ride.t > 45000 || (!o && nowMs - ride.t > 4000) || (o && !parseCar(o.dn) && nowMs - ride.t > 2500)) { leaveRide('No answer this time 🙂'); return; } else return; }
