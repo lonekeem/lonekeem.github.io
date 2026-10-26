@@ -184,6 +184,7 @@ function viewTex(THREE, kind) { if (views[kind]) return views[kind]; const cv = 
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; views[kind] = t; return t; }
 
 // build one interior in a ROOMS cell. K = { put, flush, G, std }. Returns a handle with live setters.
+let upPl = null; const upPlane = (THREE) => upPl || (upPl = new THREE.PlaneGeometry(1, 1));
 export function buildInterior(api, K, h, cx, cz, decor) {
   const { THREE, box, LOW } = api; const { put, flush, G } = K; const y = K.y ?? 0; const SC = scOf(h); const two = h.style === 1 || h.style === 3 || !!h.estate; const S = palOf(h);
   const g = new THREE.Group(); g.name = 'interior-' + h.id; const vc = (o = {}) => (LOW ? new THREE.MeshLambertMaterial({ color: '#fff', vertexColors: true, ...o }) : new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.8, vertexColors: true, ...o }));
@@ -224,7 +225,8 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   B(k + 's', '#f8fafc', 5.5, 0.3, 2.3, 0.9, 0.6, 2.0, 1); B(k + 's', '#cbd5e1', 5.5, 2.2, 2.3, 0.04, 0.04, 2.0); B(k + 's', '#cbd5e1', 5.95, 1.9, 2.3, 0.05, 0.05, 0.05); B(k + 's', '#94a3b8', 5.92, 1.85, 2.3, 0.12, 0.06, 0.06); // shower head + curtain rail B(k + 's', '#7dd3fc', 5.5, 0.58, 2.3, 0.7, 0.02, 1.8); B(k + 's', '#f8fafc', 2.0, 0.25, 4.45, 0.45, 0.5, 0.6, 1); B(k + 's', '#f8fafc', 2.0, 0.65, 4.7, 0.45, 0.4, 0.15);
   B(k + 's', '#f8fafc', 3.6, 0.45, 4.6, 0.9, 0.9, 0.5, 1); B(k + 'g', '#e0f2fe', 3.6, 1.6, 4.86, 0.8, 0.7, 0.02); B(k + 's', A, 4.2, 0.012, 2.4, 1.0, 0.02, 0.6); for (let i = -2; i <= 2; i++) B(k + 's', '#cbd5e1', 3.55, 1.2, 0.1 + 0, 5.0, 0.02, 0.01, 0, 'box', 0, 1);
   // windows (painted views) + frames
-  const vk = k + 'v'; const win = (x, yy, z, ry, w, hh) => { put(vk, G.plane, '#ffffff', cx + x * SC, y + yy, cz + z * SC, ry, w, hh, 1); const fx = Math.abs(Math.sin(ry)), fz = Math.abs(Math.cos(ry)); B(k + 's', '#ffffff', x, yy - hh / 2, z, w * fz + 0.12 * fx, 0.08, w * fx + 0.12 * fz); B(k + 's', '#ffffff', x, yy + hh / 2, z, w * fz + 0.1 * fx, 0.06, w * fx + 0.1 * fz); B(k + 's', '#ffffff', x, yy, z, 0.05 * fz + 0.06 * fx, hh, 0.05 * fx + 0.06 * fz); };
+  // G.plane is pre-rotated flat (XZ, kemyworld.js), so floor tiles use it as-is; windows need an upright XY plane
+  const vk = k + 'v'; const VPL = upPlane(THREE); const win = (x, yy, z, ry, w, hh) => { put(vk, VPL, '#ffffff', cx + x * SC, y + yy, cz + z * SC, ry, w, hh, 1); const fx = Math.abs(Math.sin(ry)), fz = Math.abs(Math.cos(ry)); B(k + 's', '#ffffff', x, yy - hh / 2, z, w * fz + 0.12 * fx, 0.08, w * fx + 0.12 * fz); B(k + 's', '#ffffff', x, yy + hh / 2, z, w * fz + 0.1 * fx, 0.06, w * fx + 0.1 * fz); B(k + 's', '#ffffff', x, yy, z, 0.05 * fz + 0.06 * fx, hh, 0.05 * fx + 0.06 * fz); };
   win(-3.6, 1.6, 5.98, Math.PI, 1.8, 1.2); win(-3, 1.85, -5.98, 0, 1.6, 0.8); win(-5.98, 1.6, -2.4, Math.PI / 2, 1.4, 1.1); win(5.98, 1.6, -4.0, -Math.PI / 2, 1.4, 1.1); win(5.98, 2.0, 4.0, -Math.PI / 2, 0.8, 0.6);
   if (two) { win(3.6, 4.9, -5.98, 0, 1.6, 1.1); win(5.98, 4.9, -2.0, -Math.PI / 2, 1.4, 1.1); }
   // ceiling lamps (glow) per room
@@ -236,13 +238,13 @@ export function buildInterior(api, K, h, cx, cz, decor) {
   let floorM = null, decG = null; let decCols = [], seats = [], screens = []; let items = placedItems(decor, h, two);
   function setFloor(t, floors) { const F = FLOORS[t] || FLOORS[S.floor]; const map = parseFloors(floors); const painted = FLOOR_KEYS.some((key) => map[key]); if (floorM) { g.remove(floorM); floorM.geometry.dispose(); floorM = null; } const fk = k + 'f';
     if (!painted) { put(fk, G.box, F.c, cx, y - 0.05, cz, 0, 12.4 * SC, 0.1, 12.4 * SC);
-      if (t === 'tile') { for (let i = -6; i < 6; i++) for (let j = -6; j < 6; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC, SC, 1, -Math.PI / 2); }
+      if (t === 'tile') { for (let i = -6; i < 6; i++) for (let j = -6; j < 6; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC, 1, SC); }
       else if (F.l) for (let i = -5; i <= 5; i++) put(fk, G.box, F.l, cx + i * 1.1 * SC, y + 0.002, cz, 0, 0.03, 0.004, 12.2 * SC);
       floorM = flush(fk, vc({ roughness: t === 'carpet' ? 1 : 0.6 }), false, g); return; }
     for (const [rm, x0, x1, z0, z1] of [['K', -6.2, -0.95, -6.2, -1], ['L', -6.2, -0.95, -1, 6.2], ['B', 0.95, 6.2, -6.2, 0], ['T', 0.95, 6.2, 0, 6.2], ['H', -0.95, 0.95, -6.2, 6.2]]) {
       const hex = map[rm], col = hex || F.c, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, sx = (x1 - x0) * SC, sz = (z1 - z0) * SC;
       put(fk, G.box, col, cx + mx * SC, y - 0.05, cz + mz * SC, 0, sx, 0.1, sz);
-      if (!hex && t === 'tile') { for (let i = Math.ceil(x0); i < x1; i++) for (let j = Math.ceil(z0); j < z1; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC * 0.92, SC * 0.92, 1, -Math.PI / 2); }
+      if (!hex && t === 'tile') { for (let i = Math.ceil(x0); i < x1; i++) for (let j = Math.ceil(z0); j < z1; j++) if ((i + j) & 1) put(fk, G.plane, F.l, cx + (i + 0.5) * SC, y + 0.002, cz + (j + 0.5) * SC, 0, SC * 0.92, 1, SC * 0.92); }
       else if (!hex && F.l) for (let s = 1; s <= 3; s++) put(fk, G.box, F.l, cx + (x0 + (x1 - x0) * s / 4) * SC, y + 0.002, cz + mz * SC, 0, 0.03, 0.004, sz * 0.96); }
     if (two && map.U) put(fk, G.box, map.U, cx + 3.55 * SC, y + 3.37, cz - 0.55 * SC, 0, 5 * SC, 0.04, 10.6 * SC);
     const wins = [['L', -3.6, 1.6, 5.98, 1.8, 1.2, 0, -1], ['K', -3, 1.85, -5.98, 1.6, 0.8, 0, 1], ['K', -5.98, 1.6, -2.4, 1.4, 1.1, 1, 0], ['B', 5.98, 1.6, -4, 1.4, 1.1, -1, 0], ['T', 5.98, 2, 4, 0.8, 0.6, -1, 0]];
