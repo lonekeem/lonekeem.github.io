@@ -605,6 +605,17 @@
 .lu-play{background:linear-gradient(#ffe36b,#f0a400)!important;color:#4a2a00!important;box-shadow:0 4px 0 #8a5a00,0 6px 14px rgba(0,0,0,.4)!important}
 .lu-hero:active .lu-play{transform:translateY(3px);box-shadow:0 1px 0 #8a5a00!important}
 @media (prefers-reduced-motion:reduce){.lu-hd1,.lu-hd2{animation:none}}
+/* Capy Chess hero card (Games hub, under Pal Ludo) */
+.cxh-hero{background:radial-gradient(120% 100% at 85% 15%,#c98a4b 0,#8a5228 35%,#4a2812 70%,#1e0f06 100%);border-color:rgba(255,214,140,.7)}
+.cxh-hero::after{background:repeating-linear-gradient(90deg,#f3e6cf 0 18px,#2a2420 18px 36px);opacity:.4;height:12px}
+.cxh-hero .zf-txt{max-width:50%}
+.cxh-hero .zf-txt b{text-shadow:0 2px 0 #3a1d08,0 0 12px rgba(255,214,120,.6)}
+.cxh-hero .zf-txt small{text-shadow:0 1px 2px rgba(30,10,0,.7);opacity:1}
+.cxh-art{position:absolute;z-index:1;right:10px;top:50%;width:47%;max-width:260px;height:auto;aspect-ratio:4/3;object-fit:cover;transform:translateY(-50%) rotate(2deg);border-radius:14px;border:2px solid rgba(255,226,170,.75);box-shadow:0 8px 18px rgba(0,0,0,.5);background:#4a2a14}
+.cxh-play{background:linear-gradient(#fff4dc,#e7c98f)!important;color:#3a1d08!important;box-shadow:0 4px 0 #7a4a1e,0 6px 14px rgba(0,0,0,.4)!important}
+.cxh-hero:active .cxh-play{transform:translateY(3px);box-shadow:0 1px 0 #7a4a1e!important}
+@media (max-width:380px){.cxh-art{width:44%}.cxh-hero .zf-txt small{font-size:.76rem}}
+@media (min-width:600px){.cxh-art{width:auto;height:calc(100% - 34px);max-width:none}}
 /* Join with code + room code box (every online game) */
 .g-joincode { align-items: center; flex-wrap: wrap; }
 .g-joincode-l { font-weight: 700; white-space: nowrap; }
