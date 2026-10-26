@@ -182,7 +182,7 @@ function build(pal) {
   }
   // head: big round head, slightly squashed, kid-friendly
   const headR = (kind === 'blob' ? 0.44 : 0.4) * (sp.id === 'jelly' ? 0 : 1);
-  if (headR) { const h = mesh(sph(1), mB, J.Head); h.scale.set(headR * 1.08, headR, headR * 0.98); h.position.y = headR * 0.82; const ch = mesh(sph(1), mB, J.Head); ch.scale.set(headR * 0.95, headR * 0.6, headR * 0.85); ch.position.set(0, headR * 0.52, headR * 0.08); }
+  const CF = ex.has('capyface'); if (headR) { const h = mesh(sph(1), mB, J.Head); h.scale.set(headR * (CF ? 1.14 : 1.08), headR * (CF ? 0.94 : 1), headR * (CF ? 1.02 : 0.98)); h.position.y = headR * 0.82; const ch = mesh(sph(1), mB, J.Head); ch.scale.set(headR * 0.95, headR * 0.6, headR * 0.85); ch.position.set(0, headR * 0.52, headR * 0.08); }
   const hy = headR * 0.82 || 0.05, fz = headR * 0.9 || 0.6;
   const H = new THREE.Group(); H.position.y = hy - (sp.id === 'jelly' ? 0.42 : 0); J.Head.add(H); J.face = H;
   if (ex.has('antennae') && headR) for (const q of [-1, 1]) { const st = mesh(cap(0.014, 0.26), mA, H); st.position.set(q * 0.14, headR * 1.05, 0.05); st.rotation.z = -q * 0.35; mesh(sph(0.045), mat(A, { em: A }), H).position.set(q * 0.21, headR * 1.05 + 0.15, 0.05); }
@@ -190,22 +190,26 @@ function build(pal) {
   if (ex.has('mane')) for (let i = 0; i < 14; i++) { const a = i * Math.PI * 2 / 14; mesh(sph(0.16), mA, H).position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.5, -0.12); }
   if (ex.has('wool')) for (let i = 0; i < 6; i++) mesh(sph(0.14), mat('#ffffff'), H).position.set(-0.25 + i * 0.1, 0.42 + (i % 2) * 0.04, 0.05);
   // eyes (glossy, with catch-lights) + blush
-  const eyes = []; const er = 0.085 * (ex.has('frogeyes') ? 1.3 : 1);
+  const eyes = []; const er = 0.085 * (ex.has('frogeyes') ? 1.3 : ex.has('tinyeyes') ? 0.62 : 1);
   for (const s of [-1, 1]) {
-    const ey = ex.has('frogeyes') ? 0.36 : 0.06, ex0 = s * 0.19, hz = headR ? headR * 0.98 * Math.sqrt(Math.max(0.05, 1 - (ex0 / (headR * 1.08)) ** 2 - (ey / headR) ** 2)) : fz;
-    const g = new THREE.Group(); g.position.set(ex0, ey, ex.has('frogeyes') ? fz * 0.92 : hz - er * 0.22); g.rotation.y = s * 0.28; H.add(g);
+    const ey = ex.has('frogeyes') ? 0.36 : ex.has('tinyeyes') ? 0.1 : 0.06, ex0 = s * (ex.has('tinyeyes') ? 0.21 : 0.19), hz = headR ? headR * 0.98 * Math.sqrt(Math.max(0.05, 1 - (ex0 / (headR * 1.08)) ** 2 - (ey / headR) ** 2)) : fz;
+    const g = new THREE.Group(); g.position.set(ex0, ey, ex.has('frogeyes') ? fz * 0.92 : hz - er * 0.22 + (CF ? 0.045 : 0)); g.rotation.y = s * 0.28; H.add(g);
     if (ex.has('frogeyes')) mesh(sph(0.15), mB, g).position.z = -0.06;
     if (new THREE.Color(B).getHSL({}).l < 0.3) { const w = mesh(sph(1), mat('#ffffff', { sheen: 0 }), g); w.scale.set(er * 1.5, er * 1.6, er * 0.5); w.position.z = -0.02; }
     const e = mesh(sph(1), mEye, g); e.scale.set(er, er * 1.15, er * 0.42);
-    const hl = mesh(sph(0.027), mWhite, g); hl.position.set(-0.028, 0.04, er * 0.4); hl.castShadow = false; const hl2 = mesh(sph(0.011), mWhite, g); hl2.position.set(0.025, -0.03, er * 0.4);
+    const hl = mesh(sph(ex.has('tinyeyes') ? 0.019 : 0.027), mWhite, g); hl.position.set(-0.028, 0.04, er * 0.4); hl.castShadow = false; const hl2 = mesh(sph(0.011), mWhite, g); hl2.position.set(0.025, -0.03, er * 0.4);
     const lid = mesh(sph(1), mB, g); lid.scale.set(er * 1.2, er * 1.3, er * 0.6); lid.position.y = er * 2.6; lid.userData.open = er * 2.6; lid.userData.shut = er * 0.25; g.userData.lid = lid; eyes.push(g);
     if (sp.id === 'panda' || ex.has('eyepatch')) { const p = mesh(sph(1), mat(A), H); p.scale.set(0.13, 0.15, 0.05); p.position.set(s * 0.19, 0.04, fz * 0.88); p.rotation.z = s * 0.4; }
-    const bl = mesh(sph(1), mPink, H); bl.scale.set(0.08, 0.05, 0.03); bl.position.set(s * 0.3, -0.08, fz * 0.84);
+    const bl = mesh(sph(1), ex.has('blush2') ? mat('#ff8fb8', { op: 0.85, sheen: 0 }) : mPink, H); bl.scale.set(0.08, 0.05, 0.03); bl.position.set(s * (CF ? 0.33 : 0.3), -0.08, fz * (CF ? 0.86 : 0.84));
   }
   J.eyes = eyes;
   // snout
   const sn = sp.snout; const snz = fz;
   if (sn === 'muzzle' || sn === 'nose' || sn === 'whiskers') { const m = mesh(sph(1), mLight, H); m.scale.set(0.16, 0.11, 0.1); m.position.set(0, -0.1, snz * 0.95); const n = mesh(sph(1), mNose, H); n.scale.set(0.05, 0.035, 0.03); n.position.set(0, -0.06, snz * 0.95 + 0.09); }
+  if (sn === 'capy') { // short, wide, blunt plush snout + big darker nose pad
+    const m = mesh(geo('capysnout', () => new THREE.CapsuleGeometry(0.13, 0.24, 8, 20).rotateZ(Math.PI / 2)), mat(shade(B, -0.12), { fur: 1 }), H); m.scale.set(1, 0.95, 0.8); m.position.set(0, -0.12, snz * 0.94);
+    const n = mesh(geo('capynose', () => new THREE.CapsuleGeometry(0.045, 0.1, 6, 14).rotateZ(Math.PI / 2)), mat(shade(A, -0.3), { sheen: 0, cc: 1, r: 0.3 }), H); n.scale.set(1.25, 1, 0.6); n.position.set(0, -0.065, snz * 0.94 + 0.09);
+    for (const q of [-1, 1]) { const ns = mesh(sph(0.012), mat(shade(A, -0.6), { sheen: 0 }), H); ns.position.set(q * 0.045, -0.075, snz * 0.94 + 0.115); ns.scale.set(1.4, 0.8, 0.5); } }
   if (ex.has('whiskers')) for (const s of [-1, 1]) for (const k of [-1, 1]) { const w = mesh(cap(0.006, 0.18), mNose, H); w.position.set(s * 0.22, -0.1 + k * 0.025, snz * 0.95); w.rotation.z = Math.PI / 2 + k * 0.15 * s; }
   if (sn === 'beak' || sn === 'duckbill') { const b = mesh(cone(0.08, 0.16), mat('#ffa53a', { sheen: 0, cc: 0.6 }), H); b.rotation.x = Math.PI / 2; b.position.set(0, -0.07, snz + 0.1); b.scale.setScalar(1.25); if (sn === 'duckbill') b.scale.set(1.9, 1.25, 0.75); }
   if (sn === 'pig') { const p = mesh(geo('pig', () => new THREE.CylinderGeometry(0.1, 0.1, 0.08, 18)), mat(shade(B, -0.12)), H); p.rotation.x = Math.PI / 2; p.position.set(0, -0.1, snz + 0.05); for (const q of [-1, 1]) { const h = mesh(sph(0.018), mat(shade(B, -0.5), { sheen: 0 }), H); h.position.set(q * 0.035, -0.1, snz + 0.09); h.scale.z = 0.4; } }
@@ -222,12 +226,13 @@ function build(pal) {
     for (const sx of [-1, 1]) { const tk = mesh(cone(0.022, 0.09), mat('#fffaf0', { sheen: 0, cc: 0.8 }), H); tk.position.set(sx * 0.1, -0.15, snz * 0.86); tk.rotation.set(0.9, 0, sx * -0.3); }
   }
   // mouth: small smile
-  const mo = mesh(geo('smile', () => new THREE.TorusGeometry(0.05, 0.012, 6, 12, Math.PI)), mNose, H); mo.rotation.z = Math.PI; mo.position.set(0, sn === 'trunk' ? -0.2 : -0.16, snz * 0.97 + 0.02); J.mouth = mo;
+  const mo = mesh(geo('smile', () => new THREE.TorusGeometry(0.05, 0.012, 6, 12, Math.PI)), mNose, H); mo.rotation.z = Math.PI; mo.position.set(0, sn === 'trunk' ? -0.2 : sn === 'capy' ? -0.17 : -0.16, snz * (sn === 'capy' ? 0.94 : 0.97) + (sn === 'capy' ? 0.1 : 0.02)); if (sn === 'capy') mo.scale.setScalar(0.75); J.mouth = mo;
   // ears
   J.ears = []; const ea = sp.ears; const of0 = pal.outfit || {}; const hasHat = !!(of0.head && (WEAR_BY[of0.head] || ITEM[of0.head]));
   for (const s of [-1, 1]) {
     const e = bone(s < 0 ? 'EarR' : 'EarL', H, s * 0.3, 0.32, 0); let m;
     if (ea === 'round' || ea === 'biground') { const r = ea === 'round' ? 0.13 : 0.2; m = mesh(sph(1), mB, e); m.scale.set(r, r, r * 0.55); const i = mesh(sph(1), mat(ex.has('eyepatch') ? A : '#ffc0d8'), e); i.scale.set(r * 0.6, r * 0.6, r * 0.2); i.position.z = r * 0.42; e.position.set(s * (ea === 'round' ? 0.34 : 0.4), 0.34, -0.02); }
+    if (ea === 'capy') { m = mesh(sph(1), mat(shade(B, -0.08), { fur: 1 }), e); m.scale.set(0.085, 0.075, 0.05); const i = mesh(sph(1), mat(shade(A, 0.1)), e); i.scale.set(0.05, 0.042, 0.02); i.position.z = 0.035; e.position.set(s * 0.27, 0.36, -0.02); e.rotation.z = -s * 0.2; }
     if (ea === 'pointy') { m = mesh(cone(0.13, 0.3), sp.id === 'fox' || sp.id === 'redpanda' ? mA : mB, e); m.position.y = 0.12; m.scale.z = 0.6; const ie = mesh(cone(0.075, 0.2), mat('#ffc0d8'), e); ie.position.set(0, 0.1, 0.035); ie.scale.z = 0.3; e.rotation.z = -s * 0.25; }
     if (ea === 'long') { m = mesh(cap(0.08, 0.38), mB, e); m.position.y = 0.26; m.scale.z = 0.5; const i = mesh(cap(0.045, 0.3), mat('#ffb3cf'), e); i.position.set(0, 0.26, 0.03); i.scale.z = 0.3; e.position.set(s * 0.14, 0.4, 0); e.rotation.z = -s * 0.12; }
     if (ea === 'floppy') { m = mesh(cap(0.1, 0.22), mA, e); m.position.y = -0.14; m.scale.z = 0.45; e.position.set(s * 0.42, 0.22, 0); e.rotation.z = s * 0.35; }
@@ -245,6 +250,10 @@ function build(pal) {
     J.ears.push(e);
   }
   if (ex.has('horn') || ex.has('horns')) for (const s of ex.has('horn') ? [0] : [-1, 1]) { const h = mesh(cone(0.06, 0.26), mat(ex.has('horn') ? '#ffe88a' : '#fff0d0', { em: ex.has('horn') ? '#ffd34d' : undefined }), H); h.position.set(s * 0.2, 0.5, 0.15); h.rotation.set(0.3, 0, -s * 0.3); }
+  if (ex.has('yuzu') && headR && !hasHat) { const yz = new THREE.Group(); yz.position.set(-0.05, headR * 0.98, 0.03); yz.rotation.z = 0.12; H.add(yz); J.yuzu = yz;
+    const fr = mesh(sph(1), mat('#ffab2e', { sheen: 0.2, cc: 0.7, r: 0.35, em: '#ff8a10' }), yz); fr.scale.set(0.105, 0.09, 0.105); fr.position.y = 0.07;
+    mesh(sph(0.014), mat('#8a5418', { sheen: 0 }), yz).position.set(0, 0.16, 0);
+    const lf = mesh(sph(1), mat('#5cc05a', { sheen: 0.3 }), yz); lf.scale.set(0.06, 0.016, 0.03); lf.position.set(0.05, 0.17, 0); lf.rotation.z = 0.5; }
   if (ex.has('rainbowmane')) ['#ff8ab8', '#ffd34d', '#7fe0a0', '#7fb8ff', '#c49aff'].forEach((c, i) => mesh(sph(0.1), mat(c), H).position.set(-0.05, 0.42 - i * 0.12, -0.32 - i * 0.02));
   // arms: shoulder > upper > lower > hand (+3 fingers); flippers / wings swap the hand shape
   const armType = ex.has('wings') ? 'wing' : ex.has('flippers') ? 'flipper' : 'paw';
@@ -371,7 +380,7 @@ function apply(rootObj, P, t, mode) {
   const bt = t % 260; const shut = bt < 5 || (Math.floor(t / 260) % 3 === 1 && bt > 14 && bt < 19) || mode === 'sleep'; /* blink, sometimes a double blink */ for (const e of J.eyes) { const l = e.userData.lid; if (l) { l.position.y += ((shut ? l.userData.shut : l.userData.open) - l.position.y) * 0.6; l.visible = l.position.y < l.userData.open * 0.95; } }
   const sg = springs(rootObj, P); sp.e = sg.e[0] * 2.2 + (P.hrz || 0) * 0.3; // spring-driven floppy parts
   J.ears.forEach((e, i) => { e.rotation.x = sp.e * 0.4 + sg.e[0] * 0.3; e.rotation.y = e.userData.flap ? (i ? 1 : -1) * (Math.sin(t * 0.09) * 0.18 + (mode === 'react' ? Math.sin(t * 0.6) * 0.4 : 0)) : 0; e.userData.z ??= e.rotation.z; e.rotation.z = e.userData.z + Math.sin(t * 0.07 + i) * 0.04 + (i ? -1 : 1) * sp.e * 0.2; });
-  sp.tl = sg.tl[0];
+  sp.tl = sg.tl[0]; if (J.yuzu) { J.yuzu.rotation.z = 0.12 + Math.sin(t * 0.08) * 0.06 + sp.e * 0.3; J.yuzu.rotation.x = sg.e[0] * 0.4; } // capybara's yuzu wobbles
   if (J.gill) J.gill.forEach((g, i) => { g.rotation.z = g.userData.base + Math.sin(t * 0.11 + i * 1.3) * 0.06 + sg.e[1] * 0.25 * (i % 2 ? 1 : -1); g.rotation.x = Math.sin(t * 0.07 + i) * 0.08 + sg.e[0] * 0.3; });
   J.tail.forEach((b, i) => { if (i) b.rotation.set(0.3 + sg.tl[1] * 0.3 * i, 0, Math.sin(t * (P.tw || 0.1) - i * 0.6) * 0.25 + sp.tl * (0.3 + i * 0.12)); else { b.rotation.z = Math.sin(t * (P.tw || 0.1)) * 0.3 + sp.tl; b.rotation.x = sg.tl[1] * 0.3; } });
   if (J.tent) J.tent.forEach((b, i) => { b.rotation.x = Math.sin(t * 0.12 + i) * 0.3 + sg.e[0] * 0.6; b.rotation.z = Math.cos(t * 0.1 + i) * 0.2 + sg.tl[0] * 0.25; });

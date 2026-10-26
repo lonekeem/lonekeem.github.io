@@ -49,6 +49,7 @@ export const setPal3D = (fn) => { R3 = fn; };
 export const setPal3DWait = (on, loadingFn) => { wait3D = !!on; if (loadingFn) LOADING = loadingFn; };
 function drawWait(c, x, y, size) { const p = 0.5 + 0.5 * Math.sin(performance.now() / 260); c.save(); c.globalAlpha = 0.28 + p * 0.22; c.fillStyle = '#e9dcff'; c.beginPath(); c.ellipse(x, y - size * 0.42, size * 0.36, size * 0.42, 0, 0, 7); c.fill(); c.globalAlpha = 0.2; c.beginPath(); c.ellipse(x, y - 2, size * 0.34, size * 0.06, 0, 0, 7); c.fill(); c.restore(); }
 export const pal3DOn = () => !!R3;
+export const pal3DWaiting = () => !R3 && wait3D; // true while three.js is still loading (drawPal shows a placeholder)
 // dance.js asks to be told when a Pal is first drawn, and only then fetches three.js (never just for the feed)
 let NEED3D = null; export const onNeed3D = (fn) => { NEED3D = fn; };
 const thumbs = new Map();
@@ -86,6 +87,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (R === 'roar' || R === 'honk') { mouthOpen = 1; tilt = -0.15 * face; }
   if (R === 'hop') bob = -Math.abs(Math.sin(t * 0.25)) * 12;
   if (R === 'wiggle') { tilt = Math.sin(t * 0.6) * 0.3; }
+  if (R === 'relax') { bob = Math.sin(t * 0.08) * 0.8; tilt = Math.sin(t * 0.07) * 0.12; tailW = 0; wing = 0; earF = Math.sin(t * 0.1) * 0.08; } // capybara: slow, blissed-out sway
   if (floaty) bob += Math.sin(t * 0.07) * 2 - 4;
   const grow = [0.84, 1, 1.12][stage], bodyG = [1, 1.08, 1.22][stage];
   if (stage === 2) { const g = c.createRadialGradient(0, -16, 2, 0, -16, 26); g.addColorStop(0, 'rgba(255,230,140,.35)'); g.addColorStop(1, 'rgba(178,107,255,0)'); c.fillStyle = g; c.fillRect(-28, -46, 56, 48); }
@@ -143,6 +145,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   const ears = sp.ears;
   const earPair = (fn) => { for (const s of [-1, 1]) P(() => fn(s)); };
   if (ears === 'round') earPair((s) => { ell(c, s * 6.5, hy - 6, 2.9, 2.9); fillS(ex.has('eyepatch') ? A : B); ell(c, s * 6.5, hy - 6, 1.5, 1.5); c.fillStyle = ex.has('eyepatch') ? shade(A, 0.2) : shade(A === '#ffffff' ? B : A, 0.45); c.fill(); });
+  if (ears === 'capy') earPair((s) => { c.translate(s * 5.9, hy - 6.5); c.rotate(s * (0.15 + earF)); ell(c, 0, 0, 1.8, 1.5); fillS(shade(B, -0.08)); ell(c, 0, 0.3, 0.9, 0.7); c.fillStyle = shade(A, 0.1); c.fill(); });
   if (ears === 'biground') earPair((s) => { ell(c, s * 8, hy - 4, 4.6, 4.6); fillS(B); ell(c, s * 8, hy - 4, 2.8, 2.8); c.fillStyle = A; c.fill(); });
   if (ears === 'pointy') earPair((s) => { c.translate(s * 5.8, hy - 5); c.rotate(s * (0.25 + earF)); c.beginPath(); c.moveTo(-3.4, 2); c.lineTo(0, -6 - stage); c.lineTo(3.4, 2); c.closePath(); fillS(sp.id === 'fox' || sp.id === 'redpanda' ? B : B); c.beginPath(); c.moveTo(-1.6, 1); c.lineTo(0, -3.6 - stage); c.lineTo(1.6, 1); c.closePath(); c.fillStyle = sp.id === 'piglet' ? A : shade('#ff9fc8', 0.3); c.fill(); });
   if (ears === 'long') earPair((s) => { c.translate(s * 3.8, hy - 6); c.rotate(s * (0.18 + earF)); ell(c, 0, -6, 2.8, 7 + stage); fillS(B); ell(c, 0, -6, 1.3, 5 + stage); c.fillStyle = A; c.fill(); });
@@ -154,7 +157,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (ex.has('mane')) P(() => { c.fillStyle = A; for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ell(c, Math.cos(a) * (hr + 1), hy + Math.sin(a) * 8.6, 3.4 + stage * 0.5, 3.4 + stage * 0.5); c.fill(); } });
   if (ex.has('wool')) P(() => { c.fillStyle = '#fff'; for (const [a, b] of [[-6, -6], [-2, -8], [2, -8], [6, -6], [0, -9]]) { ell(c, a, hy + b, 3.4, 3); c.fill(); c.stroke(); } });
   // ---------------- head
-  if (kind === 'blob') { ell(c, 0, hy, hr * (ex.has('cheeks') ? cheek * 1.05 : 1), 7.6); const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(0.6, shade(B, 0.25)); g.addColorStop(1, B); fillS(g); }
+  if (kind === 'blob') { ell(c, 0, hy, hr * (ex.has('cheeks') ? cheek * 1.05 : ex.has('capyface') ? 1.06 : 1), ex.has('capyface') ? 7.3 : 7.6); const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(0.6, shade(B, 0.25)); g.addColorStop(1, B); fillS(g); }
   if (kind === 'jelly') { c.beginPath(); c.moveTo(-10, hy + 6); c.bezierCurveTo(-10, hy - 10, 10, hy - 10, 10, hy + 6); c.quadraticCurveTo(5, hy + 9, 0, hy + 7); c.quadraticCurveTo(-5, hy + 9, -10, hy + 6); c.globalAlpha = 0.92; const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(1, B); fillS(g); c.globalAlpha = 1; }
   if (ex.has('cheeks')) { c.fillStyle = shade(B, 0.45); ell(c, -6.5, hy + 3, 3.4 * cheek, 2.8 * cheek); c.fill(); ell(c, 7.5, hy + 3, 3.4 * cheek, 2.8 * cheek); c.fill(); }
   if (ex.has('mask')) { c.fillStyle = '#fff6ee'; ell(c, -4.5, hy + 2, 3.4, 2.6); c.fill(); ell(c, 6, hy + 2, 3.4, 2.6); c.fill(); c.fillStyle = shade(B, 0.6); ell(c, 1, hy - 4.5, 1.6, 1.2); c.fill(); }
@@ -167,19 +170,24 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (ex.has('horn')) P(() => { c.beginPath(); c.moveTo(-1.6, hy - 6.4); c.lineTo(0.4, hy - 13 - stage * 2); c.lineTo(1.8, hy - 6.4); c.closePath(); fillS('#ffe9a8'); c.strokeStyle = '#d9a640'; c.beginPath(); c.moveTo(-1, hy - 8); c.lineTo(1.4, hy - 9); c.moveTo(-0.4, hy - 10); c.lineTo(1, hy - 10.6); c.stroke(); });
   if (ex.has('horns')) for (const s of [-1, 1]) P(() => { c.beginPath(); c.moveTo(s * 3, hy - 6.5); c.quadraticCurveTo(s * 5, hy - 11 - stage, s * 6.5, hy - 11.5 - stage); c.quadraticCurveTo(s * 5, hy - 8, s * 5.6, hy - 6); c.closePath(); fillS('#fff3d0'); });
   if (ex.has('rainbowmane')) P(() => { ['#ff9fc8', '#ffd34d', '#8fe3b0', '#9fc8ff', '#c9a0ff'].forEach((cc, i) => { c.fillStyle = cc; ell(c, -3 - i * 1.6, hy - 6 + i * 2.4, 2.8, 2.2, 0.5); c.fill(); }); });
+  const hatOn = pal.acc === 'crown' || pal.acc === 'hat' || !!(pal.outfit && pal.outfit.head);
+  if (ex.has('yuzu') && !hatOn) P(() => { c.translate(-1.2, hy - 8.4 + Math.sin(t * 0.08) * 0.25); c.rotate(-0.12 + (R === 'relax' ? Math.sin(t * 0.1) * 0.12 : 0)); ell(c, 0, 0, 2.7, 2.3); const g = c.createRadialGradient(-0.9, -0.9, 0.3, 0, 0, 2.8); g.addColorStop(0, '#ffe08a'); g.addColorStop(0.55, '#ffb53a'); g.addColorStop(1, '#f08a1c'); c.fillStyle = g; c.strokeStyle = '#b8601a'; c.fill(); c.stroke(); c.fillStyle = '#9a5a1a'; ell(c, 0, -2.1, 0.45, 0.35); c.fill(); c.fillStyle = '#5fbf5a'; c.strokeStyle = '#2f7a3a'; ell(c, 1.4, -2.6, 1.6, 0.75, -0.5); c.fill(); c.stroke(); c.fillStyle = 'rgba(255,255,255,.7)'; ell(c, -1, -0.9, 0.7, 0.45, -0.5); c.fill(); });
   if (sp.id === 'penguin') { c.fillStyle = '#fbf6ff'; ell(c, 1, hy + 1.4, 7, 5.4); c.fill(); }
   if (ex.has('eyepatch')) { c.fillStyle = A; ell(c, -2.6, hy + 0.2, 2.9, 3.3, 0.4); c.fill(); ell(c, 4.8, hy + 0.2, 2.9, 3.3, -0.4); c.fill(); }
   if (ex.has('frogeyes')) for (const s of [-1, 1]) { ell(c, s * 4 + 1, hy - 6, 3.4, 3.2); fillS(B); }
   // ---------------- face
   const fx = 1.2, ey = ex.has('frogeyes') ? hy - 6 : kind === 'star' ? hy + 1.5 : kind === 'cloud' ? -9 : hy - 0.1;
   c.fillStyle = '#ff9fc8'; c.globalAlpha = ex.has('blush2') ? 0.95 : 0.75; ell(c, fx - 6, (ex.has('frogeyes') ? hy : ey) + 2.5, 1.9, 1.1); c.fill(); ell(c, fx + 6, (ex.has('frogeyes') ? hy : ey) + 2.5, 1.9, 1.1); c.fill(); c.globalAlpha = 1;
-  const closed = mode === 'sleep' || (mode === 'happy' && Math.sin(t * 0.4) > 0.6) || (mode === 'idle' && t % 200 < 7) || mode === 'shake' || R === 'roar';
+  const closed = mode === 'sleep' || (mode === 'happy' && Math.sin(t * 0.4) > 0.6) || (mode === 'idle' && t % 200 < 7) || mode === 'shake' || R === 'roar' || R === 'relax';
   const eyeL = fx - 3.6, eyeR = fx + 3.6; const eyeCol = ex.has('eyepatch') ? '#1a1020' : E;
   if (closed) { c.strokeStyle = ex.has('eyepatch') ? '#fff' : E; c.lineWidth = 1.1; const u = mode === 'happy' || R ? -1.4 : 1; c.beginPath(); c.moveTo(eyeL - 1.5, ey); c.quadraticCurveTo(eyeL, ey + u, eyeL + 1.5, ey); c.moveTo(eyeR - 1.5, ey); c.quadraticCurveTo(eyeR, ey + u, eyeR + 1.5, ey); c.stroke(); }
+  else if (ex.has('tinyeyes')) { c.fillStyle = eyeCol; ell(c, eyeL, ey - 0.6, 1.25, 1.45); c.fill(); ell(c, eyeR, ey - 0.6, 1.25, 1.45); c.fill(); c.fillStyle = '#fff'; ell(c, eyeL + 0.45, ey - 1.2, 0.5, 0.5); c.fill(); ell(c, eyeR + 0.45, ey - 1.2, 0.5, 0.5); c.fill(); ell(c, eyeL - 0.4, ey - 0.1, 0.22, 0.22); c.fill(); ell(c, eyeR - 0.4, ey - 0.1, 0.22, 0.22); c.fill(); }
   else { c.fillStyle = eyeCol; ell(c, eyeL, ey, 2, 2.3); c.fill(); ell(c, eyeR, ey, 2, 2.3); c.fill(); c.fillStyle = '#fff'; ell(c, eyeL + 0.6, ey - 0.9, 0.75, 0.75); c.fill(); ell(c, eyeR + 0.6, ey - 0.9, 0.75, 0.75); c.fill(); }
   c.strokeStyle = '#24133f'; c.lineWidth = 0.8;
   const my = (ex.has('frogeyes') ? hy + 1 : ey) + 3; const snout = sp.snout;
   if (snout === 'muzzle') { c.fillStyle = shade(B, 0.6); ell(c, fx, my - 0.4, 3.2, 2.3); c.fill(); }
+  if (snout === 'capy') { c.fillStyle = shade(B, -0.1); c.beginPath(); c.roundRect(fx - 5.4, my - 3.6, 10.8, 6, 3); c.fill(); c.fillStyle = shade(B, 0.12); ell(c, fx, my - 1.6, 3.6, 1.4); c.globalAlpha = 0.5; c.fill(); c.globalAlpha = 1;
+    c.fillStyle = shade(A, -0.35); c.beginPath(); c.roundRect(fx - 2.8, my - 2.9, 5.6, 2.1, 1.05); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; ell(c, fx - 0.9, my - 2.2, 0.8, 0.35); c.fill(); }
   if (snout === 'pig') { c.fillStyle = A; ell(c, fx, my - 0.6, 2.8, 2); c.fill(); c.stroke(); c.fillStyle = shade(A, -0.4); ell(c, fx - 1, my - 0.6, 0.5, 0.8); c.fill(); ell(c, fx + 1, my - 0.6, 0.5, 0.8); c.fill(); }
   if (snout === 'beak') { c.fillStyle = A; c.beginPath(); c.moveTo(fx - 1.4, my - 0.8); c.lineTo(fx + 1.4, my - 0.8); c.lineTo(fx, my + 1 + mouthOpen); c.closePath(); c.fill(); }
   if (snout === 'duckbill') { c.fillStyle = A; ell(c, fx + 0.6, my - 0.2, 3.2, 1.3 + mouthOpen * 0.6); c.fill(); c.strokeStyle = shade(A, -0.3); c.stroke(); }
@@ -194,6 +202,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
     else { c.beginPath(); c.moveTo(fx - 1.8, my - 0.1); c.quadraticCurveTo(fx - 0.9, my + 1.1, fx, my + 0.1); c.quadraticCurveTo(fx + 0.9, my + 1.1, fx + 1.8, my - 0.1); c.stroke(); }
   } else if (snout === 'trunk' && mood.sad && mode !== 'sleep') { c.fillStyle = '#8fd0ff'; ell(c, fx - 5, my, 0.8, 1.2); c.fill(); }
   if (ex.has('whiskers')) { c.strokeStyle = 'rgba(60,30,60,.55)'; c.lineWidth = 0.5; for (const s of [-1, 1]) for (const d of [-0.6, 0.6]) { c.beginPath(); c.moveTo(fx + s * 3, my - 0.8); c.lineTo(fx + s * 7, my - 0.8 + d * 1.6); c.stroke(); } }
+  if (R === 'relax') { c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 0.7; for (let i = 0; i < 3; i++) { const q = ((t * 0.012 + i / 3) % 1); c.globalAlpha = Math.sin(q * Math.PI); const x0 = -6 + i * 6, y0 = hy - 10 - q * 12; c.beginPath(); c.moveTo(x0, y0 + 3); c.bezierCurveTo(x0 + 1.6, y0 + 2, x0 - 1.6, y0 + 1, x0, y0); c.stroke(); } c.globalAlpha = 1; c.fillStyle = '#ff8fb8'; if (t % 90 < 60) { heart(c, 10, hy - 8 - (t % 90) * 0.06, 1.3); c.fill(); } c.lineWidth = 0.8; c.strokeStyle = '#24133f'; }
   if (R === 'flame') { c.fillStyle = '#ffb347'; for (let i = 0; i < 4; i++) { const q = ((t * 0.06 + i / 4) % 1); c.globalAlpha = 1 - q; ell(c, fx + 4 + q * 9, my - q * 3, 1.2 + q * 1.5, 1 + q * 1.2); c.fill(); } c.globalAlpha = 1; }
   if (R === 'bubbles' || (mode === 'happy' && sp.id === 'jelly')) for (let i = 0; i < 3; i++) { const q = ((t * 0.02 + i / 3) % 1); drawBubble(c, fx + 6 + Math.sin(q * 9) * 2, hy - q * 16, 1.4 + i * 0.4); }
   if (R === 'sparkle' || ex.has('sparkles') && mode !== 'sleep') { c.fillStyle = '#ffd34d'; for (let i = 0; i < 4; i++) { const a = t * 0.05 + i * TAU / 4; star(c, Math.cos(a) * 15, hy + Math.sin(a) * 9, 1.4 + (i % 2) * 0.6); c.fill(); } }

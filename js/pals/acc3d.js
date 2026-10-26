@@ -36,7 +36,7 @@ export function accAnchors({ J, H, headR, kind, fit, ears, snout, fz }) {
   // 👃 nose anchor per snout type (matches pal3d.js snout meshes) + per body-shape scale; ring hangs from the right nostril
   if (H) { const z = fz || hr * 0.9, sn = snout || 'smile', kS = kind === 'jelly' ? 1.25 : kind === 'cloud' ? 1.1 : kind === 'star' ? 0.95 : 1;
     const NP = { muzzle: [0.032, -0.072, z * 0.95 + 0.115, 1], nose: [0.032, -0.072, z * 0.95 + 0.115, 1], whiskers: [0.032, -0.072, z * 0.95 + 0.115, 1],
-      pig: [0.035, -0.118, z + 0.095, 1.05], beak: [0.03, -0.035, z + 0.085, 0.85], duckbill: [0.06, -0.04, z + 0.075, 0.9], trunk: [0.035, -0.095, z * 0.86 + 0.13, 1] };
+      pig: [0.035, -0.118, z + 0.095, 1.05], beak: [0.03, -0.035, z + 0.085, 0.85], duckbill: [0.06, -0.04, z + 0.075, 0.9], trunk: [0.035, -0.095, z * 0.86 + 0.13, 1], capy: [0.035, -0.085, z * 0.9 + 0.12, 1] };
     const [nx, ny, nz, ns] = NP[sn] || [0.025, -0.05, z * 1.03 + 0.01, 0.95];
     A.nose = grp(H, nx, ny, nz); A.noseS = 1.25 * ns * kS * Math.max(0.8, Math.min(1.4, hr / 0.45)); A.nose.scale.setScalar(A.noseS);
     if (sn === 'trunk' && J.trunk && J.trunk.length) { const tb = J.trunk[J.trunk.length - 1]; A.nose.removeFromParent(); A.nose.position.set(0.028, -0.078 - 0.012, 0.03); A.nose.scale.multiplyScalar(0.85); tb.add(A.nose); } }

@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff6ec"><canvas id="c" width="1200" height="760"></canvas>
+<script type="module">
+// capybara Pal check: 2D (flat) + 3D, three growth stages, idle / react / with a hat
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { drawPal } from '../../js/pals/art.js';
+const q = new URLSearchParams(location.search); const c = document.getElementById('c').getContext('2d'); const sp = q.get('sp') || 'capybara';
+const cells = [[1, 'idle'], [6, 'idle'], [15, 'idle'], [6, 'react'], [6, 'sleep'], [6, 'hat']];
+window.frame = (t) => { c.fillStyle = '#fff6ec'; c.fillRect(0, 0, 1200, 760); c.font = '600 14px sans-serif';
+  cells.forEach(([lv, m], i) => { const x = 100 + i * 200; const pal = { species: sp, level: lv, ...(m === 'hat' ? { outfit: { head: 'goldcrown' } } : {}) }; const mode = m === 'hat' ? 'idle' : m;
+    c.fillStyle = '#7a4e2c'; c.fillText(`2D L${lv} ${m}`, x - 80, 30); drawPal(c, x, 330, 150, pal, { t, mode, flat: 1 });
+    c.fillStyle = '#7a4e2c'; c.fillText(`3D L${lv} ${m}`, x - 80, 400); drawPal3D.__b = 0; drawPal3D(c, x, 720, 150, pal, { t, mode, face: 1 }); }); };
+if (q.has('big')) window.frame = (t) => { c.fillStyle = '#fff6ec'; c.fillRect(0, 0, 1200, 760); const pal = { species: sp, level: 6 }; const mode = q.get('mode') || 'idle';
+  drawPal(c, 300, 700, 480, pal, { t, mode, flat: 1 }); drawPal3D.__b = 0; drawPal3D(c, 880, 720, 480, pal, { t, mode, face: 1 }); };
+window.ready = true;
+</script>

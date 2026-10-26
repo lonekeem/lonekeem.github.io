@@ -32,7 +32,7 @@ export const VOICES = [
 ];
 export const VOICE = Object.fromEntries(VOICES.map((v) => [v.id, v]));
 export const SPECIES_VOICE = { kemy: 'bubbly', elephant: 'sweetie', puppy: 'bouncy', kitten: 'giggly', bunny: 'tiny', panda: 'sleepy', redpanda: 'chirpy', fox: 'sparkle', koala: 'koala', penguin: 'ocean', duckling: 'squeaky', chick: 'chirpy', piglet: 'giggly', lamb: 'sweetie', giraffe: 'singsong', lion: 'grumpy', tiger: 'hyper', bear: 'sleepy', hedgehog: 'tiny', hamster: 'squeaky', otter: 'ocean', seal: 'bubbly', turtle: 'sleepy', frog: 'bouncy', owl: 'whisper', unicorn: 'sparkle', dragon: 'babydragon', starsprite: 'sparkle', cloudpuff: 'whisper', jelly: 'jelly' };
-export const SPECIES_SOUND = { elephant: 'toot', kitten: 'purr', puppy: 'yip', chick: 'chirp', duckling: 'chirp', owl: 'hoot', dragon: 'roar', lion: 'roar', tiger: 'roar', kemy: 'bubble', jelly: 'wobble', penguin: 'squeak', piglet: 'oink', frog: 'ribbit', lamb: 'baa' };
+export const SPECIES_SOUND = { elephant: 'toot', kitten: 'purr', puppy: 'yip', chick: 'chirp', duckling: 'chirp', owl: 'hoot', dragon: 'roar', lion: 'roar', tiger: 'roar', kemy: 'bubble', jelly: 'wobble', penguin: 'squeak', piglet: 'oink', frog: 'ribbit', lamb: 'baa', capybara: 'mellow' };
 let AC = null;
 const ac = () => { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } } if (AC.state === 'suspended') AC.resume(); return AC; };
 function out(fx, vol = 0.18) {
@@ -69,6 +69,7 @@ export function sfx(kind, fx = '', vol = 0.18) {
     case 'yip': B(900, 1500, 0, 0.08, 'triangle'); B(950, 1600, 0.12, 0.08, 'triangle'); break;
     case 'fanfare': [523, 659, 784, 1047].forEach((f, i) => B(f, f, i * 0.1, 0.18, 'triangle', 0.5)); break;
     case 'toot': B(330, 520, 0, 0.12, 'sawtooth', 0.35); B(520, 700, 0.12, 0.35, 'sawtooth', 0.35); break;   // elephant trunk toot
+    case 'mellow': B(260, 220, 0, 0.32, 'sine', 0.6); B(330, 262, 0.26, 0.42, 'sine', 0.5); break; // capybara: a soft, sleepy 'mm-hmm'
     case 'purr': noise(d, 0, 0.8, 180, 22); break;
     case 'hoot': B(500, 430, 0, 0.25, 'sine'); B(500, 430, 0.35, 0.3, 'sine'); break;
     case 'oink': B(260, 360, 0, 0.12, 'sawtooth', 0.3); B(280, 380, 0.16, 0.12, 'sawtooth', 0.3); break;

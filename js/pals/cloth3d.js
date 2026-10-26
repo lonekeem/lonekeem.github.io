@@ -217,7 +217,7 @@ class RoundBox extends THREE.BufferGeometry { constructor(w, h, d) { super(); co
 // K: { H, hr, ea, ex:Set, J, col, st }  head = ellipsoid (1.08hr, hr, 0.98hr) centred at H origin
 export function dressHead(K) {
   const { H, hr, ea, ex, J, st } = K; const c = K.col; const G = new THREE.Group(); G.position.y = K.dy || 0; H.add(G);
-  const topEars = ['round', 'biground', 'pointy', 'long', 'ossicones'].includes(ea) || ex.has('horn') || ex.has('horns') || ex.has('antennae');
+  const topEars = ['round', 'capy', 'biground', 'pointy', 'long', 'ossicones'].includes(ea) || ex.has('horn') || ex.has('horns') || ex.has('antennae');
   const sideBig = ['big', 'gills', 'floppy'].includes(ea);
   const ex2 = (y) => Math.sqrt(Math.max(0, 1 - (y / hr) ** 2)); // ellipse factor at height y
   const m = fabric(c, { w: st === 'beanie' ? 'knit' : st === 'cap' || st === 'bucket' ? 'twill' : 'plain', bs: st === 'beanie' ? 1.5 : 0.8, sheen: st === 'tophat' ? 0.4 : 0.9 });
