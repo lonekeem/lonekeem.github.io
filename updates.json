@@ -1,5 +1,14 @@
 [
   {
+    "id": "sheriff-runtime-title",
+    "date": "2026-10-26",
+    "type": "fix",
+    "emoji": "🤠",
+    "title": "Sheriff times and tab title",
+    "body": "Episode times on The Sheriff of Lone Keem match the clock on the poster. Leaving an episode puts the browser tab title back.",
+    "link": "#/series/sheriff"
+  },
+  {
     "id": "sheriff-of-lone-keem",
     "date": "2026-10-26",
     "type": "new",

@@ -45,6 +45,13 @@ export function nextUp(prog = readProgress()) {
 }
 export const clock = (s) => { s = Math.max(0, Math.round(Number(s) || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const mins = (s) => `${Math.max(1, Math.round(s / 60))} min`;
+// The app title lives in app.html. The player changes it per episode and must put it back
+// on the series page and on every other page.
+const APP_TITLE = document.title;
+function restoreTitle() {
+  if (/^#\/?series\/sheriff\/\d/.test(location.hash || '')) return; // the open player sets the episode title
+  document.title = APP_TITLE;
+}
 
 function loadCss() {
   if (document.getElementById('sheriff-css')) return;
@@ -62,6 +69,7 @@ export function page(main, { ep, toast, social } = {}) {
   loadCss();
   if (ep) return player(main, Number(ep), { toast, social });
   document.body.classList.remove('sh-playing');
+  restoreTitle();
   addEventListener('hashchange', () => { fromSeries = /^#\/series\/sheriff\/\d$/.test(location.hash); }, { once: true });
   const prog = readProgress(); const up = nextUp(prog);
   const label = up.resume ? `Resume Episode ${up.ep.n} · ${clock(up.resume)}` : up.again ? (OUT().length > 1 ? 'Watch again from Episode 1' : 'Watch Episode 1 again') : `Play Episode ${up.ep.n}`;
@@ -84,7 +92,7 @@ export function page(main, { ep, toast, social } = {}) {
         const pct = done ? 1 : r && w.d ? Math.min(1, r / w.d) : 0;
         return `<li><a class="sep sh-ep ${r ? 'cont' : ''}" href="#/series/sheriff/${e.n}" data-ep="${e.n}" aria-label="Episode ${e.n}: ${esc(e.title)}, ${clock(e.dur)}${done ? ', watched' : r ? ', resume at ' + clock(r) : ''}">
           <span class="sep-th sh-th"><img src="${esc(e.poster)}" alt="" width="540" height="868" loading="lazy" decoding="async"><span class="sep-rt">${clock(e.dur)}</span>${pct ? `<span class="sep-pr"><span style="width:${Math.round(pct * 100)}%"></span></span>` : ''}${done ? '<span class="sh-check" aria-hidden="true">✓</span>' : ''}</span>
-          <span class="sep-m"><span class="sep-l">Episode ${e.n}</span><b>${esc(e.title)}</b>${r ? `<span class="sep-cw">Resume at ${clock(r)}</span>` : done ? '<span class="sep-done">✓ Watched</span>' : ''}<small>${clock(e.dur)} · ${mins(e.dur)}</small><small class="sep-d">${esc(e.desc)}</small></span></a></li>`; }).join('')}</ol>
+          <span class="sep-m"><span class="sep-l">Episode ${e.n}</span><b>${esc(e.title)}</b>${r ? `<span class="sep-cw">Resume at ${clock(r)}</span>` : done ? '<span class="sep-done">✓ Watched</span>' : ''}<small>${clock(e.dur)}</small><small class="sep-d">${esc(e.desc)}</small></span></a></li>`; }).join('')}</ol>
       ${soon ? '' : `<section class="sh-more" aria-label="More episodes coming soon"><span class="sh-more-ic" aria-hidden="true">🤠</span><div><b>More episodes coming soon</b><p>That’s all of Season 1 for now. Gecko will be back in Lone Keem soon, so saddle up for more adventures.</p></div></section>`}
       <section class="sh-about">
         <h2 class="sseason-h">About the series</h2>
@@ -203,7 +211,7 @@ function player(main, n, { toast, social } = {}) {
   function goBack() { save(); if (canBack && history.length > 1) history.back(); else location.hash = '#/series/sheriff'; }
   const onKey = (e) => { if (e.key === 'Escape' && document.getElementById('shp')) { if (soc.close()) return; goBack(); } };
   const onHide = () => { if (document.hidden) save(); };
-  const cleanup = () => { stopCountdown(); soc.stop(); try { save(); v.pause(); } catch { /* */ } removeEventListener('hashchange', onHash); removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onHide); removeEventListener('pagehide', save0); document.body.classList.remove('sh-playing'); cur = null; };
+  const cleanup = () => { stopCountdown(); soc.stop(); try { save(); v.pause(); } catch { /* */ } removeEventListener('hashchange', onHash); removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onHide); removeEventListener('pagehide', save0); document.body.classList.remove('sh-playing'); cur = null; restoreTitle(); };
   const save0 = () => save();
   const onHash = () => { if (!/^#\/series\/sheriff\/\d/.test(location.hash)) cleanup(); };
   addEventListener('hashchange', onHash); addEventListener('keydown', onKey); document.addEventListener('visibilitychange', onHide); addEventListener('pagehide', save0);
