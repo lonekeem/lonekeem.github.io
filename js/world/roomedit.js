@@ -120,8 +120,10 @@ export function snapWall(it, roomId, keepRot) {
   else if (side === 2) it.z = snap(R.z1);
   else if (side === 1) it.x = snap(R.x0);
   else it.x = snap(R.x1);
-  if (side === 0 || side === 2) it.x = snap(Math.max(R.x0, Math.min(R.x1, +it.x)));
-  else it.z = snap(Math.max(R.z0, Math.min(R.z1, +it.z)));
+  // wide wall pieces (big TVs, curtains, lights) stay inside the wall they hang on
+  const half = Math.max(0, (D.ww || 0) / 2 / 1.4 - 0.1), cl = (v, a, b) => (b - a > 2 * half ? Math.max(a + half, Math.min(b - half, v)) : (a + b) / 2);
+  if (side === 0 || side === 2) it.x = snap(cl(+it.x, R.x0, R.x1));
+  else it.z = snap(cl(+it.z, R.z0, R.z1));
   const pin = side === 0 || side === 2 ? 'z' : 'x';
   const goal = pin === 'z' ? (R.z0 + R.z1) / 2 : (R.x0 + R.x1) / 2;
   for (let n = 0; n < 8 && itemRoom(it.x, it.z, it.f) !== roomId; n++) it[pin] = snap(it[pin] + Math.sign(goal - it[pin] || 1) * 0.5);
@@ -134,17 +136,33 @@ const MULTI = {
   bk: [['f', 'Frame'], ['s', 'Sheets']],
   br: [['f', 'Frame'], ['s', 'Sheets'], ['p', 'Pillows']],
   cs: [['f', 'Frame'], ['c', 'Cushions']],
-  cl: [['f', 'Frame'], ['c', 'Cushions']]
+  cl: [['f', 'Frame'], ['c', 'Cushions']],
+  tv: [['f', 'Frame'], ['s', 'Stand']], tg: [['f', 'Frame'], ['s', 'Stand']], ts: [['f', 'Frame'], ['s', 'Table']], tr: [['f', 'Cabinet'], ['s', 'Bezel'], ['p', 'Knobs']],
+  tw: [['f', 'Frame'], ['s', 'Glow strip']], tl: [['f', 'Frame'], ['s', 'Glow strip']], tx: [['f', 'Frame'], ['s', 'Glow strip']],
+  th: [['f', 'Screen frame'], ['s', 'Console'], ['p', 'Speakers'], ['c', 'Lights']], sp: [['f', 'Box'], ['s', 'Woofer'], ['p', 'Light']],
+  gc: [['f', 'Console'], ['s', 'Light'], ['p', 'Pad 1'], ['c', 'Pad 2']], bx: [['f', 'Body'], ['s', 'Speakers'], ['p', 'Display']], st: [['f', 'Cabinet'], ['s', 'Drivers'], ['p', 'Light']],
+  cd: [['f', 'Desk'], ['s', 'Computer'], ['p', 'Screen'], ['c', 'Keyboard']], rc: [['f', 'Seat'], ['c', 'Arms']], ls: [['f', 'Frame'], ['c', 'Pillows']],
+  dk: [['f', 'Desk'], ['s', 'Chair'], ['p', 'Chair post']], dt: [['f', 'Top'], ['s', 'Legs'], ['p', 'Runner'], ['c', 'Vase']], bt: [['f', 'Seat'], ['s', 'Frame']],
+  wd: [['f', 'Body'], ['s', 'Doors'], ['p', 'Handles']], ct: [['f', 'Top'], ['s', 'Legs'], ['p', 'Book'], ['c', 'Mug']], ns: [['f', 'Body'], ['s', 'Drawer'], ['p', 'Knob + post'], ['c', 'Lamp']],
+  la: [['f', 'Base'], ['s', 'Shade']], fl: [['f', 'Wire'], ['s', 'Bulbs 1'], ['p', 'Bulbs 2'], ['c', 'Bulbs 3']], ne: [['f', 'Backing'], ['s', 'Zigzag'], ['p', 'Border']],
+  fb: [['f', 'Stand'], ['s', 'Water'], ['p', 'Fish'], ['c', 'Gravel']], cg: [['f', 'Case'], ['s', 'Face'], ['p', 'Window'], ['c', 'Pendulum']], mf: [['f', 'Frame'], ['s', 'Glass']],
+  cu: [['f', 'Rod'], ['s', 'Curtains'], ['p', 'Ties'], ['c', 'Valance']], pg: [['f', 'Frame'], ['s', 'Background'], ['p', 'Invader'], ['c', 'Ship']], pk: [['f', 'Frame'], ['s', 'Background'], ['p', 'Star'], ['c', 'Banner']],
+  cn: [['f', 'Cushion 1'], ['s', 'Cushion 2'], ['p', 'Top cushion']], ac: [['f', 'Cabinet'], ['s', 'Bezel'], ['p', 'Buttons'], ['c', 'Screen']], gt: [['f', 'Body'], ['s', 'Neck'], ['p', 'Sound hole'], ['c', 'Stand']],
+  dm: [['f', 'Drums'], ['s', 'Heads'], ['p', 'Cymbals'], ['c', 'Stands']], tp: [['f', 'Frame'], ['s', 'Mat'], ['p', 'Legs']], pb: [['f', 'Fur'], ['s', 'Ears + nose']], pd: [['f', 'Body'], ['s', 'Spikes']],
+  hp: [['f', 'Pumpkin'], ['s', 'Stem'], ['p', 'Face glow']], hg: [['f', 'Sheet'], ['s', 'Eyes'], ['p', 'Cheeks']], hc: [['f', 'Pot'], ['s', 'Brew']],
+  xt: [['f', 'Tree'], ['s', 'Baubles'], ['p', 'Star'], ['c', 'Trunk']], xg: [['f', 'Gift 1'], ['s', 'Gift 2'], ['p', 'Ribbons'], ['c', 'Gift 3']]
 };
 export const partsFor = (code) => MULTI[code] || null;
 
 export const CATS = [
   { id: 'furn', name: 'Furniture' },
+  { id: 'tech', name: 'TVs + Tech' },
   { id: 'plant', name: 'Plants' },
   { id: 'wall', name: 'Wall art' },
   { id: 'light', name: 'Lights' },
   { id: 'rug', name: 'Rugs' },
-  { id: 'fun', name: 'Fun' }
+  { id: 'fun', name: 'Fun' },
+  { id: 'hol', name: 'Holidays' }
 ];
 const CAT_OF = {
   bd: 'furn', bc: 'furn', bk: 'furn', br: 'furn', cs: 'furn', cl: 'furn', ch: 'furn', ta: 'furn', cr: 'furn', bs: 'furn', dr: 'furn', pn: 'furn',
@@ -152,7 +170,11 @@ const CAT_OF = {
   ar: 'wall', am: 'wall', ak: 'wall', aa: 'wall', po: 'wall', mr: 'wall', ck: 'wall', ws: 'wall',
   lp: 'light', ll: 'light', lc: 'light', lt: 'light',
   rg: 'rug', rr: 'rug', rs: 'rug', rh: 'rug',
-  tv: 'fun', tg: 'fun', bb: 'fun', bp: 'fun', sp: 'fun', aq: 'fun', ty: 'fun', kb: 'fun'
+  bb: 'fun', bp: 'fun', aq: 'fun', ty: 'fun', kb: 'fun',
+  tv: 'tech', tg: 'tech', ts: 'tech', tr: 'tech', tw: 'tech', tl: 'tech', tx: 'tech', th: 'tech', sp: 'tech', gc: 'tech', bx: 'tech', st: 'tech', cd: 'tech',
+  rc: 'furn', ls: 'furn', dk: 'furn', dt: 'furn', bt: 'furn', wd: 'furn', ct: 'furn', ns: 'furn',
+  la: 'light', fl: 'light', ne: 'light', fb: 'fun', cg: 'furn', mf: 'furn', cu: 'wall', pg: 'wall', pk: 'wall', cn: 'furn',
+  ac: 'fun', gt: 'fun', dm: 'fun', tp: 'fun', pb: 'fun', pd: 'fun', hp: 'hol', hg: 'hol', hc: 'hol', xt: 'hol', xg: 'hol'
 };
 export const catOf = (code) => CAT_OF[code] || 'furn';
 
@@ -180,7 +202,7 @@ export function colorHtml({ roomName, target, current, recent, itemName, partLis
   const painting = kind === 'item' ? (itemName || 'a piece') : (TARGETS.find(([k]) => k === kind)[1]);
   const list = kind === 'item' && Array.isArray(partList) ? partList : null;
   const parts = list && list.length ? `<div class="kh-parts" role="group" aria-label="Piece parts">${list.map(([k, n]) => `<button type="button" data-part="${k}" class="${part === k ? 'on' : ''}" aria-pressed="${part === k ? 'true' : 'false'}">${esc(n)}</button>`).join('')}</div>` : '';
-  const pieceTip = kind === 'item' && !itemName ? '<p class="kh-tip">Tap a piece, then pick its colour. Beds have a frame, sheets, and pillows.</p>' : '';
+  const pieceTip = kind === 'item' && !itemName ? '<p class="kh-tip">Tap a piece, then pick its colour. Many pieces have parts: a TV frame and stand, a lamp base and shade, bed sheets and pillows.</p>' : '';
   const clear = kind === 'item' && !itemName ? '' : `<button type="button" data-clear="${kind}">${CLEAR[kind]}</button>`;
   return `<div class="kh-targets" role="group" aria-label="What to colour">${targets}</div>`
     + `<p class="kh-tip">${esc(roomName)} · ${esc(painting)}. The floor colour also covers carpet.</p>${pieceTip}${parts}`

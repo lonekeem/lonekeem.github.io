@@ -2,6 +2,7 @@
 // two-story homes), open doorways (no interior doors), seats (beds, chairs, couches), a TV that shows the house music, windows with a painted town view, lamps, per-town styles. Built lazily on entry,
 // merged per material (a few draw calls per house). Owner decor (homes/{plot}.decor) = wall colour, floor type and
 // movable furniture on a 0.5 m grid. Original content only. Written by Lone Keem
+import { MORE_DECOR, SCREENS_MORE, SEATS_MORE } from './decor-more.js';
 export const PAL = {
   street: { wall: '#fde7c7', trim: '#7c4a2a', acc: '#7c3aed', floor: 'wood', view: 'street' }, down: { wall: '#e5e7eb', trim: '#334155', acc: '#0ea5e9', floor: 'tile', view: 'down' },
   farm: { wall: '#f5e1c0', trim: '#7c2d12', acc: '#dc2626', floor: 'dark', view: 'farm' }, snow: { wall: '#e8d5b5', trim: '#5b3a1f', acc: '#b91c1c', floor: 'dark', view: 'snow' },
@@ -31,8 +32,8 @@ export const DECOR = {
   cs: { n: 'Sofa', e: '🛋️', foot: [3.2, 1], p: [['box', 'A', 0, .3, 0, 3.2, .5, 1, 0, 'f'], ['box', 'A', 0, .8, -.38, 3.2, .7, .25, 0, 'f'], ['box', 'T', 1.55, .55, 0, .22, .6, 1, 0, 'f'], ['box', 'T', -1.55, .55, 0, .22, .6, 1, 0, 'f'], ['box', '#fff', .8, .65, -.15, .5, .4, .15, 0, 'c'], ['box', '#fff', -.8, .65, -.15, .5, .4, .15, 0, 'c']] },
   cl: { n: 'Corner Sofa', e: '🛋️', c: 350, foot: [3.2, 2.2], p: [['box', 'A', 0, .3, -.6, 3.2, .5, 1, 0, 'f'], ['box', 'A', 0, .8, -.98, 3.2, .7, .25, 0, 'f'], ['box', 'A', 1.1, .3, .5, 1, .5, 1.3, 0, 'f'], ['box', 'A', 1.48, .8, .2, .25, .7, 1.9, 0, 'f'], ['box', '#fff', -.8, .65, -.75, .5, .4, .15, 0, 'c']] },
   ch: { n: 'Armchair', e: '🪑', foot: [1, 1], p: [['box', 'A', 0, .3, 0, 1, .5, 1], ['box', 'A', 0, .8, -.38, 1, .7, .25], ['box', 'T', .45, .55, 0, .14, .5, 1], ['box', 'T', -.45, .55, 0, .14, .5, 1]] },
-  tv: { n: 'TV + Stand', e: '📺', foot: [2.4, .5], p: [['box', '#3f3f46', 0, .35, 0, 2.4, .7, .5], ['box', '#111827', 0, 1.25, -.05, 2.2, 1.1, .08], ['box', '#60a5fa', 0, 1.25, 0, 2, .95, .01, 1]] },
-  tg: { n: 'Big Screen TV', e: '🎬', c: 400, foot: [3.4, .5], p: [['box', '#27272a', 0, .3, 0, 3.4, .6, .5], ['box', '#09090b', 0, 1.5, -.05, 3.2, 1.7, .08], ['box', '#a78bfa', 0, 1.5, 0, 3, 1.5, .01, 1]] },
+  tv: { n: 'TV + Stand', e: '📺', foot: [2.4, .5], p: [['box', '#3f3f46', 0, .35, 0, 2.4, .7, .5, 0, 's'], ['box', '#111827', 0, 1.25, -.05, 2.2, 1.1, .08, 0, 'f'], ['box', '#60a5fa', 0, 1.25, 0, 2, .95, .01, 1]] },
+  tg: { n: 'Big Screen TV', e: '🎬', c: 400, foot: [3.4, .5], p: [['box', '#27272a', 0, .3, 0, 3.4, .6, .5, 0, 's'], ['box', '#09090b', 0, 1.5, -.05, 3.2, 1.7, .08, 0, 'f'], ['box', '#a78bfa', 0, 1.5, 0, 3, 1.5, .01, 1]] },
   rg: { n: 'Rug', e: '🟪', foot: null, p: [['box', 'A', 0, .012, 0, 4, .02, 2.8], ['box', '#fff', 0, .015, 0, 3.4, .02, .1]] },
   rr: { n: 'Round Rug', e: '⭕', foot: null, p: [['cyl', '#f9a8d4', 0, .012, 0, 3, .02, 3], ['cyl', '#fff', 0, .015, 0, 1.6, .02, 1.6]] },
   rs: { n: 'Star Rug', e: '⭐', c: 150, foot: null, p: [['cyl6', '#facc15', 0, .012, 0, 3.2, .02, 3.2], ['cyl6', '#fff7ae', 0, .015, 0, 1.6, .02, 1.6]] },
@@ -57,7 +58,7 @@ export const DECOR = {
   cr: { n: 'Chair', e: '🪑', foot: [.5, .5], p: [['box', '#fbbf24', 0, .45, 0, .45, .06, .45], ['box', '#fbbf24', 0, .75, -.2, .45, .6, .06], ['box', 'T', 0, .22, 0, .08, .44, .08]] },
   bs: { n: 'Bookshelf', e: '📚', foot: [1.8, .6], p: [['box', 'T', 0, 1, 0, 1.8, 2, .6], ['box', '#ef4444', -.4, .45, .2, .7, .36, .3], ['box', '#3b82f6', .4, .95, .2, .8, .36, .3], ['box', '#22c55e', -.3, 1.45, .2, .9, .36, .3], ['box', '#f59e0b', .3, 1.85, .2, .7, .2, .3]] },
   dr: { n: 'Dresser', e: '🗄️', foot: [1.4, .6], p: [['box', 'T', 0, .5, 0, 1.4, 1, .6], ['box', '#fde68a', -.35, .7, .31, .1, .06, .02], ['box', '#fde68a', .35, .7, .31, .1, .06, .02], ['box', '#fde68a', 0, .35, .31, .1, .06, .02]] },
-  sp: { n: 'Speaker', e: '🔊', foot: [.5, .5], p: [['box', '#111827', 0, .5, 0, .5, 1, .5], ['cyl', '#334155', 0, .65, .26, .32, .02, .32], ['cyl', '#22d3ee', 0, .3, .26, .14, .02, .14, 1]] },
+  sp: { n: 'Speaker', e: '🔊', foot: [.5, .5], p: [['box', '#111827', 0, .5, 0, .5, 1, .5, 0, 'f'], ['cyl', '#334155', 0, .65, .26, .32, .02, .32, 0, 's'], ['cyl', '#22d3ee', 0, .3, .26, .14, .02, .14, 1, 'p']] },
   pn: { n: 'Piano', e: '🎹', c: 500, foot: [1.6, .7], p: [['box', '#111111', 0, .6, 0, 1.6, 1.2, .6], ['box', '#ffffff', 0, .8, .38, 1.5, .05, .25], ['box', '#111111', 0, .4, .3, 1.5, .5, .3]] },
   aq: { n: 'Aquarium', e: '🐠', d: 40, foot: [1.4, .5], p: [['box', 'T', 0, .4, 0, 1.4, .8, .5], ['box', '#38bdf8', 0, 1.15, 0, 1.4, .7, .5, 1], ['box', '#f97316', -.3, 1.2, .26, .2, .1, .01], ['box', '#facc15', .3, 1.05, .26, .2, .1, .01]] },
   fw: { n: 'Flowers', e: '🌷', foot: [.45, .45], p: [['cyl', '#b45309', 0, .15, 0, .4, .3, .4], ['cyl', '#15803d', 0, .45, 0, .04, .4, .04], ['sph', '#f472b6', -.08, .72, .04, .28, .22, .22], ['sph', '#facc15', .1, .8, 0, .26, .22, .22], ['sph', '#fb7185', 0, .66, -.06, .22, .2, .2]] },
@@ -79,7 +80,8 @@ export const doorClear = (gap, sc, rad = 0.42) => gap * sc - rad * 2;
 // seats [x, seatTop, z, yawOffset] in a piece's local frame (front = +z)
 export const SEATS = { bd: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bc: [[-.5, .63, .9, 0], [.5, .63, .9, 0]], bk: [[0, .51, .5, 0]], br: [[-.5, .62, .6, 0], [.5, .62, .6, 0]],
   cs: [[-1, .55, .05, 0], [0, .55, .05, 0], [1, .55, .05, 0]], cl: [[-1, .55, -.5, 0], [0, .55, -.5, 0], [1, .55, .5, Math.PI / 2]], ch: [[0, .55, .05, 0]], cr: [[0, .48, .02, 0]] };
-export const SCREENS = { tv: [0, 1.25, .02, 2, .95], tg: [0, 1.5, .02, 3, 1.5] };
+export const SCREENS = { tv: [0, 1.25, .02, 2, .95], tg: [0, 1.5, .02, 3, 1.5], ...SCREENS_MORE };
+Object.assign(DECOR, MORE_DECOR); Object.assign(SEATS, SEATS_MORE);
 export const decorItem = (code) => { const d = DECOR[code]; return d ? (d.d ? 'z_hd_' + code : 'hd_' + code) : null; };
 // code,xHalf,zHalf,rot[,1][,#rrggbb][,fRRGGBB][,sRRGGBB][,pRRGGBB][,cRRGGBB].
 // A #hex is the old single tint. f/s/p/c plus 6 hex digits are frame, sheets, pillows, cushions.
