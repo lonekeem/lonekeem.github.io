@@ -210,3 +210,18 @@ export function colorHtml({ roomName, target, current, recent, itemName, partLis
     + clear + families
     + `<label>Floor style for rooms with no colour</label><div class="kh-strip">${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}">${esc(F.n)}</button>`).join('')}</div>`;
 }
+
+// Compact phone version of colorHtml: one row of targets (and parts), one scrolling row of chips.
+export function colorStripHtml({ target, current, recent, itemName, partList, part }) {
+  const kind = TARGETS.some(([k]) => k === target) ? target : 'wall';
+  const cur = hex6(current) || '';
+  const rec = pushRecent(recent, '');
+  const targets = TARGETS.filter(([k]) => k !== 'item' || itemName).map(([k, n]) => `<button type="button" data-target="${k}" class="${kind === k ? 'on' : ''}" aria-pressed="${kind === k ? 'true' : 'false'}">${k === 'item' ? esc(itemName) : n}</button>`).join('');
+  const list = kind === 'item' && Array.isArray(partList) ? partList : null;
+  const parts = list && list.length ? '<span class="kh-sep"></span>' + list.map(([k, n]) => `<button type="button" data-part="${k}" class="${part === k ? 'on' : ''}" aria-pressed="${part === k ? 'true' : 'false'}">${esc(n)}</button>`).join('') : '';
+  const floors = kind === 'floor' ? '<span class="kh-sep"></span>' + Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}">${esc(F.n)}</button>`).join('') : '';
+  const seen = new Set();
+  const chips = [...rec.map((h) => [h, 'Recent ' + h]), ...FAMILIES.flatMap((f) => f.colors)].filter(([h]) => !seen.has(h) && seen.add(h)).map(([h, n]) => chip(h, n, cur === h)).join('');
+  return `<div class="kh-strip" role="group" aria-label="What to colour">${targets}${parts}${floors}</div>`
+    + `<div class="kh-sws" aria-label="Colours"><label class="kh-custom" title="Custom colour"><input type="color" data-custom value="${cur || '#7c3aed'}" aria-label="Custom colour"></label><button type="button" data-clear="${kind}" aria-label="${CLEAR[kind]}" title="${CLEAR[kind]}">↺</button>${chips}</div>`;
+}

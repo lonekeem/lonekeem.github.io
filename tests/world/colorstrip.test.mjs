@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { colorStripHtml, FAMILIES } from '../../js/world/roomedit.js';
+
+const all = FAMILIES.flatMap((f) => f.colors.map(([h]) => h));
+const wall = colorStripHtml({ target: 'wall', current: '#ec4899', recent: ['#ffffff', 'nope'], itemName: '' });
+assert.ok(!wall.includes('data-target="item"'), 'no piece target with nothing selected');
+for (const k of ['wall', 'floor', 'curtain']) assert.ok(wall.includes(`data-target="${k}"`), k);
+assert.ok(wall.includes('data-target="wall" class="on"'), 'wall is on');
+assert.ok(wall.includes('class="sw on" style="background:#ec4899"'), 'current chip on');
+assert.equal((wall.match(/data-hex="#ffffff"/g) || []).length, 1, 'recent white is not repeated');
+for (const h of all) assert.ok(wall.includes(`data-hex="${h}"`), 'chip ' + h);
+assert.ok(wall.includes('data-custom') && wall.includes('data-clear="wall"'), 'custom and clear');
+assert.ok(!wall.includes('nope'), 'bad recent dropped');
+assert.ok(!wall.includes('data-fl='), 'floor styles only on floor');
+assert.ok(colorStripHtml({ target: 'floor', current: '', recent: [] }).includes('data-fl='), 'floor styles');
+const piece = colorStripHtml({ target: 'item', current: '#7c3aed', recent: [], itemName: '<b>Sofa</b>', partList: [['f', 'Frame'], ['s', 'Seat']], part: 's' });
+assert.ok(piece.includes('data-target="item" class="on"'), 'piece on');
+assert.ok(piece.includes('&lt;b&gt;Sofa'), 'name escaped');
+assert.ok(piece.includes('data-part="s" class="on"') && piece.includes('data-part="f"'), 'parts');
+assert.ok(piece.includes('data-clear="item"'), 'clear piece');
+assert.ok(!colorStripHtml({ target: 'item', current: '', recent: [], itemName: '' }).includes('data-target="item"'), 'item falls back without a piece');
+console.log('colorstrip ok');

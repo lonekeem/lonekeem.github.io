@@ -251,51 +251,51 @@ export function attachHomes(api, W, K) {
 .kh-dec,.kh-yard{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 226px);pointer-events:auto;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(15,118,110,.85);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
 .kh-stuck{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 108px);z-index:28;pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;background:#c2410c;color:#fff;font:800 14px Inter,sans-serif;padding:0 12px;box-shadow:0 4px 12px rgba(0,0,0,.35)}
 .kh-yard[hidden],.kh-dec[hidden]{display:none}
-.kh-dbar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(8px,env(safe-area-inset-bottom)) + 150px);width:min(94vw,520px);display:flex;flex-direction:column;gap:6px;background:transparent;color:#111;pointer-events:none;z-index:12;font:600 13px Inter,sans-serif}
-.kh-dbar .kh-handle,.kh-dbar .kh-tools,.kh-dbar .kh-body{pointer-events:auto;background:rgba(255,255,255,.96);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
-.kh-dbar .kh-handle{display:flex;gap:6px;align-items:center;overflow-x:auto;touch-action:pan-x;padding:6px 8px}
-.kh-dbar .kh-body{padding:0 8px 6px;max-height:86px;overflow:hidden}
-.kh-dbar.open .kh-body{max-height:200px;overflow:auto}
-.kh-dbar button{border:0;border-radius:10px;padding:7px 10px;font:800 15px Inter,sans-serif;background:#e5e7eb;color:#111;min-height:48px;flex:none}
-.kh-dbar button.on,.kh-dbar button.p{background:#6d28d9;color:#fff}
-.kh-dbar button.x{background:#fee2e2;color:#991b1b}
-.kh-dbar .kh-acts{display:flex;gap:6px;flex:1 0 100%}
-.kh-dbar .kh-acts button{flex:1}
-.kh-dbar .kh-tabs{display:flex;gap:6px;flex:1 0 100%}
-.kh-dbar .kh-tabs button{flex:1}
-.kh-dbar.rooms .kh-body,.kh-dbar.tall .kh-body,.kh-dbar.tall.open .kh-body{max-height:46vh;overflow:auto}
-.kh-dbar .kh-add{flex:1 0 100%;background:#15803d;color:#fff;min-height:52px;font-size:18px}
-.kh-dbar .kh-cats{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 0}
-.kh-dbar .kh-cats button{flex:none;min-height:40px;font-size:13px;padding:6px 8px}
-.kh-dbar .kh-grid{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 8px}
-.kh-dbar .kh-grid .it{flex:1 1 86px;max-width:112px}
-.kh-dbar .kh-parts{display:flex;gap:6px;position:sticky;top:46px;z-index:2;background:#fff;padding:4px 0}
-.kh-dbar .kh-parts button{flex:1;min-height:44px;font-size:14px}
-.kh-rooms{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 0}
-.kh-rooms button{min-height:64px;font-size:16px}
-.kh-swatches{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0 8px}
-.kh-dbar .sw{width:44px;height:44px;min-width:44px;min-height:44px}
+.kh-dbar{position:absolute;inset:0;pointer-events:none;z-index:40;color:#1f1147;font:600 13px Inter,sans-serif}
+.kh-dbar[hidden]{display:none}
+.kh-dbar button{border:0;border-radius:12px;font:800 13px Inter,sans-serif;background:#eef0f6;color:#1f1147;min-height:44px;min-width:44px;padding:0 10px;flex:none;touch-action:manipulation;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.kh-dbar button.on{background:#6d28d9;color:#fff}
+.kh-dbar button:focus-visible{outline:3px solid #ffd34d;outline-offset:2px}
+.kh-dtop{position:absolute;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));display:flex;gap:6px;align-items:center;pointer-events:auto}
+.kh-dtop button{width:44px;height:44px;padding:0;border-radius:50%;font-size:20px;line-height:1;background:rgba(255,255,255,.94);box-shadow:0 3px 10px rgba(0,0,0,.3)}
+.kh-dtop .kh-rname{width:auto;border-radius:22px;padding:0 12px;font-size:13px;max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kh-dtop .ok{background:#16a34a;color:#fff}.kh-dtop .x{color:#b91c1c}
+.kh-tip1{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 52px);right:max(8px,env(safe-area-inset-right));max-width:min(300px,72vw);margin:0;background:rgba(24,14,52,.88);color:#fff;font:600 12px/1.35 Inter,sans-serif;padding:7px 11px;border-radius:12px;pointer-events:auto;animation:khTip .25s ease-out}
+@keyframes khTip{from{opacity:0;transform:translateY(-4px)}}
+.kh-dock{position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:stretch;gap:6px;pointer-events:none}
+.kh-dbar .kh-tools{align-self:flex-end;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;align-items:center;pointer-events:auto;background:rgba(255,255,255,.94);border-radius:16px;padding:4px;box-shadow:0 4px 14px rgba(0,0,0,.28);max-width:100%}
+.kh-dbar .kh-tools:empty{display:none}
+.kh-dbar .kh-tools .nm{font:800 12px Inter,sans-serif;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+.kh-dbar .kh-tools button{width:44px;padding:0;font-size:19px;background:#f1edfb}
+.kh-dbar .kh-tools button.on{background:#6d28d9;color:#fff}
+.kh-dbar .kh-tools .del{background:#fee2e2;color:#b91c1c}
+.kh-dbar .kh-nudge{display:flex;gap:4px;flex:1 0 100%;justify-content:flex-end}
+.kh-dbar .kh-tray{pointer-events:auto;background:rgba(255,255,255,.95);border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.3);padding:4px;display:flex;flex-direction:column;gap:4px;width:100%;max-width:640px;align-self:center;min-width:0}
+.kh-dbar .kh-tabs2,.kh-dbar .kh-strip,.kh-dbar .kh-grid,.kh-dbar .kh-rooms,.kh-dbar .kh-sws{display:flex;gap:5px;align-items:center;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;touch-action:pan-x;scrollbar-width:none;padding:1px}
+.kh-dbar .kh-tabs2::-webkit-scrollbar,.kh-dbar .kh-strip::-webkit-scrollbar,.kh-dbar .kh-grid::-webkit-scrollbar,.kh-dbar .kh-rooms::-webkit-scrollbar,.kh-dbar .kh-sws::-webkit-scrollbar{display:none}
+.kh-dbar .kh-tabs2 button{white-space:nowrap;padding:0 9px;font-size:12px}
+.kh-dbar .kh-tabs2 .ic{width:44px;padding:0;font-size:18px;position:relative}
+.kh-dbar .kh-tabs2 .ic small{position:absolute;right:2px;top:2px;font:800 9px Inter,sans-serif;background:#6d28d9;color:#fff;border-radius:8px;padding:1px 4px}
+.kh-dbar .kh-sep{flex:none;align-self:stretch;width:1px;background:#d4d4d8;margin:6px 1px}
+.kh-dbar .kh-lbl{font:800 12px Inter,sans-serif;padding:0 6px;white-space:nowrap}
+.kh-dbar .kh-body{display:flex;flex-direction:column;gap:4px;min-width:0}
+.kh-dbar .kh-tray:not(.open) .kh-body{display:none}
+.kh-dbar .kh-body .kh-cats{display:none}
+.kh-dbar .kh-body small,.kh-dbar .kh-body .kh-tip{font:600 12px Inter,sans-serif;color:#52525b;padding:8px 6px;margin:0;white-space:nowrap}
+.kh-dbar .it{flex:0 0 62px;height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;font:700 10px/1.05 Inter,sans-serif;text-align:center;white-space:normal;overflow:hidden;border-radius:12px;background:#f4f2fb}
+.kh-dbar .it i{font-style:normal;font-size:22px;line-height:1}
+.kh-dbar .it em{font-style:normal;font-size:9px;color:#6d28d9}
+.kh-dbar .it.on{background:#ede4ff;box-shadow:inset 0 0 0 2px #6d28d9;color:#1f1147}
+.kh-dbar .kh-rooms button{white-space:nowrap}.kh-dbar .kh-body button.x{background:#fee2e2;color:#991b1b}
+.kh-dbar .sw{width:40px;height:40px;min-width:40px;min-height:40px;border-radius:50%;padding:0;border:2px solid #fff;box-shadow:0 0 0 1px #a1a1aa;margin:2px}
 .kh-dbar .sw.on{box-shadow:0 0 0 3px #6d28d9}
-.kh-custom{display:flex;flex-direction:column;align-items:center;font-size:11px;font-weight:800;color:#333}
-.kh-custom input[type=color]{width:48px;height:48px;border:0;padding:0;background:transparent}
-.kh-dbar .kh-tip{margin:0;padding:2px 10px 0;color:#3f3f46;font:600 12px/1.35 Inter,sans-serif}
-.kh-dbar .kh-grip{background:transparent;color:#111;padding-left:4px}
-.kh-dbar .kh-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px}
-.kh-dbar .kh-tools b,.kh-dbar .kh-tools small{flex:1 1 100%;color:#333;font-weight:700}
-.kh-dbar .kh-strip{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;padding:6px 0 2px}
-.kh-dbar .sw{width:32px;height:32px;border-radius:50%;padding:0;min-height:32px;min-width:32px;border:2px solid #fff;box-shadow:0 0 0 1px #94a3b8}
-.kh-targets{display:flex;gap:6px;position:sticky;top:0;z-index:2;background:#fff;padding:6px 0 4px}
-.kh-targets button{flex:1 1 22%;min-height:44px;font-size:13px;padding:6px 4px}
-.kh-fam>span{display:block;font:800 12px/1.2 Inter,sans-serif;color:#3f3f46;margin:8px 0 0}
-.kh-dbar .kh-swatches .sw{width:44px;height:44px;min-width:44px;min-height:44px;border-radius:12px;scroll-margin:76px 0 16px}
-.kh-fam{scroll-margin-top:76px}
-.kh-dbar .it{flex:0 0 78px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;min-height:68px;text-align:center;line-height:1.15}
-.kh-dbar .it i{font-style:normal;font-size:20px}.kh-dbar .it em{font-style:normal;font-size:10px;color:#6d28d9}
-.kh-dbar label{display:block;margin:6px 0 2px;font-weight:800}
+.kh-dbar .kh-custom{flex:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:conic-gradient(#f43f5e,#f59e0b,#84cc16,#06b6d4,#6366f1,#d946ef,#f43f5e);overflow:hidden}
+.kh-dbar .kh-custom input[type=color]{width:44px;height:44px;border:0;padding:0;opacity:0;cursor:pointer}
+@media (orientation:landscape) and (max-height:500px){.kh-dock{flex-direction:row;align-items:flex-end;justify-content:space-between}.kh-dbar .kh-tray{flex:0 1 520px;align-self:flex-end}.kh-dbar .kh-tools{order:2;flex-direction:column;flex-wrap:nowrap;align-self:flex-end}.kh-dbar .kh-tools .nm{max-width:64px;font-size:10px;white-space:normal;text-align:center}.kh-dbar .kh-nudge{display:grid;grid-template-columns:44px 44px;flex:none}}
 body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kh-yard,body.kh-decorating .kd-my,body.kh-decorating .p3-chat,body.kh-decorating .p3-log,body.kh-decorating #ks-bag,body.kh-decorating .p3-top,body.kh-decorating #p3-set,body.kh-decorating #p3-rot,body.kh-decorating .p3-rotip,body.kh-decorating .kc-gear{display:none!important}
-body.kh-decorating .kh-stuck{display:inline-block!important}
-@media (min-width:900px) and (pointer:fine){.kh-dbar{bottom:12px}}
-@media (orientation:landscape) and (max-height:500px){.kh-dec,.kh-yard{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 400px)}.kh-stuck{top:calc(max(8px,env(safe-area-inset-top)) + 4px);right:calc(max(8px,env(safe-area-inset-right)) + 56px)}.kh-dbar{width:min(58vw,460px);left:auto;right:8px;bottom:8px;transform:none}.kh-dbar .kh-body,.kh-dbar.open .kh-body{max-height:28vh}.kh-radio:not(.min):not(.dock){top:calc(max(8px,env(safe-area-inset-top)) + 4px)}}`; document.head.appendChild(css2);
+body.kh-decorating #ks-map,body.kh-decorating .kh-home,body.kh-decorating .kh-yard,body.kh-decorating .kd-my,body.kh-decorating .p3-chat,body.kh-decorating .p3-log,body.kh-decorating .p3-top,body.kh-decorating .kh-stuck,body.kh-decorating .kc-joy,body.kh-decorating .kc-btns,body.kh-decorating .kc-hint,body.kh-decorating .kc-gear,body.kh-decorating .kc-card,body.kh-decorating #p3-quick,body.kh-decorating .p3-dances,body.kh-decorating .p3-hint,body.kh-decorating .p3-room,body.kh-decorating .p3-rotip,body.kh-decorating #p3-set,body.kh-decorating #p3-rot,body.kh-decorating .kh-note-btn,body.kh-decorating .kh-dec{display:none!important}
+body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;pointer-events:none!important}
+@media (orientation:landscape) and (max-height:500px){.kh-dec,.kh-yard{top:calc(max(8px,env(safe-area-inset-top)) + 4px);left:auto;right:calc(max(8px,env(safe-area-inset-right)) + 400px)}.kh-stuck{top:calc(max(8px,env(safe-area-inset-top)) + 4px);right:calc(max(8px,env(safe-area-inset-right)) + 56px)}.kh-radio:not(.min):not(.dock){top:calc(max(8px,env(safe-area-inset-top)) + 4px)}}`; document.head.appendChild(css2);
   const radioBox = document.createElement('div'); radioBox.className = 'kh-radio'; radioBox.hidden = true; const decB = document.createElement('button'); decB.className = 'kh-dec'; decB.textContent = '🛠️ Decorate'; decB.hidden = true;
   const yardB = document.createElement('button'); yardB.type = 'button'; yardB.className = 'kh-yard'; yardB.textContent = '🎨 Outside'; yardB.hidden = true; yardB.setAttribute('aria-label', 'Decorate the outside of your house');
   const stuckB = document.createElement('button'); stuckB.type = 'button'; stuckB.className = 'kh-stuck'; stuckB.textContent = 'Stuck? 🔄'; stuckB.setAttribute('aria-label', 'Stuck? Go back to your front door');
@@ -643,12 +643,15 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
     drawDeco(); window.__kh && (window.__kh.deco = true); say('Decorating the outside. You stay in the yard.');
   }
+  const EXT_K = [['w', 'Walls'], ['r', 'Roof'], ['d', 'Door'], ['t', 'Trim']];
+  const CAT_IC = { furn: '🛋️', tech: '📺', plant: '🪴', wall: '🖼️', light: '💡', rug: '🟫', fun: '🎲', hol: '🎄' };
+  const DECO_TIPS = { pick: 'Tap a room to decorate it. ✓ saves every room, ✕ cancels.', room: 'Tap a tile to place it. Drag a piece to move it. Tap ✓ when you are done.', out: 'Pick a part, then a colour. ✓ saves, ✕ puts the old colours back.' };
   function startDeco(mode) {
     if (deco) return;
     if (mode === 'out' || (mode !== 'in' && !inside)) { beginOutside(); return; }
     if (!inside || !myPlot || inside.id !== myPlot) return; const r = rooms.get(myPlot); const o = owners.get(myPlot) || {}; const d0 = o.decor || {};
     const base = {}; for (const it of starterOf(r)) base[it.c] = (base[it.c] || 0) + 1;
-    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i, ...(i.parts ? { parts: { ...i.parts } } : {}) })), stash: unpackStash(d0.items), base, sel: -1, tab: 'c', cat: 'plant', part: 'f', room: '', edit: null, editState: 'loading', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false, paintNoted: false, paintTarget: 'wall' };
+    deco = { out: false, spot: { x: P.x, z: P.z, y: P.y, yaw: P.yaw || 0 }, r, wall: d0.wall || r.I.S.wall, walls: d0.walls || '', wroom: '', floor: d0.floor || r.I.S.floor, surf: parseFloors(d0.floors), ext: { w: '', r: '', d: '', t: '', ...(d0.ext || {}) }, items: r.I.items().map((i) => ({ ...i, ...(i.parts ? { parts: { ...i.parts } } : {}) })), stash: unpackStash(d0.items), base, sel: -1, tab: 'f', cat: 'furn', ek: 'w', nudge: false, part: 'f', room: '', edit: null, editState: 'loading', hist: [], t: 0, open: true, moving: false, drag: null, stick: null, stickT: 0, parkedRadio: false, resetSure: false, paintNoted: false, paintTarget: 'wall' };
     document.body.classList.add('kh-decorating');
     if (rad && !radioBox.hidden && !radioBox.classList.contains('dock')) { dockRadio(); deco.parkedRadio = true; }
     loadOwned().then(() => deco && drawDeco());
@@ -678,15 +681,14 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   const have = (c) => { const D = DECOR[c]; return !D.c && !D.d ? true : !!(owned && owned[decorItem(c)]); };
   function mineName(it, i) { const D = DECOR[it.c]; const n = deco.items.slice(0, i + 1).filter((q) => q.c === it.c).length; const many = deco.items.filter((q) => q.c === it.c).length > 1; return `${D.e} ${D.n}${many ? ' ' + n : ''}${it.f ? ' · Up' : ''}`; }
   function paintTools() {
-    const box = dbar.querySelector('.kh-tools'); if (!box || !deco) return; const it = deco.items[deco.sel];
-    if (deco.out) { box.innerHTML = '<small>Walk around your yard. The colours update on the house while you watch.</small>'; return; }
-    if (!deco.room) { box.innerHTML = '<small>Pick a room. You edit one room at a time.</small>'; return; }
-    const here = it && inRoom(it) ? it : null;
-    const add = '<button type="button" class="kh-add" data-addopen>Add item</button>';
-    box.innerHTML = add + (here ? `<b>${DECOR[here.c].e} ${DECOR[here.c].n}</b><button type="button" data-move class="${deco.moving ? 'on' : ''}" aria-pressed="${deco.moving ? 'true' : 'false'}">Move</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-rot>Rotate</button><button type="button" data-color>Color</button><button type="button" data-del>Delete</button>` : '<small>Tap Add item for plants, pictures, and furniture. Tap a piece to move, colour, or remove it.</small>');
-    const addB = box.querySelector('[data-addopen]'); if (addB) addB.onclick = () => { deco.tab = 'f'; deco.open = true; drawDeco(); };
-    const mv = box.querySelector('[data-move]'); if (mv) mv.onclick = () => { deco.moving = !deco.moving; paintTools(); };
-    const cb = box.querySelector('[data-color]'); if (cb) cb.onclick = () => { deco.paintTarget = 'item'; deco.tab = 'c'; deco.open = true; drawDeco(); };
+    const box = dbar.querySelector('.kh-tools'); if (!box || !deco) return; box.innerHTML = '';
+    if (deco.out || !deco.room) return;
+    const it = deco.items[deco.sel]; const here = it && inRoom(it) ? it : null; if (!here) return; const D = DECOR[here.c];
+    const pc = deco.tab === 'c' && deco.paintTarget === 'item' && deco.open;
+    box.innerHTML = `<span class="nm" title="${esc(D.n)}">${D.e} ${esc(D.n)}</span><button type="button" data-rot aria-label="Rotate" title="Rotate">⟳</button><button type="button" data-color class="${pc ? 'on' : ''}" aria-label="Colour this piece" title="Colour">🎨</button><button type="button" data-nudgeopen class="${deco.nudge ? 'on' : ''}" aria-pressed="${deco.nudge ? 'true' : 'false'}" aria-label="Nudge arrows" title="Nudge">✥</button><button type="button" class="del" data-del aria-label="Put away" title="Put away">🗑</button>` +
+      (deco.nudge ? '<div class="kh-nudge"><button type="button" data-nudge="0,-1" aria-label="Nudge away">↑</button><button type="button" data-nudge="0,1" aria-label="Nudge closer">↓</button><button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button></div>' : '');
+    const nb = box.querySelector('[data-nudgeopen]'); if (nb) nb.onclick = () => { deco.nudge = !deco.nudge; paintTools(); };
+    const cb = box.querySelector('[data-color]'); if (cb) cb.onclick = () => { if (pc) { deco.tab = 'f'; } else { deco.paintTarget = 'item'; deco.tab = 'c'; deco.open = true; } drawDeco(); };
     box.querySelectorAll('[data-nudge]').forEach((b) => (b.onclick = () => { const [sx, sy] = b.dataset.nudge.split(',').map(Number); nudgeScreen(sx, sy); }));
     const rb = box.querySelector('[data-rot]'); if (rb) rb.onclick = () => rotateSel();
     const db2 = box.querySelector('[data-del]'); if (db2) db2.onclick = () => removeSel();
@@ -706,23 +708,24 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
   }
   function paintBody() {
     const body = dbar.querySelector('.kh-body'); if (!body || !deco) return; const t = deco.tab;
-    const extRows = [['w', 'Walls'], ['r', 'Roof'], ['d', 'Door'], ['t', 'Trim']].map(([k, n]) => `<label>${n}</label><div class="kh-strip">${EXT_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-e="${k}:${c}" aria-label="${n} ${c}"></button>`).join('')}</div>`).join('') + '<button type="button" data-e="reset">Reset outside colours</button>';
+    const ek = EXT_K.some(([k]) => k === deco.ek) ? deco.ek : 'w', ekn = EXT_K.find(([k]) => k === ek)[1];
+    const extRows = `<div class="kh-sws" aria-label="${ekn} colours">${EXT_SW.map((c) => `<button type="button" class="sw${(deco.ext || {})[ek] === c ? ' on' : ''}" style="background:${c}" data-e="${ek}:${c}" aria-label="${ekn} ${c}"></button>`).join('')}<button type="button" data-e="reset" aria-label="Reset outside colours" title="Reset outside colours">↺ Reset</button></div>`;
     const oldPaint = () => { body.innerHTML = `<div class="kh-strip" aria-label="Wall colours">${WALL_SW.map((c) => `<button type="button" class="sw" style="background:${c}" data-w="${c}" aria-label="wall ${c}"></button>`).join('')}</div><div class="kh-strip">${[['', 'Whole home'], ...WALL_ROOMS.filter(([k]) => k !== 'U' || deco.r.I.two)].map(([k, n]) => `<button type="button" data-wr="${k}" class="${deco.wroom === k ? 'on' : ''}">${n}</button>`).join('')}${Object.entries(FLOORS).map(([k, F]) => `<button type="button" data-fl="${k}" class="${deco.floor === k ? 'on' : ''}">${F.n}</button>`).join('')}</div>`; };
     if (deco.out) body.innerHTML = extRows;
-    else if (deco.editState === 'loading') body.innerHTML = '<p class="kh-tip">Opening the room editor…</p>';
+    else if (deco.editState === 'loading') body.innerHTML = '<small>Opening the room editor…</small>';
     else if (!deco.edit) oldPaint();
-    else if (!deco.room) body.innerHTML = deco.edit.roomPickerHtml(!!deco.r.I.two) + `<button type="button" data-reset>${deco.resetSure ? 'Tap again to reset the whole home' : 'Reset whole home'}</button>`;
-    else if (t === 'm') { const mine = deco.items.map((it, i) => ({ it, i })).filter(({ it }) => inRoom(it)); body.innerHTML = `<div class="kh-strip" aria-label="Furniture in this room">${mine.map(({ it, i }) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing in this room yet. Use Add.</small>'}</div>`; }
-    else if (t === 'f') { const stored = (c) => deco.stash.filter((q) => q === c).length; const cat = deco.edit.CATS.some((c) => c.id === deco.cat) ? deco.cat : 'plant'; deco.cat = cat;
+    else if (!deco.room) body.innerHTML = deco.edit.roomPickerHtml(!!deco.r.I.two).replace(/<\/div>\s*$/, `<span class="kh-sep"></span><button type="button" data-reset class="x">${deco.resetSure ? 'Tap again to reset' : '↺ Reset home'}</button></div>`);
+    else if (t === 'm') { const mine = deco.items.map((it, i) => ({ it, i })).filter(({ it }) => inRoom(it)); body.innerHTML = `<div class="kh-strip" aria-label="Furniture in this room">${mine.map(({ it, i }) => `<button type="button" class="it${i === deco.sel ? ' on' : ''}" data-mine="${i}">${mineName(it, i)}</button>`).join('') || '<small>Nothing here yet. Pick a category above.</small>'}</div>`; }
+    else if (t === 'f') { const stored = (c) => deco.stash.filter((q) => q === c).length; const cat = deco.edit.CATS.some((c) => c.id === deco.cat) ? deco.cat : 'furn'; deco.cat = cat;
       const rows = Object.entries(DECOR).filter(([c]) => deco.edit.catOf(c) === cat).map(([c, D]) => { const n = stored(c); const em = n ? 'Stored' + (n > 1 ? ' ' + n : '') : have(c) ? (D.c || D.d ? 'Owned' : 'Free') : priceOf(D); return { c, e: D.e, n: D.n, em, rank: n ? 0 : have(c) ? 1 : 2 }; }).sort((a, b) => a.rank - b.rank || a.n.localeCompare(b.n));
       body.innerHTML = deco.edit.addHtml(cat, rows); }
     else { const walls = parseWalls(deco.walls); const it = deco.items[deco.sel]; const here = it && inRoom(it) ? it : null; const R = deco.edit.roomById(deco.room);
       let kind = deco.paintTarget || 'wall'; if (!['wall', 'floor', 'curtain', 'item'].includes(kind) || (kind === 'item' && !here)) kind = 'wall'; deco.paintTarget = kind;
       const spec = here && kind === 'item' ? deco.edit.partsFor(here.c) : null; if (spec && !spec.some(([k]) => k === deco.part)) deco.part = spec[0][0];
       const surf = deco.surf || {}; const current = kind === 'floor' ? (surf[deco.room] || '') : kind === 'curtain' ? (surf['c' + deco.room] || '') : kind === 'item' ? (spec ? ((here.parts && here.parts[deco.part]) || '') : (here.col || '')) : (walls[deco.room] || '');
-      body.innerHTML = deco.edit.colorHtml({ roomName: R.name, target: kind, current, recent: deco.edit.recentColors(uid), itemName: here ? `${DECOR[here.c].e} ${DECOR[here.c].n}` : '', partList: spec, part: deco.part });
+      body.innerHTML = (deco.edit.colorStripHtml || deco.edit.colorHtml)({ roomName: R.name, target: kind, current, recent: deco.edit.recentColors(uid), itemName: here ? `${DECOR[here.c].e} ${DECOR[here.c].n}` : '', partList: spec, part: deco.part });
       body.querySelectorAll('[data-fl]').forEach((b) => b.classList.toggle('on', b.dataset.fl === deco.floor)); }
-    body.querySelectorAll('[data-room]').forEach((b) => (b.onclick = () => { const id = b.dataset.room; if (!deco.edit.roomById(id)) return; deco.room = id; deco.sel = -1; deco.moving = false; deco.tab = 'c'; deco.open = true; focusRoom(id); placeHi(); drawDeco(); say(deco.edit.roomById(id).name + '. Only this room can be edited.'); }));
+    body.querySelectorAll('[data-room]').forEach((b) => (b.onclick = () => { const id = b.dataset.room; if (!deco.edit.roomById(id)) return; deco.room = id; deco.sel = -1; deco.moving = false; deco.nudge = false; deco.tab = 'f'; deco.open = true; focusRoom(id); placeHi(); drawDeco(); say(deco.edit.roomById(id).emoji + ' ' + deco.edit.roomById(id).name); }));
     body.querySelectorAll('[data-mine]').forEach((b) => (b.onclick = () => selectItem(+b.dataset.mine)));
     body.querySelectorAll('[data-wr]').forEach((b) => (b.onclick = () => { deco.wroom = b.dataset.wr; paintBody(); }));
     body.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); const c = b.dataset.w; if (deco.wroom) { const m = parseWalls(deco.walls); m[deco.wroom] = c; deco.walls = Object.entries(m).map(([k, v]) => k + ':' + v).join(','); } else { deco.wall = c; deco.walls = ''; } deco.r.I.setWall(deco.wall, deco.walls); }));
@@ -733,7 +736,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     body.querySelectorAll('[data-custom]').forEach((el) => { const apply = (live) => { const c = hex6(el.value); if (c) paintKind(deco.paintTarget || 'wall', c, live); }; el.oninput = () => apply(true); el.onchange = () => apply(false); });
     body.querySelectorAll('[data-clear]').forEach((b) => (b.onclick = () => paintKind(b.dataset.clear, '', false)));
     body.querySelectorAll('[data-fl]').forEach((b) => (b.onclick = () => { if (deco.out || !deco.r) return; remember(); deco.floor = b.dataset.fl; surfNow(); paintBody(); }));
-    body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { remember(); if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); say(deco.out ? '🎨 That colour is on the house.' : '🎨 Outside colour set. Step out to see it, or use Decorate outside from the yard.'); }));
+    body.querySelectorAll('[data-e]').forEach((b) => (b.onclick = () => { remember(); if (b.dataset.e === 'reset') deco.ext = { w: '', r: '', d: '', t: '' }; else { const [k, c] = b.dataset.e.split(':'); deco.ext[k] = c; } W.paintHouse && W.paintHouse(myPlot, deco.ext); paintBody(); say(deco.out ? '🎨 That colour is on the house.' : '🎨 Outside colour set. Step out to see it, or use Decorate outside from the yard.'); }));
     const resetB = body.querySelector('[data-reset]'); if (resetB) resetB.onclick = () => { if (!deco.resetSure) { deco.resetSure = true; paintBody(); say('Tap again to put back the furniture that came with the house. Colours stay.'); return; }
       remember(); deco.items = starterOf(deco.r).map((i) => ({ ...i })); deco.stash = []; deco.sel = -1; deco.moving = false; deco.resetSure = false; relItems(); drawDeco(); say('Starter furniture is back. Pieces you bought are still yours.'); };
     body.querySelectorAll('[data-add]').forEach((b) => (b.onclick = async () => { if (deco.out || !deco.r || !deco.room || !deco.edit) return; const c = b.dataset.add, D = DECOR[c]; if (!D) return; const cap = deco.edit.ROOM_CAP || 12; const inThis = deco.items.reduce((n, q) => n + (inRoom(q) ? 1 : 0), 0); if (inThis >= cap) { say('This room is full (' + cap + '). Remove one, then add another.'); return; }
@@ -748,19 +751,30 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
       remember(); if (si >= 0) deco.stash.splice(si, 1); deco.items.push(it); deco.sel = deco.items.length - 1; const spec = deco.edit.partsFor(c); if (spec) { deco.paintTarget = 'item'; deco.part = spec[0][0]; } relItems(); drawDeco(); }));
   }
   function drawDeco() { if (!deco) return; const t = deco.tab; const roomed = !deco.out && deco.editState === 'ready' && deco.edit;
-    dbar.classList.toggle('open', !!deco.open); dbar.classList.toggle('rooms', !!(roomed && !deco.room)); dbar.classList.toggle('tall', !!(roomed && deco.room && (t === 'c' || t === 'f'))); dbar.hidden = false;
+    dbar.hidden = false;
     const R = roomed && deco.room ? deco.edit.roomById(deco.room) : null;
-    const tip = deco.out ? 'You stay in the yard. Tap a colour. Done saves. Exit puts the old colours back.' : !roomed ? 'Opening the room editor…' : !deco.room ? 'Tap a room. The camera moves there. Only that room can be edited. Done saves. Exit cancels.' : `${R.name}. Tap Add item for plants, pictures, and furniture. Wall art snaps to a wall. Done saves every room. Exit cancels.`;
-    const count = roomed && deco.room ? deco.items.filter((it) => inRoom(it)).length : deco.items.length;
-    const acts = `<div class="kh-acts">${roomed && deco.room ? '<button type="button" data-rooms>Rooms</button>' : ''}<button type="button" data-undo>Undo</button><button type="button" class="x" data-x>Exit</button><button type="button" class="p" data-sv>Done</button></div>`;
-    const tabs = roomed && deco.room ? `<div class="kh-tabs"><button type="button" data-tab="c" class="${t === 'c' ? 'on' : ''}">Color</button><button type="button" data-tab="f" class="${t === 'f' ? 'on' : ''}">Add</button><button type="button" data-tab="m" class="${t === 'm' ? 'on' : ''}">Mine ${count}</button></div>` : '';
-    dbar.innerHTML = `<div class="kh-handle"><button type="button" class="kh-grip" data-handle aria-expanded="${deco.open ? 'true' : 'false'}">${deco.open ? '▾' : '▴'} ${deco.out ? 'Outside' : (R ? R.name : 'Decorate')}</button>${acts}${tabs}</div><p class="kh-tip">${tip}</p><div class="kh-tools"></div><div class="kh-body"></div>`;
+    const count = R ? deco.items.filter((it) => inRoom(it)).length : 0;
+    const top = `<div class="kh-dtop">${R ? `<button type="button" class="kh-rname" data-rooms aria-label="Pick another room" title="Rooms">${R.emoji || '🏠'} ${esc(R.name)} ▾</button>` : ''}<button type="button" data-undo aria-label="Undo" title="Undo">↶</button><button type="button" class="x" data-x aria-label="Exit without saving" title="Exit">✕</button><button type="button" class="ok" data-sv aria-label="Done, save" title="Done">✓</button></div>`;
+    let tabs;
+    if (deco.out) tabs = '<span class="kh-lbl">🏡 Outside</span>' + EXT_K.map(([k, n]) => `<button type="button" data-ek="${k}" class="${(deco.ek || 'w') === k ? 'on' : ''}">${n}</button>`).join('');
+    else if (!roomed) tabs = '<span class="kh-lbl">Opening…</span>';
+    else if (!R) tabs = '<span class="kh-lbl">🏠 Pick a room</span>';
+    else tabs = `<button type="button" class="ic${t === 'c' ? ' on' : ''}" data-tab="c" aria-label="Paint" title="Paint">🎨</button><button type="button" class="ic${t === 'm' ? ' on' : ''}" data-tab="m" aria-label="In this room: ${count}" title="In this room">📦<small>${count}</small></button><span class="kh-sep"></span>` +
+      deco.edit.CATS.map((c) => `<button type="button" data-tab="f" data-cat="${c.id}" class="${t === 'f' && deco.cat === c.id ? 'on' : ''}">${CAT_IC[c.id] || ''} ${esc(c.name)}</button>`).join('');
+    const kind = deco.out ? 'out' : R ? 'room' : roomed ? 'pick' : '';
+    if (kind && !deco.tips) deco.tips = {};
+    if (kind && !deco.tips[kind]) { deco.tips[kind] = 1; let seen = ''; try { seen = localStorage.getItem('kemy-deco-tip-' + kind) || ''; localStorage.setItem('kemy-deco-tip-' + kind, '1'); } catch (_) {} if (!seen) { deco.tipUntil = Date.now() + 7000; deco.tip = DECO_TIPS[kind]; setTimeout(() => { if (deco && Date.now() >= deco.tipUntil) { const el = dbar.querySelector('.kh-tip1'); if (el) el.remove(); } }, 7100); } }
+    const tip = deco.tip && Date.now() < (deco.tipUntil || 0) ? `<p class="kh-tip1" role="status" data-tip1>${deco.tip}</p>` : '';
+    dbar.innerHTML = `${top}${tip}<div class="kh-dock"><div class="kh-tools"></div><div class="kh-tray${deco.open ? ' open' : ''}"><div class="kh-tabs2" role="toolbar" aria-label="Catalog"><button type="button" class="ic" data-handle aria-expanded="${deco.open ? 'true' : 'false'}" aria-label="${deco.open ? 'Hide catalog' : 'Show catalog'}" title="${deco.open ? 'Hide' : 'Show'}">${deco.open ? '▾' : '▴'}</button>${tabs}</div><div class="kh-body"></div></div></div>`;
     dbar.querySelector('[data-handle]').onclick = () => { deco.open = !deco.open; drawDeco(); };
-    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { deco.tab = b.dataset.tab; deco.open = true; drawDeco(); }));
-    const roomsB = dbar.querySelector('[data-rooms]'); if (roomsB) roomsB.onclick = () => { deco.room = ''; deco.sel = -1; deco.moving = false; placeHi(); drawDeco(); };
+    const tipEl = dbar.querySelector('[data-tip1]'); if (tipEl) tipEl.onclick = () => { deco.tipUntil = 0; tipEl.remove(); };
+    dbar.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { if (b.dataset.cat) deco.cat = b.dataset.cat; deco.tab = b.dataset.tab; deco.open = true; drawDeco(); }));
+    dbar.querySelectorAll('[data-ek]').forEach((b) => (b.onclick = () => { deco.ek = b.dataset.ek; deco.open = true; drawDeco(); }));
+    const roomsB = dbar.querySelector('[data-rooms]'); if (roomsB) roomsB.onclick = () => { deco.room = ''; deco.sel = -1; deco.moving = false; deco.nudge = false; deco.open = true; placeHi(); drawDeco(); };
     const undoB = dbar.querySelector('[data-undo]'); if (undoB) undoB.onclick = () => undoDeco();
     dbar.querySelector('[data-x]').onclick = () => endDeco(false); dbar.querySelector('[data-sv]').onclick = () => endDeco(true);
-    paintTools(); paintBody(); }
+    paintTools(); paintBody();
+    const on = dbar.querySelector('.kh-tabs2 .on'); if (on && on.scrollIntoView) try { on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {} }
   function rayAt(clientX, clientY) {
     const cam = api.cam, cv = view.querySelector('canvas'); if (!cam || !cv) return null;
     const rect = cv.getBoundingClientRect(); if (rect.width < 2 || rect.height < 2) return null;
@@ -773,7 +787,8 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (e.target.closest && e.target.closest('button, a, input, textarea, select, label, .kh-dbar, .kh-radio, .kh-note-btn, .kc-b, .kc-gear, .kh-p, .ks-panel')) return;
     const ray = rayAt(e.clientX, e.clientY); if (!ray) return;
     const hit = pickIndex(deco.items, ray.origin, ray.dir, (it) => (inRoom(it) ? aabbOf(it) : null));
-    const idx = hit >= 0 ? hit : (deco.moving && deco.sel >= 0 ? deco.sel : -1);
+    let idx = hit >= 0 ? hit : (deco.moving && deco.sel >= 0 ? deco.sel : -1);
+    if (idx < 0 && deco.sel >= 0 && inRoom(deco.items[deco.sel])) { const sp = screenOf(deco.sel); if (sp && !sp.behind && Math.hypot(sp.x - e.clientX, sp.y - e.clientY) < 80) idx = deco.sel; }
     if (idx < 0) return;
     e.preventDefault(); e.stopPropagation(); selectItem(idx);
     const it = deco.items[idx]; const y = itemBaseY(it) + 0.02;
@@ -980,7 +995,7 @@ body.kh-decorating .kh-stuck{display:inline-block!important}
     if (inside && (!Number.isFinite(P.y) || P.y < FLAT - 0.25)) { const r = rooms.get(inside.id); if (r) { P.x = r.cx; P.z = r.cz + 4.6 * SC; } P.y = FLAT; P.vy = 0; P.onGround = true; }
     if (deco && deco.out) { const y = standY(ground(P.x, P.z), P.x, P.z); if (inside || positionBad(P.x, P.z) || !Number.isFinite(P.y) || P.y < y - 0.45) placeAt(deco.spot); }
     if (driving && rad && !radioBox.hidden) { if (radioBox.classList.contains('dock')) placeNote(); else if (!radioBox.classList.contains('min')) dockRadio(); else { const rr = radioBox.getBoundingClientRect(); if (hitsPad({ l: rr.left, t: rr.top, r: rr.right, b: rr.bottom })) dockRadio(); } }
-    if (inside) { const { cx, cz } = roomCell(inside); if (Math.hypot(P.x - cx, P.z - (cz + 5.4 * SC)) < 1.8 && !(deco && deco.out)) promptNow = { id: 'kh:out', label: '🚪 Go outside' }; else if (!deco) promptNow = roomPrompt(); }
+    if (inside) { const { cx, cz } = roomCell(inside); if (Math.hypot(P.x - cx, P.z - (cz + 5.4 * SC)) < 1.8 && !deco) promptNow = { id: 'kh:out', label: '🚪 Go outside' }; else if (!deco) promptNow = roomPrompt(); }
     else if (!driving && !(deco && deco.out)) { let best = null, bd = 2.8; for (const h of housesNear(P.x, P.z, 12)) { const d = Math.hypot(h.door.x - P.x, h.door.z - P.z); if (d < bd) { bd = d; best = h; } }
       if (best) { const o = owners.get(best.id); if (best.sale) { if (!o) promptNow = { id: 'kh:sale:' + best.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[best.style]) }; else if (o.owner === uid) { promptNow = { id: 'kh:mine:' + best.id, label: '🏠 My home' }; showIn = best; } else if (canEnter(best)) showIn = best; else promptNow = { id: 'kh:ring:' + best.id, label: '🚪 Ring doorbell' }; } else showIn = best; }
       else for (const h of housesNear(P.x, P.z, 20)) if (h.sale && !owners.has(h.id)) { const [sx, sz] = Lw(h, -6.3, h.d / 2 + 4.6); if (Math.hypot(sx - P.x, sz - P.z) < 2.4) { promptNow = { id: 'kh:sale:' + h.id, label: '🏷️ For Sale · ' + price(HOME_STYLES[h.style]) }; break; } } }
