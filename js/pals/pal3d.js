@@ -598,6 +598,8 @@ export function posePal3D(m, st = {}) {
   if (!sane(P)) P = modePose('idle', t);
   const pv = ud.prev; if (pv && Math.abs(t - (ud.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }
   ud.prev = P; ud.pt = t;
-  apply(m, P, t, md); grip(m, st.dance3d ? st.amt ?? 1 : 0, md, t);
+  // whole-body turns from the dance styles (spins, cartwheels): procedural, applied after smoothing so they never unwind
+  if (ud.ry0 == null) ud.ry0 = m.rotation.y; m.rotation.y = ud.ry0 + (st.ry || 0);
+  apply(m, P, t, md); if (st.rz) ud.J.Hips.rotation.z += st.rz; if (st.rx) ud.J.Hips.rotation.x += st.rx; grip(m, st.dance3d ? st.amt ?? 1 : 0, md, t);
 }
 export { THREE };

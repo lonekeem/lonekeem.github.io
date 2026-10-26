@@ -56,6 +56,7 @@ body.p3-on .gm.top-right { z-index: 95; }
 .p3-view .p3-dances button .ic { display: block; font-size: 22px; margin-bottom: 2px; }
 .p3-view .p3-dances button.on { border-color: #7c3aed; background: #f4ecff; }
 .p3-view .p3-dances button.stop { grid-column: 1 / -1; min-height: 48px; background: #2a1458; color: #fff; border-color: #2a1458; font-size: 15px; }
+.p3-view .p3-styles .p3-sty-h { grid-column: 1 / -1; font: 800 14px/1.2 Inter, system-ui, sans-serif; color: #2a1458; text-align: center; padding: 2px 0 4px; }
 .p3-view .kc-hint { bottom: calc(16% + 30px); }
 .p3-top { padding-right: 118px; }
 .p3-view .kc-gear { display: none; }

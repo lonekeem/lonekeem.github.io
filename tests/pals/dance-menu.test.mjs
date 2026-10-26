@@ -23,3 +23,22 @@ const a = clipFor('armswing')(0.1);
 const b = clipFor('armswing')(1.1);
 assert.notEqual(a.aL[0], b.aL[0]);
 console.log('dance menu tests ok', WORLD_DANCES.length);
+
+// Dance styles: one short presence value, clock-synced so every viewer sees the same move.
+{
+  const { DANCE_STYLES, styleDn, isStyleDn, styleOf, styleAt, danceBeat } = await import('../../js/pals/dance-menu.js');
+  assert.deepEqual(DANCE_STYLES.map((s) => s.k), ['c', 'b', 'k', 'h', 'f']);
+  for (const s of DANCE_STYLES) {
+    const dn = styleDn(s.k, 2.5, 107.7);
+    assert.ok(dn.length <= 20 && isStyleDn(dn), dn);
+    assert.equal(styleOf(dn).k, s.k);
+    if (s.k === 'c') continue;
+    const bt = danceBeat(dn, 999);
+    assert.ok(Math.abs(bt - 2.5) < 0.3, `${dn} beat ${bt}`);
+    assert.equal(styleAt(dn, bt).i, 0); // starts on the style's first move
+    for (let m = 0; m < s.moves.length; m++) assert.equal(styleAt(dn, m * 8 + 1).i, m);
+    assert.equal(styleAt(dn, bt, true).i, 0); // Pals: lite
+  }
+  assert.equal(isStyleDn('g:z1000.abc'), false);
+  assert.equal(isStyleDn('g:b1000.abc!'), false);
+}
