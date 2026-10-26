@@ -15,6 +15,7 @@ function loadSounds() {
   return soundMod;
 }
 import { faceName, adminNameClass } from './kemy-name.js';
+import { sheriffCard } from './sheriff-card.js';
 
 export const GENRES = {
   movie: ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Fantasy', 'Romance', 'Animation', 'Music', 'Documentary', 'Other'],
@@ -469,7 +470,7 @@ export function createWorks(ctx) {
         <p class="wintro clamp" id="wintro">${esc(D.intro)}</p><button class="link-btn wmorebtn" type="button" aria-expanded="false">more</button>
         <a class="btn btn-sm wnew" href="#/new/${kind}">+ Share ${isSong ? 'a song' : 'a movie'}</a>${isSong ? '' : '<a class="btn btn-sm btn-ghost wnew wmm" href="#/new/aimovie">✨ Make an AI movie</a>'}
         <div class="wpicks" hidden><h3>★ Studio Picks</h3><div class="wrow"></div></div>
-        ${isSong ? '' : '<div class="worig" hidden><h3>Lone Keem Studios Originals</h3><div class="wrow"></div></div><div class="wseries" hidden><h3>📺 Series <a class="small" href="#/series/new">+ New series</a></h3><div class="wrow"></div></div>'}
+        ${isSong ? '' : `<div class="worig"><h3>Lone Keem Studios Originals</h3><div class="wrow">${sheriffCard('tile')}</div></div><div class="wseries" hidden><h3>📺 Series <a class="small" href="#/series/new">+ New series</a></h3><div class="wrow"></div></div>`}
         <div class="wchips" role="toolbar" aria-label="Genres"><button class="chip on" data-g="">All</button>${isSong ? '' : '<button class="chip" data-g="__series">Series</button>'}${GENRES[kind].map((g) => `<button class="chip" data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div>
         <div class="wsort" role="tablist"><button class="on" data-s="createdAt">New</button><button data-s="viewCount">${isSong ? 'Most played' : 'Most viewed'}</button><button data-s="likeCount">Top starred</button></div>
         <div class="wgrid"><div class="spinner"></div></div>
@@ -493,7 +494,7 @@ export function createWorks(ctx) {
     root.querySelectorAll('[data-s]').forEach((b) => (b.onclick = () => { sort = b.dataset.s; root.querySelectorAll('[data-s]').forEach((x) => x.classList.toggle('on', x === b)); load(); }));
     if (!isSong) {
       series().fetchList({ max: 20 }).then(async (l) => { if (stale(token) || !l.length) return; const orig = l.filter((x) => x.ownerId === 'studio'), rest = l.filter((x) => x.ownerId !== 'studio');
-        if (orig.length) { q('.worig').hidden = false; await series().renderTiles(q('.worig .wrow'), orig); }
+        if (orig.length) { const row = q('.worig .wrow'); await series().renderTiles(row, orig); row.insertAdjacentHTML('afterbegin', sheriffCard('tile')); }
         if (rest.length) { q('.wseries').hidden = false; await series().renderTiles(q('.wseries .wrow'), rest); } }).catch(() => {});
     }
     getDocs(query(collection(db, 'posts'), where('type', '==', kind), where('featured', '==', true), limit(12))).then((qs) => {

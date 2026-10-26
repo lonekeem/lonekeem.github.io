@@ -12,6 +12,7 @@ import { mountGameMusic, hideGameMusic } from './gamemusic.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
+import { sheriffCard } from './sheriff-card.js';
 import { deliveryUrls, LIMITS, safePhotoURL, keepTrying } from './media-config.js';
 import { createStories } from './stories.js';
 import { createSearch, SEARCH_ICON } from './search.js';
@@ -676,6 +677,8 @@ const routes = [
   [/^#\/new(?:\/(text|menu|movie|song|aimovie))?(?:\?(.*))?$/, pageCompose, 'new'],
   [/^#\/series\/new$/, gated((t) => getWorks().series().editPage(null, t)), 'explore'],
   [/^#\/series\/([\w-]+)\/edit$/, (id, t) => getWorks().series().editPage(id, t), 'explore'],
+  // Studio Original mini-series (static files, js/sheriff.js loads only on this route).
+  [/^#\/series\/sheriff(?:\/([1-9]))?$/, (ep) => import('./sheriff.js').then((m) => m.page(main, { ep, toast })), 'explore'],
   [/^#\/series\/([\w-]+)$/, (id, t) => getWorks().series().page(id, t), 'explore'],
   [/^#\/messages(?:\/(studio))?$/, pageInbox, 'messages'],
   [/^#\/chat\/([\w-]+)(?:\/(studio))?$/, pageChat, 'messages'],
@@ -766,7 +769,7 @@ async function route() {
   S.unsubs.forEach((u) => u()); S.unsubs = [];
   closeModal();
   // Accept short deep links like app.html#watch/<postId> as well as #/watch/<postId>.
-  const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch').replace(/^#game\//, '#/game/');
+  const hash = (location.hash || '#/watch').replace(/^#watch\b/, '#/watch').replace(/^#game\//, '#/game/').replace(/^#series\//, '#/series/');
   armRotate(hash);
   const token = ++routeToken;
   for (const [re, fn, nav] of routes) {
@@ -910,6 +913,7 @@ async function pageExplore(tab, token) {
   if (tab) { main.innerHTML = `<h1 class="page-title">Explore</h1>${tabs}<div id="wx"></div>`; return getWorks().explore($('#wx'), tab === 'movies' ? 'movie' : 'song', token); }
   main.innerHTML = `
     <h1 class="page-title">Explore</h1>${tabs}
+    ${sheriffCard('explore')}
     <a class="g-promo pk-promo" href="#/park"><i class="zf-mini" aria-hidden="true">🌳</i><span><b>Pal Park 3D</b><small>Walk your Pal with friends, chat, dance and find treasures.</small></span><span aria-hidden="true">›</span></a>
     <a class="g-promo" href="#/games">${GAMES_ICON}<span><b>Games</b><small>Star Pool, Star Drop, checkers, Trivia &amp; more. Play friends or the computer.</small></span><span aria-hidden="true">›</span></a>
     <a class="wn-hub" href="#/updates"><span aria-hidden="true">✨</span><span><b>What's New</b><small>See everything Keem has added</small></span><span class="wn-dot" data-wn-dot hidden></span></a>

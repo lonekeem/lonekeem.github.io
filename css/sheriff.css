@@ -1,0 +1,61 @@
+/* The Sheriff of Lone Keem: series page + full-screen vertical player (loaded with js/sheriff.js). Written by Lone Keem. */
+.sh-page{max-width:760px;margin:0 auto}
+.sh-back-link{display:inline-flex;align-items:center;gap:4px;min-height:44px;color:var(--muted);text-decoration:none;font-weight:600}
+.sh-back-link svg{width:20px;height:20px}
+.sh-hero{min-height:min(118vw,440px);background:#1a0f08}
+.sh-hero::before{background-position:center 18%}
+.sh-hero .sb-series{background:linear-gradient(120deg,#c8741f,#8a2be2)}
+.sh-hero h1{font-size:clamp(30px,8vw,46px);text-shadow:0 2px 14px rgba(0,0,0,.6);color:#ffe2a8}
+.sh-rating{display:inline-block;font:800 11px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;background:#2bb673;color:#04210f;padding:2px 7px;border-radius:6px;margin-right:4px;vertical-align:1px}
+.sh-tagline{margin:6px 0 12px;color:#efe6ff;max-width:46ch;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+.sh-play{display:inline-flex;align-items:center;gap:8px;min-height:48px}
+.sh-play svg{width:20px;height:20px}
+.sh-th{width:clamp(88px,26vw,128px)!important;aspect-ratio:540/868!important}
+.sh-ep .sep-m b{font-size:16px}
+.sh-ep .sep-l{align-self:flex-start}
+.sh-check{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#2bb673;color:#04210f;font:900 14px Inter,sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.5)}
+.sh-about{margin:22px 0 8px}
+.sh-about p{margin:6px 0}
+
+/* player: covers the whole screen (header, bottom nav, floating pals) */
+body.sh-playing{overflow:hidden}
+body.sh-playing .bottom-nav{visibility:hidden}
+.shp{position:fixed;inset:0;z-index:2147480000;background:#000;display:flex;align-items:center;justify-content:center}
+.shp-video{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;background:#000}
+.shp-top{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 8px) 12px 22px;background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);pointer-events:none}
+.shp-top > *{pointer-events:auto}
+.shp-back{display:inline-flex;align-items:center;gap:4px;min-height:44px;min-width:44px;padding:0 12px 0 6px;border-radius:22px;background:rgba(20,12,34,.72);color:#fff;text-decoration:none;font-weight:700;border:1px solid rgba(255,255,255,.18)}
+.shp-back svg{width:22px;height:22px}
+.shp-title{display:flex;flex-direction:column;min-width:0;color:#fff;text-shadow:0 1px 6px #000}
+.shp-title small{color:#ffd9a0;font-size:.75rem;font-weight:700;letter-spacing:.03em}
+.shp-title b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.95rem}
+.shp-bigplay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:84px;height:84px;border-radius:50%;border:0;background:rgba(138,43,226,.88);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 30px rgba(0,0,0,.6)}
+.shp-bigplay svg{width:40px;height:40px;margin-left:4px}
+.shp-next{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom) + 84px);display:inline-flex;align-items:center;gap:8px;min-height:48px;box-shadow:0 6px 24px rgba(0,0,0,.6);animation:shp-in .25s ease-out}
+.shp-next svg{width:18px;height:18px}
+@keyframes shp-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.shp-end{position:absolute;inset:0;display:grid;place-items:center;background:rgba(7,3,15,.86);padding:20px;overflow:auto}
+.shp-end-in{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;max-width:420px;color:#fff}
+.shp-end-in small{color:#ffd9a0;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:.78rem}
+.shp-end-in b{font:700 22px/1.2 'Space Grotesk',sans-serif}
+.shp-end-in p{margin:0;color:#d9ccf2}
+.shp-end-art{width:min(34vw,150px);height:auto;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.6)}
+.shp-count{font-weight:800;color:#fff}
+.shp-end-in .row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
+.shp-end-in .btn{display:inline-flex;align-items:center;gap:6px}
+.shp-end-in .btn svg{width:16px;height:16px}
+@media (orientation:landscape) and (max-height:500px){
+  .sh-hero{min-height:0}
+  .sh-hero::before{background-position:center 30%}
+  .shp-end-art{display:none}
+  .shp-next{bottom:calc(env(safe-area-inset-bottom) + 64px)}
+}
+#main.k-enter > .shp{animation:none}
+/* episodes that aren't released yet */
+.sh-locked{cursor:default;opacity:.92}
+.sh-locked .sh-th img{filter:grayscale(.55) brightness(.55)}
+.sh-soon{position:absolute;left:6px;right:6px;bottom:6px;text-align:center;font:800 10.5px Inter,sans-serif;letter-spacing:.05em;text-transform:uppercase;background:rgba(255,217,160,.95);color:#2a1606;padding:3px 4px;border-radius:6px}
+.sh-lock{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-size:24px;filter:drop-shadow(0 2px 6px #000)}
+.sh-soon-l{display:inline-block;align-self:flex-start;font:800 11px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#ffd9a0;border:1px solid rgba(255,217,160,.5);padding:1px 7px;border-radius:6px;margin:2px 0}
+.shp-next.shp-soon{background:rgba(30,18,50,.88);color:#ffd9a0;border:1px solid rgba(255,217,160,.45);cursor:default}
+.sh-end-locked{filter:grayscale(.5) brightness(.6)}

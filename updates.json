@@ -1,5 +1,14 @@
 [
   {
+    "id": "sheriff-of-lone-keem",
+    "date": "2026-10-26",
+    "type": "new",
+    "emoji": "🤠",
+    "title": "New series: The Sheriff of Lone Keem",
+    "body": "A Lone Keem Studios Original, created by Keem. Follow Gecko, a lizard sheriff with an eyepatch, in a 3-episode animated western for all ages. Find it in Explore, or in Movies under Lone Keem Studios Originals.",
+    "link": "#/series/sheriff"
+  },
+  {
     "id": "street-doorbell",
     "date": "2026-10-22",
     "type": "soon",

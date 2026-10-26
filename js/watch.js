@@ -18,6 +18,7 @@ import { prefsStore as sharedPrefsStore } from './interests.js';
 import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from './autoplay.js';
 import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 import { faceName, adminNameClass } from './kemy-name.js';
+import { sheriffCard } from './sheriff-card.js';
 let soundMod = null, sounds = null;
 function loadSounds() {
   if (!soundMod) soundMod = import('./sounds.js').then((m) => { sounds = m; return m; }).catch(() => null);
@@ -279,6 +280,14 @@ export function createWatch(ctx) {
     const feed = $('#vfeed'), wrap = $('#vwrap'), muteBtn = $('#vmute'), hint = $('#vunmute-hint'), sheetRoot = $('#vsheet-root');
     const slides = [...feed.querySelectorAll('.vslide:not(.vdon)')];
     if (tab === 'foryou') window.kemyDonate?.feedSlides(feed, 25);
+    if (tab === 'foryou' && slides.length) { // Studio Original promo: its own full-height card after the 2nd video (never over a video)
+      const at = slides[Math.min(1, slides.length - 1)];
+      at.insertAdjacentHTML('afterend', sheriffCard('slide'));
+      const sp = at.nextElementSibling;
+      sp.querySelector('[data-vsh-skip]').onclick = () => sp.nextElementSibling?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const spo = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) dispatchEvent(new Event('kemy:feed-break')); }), { threshold: 0.6 });
+      spo.observe(sp);
+    }
     const byId = new Map(posts.map((p) => [p.id, p]));
     slides.forEach((sl) => {
       const p = byId.get(sl.dataset.id);
