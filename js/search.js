@@ -50,7 +50,7 @@ export function createSearch(ctx) {
   const userHay = (u) => [fold(u.username), ...words(u.username), ...words(u.displayName)];
   const allMatch = (terms, list) => matchScore(terms, list) > 0;
   const visibleUser = (u) => u && !S.blocked.has(u.uid);
-  const visiblePost = (p) => p && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p);
+  const visiblePost = (p) => p && !S.blocked.has(p.authorId) && !window.kemyReportHidden?.(p) && !window.kemyAgeHidden?.(p);
   const ms = (p) => p.createdAt?.toMillis?.() || 0;
   const safe = (pr) => pr.catch((e) => { console.warn('search query', e.code || e.message); return null; });
 

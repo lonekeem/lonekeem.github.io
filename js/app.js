@@ -42,6 +42,7 @@ import { createAccountDeleter } from './account-delete.js';
 import { createDevices } from './devices.js';
 import { createComments } from './comments.js';
 import * as parental from './parental.js';
+import * as ages from './agegate.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
 import { CONTROLLER as GAMES_ICON } from './games/art.js';
 import { initInterests, interestsPage, learnTap, pickTopics, topicChips } from './interests.js';
@@ -417,12 +418,14 @@ function postCard(p, { detail = false } = {}) {
           <button data-a="copy">Copy link</button>
           ${S.user && !mine ? `<button data-a="report">Report post</button>` : ''}
           ${S.user && !mine && p.authorId !== STUDIO_UID ? `<button data-a="block" class="danger">Block @${esc(p.authorUsername)}</button>` : ''}
+          ${mine || isAdmin() ? `<button data-a="age">Age limit${ages.minAgeOf(p) ? ` (${ages.minAgeOf(p)}+)` : ''}</button>` : ''}
           ${mine || isAdmin() ? `<button data-a="delete" class="danger">Delete post</button>` : ''}
         </div>
       </div>
     </div>
-    ${p.text ? `<p class="post-text">${linkify(esc(p.text))}</p>` : ''}
-    ${mediaHtml(p)}
+    ${ages.minAgeOf(p) ? `<div class="age-line">${ages.badgeHtml(p, 'inline')}</div>` : ''}
+    ${ages.needsGate(p) ? ages.gateHtml(p, p.posterUrl || p.poster || (p.mediaType === 'image' ? p.mediaUrl : '')) : `${p.text ? `<p class="post-text">${linkify(esc(p.text))}</p>` : ''}
+    ${mediaHtml(p)}`}
     ${p.sound && p.sound.id ? '<p class="ks-credit" data-ks-credit></p>' : ''}
     <div class="actions">
       <button class="act like" data-a="like" aria-pressed="false" aria-label="Give a star">${ICON.heart}<span class="n">${Number(p.likeCount) || 0}</span></button>
@@ -488,6 +491,7 @@ function postCard(p, { detail = false } = {}) {
       try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { prompt('Copy this link:', url); }
     }
     if (a === 'report') reportDialog('post', p.id, p.id, p.text);
+    if (a === 'age') ages.editAge(p, () => el.replaceWith(postCard(p, { detail })));
     if (a === 'block') blockUser(p.authorId, p.authorUsername);
     if (a === 'delete') {
       if (!confirm('Delete this post? This can’t be undone.')) return;
@@ -495,6 +499,7 @@ function postCard(p, { detail = false } = {}) {
       catch (e) { toast(friendlyError(e)); }
     }
   };
+  $('[data-a=agegate]', el)?.addEventListener('click', async (ev) => { ev.stopPropagation(); if (await ages.askAge(ages.minAgeOf(p))) el.replaceWith(postCard(p, { detail })); });
   return el;
 }
 function closeMenus() { $$('.menu').forEach((m) => (m.hidden = true)); }
@@ -721,6 +726,7 @@ const routes = [
 ];
 function gated(fn) { return async (...a) => { if (!requireAuth()) return; if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; } return fn(...a); }; }
 safety.initSafety({ S, db, esc, openModal, closeModal, toast, isAdmin: () => isAdmin(), friendlyError });
+ages.initAgeGate({ S, esc, openModal, closeModal, toast, friendlyError, isAdmin: () => isAdmin(), save: (p, minAge) => updateDoc(doc(db, 'posts', p.id), { minAge }) });
 initSpam({ S, toast, isAdmin: () => isAdmin(), autoPause: (o) => { if (window.kemyModWarn) window.kemyModWarn(); if (window.kemyModFlag) window.kemyModFlag(o.text || 'spam', 'park', ''); } });
 initMediaScan({ S, db, isAdmin: () => isAdmin() });
 // 3+ reports from different people: hidden from everyone except moderators and the author until a
@@ -981,6 +987,7 @@ function textComposeForm(slot, open) {
         <div class="field"><label for="post-link">YouTube or TikTok link <span class="muted">(optional)</span></label>
           <input id="post-link" type="url" inputmode="url" placeholder="https://youtube.com/watch?v=…"></div>
         ${catPickerHtml('post-cat', '', esc)}
+        ${ages.pickerHtml('post-age')}
         <p class="small muted">By posting you agree to the <a href="guidelines.html">Community Guidelines</a>. Only share things you made or have the right to share.</p>
         <p class="form-error" id="compose-err"></p>
         <button class="btn btn-block" type="submit" id="compose-btn">Post</button>
@@ -1008,6 +1015,7 @@ function textComposeForm(slot, open) {
       mod.holdOrSet(b, ref, {
         authorId, authorName: author.displayName, authorUsername: author.username, authorColor: author.color,
         type: linkUrl ? 'link' : 'text', text, linkUrl, mediaUrl: '', mediaType: '', poster: '', ...(pickedCat(main, 'post-cat') ? { cat: pickedCat(main, 'post-cat') } : {}),
+        ...(ages.pickedAge(main, 'post-age') ? { minAge: ages.pickedAge(main, 'post-age') } : {}),
         ...searchFields({ text, authorName: author.displayName, authorUsername: author.username }),
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
       });
@@ -1024,7 +1032,7 @@ function textComposeForm(slot, open) {
 }
 // Saves a photo/video post after the Cloudinary upload finished. Same post model as text/link
 // posts plus mediaType, mediaUrl, poster/posterUrl, width, height, duration, cloudinaryPublicId.
-async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound = null, song = null }) {
+async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound = null, song = null, minAge = 0 }) {
   if (!asStudio && !safety.canPostNow()) throw Object.assign(new Error('Posting photos and videos is off for this account.'), { code: 'kemy/young' });
   if (!asStudio && !spamOk('post', caption || '')) throw Object.assign(new Error('Please change the caption a little and try again.'), { code: 'kemy/spam', quiet: true });
   if (caption) safety.scanAge(caption, 'post');
@@ -1040,6 +1048,7 @@ async function saveMediaPost({ upload, info, caption, asStudio, cat = '', sound 
     mediaUrl: urls.mediaUrl, mediaType: urls.mediaType, poster: urls.posterUrl, posterUrl: urls.posterUrl,
     width: n(upload.width || info.width, 20000), height: n(upload.height || info.height, 20000), duration,
     cloudinaryPublicId: String(upload.public_id).slice(0, 255), ...(cat ? { cat } : {}), ...(sound ? { sound } : {}),
+    ...(ages.minAgeOf({ minAge }) ? { minAge: ages.minAgeOf({ minAge }) } : {}),
     ...searchFields({ text: caption, authorName: author.displayName, authorUsername: author.username }),
     createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, lastCommentId: '', studio: authorId === STUDIO_UID
   }, song && song.reason ? song : takeHold());
@@ -1080,6 +1089,9 @@ async function pagePost(postId, token) {
   if (stale(token)) return;
   if (!snap.exists()) { const held = await mod.heldNotice(postId); main.innerHTML = held || '<div class="empty">This post was removed or doesn’t exist. <a href="#/explore">Explore</a></div>'; return; }
   const p = { id: snap.id, ...snap.data() };
+  if (ages.ageHidden(p)) { main.innerHTML = `<section class="card pad center"><div class="age-big" aria-hidden="true">${ages.minAgeOf(p)}+</div><h1 class="page-title">This post isn’t available</h1><p>The creator set it for ${ages.minAgeOf(p)}+.</p><a class="btn btn-sm" href="#/watch">Back to Kemy</a></section>`; return; }
+  if (ages.needsGate(p) && !(await ages.askAge(ages.minAgeOf(p)))) { if (!stale(token)) main.innerHTML = `<section class="card pad center">${ages.gateHtml(p, p.posterUrl || p.poster || '')}</section>`; main.querySelector('[data-a=agegate]')?.addEventListener('click', () => ages.askAge(ages.minAgeOf(p)).then((ok) => ok && route())); return; }
+  if (stale(token)) return;
   if (window.kemyReportHidden(p)) { main.innerHTML = '<section class="card pad center"><div style="font-size:2.4rem" aria-hidden="true">🕒</div><h1 class="page-title">This post is being reviewed</h1><p>Several people reported it, so it’s hidden until a Kemy moderator checks it.</p><a class="btn btn-sm" href="#/watch">Back to Kemy</a></section>'; return; }
   main.innerHTML = `${reportHidden(p) ? '<p class="card pad small" role="status">🕒 Hidden from others: 3 or more people reported this post. A moderator will review it.</p>' : ''}<div id="post-slot"></div>
     <section class="card pad" aria-labelledby="c-title">
@@ -1239,7 +1251,8 @@ function gridTile(p) {
   const inner = thumb ? `<img src="${esc(thumb)}" alt="" loading="lazy" decoding="async">`
     : kind === 'video' ? `<video src="${esc(p.mediaUrl)}#t=0.5" preload="metadata" muted playsinline tabindex="-1" aria-hidden="true"></video>`
     : `<span class="gtext">${esc((p.text || p.linkUrl || '').slice(0, 120))}</span>`;
-  return `<a class="gtile k-${kind}" href="${href}" aria-label="${esc(label)}">${inner}
+  const gate = ages.needsGate(p);
+  return `<a class="gtile k-${kind}${gate ? ' age-blur' : ''}" href="${href}" aria-label="${esc(label)}${ages.minAgeOf(p) ? ` (${ages.minAgeOf(p)}+)` : ''}"${gate ? ` data-age-tile="${ages.minAgeOf(p)}"` : ''}>${gate && kind === 'text' ? '' : inner}${ages.badgeHtml(p, 'tile')}
     <span class="gicon">${kind === 'image' ? GRID_IC.photo : kind === 'text' ? GRID_IC.text : GRID_IC.play}</span>
     ${viewsHtml(p.viewCount, p.id, 'gviews')}</a>`;
 }

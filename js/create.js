@@ -8,6 +8,7 @@ import {
 } from './media-config.js';
 import { ICONS } from './icons.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
+import { pickerHtml as agePickerHtml, pickedAge } from './agegate.js';
 import { LIVE_CAP } from './live.js';
 import { createFx } from './fx/pipeline.js';
 import { mountPicker } from './fx/picker.js';
@@ -586,6 +587,7 @@ export function createComposer(ctx) {
         <textarea id="pv-caption" maxlength="${LIMITS.captionMax}" rows="2" placeholder="Write a caption…"></textarea>
         ${isVideo ? '<div class="ks-host" id="pv-sounds"></div>' : ''}
         ${catPickerHtml('pv-cat', '', esc)}
+        ${agePickerHtml('pv-age')}
         <div class="pv-row small muted"><span>${isAdmin() ? '<label class="check pv-studio"><input type="checkbox" id="pv-studio"> <span>Post as <b>Lone Keem Studios</b></span></label>' : 'By posting you agree to the <a href="#/rules">Community Rules</a>. Photo location info is removed.'}</span><span><span id="pv-count">0</span>/${LIMITS.captionMax}</span></div>
         <div class="pv-progress" hidden aria-hidden="true"><span></span></div>
         <p class="pv-status small muted" aria-live="polite"></p>
@@ -672,7 +674,7 @@ export function createComposer(ctx) {
           return;
         }
         status.textContent = 'Saving your post…';
-        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat'), sound: soundCtl ? soundCtl.get() : null, song: songForce });
+        const id = await saveMediaPost({ upload: uploaded, info, caption: cap.value.trim(), asStudio, cat: pickedCat(el, 'pv-cat'), minAge: pickedAge(el, 'pv-age'), sound: soundCtl ? soundCtl.get() : null, song: songForce });
         closeOverlay();
         dispatchEvent(new CustomEvent('kemy:xp', { detail: { n: 30 } }));
         if (S.lastHeld === id) { toast(REVIEW_MSG); location.hash = '#/post/' + id; return; }

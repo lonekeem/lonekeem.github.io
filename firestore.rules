@@ -613,7 +613,8 @@ service cloud.firestore {
                                'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
                                'commentCount', 'lastCommentId', 'studio',
                                'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId',
-                               'keywords', 'hashtags', 'work', 'cat', 'sound'])
+                               'keywords', 'hashtags', 'work', 'cat', 'sound', 'minAge'])
+        && d.get('minAge', 0) in [0, 13, 17]
         && validPostSearch(d)
         && validSound(d)
         && (!('cat' in d) || d.cat in postCats())
@@ -731,9 +732,11 @@ service cloud.firestore {
           && resource.data.type in ['movie', 'song'];
       }
       // Category: the author (or admin) can set / change it later.
+      // Category and/or creator age limit (minAge 0 = all ages, 13+ or 17+).
       function catChange() {
-        return changed().hasOnly(['cat']) && (actingAs(resource.data.authorId) || isAdmin())
-          && request.resource.data.cat in postCats();
+        return changed().hasOnly(['cat', 'minAge']) && (actingAs(resource.data.authorId) || isAdmin())
+          && (!changed().hasAny(['cat']) || request.resource.data.cat in postCats())
+          && request.resource.data.get('minAge', 0) in [0, 13, 17];
       }
       // Shares: exactly +1, once per account (shares/{uid} created in the same batch).
       function shareChange() {

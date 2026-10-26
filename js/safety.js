@@ -17,6 +17,16 @@ export function limited() {
   if (flagCache.uid === S.user.uid && flagCache.v === true) return true;
   return !is13(S.profile);
 }
+// Viewer's age in whole years for creator age limits (posts with minAge 13 / 17).
+// null = signed out or no birthday yet (they get the "I'm 13+" / "I'm 17+" check instead).
+export function viewerAge() {
+  if (C && C.isAdmin && C.isAdmin()) return 99;
+  const S = C && C.S;
+  if (!S || !S.user || !S.profile) return null;
+  if (flagCache.uid === S.user.uid && flagCache.v === true) return 0;
+  if (!Number.isInteger(S.profile.birthY)) return null;
+  return Math.floor(ageMonths(S.profile.birthY, S.profile.birthM) / 12);
+}
 export const SAFETY_NOTE = "For safety, links and contact info aren't allowed";
 const CONTACT_KIND = new Set(['phone', 'email', 'address', 'social', 'link']);
 export function contactBlocked(text) { return CONTACT_KIND.has(scan(String(text || '')).kind); }

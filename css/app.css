@@ -1953,3 +1953,22 @@ button.nm-back { background: none; border: 0; padding: 0; font: inherit; cursor:
 .vsh-cta { margin-top: 8px; pointer-events: auto; }
 .vsh-ep a.vact { text-decoration: none; color: #fff; }
 @media (orientation: landscape) and (max-height: 500px) { .vsh-ep .vsh-tags { margin-bottom: 2px; } .vsh-ep .vcaption { display: none; } .vsh-ep .vsh-cta { margin-top: 4px; } .vsh-ep .vrail > a[href$='/1'], .vsh-ep .vrail > a[href$='/sheriff'], .vsh-ep .vrail > .save { display: none; } .vsh-ep .vrail { gap: 6px; } .vsh-ep .vact svg { width: 40px; height: 40px; padding: 8px; } }
+
+/* Creator age limits (13+ / 17+): badge, blurred tiles, "I'm 13+" cover (js/agegate.js) */
+.age-badge { display: inline-block; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.25); font: 800 .72rem/1.4 Inter, sans-serif; color: #fff; letter-spacing: .02em; }
+.age-badge.tile { position: absolute; top: 6px; left: 6px; z-index: 2; }
+.age-badge.inline { margin-left: 6px; vertical-align: middle; }
+.age-badge.lg { font-size: 1.1rem; padding: 4px 12px; border-radius: 10px; }
+.age-line { margin: 4px 0 6px; }
+.age-line .age-badge.inline { margin-left: 0; }
+.gtile.age-blur img, .gtile.age-blur video { filter: blur(16px) brightness(.55); transform: scale(1.15); }
+.age-cover { position: relative; min-height: 220px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: linear-gradient(160deg, #1b1230, #0b0814); margin: 8px 0; text-align: center; color: #fff; }
+.age-cover > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(22px) brightness(.45); transform: scale(1.2); }
+.age-cover-in { position: relative; padding: 18px; display: grid; gap: 8px; justify-items: center; }
+.age-cover-in p { margin: 0; }
+.vage .age-cover { position: absolute; inset: 0; margin: 0; border-radius: 0; background: transparent; }
+.vage .age-cover > img { display: none; }
+.age-gate { text-align: center; }
+.age-big { font: 800 2.2rem 'Space Grotesk', sans-serif; }
+.age-btns { justify-content: center; gap: 8px; flex-wrap: wrap; }
+.agepick-note { margin: 6px 0 0; }

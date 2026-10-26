@@ -20,6 +20,7 @@ import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 import { faceName, adminNameClass } from './kemy-name.js';
 import { sheriffCard, sheriffFeedPost, SHERIFF_COUNT } from './sheriff-card.js';
 import { isSheriffPost, sheriffEpOf, sheriffPostId } from './sheriff-data.js';
+import * as ages from './agegate.js';
 let soundMod = null, sounds = null;
 function loadSounds() {
   if (!soundMod) soundMod = import('./sounds.js').then((m) => { sounds = m; return m; }).catch(() => null);
@@ -88,7 +89,7 @@ export function createWatch(ctx) {
     const ids = [...S.following].filter((u) => !S.blocked.has(u));
     const out = new Map(own.filter((p) => S.following.has(p.authorId)).map((p) => [p.id, p]));
     for (let i = 0; i < Math.min(ids.length, 30); i += 10) {
-      try { (await getDocs(query(collection(db, 'posts'), where('authorId', 'in', ids.slice(i, i + 10)), limit(40)))).docs.forEach((d) => { const p = { id: d.id, ...d.data() }; if (kindOf(p) && !isSheriffPost(p)) out.set(p.id, p); }); } catch { /* keep what we have */ }
+      try { (await getDocs(query(collection(db, 'posts'), where('authorId', 'in', ids.slice(i, i + 10)), limit(40)))).docs.forEach((d) => { const p = { id: d.id, ...d.data() }; if (kindOf(p) && !isSheriffPost(p) && !window.kemyParental?.hidePost?.(p)) out.set(p.id, p); }); } catch { /* keep what we have */ }
     }
     return [...out.values()].sort((a, b) => ms(b) - ms(a));
   }
@@ -200,6 +201,10 @@ export function createWatch(ctx) {
     const following = S.following.has(p.authorId);
     let poster = p.poster || p.posterUrl || '';
     if (kind === 'youtube') poster = `https://i.ytimg.com/vi/${youTubeId(p.linkUrl)}/hqdefault.jpg`;
+    // Creator age limit and no known age: a blurred cover with "I'm 13+ / 17+" instead of the media.
+    if (ages.needsGate(p)) return `<section class="vslide vage" data-i="${i}" data-id="${esc(p.id)}" data-kind="agegate" aria-label="Post for ${ages.minAgeOf(p)}+">
+        <div class="vbg" ${poster ? `style="background-image:url('${esc(poster)}')"` : ''} aria-hidden="true"></div>${ages.gateHtml(p, poster)}
+        <div class="vmeta"><div class="vcreator">${avatar(p, '', true)}<a class="vname" href="#/u/${esc(p.authorUsername)}">${esc(faceName(p.authorId, p.authorName))}</a></div></div></section>`;
     const media = kind === 'image'
       ? `<img class="vimage" src="${esc(p.mediaUrl)}" alt="${esc(p.text ? p.text.slice(0, 120) : 'Photo by ' + p.authorName)}" ${i > 1 ? 'loading="lazy"' : ''} decoding="async" draggable="false">
          <div class="vfail" hidden><p>This photo couldn’t load.</p></div>`
@@ -230,7 +235,7 @@ export function createWatch(ctx) {
           </div>
           ${p.text ? `<p class="vcaption" data-a="more">${linkify(esc(p.text))}</p>` : ''}
           ${p.sound && p.sound.id ? '<p class="ks-credit" data-ks-credit></p>' : ''}
-          <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))} · ${views.viewsHtml(p.viewCount, p.id, 'vviews')}${catChip(p)}</p>
+          <p class="vsub">@${esc(p.authorUsername)} · ${esc(timeAgo(p.createdAt))} · ${views.viewsHtml(p.viewCount, p.id, 'vviews')}${catChip(p)}${ages.badgeHtml(p, 'inline')}</p>
         </div>
         <div class="vrail">
           <button class="vact like" data-a="like" aria-pressed="false" aria-label="Give a star">${IC.heart}<span class="n">${fmt(p.likeCount)}</span></button>
@@ -307,7 +312,7 @@ export function createWatch(ctx) {
       if (snap.exists()) {
         const p = { id: snap.id, ...snap.data() };
         if (!kindOf(p)) { location.replace('#/post/' + postId); return; }
-        posts.unshift(p);
+        if (window.kemyParental?.hidePost?.(p)) { toast('That video isn’t available.'); startId = ''; } else posts.unshift(p);
       } else { toast('That video isn’t available anymore.'); startId = ''; }
     }
 
@@ -612,8 +617,8 @@ export function createWatch(ctx) {
 
     // Likes: show the current user's state.
     posts.forEach((p, i) => { if (!p.external) isLiked(p.id).then((on) => paintLike(slides[i], on)).catch(() => {}); });
-    function paintLike(sl, on) { const b = sl.querySelector('[data-a=like]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); }
-    function paintSave(sl, on) { const b = sl.querySelector('[data-a=save]'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = on ? 'Saved' : 'Save'; }
+    function paintLike(sl, on) { const b = sl.querySelector('[data-a=like]'); if (!b) return; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Remove your star' : 'Give a star'); }
+    function paintSave(sl, on) { const b = sl.querySelector('[data-a=save]'); if (!b) return; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = on ? 'Saved' : 'Save'; }
     function paintFollow(uid, on) {
       feed.querySelectorAll(`[data-a=follow][data-uid="${CSS.escape(uid)}"]`).forEach((b) => {
         b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
@@ -629,6 +634,7 @@ export function createWatch(ctx) {
       const sl = btn.closest('.vslide'); const p = byId.get(sl?.dataset.id);
       const a = btn.dataset.a;
       if (a === 'more') { if (!ev.target.closest('a')) btn.classList.toggle('open'); return; }
+      if (a === 'agegate') { ages.confirmAge(Number(btn.dataset.age)); if (p) { history.replaceState(null, '', '#/watch/' + (tab === 'foryou' ? '' : tab + '/') + p.id); window.dispatchEvent(new HashChangeEvent('hashchange')); } return; }
       if (a === 'replay') { slides[0].scrollIntoView({ behavior: 'smooth' }); return; }
       if (a === 'outlink') { st.signal(p, 'open'); return; }
       if (a === 'series') { if (p) st.signal(p, 'open'); return; }
@@ -738,6 +744,7 @@ export function createWatch(ctx) {
           <button data-m="open">Open post page</button>
           ${S.user && !mine ? '<button data-m="report">Report post</button>' : ''}
           ${S.user && !mine && p.authorId !== STUDIO_UID ? `<button data-m="block" class="danger">Block @${esc(p.authorUsername)}</button>` : ''}
+          ${canDeletePost(p) && !p.sheriff && !p.external ? `<button data-m="age">Age limit${ages.minAgeOf(p) ? ` (${ages.minAgeOf(p)}+)` : ''}</button>` : ''}
           ${canDeletePost(p) ? '<button data-m="delete" class="danger">Delete post</button>' : ''}
           <button data-close-sheet class="vmenu-cancel">Cancel</button>
         </section>`;
@@ -753,6 +760,7 @@ export function createWatch(ctx) {
         if (m === 'open') location.hash = '#/post/' + p.id;
         if (m === 'report') reportDialog('post', p.id, p.id, p.text || (p.mediaType ? p.mediaType + ' post' : ''));
         if (m === 'block') blockUser(p.authorId, p.authorUsername);
+        if (m === 'age') ages.editAge(p, () => { const sub = sl?.querySelector('.vsub'); if (!sub) return; sub.querySelector('.age-badge')?.remove(); sub.insertAdjacentHTML('beforeend', ages.badgeHtml(p, 'inline')); });
         if (m === 'delete') {
           if (!confirm('Delete this post? This can’t be undone.')) return;
           try {

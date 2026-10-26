@@ -120,8 +120,10 @@ export function routeBlock(hash) {
 }
 // Restricted mode: hide posts marked mature/sensitive (and anything with open reports).
 export function hidePost(p) {
+  // Creator age limit (13+ / 17+) over the viewer's known age: hidden everywhere (agegate.js).
+  if (p && window.kemyAgeHidden?.(p)) return true;
   if (!on() || !get('safe') || !p) return false;
-  return !!(p.mature || (p.work && p.work.explicit) || p.sensitive || p.nsfw || ((Number(p.reportCount) || 0) - (Number(p.reportOk) || 0) > 0));
+  return !!(p.mature || Number(p.minAge) > 0 || (p.work && p.work.explicit) || p.sensitive || p.nsfw || ((Number(p.reportCount) || 0) - (Number(p.reportOk) || 0) > 0));
 }
 // Profile visibility for other viewers: 'private' | 'friends' (follow both ways) | 'public'.
 export async function profileHidden(u, ownerUid) {

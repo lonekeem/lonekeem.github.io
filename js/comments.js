@@ -80,6 +80,8 @@ export function createComments(ctx) {
 
   // Mounts a live thread into `box`. Returns an unsubscribe function.
   function mount({ p, box, form, input, err, onCount, cls = '' }) {
+    // Creator age limit over the viewer's known age: no comments either (agegate.js).
+    if (window.kemyAgeHidden?.(p)) { box.innerHTML = ''; if (form) form.hidden = true; return () => {}; }
     const expanded = new Set();
     let reply = null; let last = [];
     const me = () => S.user && S.user.uid;
