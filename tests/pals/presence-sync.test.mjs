@@ -21,6 +21,8 @@ assert.equal(inside.inDen, 3);
 assert.equal(afterPresenceDeny(0, true).dropPlate, false, 'one denial can be the rate limit');
 assert.equal(afterPresenceDeny(1, true).dropPlate, true, 'a second denial drops only the plate');
 assert.equal(afterPresenceDeny(1, false).dropPlate, false);
+assert.equal(afterPresenceDeny(1, false).bare, false, 'two denials keep the extras');
+assert.equal(afterPresenceDeny(2, false).bare, true, 'a third denial sends the bare pose so I stay visible');
 
 assert.equal(extrapSec('walk', ''), 0.22);
 assert.equal(extrapSec('drive', ''), EXTRAP_DRIVE);

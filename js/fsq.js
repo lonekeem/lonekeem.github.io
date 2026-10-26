@@ -7,7 +7,7 @@
 // pace themselves and are replaced by the next tick anyway) goes straight through, untouched.
 import * as F from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
 export * from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
-import { RATE_FIELDS, laneFor, createPacer } from './fsq-plan.js';
+import { RATE_FIELDS, laneFor, createPacer, noNegZero } from './fsq-plan.js';
 
 const stats = (window.__kemyWrites = window.__kemyWrites || { paced: 0, retried: 0, failed: 0 });
 const runPaced = createPacer(stats);
@@ -22,17 +22,18 @@ function fieldsOf(args) {
 function plan(path, args) { return laneFor(path, fieldsOf(args)); }
 
 const guarded = (lns, attempt) => runPaced(lns, attempt);
+const nz = (a) => a.map(noNegZero); // -0 is stored as a double and fails `is int` rules
 
-export function setDoc(ref, ...a) { return guarded(plan(ref.path, a), () => F.setDoc(ref, ...a)); }
-export function updateDoc(ref, ...a) { return guarded(plan(ref.path, a), () => F.updateDoc(ref, ...a)); }
-export function addDoc(col, ...a) { return guarded(plan(col.path + '/*', a), () => F.addDoc(col, ...a)); }
+export function setDoc(ref, ...a) { a = nz(a); return guarded(plan(ref.path, a), () => F.setDoc(ref, ...a)); }
+export function updateDoc(ref, ...a) { a = nz(a); return guarded(plan(ref.path, a), () => F.updateDoc(ref, ...a)); }
+export function addDoc(col, ...a) { a = nz(a); return guarded(plan(col.path + '/*', a), () => F.addDoc(col, ...a)); }
 
 // A batch records its operations so a denied commit can be replayed into a fresh batch after the gap.
 export function writeBatch(db) {
   const ops = [];
   const b = {
-    set(ref, ...a) { ops.push(['set', ref, a]); return b; },
-    update(ref, ...a) { ops.push(['update', ref, a]); return b; },
+    set(ref, ...a) { ops.push(['set', ref, nz(a)]); return b; },
+    update(ref, ...a) { ops.push(['update', ref, nz(a)]); return b; },
     delete(ref) { ops.push(['delete', ref, []]); return b; },
     commit() {
       const seen = new Map();

@@ -29,12 +29,12 @@ import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
 import { addParkHD } from './park-hd.js';
 import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; import { roomState } from '../world/layout.js'; // Kemy World: Kemy Street district etc. (own module)
-import { presenceGapMs, presenceDeny, afterPresenceDeny, presenceVelInt, extrapSec, keepRemotePal, inVehicle, lookKey, samplePose, takePose, HEARTBEAT_MS, STALE_PRESENCE_MS, RENDER_BEHIND_MS } from './presence-sync.js';
+import { presenceGapMs, presenceDeny, afterPresenceDeny, RECOVER_MS, presenceVelInt, extrapSec, keepRemotePal, inVehicle, lookKey, samplePose, takePose, HEARTBEAT_MS, STALE_PRESENCE_MS, RENDER_BEHIND_MS } from './presence-sync.js';
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
 import { attachRotate } from '../rotate.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
-const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX), Math.round(z * PX + CY)];
+const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX) || 0, Math.round(z * PX + CY) || 0];
 const W = 100, H = 75;                                // world half-size (200 m x 150 m)
 const MAX_ROOM = 100, ROOMS = 20, CELL = 160, MAX_DRAWN = 30, HB_MS = HEARTBEAT_MS, STALE_MS = STALE_PRESENCE_MS;
 const PORTAL_NAME = { race: 'Pal Race', bubbles: 'Bubble Pop', stars: 'Star Catch', dance: 'Dance-Off' };
@@ -448,7 +448,7 @@ export function createPark3D(ctx) {
     for (let i = 1; i <= ROOMS; i++) { try { const n = await countRoom(i); if (n < MAX_ROOM) { room = 'r' + i; roomN = n; break; } } catch { break; } }
     if (!document.body.contains(cv)) { unhookSize(); R.dispose(); return; }
     $('#park-room').textContent = `Room ${room.slice(1)}`;
-    const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid); let extras = true;
+    const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid); let extras = true, extrasBack = 0;
     const sync = { vel: null, plate: '' }; let plateOk = true, denyStreak = 0;
     const base = () => { const [x, y] = toP(P.x, P.z); const o = { x: Math.max(-21000, Math.min(10000, x)), y: Math.max(0, Math.min(60000, y)), /* big world: x -1300..385 m, z up to 3460 m (rules mirror this) */ d: P.d, e: P.e, eAt: P.eAt, say: P.say, sayAt: P.sayAt, tgt: P.tgt, c: cellOf(P.x, P.z), name: S.profile.displayName, uname: S.profile.username, color: S.profile.color || '#8a2be2', pal: palSnap, at: serverTimestamp() };
       if (extras) { const iv = presenceVelInt(SV.vx, SV.vz); o.vx = iv.vx; o.vz = iv.vz; o.ct = Date.now(); o.an = SV.an; o.h = Math.max(0, Math.min(2000, Math.round(P.y * 10))); o.r = ((Math.round(P.yaw * 180 / Math.PI) % 360) + 360) % 360; o.dn = P.dance && Date.now() < P.danceUntil ? P.dance : ''; o.v = 3; if (plateOk && sync.plate) o.pl = sync.plate; } if (inOk && roomState.inId) o.in = roomState.inId; return o; }; let inOk = true;
@@ -479,12 +479,11 @@ export function createPark3D(ctx) {
       if (!force && sig === lastSig && now - lastSend < HB_MS) { dirty = false; return; }
       sending = true; lastSend = now; dirty = false; SV.sx = SV.vx; SV.sz = SV.vz;
       const t0 = performance.now(); link.markWrite();
-      try { await setDoc(meRef, body); lastSig = sig; net.ok++; denyStreak = 0; const fast = !!(sync.vel) || SV.an === 'drive' || (typeof P.dance === 'string' && P.dance[0] === '~'); nextOk = Date.now() + presenceGapMs(fast); link.noteRtt(performance.now() - t0); }
+      try { await setDoc(meRef, body); lastSig = sig; net.ok++; denyStreak = 0; if (!extras && Date.now() > extrasBack) { extras = true; dirty = true; } const fast = !!(sync.vel) || SV.an === 'drive' || (typeof P.dance === 'string' && P.dance[0] === '~'); nextOk = Date.now() + presenceGapMs(fast); link.noteRtt(performance.now() - t0); }
       catch (e) {
-        net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; net.msg = String(e.message || '').slice(0, 200); link.fail();
-        try { const q = base(); delete q.at; net.last = JSON.stringify(q).slice(0, 600); } catch { /* */ }
+        net.err = e.code || String(e); net.fails = (net.fails || 0) + 1; link.fail();
         dirty = true;
-        if (e.code === 'permission-denied') { const d = presenceDeny({ indoors: !!roomState.inId, inDen: net.inDen || 0 }); if (d.dropExtras) extras = false; net.inDen = d.inDen; if (d.giveUpInside) inOk = false; const step = afterPresenceDeny(denyStreak, !!(body.pl)); denyStreak = step.streak; if (step.dropPlate) plateOk = false; nextOk = Date.now() + d.waitMs; }
+        if (e.code === 'permission-denied') { const d = presenceDeny({ indoors: !!roomState.inId, inDen: net.inDen || 0 }); if (d.dropExtras) extras = false; net.inDen = d.inDen; if (d.giveUpInside) inOk = false; const step = afterPresenceDeny(denyStreak, !!(body.pl)); denyStreak = step.streak; if (step.dropPlate) plateOk = false; if (step.bare && extras) { extras = false; extrasBack = Date.now() + RECOVER_MS; } nextOk = Date.now() + d.waitMs; }
         else nextOk = Date.now() + 200;
       }
       sending = false;
@@ -540,7 +539,8 @@ export function createPark3D(ctx) {
     document.addEventListener('freeze', onFreeze);
     document.addEventListener('resume', onResume);
     const unsub = () => { document.removeEventListener('visibilitychange', onVis); document.removeEventListener('freeze', onFreeze); document.removeEventListener('resume', onResume); removeEventListener('offline', onOff); removeEventListener('online', onOn); clearTimeout(hideT); link.stop(); if (unsubL) unsubL(); unsubL = null; };
-    function drop(id) { const o = others.get(id); if (!o) return; if (o.obj) { scene.remove(o.obj); } o.tag?.remove(); others.delete(id); }
+    const tagV = new THREE.Vector3();
+    function drop(id) { const o = others.get(id); if (!o) return; if (o.obj) { o.obj.removeFromParent(); /* a passenger's pal sits in a car, not in the scene */ } o.tag?.remove(); others.delete(id); }
 
     // ---------------------------------------------------------------- name tags + speech bubbles (HTML overlay, crisp on phones)
     const tags = $('#p3-tags');
@@ -821,18 +821,19 @@ export function createPark3D(ctx) {
       svTick(dt); if (Math.hypot(SV.vx, SV.vz) > 18) { recFast += dt; if (recFast >= 0.25) { recFast = 0; recenter(); } } else recFast = 0; const nowMs = Date.now(); if (!(fr % 15) || !drawSet) { const L = [...others.values()].map((o) => [Math.hypot(o.x - P.x, o.z - P.z), o.uid]).sort((a, b) => a[0] - b[0]); drawSet = new Set(L.slice(0, MAX_DRAWN).map((q) => q[1])); } fr++;
       for (const o of others3D()) {
         if (blocked.has(o.uid) || nowMs - o.at > (o.house ? 8000 : STALE_MS)) { drop(o.uid); continue; }
-        if (o.obj && o.pal) { const lk = lookKey(o.pal); if (o.objKey && o.objKey !== lk) { scene.remove(o.obj); o.obj = null; } } // re-dress when they change outfit, colours, or accessories
-        interp(o, dt); const nearD = Math.hypot((o.ix ?? o.x) - P.x, (o.iz ?? o.z) - P.z); if (!keepRemotePal(drawSet.has(o.uid), o.dn, nearD, LOW)) { o.x = o.ix; o.z = o.iz; if (o.obj) o.obj.visible = false; if (o.tag) o.tag.style.display = 'none'; o.hidAt = o.hidAt || nowMs; if (o.obj && nowMs - o.hidAt > 20000) { scene.remove(o.obj); o.obj = null; o.objKey = null; } continue; } o.hidAt = 0;
+        if (o.obj && o.pal) { const lk = lookKey(o.pal); if (o.objKey && o.objKey !== lk) { o.obj.removeFromParent(); o.obj = null; } } // re-dress when they change outfit, colours, or accessories
+        interp(o, dt); const nearD = Math.hypot((o.ix ?? o.x) - P.x, (o.iz ?? o.z) - P.z); if (!keepRemotePal(drawSet.has(o.uid), o.dn, nearD, LOW)) { o.x = o.ix; o.z = o.iz; if (o.obj) o.obj.visible = false; if (o.tag) o.tag.style.display = 'none'; o.hidAt = o.hidAt || nowMs; if (o.obj && nowMs - o.hidAt > 20000) { o.obj.removeFromParent(); o.obj = null; o.objKey = null; } continue; } o.hidAt = 0;
         if (!o.obj && o.pal) { try { o.obj = palObj(o.pal, !LOW); o.objKey = lookKey(o.pal); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
         const px = o.x, pz = o.z; o.x = o.ix; o.z = o.iz; o.jump = Math.max(o.jump || 0, Math.hypot(o.x - px, o.z - pz)); const mvd = o.buf && o.buf.length ? Math.hypot(o.ivx, o.ivz) : Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
         const gy = floorAt(o.x, o.z, o.y + 0.3); const holdY = o.dn === 'sit' || o.dn === 'sleep'; const aimY = o.th != null ? (holdY ? o.th : Math.max(o.th, gy - 0.05)) : gy; o.y += (aimY - o.y) * Math.min(1, dt * 10);
         const riding = inVehicle(o.dn); if (riding && o.iyaw != null) o.yaw = o.iyaw; else if (o.buf && o.buf.length) { let dy = o.iyaw - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (o.tr != null) { let dy = o.tr - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (mvd > 0.3) o.yaw = Math.atan2(o.x - px, o.z - pz);
         if (!o.obj) continue; const dist = Math.hypot(o.x - P.x, o.z - P.z); const lim = riding ? (LOW ? 90 : 170) : (LOW ? 60 : 110); const showAt = o.obj.userData.on ? lim + 16 : lim - 8; o.obj.userData.on = dist < showAt; if (o.obj.parent === scene) { o.obj.visible = o.obj.userData.on; o.obj.position.set(o.x, o.y, o.z); o.obj.rotation.y = o.yaw; } if (!riding && o.fade < 1 && o.obj.parent === scene) { o.fade = Math.min(1, (o.fade || 0) + dt * 3); o.obj.scale.setScalar(0.2 + 0.8 * o.fade * o.fade * (3 - 2 * o.fade)); }
         const near = dist < (ULTRA ? 30 : LOW ? 12 : 20); o.t += dt * 60; o.lodN = (o.lodN || 0) + 1;
-        if (o.obj.visible && (near || o.lodN % (dist > 45 ? 6 : 3) === 0)) { const air = o.th != null && o.th > gy + 0.3 && o.dn !== 'sit'; const dnDance = o.dn && o.dn[0] !== '~' ? o.dn : ''; const od = dnDance || ((o.dance && performance.now() < o.danceUntil) ? o.dance : '');
+        const seated = o.obj.parent !== scene; // riding: js/world/drive.js seats and poses this pal in the car
+        if (!seated && o.obj.visible && (near || o.lodN % (dist > 45 ? 6 : 3) === 0)) { const air = o.th != null && o.th > gy + 0.3 && o.dn !== 'sit'; const dnDance = o.dn && o.dn[0] !== '~' ? o.dn : ''; const od = dnDance || ((o.dance && performance.now() < o.danceUntil) ? o.dance : '');
           const run2 = mvd > 2.6; const g2 = gaitFor(o.obj, mvd, run2); const s2 = { mode: air ? 'hop' : mvd > 0.6 ? (run2 ? 'run' : 'walk') : 'idle', t: o.t, dt60: dt * 60 * (near ? 1 : 3), speed: mvd > 0.6 ? g2.speed : 0, cadence: g2.cadence, stride: g2.stride, extra: run2 ? { cx: 0.22, nx: -0.08 } : null, jumpK: 0.5 }; if (od && mvd < 0.6 && !air) { s2.dance3d = od; s2.beat = bt.beat; s2.amt = 1; const sa = styleAt(od, danceBeat(od, bt.beat)); if (sa) { s2.dance3d = sa.dance3d; s2.beat = sa.beat; s2.ry = sa.ry; s2.rz = sa.rz; s2.rx = sa.rx; o.styleMove = sa.name; } } posePal3D(o.obj.userData.m, s2); }
         if (o.shN !== near) { o.shN = near; o.obj.traverse((c) => { if (c.isMesh) c.castShadow = near && !LOW; }); }
-        const said = clean(o.say || ''); placeTag(o, o.x, o.y + HEIGHT + 0.35, o.z, muted.has(o.uid) || isHidden(hideKey('park', o.uid, said)) ? '' : said, o.sayAt || 0, !o.obj.visible || dist > (roomState.inId ? 48 : 28)); }
+        const said = clean(o.say || ''); const tp = seated ? o.obj.getWorldPosition(tagV) : null; placeTag(o, tp ? tp.x : o.x, tp ? tp.y + HEIGHT * 0.6 + 0.35 : o.y + HEIGHT + 0.35, tp ? tp.z : o.z, muted.has(o.uid) || isHidden(hideKey('park', o.uid, said)) ? '' : said, o.sayAt || 0, !o.obj.visible || dist > (roomState.inId ? 48 : 28)); }
       placeTag(meTag, P.x, P.y + HEIGHT + 0.35, P.z, P.say, P.sayAt, pov && Date.now() - P.sayAt > 7000);
       // treasures & portals
       for (const it of items) { if (found.has(it.id)) continue; it.m.rotation.y += dt * 2; it.m.position.y = ground(it.x, it.z) + 1 + Math.sin(now / 400 + it.x) * 0.15;

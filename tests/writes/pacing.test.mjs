@@ -65,3 +65,15 @@ test('Ludo / chess quick-match queue ids satisfy the rules (no digits)', () => {
   assert.notEqual(queueIdOf('ludo-2'), queueIdOf('ludo-4'));
   const rule = readFileSync('firestore.rules', 'utf8'); assert.ok(rule.includes("qid.matches('^[a-z-]{3,30}$')"));
 });
+
+// -0 is written as a double -0.0 and fails `is int` rules (idle players vanished); fsq fixes it on every write
+{
+  const { noNegZero } = await import('../../js/fsq-plan.js');
+  const ts = { toMillis() { return 1; } }; const o = { vx: 3, vz: -0, a: [1, -0], m: { h: -0 }, at: ts };
+  const n = noNegZero(o);
+  assert.ok(Object.is(n.vz, 0) && Object.is(n.a[1], 0) && Object.is(n.m.h, 0), 'every -0 becomes 0');
+  assert.equal(n.at, ts, 'sentinels / class instances are passed through untouched');
+  assert.ok(Object.is(o.vz, -0), 'the caller object is not mutated');
+  const clean = { x: 1, p: { y: 2 } }; assert.equal(noNegZero(clean), clean, 'no copy when nothing to fix');
+  console.log('noNegZero ok');
+}

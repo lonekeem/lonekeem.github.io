@@ -55,3 +55,14 @@ export function createPacer(stats = {}, waits = RETRY_WAITS, sleep = (ms) => new
     } finally { done(); }
   };
 }
+
+// JS -0 (Math.round(-0.04), a velocity decaying from below zero) is sent by the SDK as the DOUBLE -0.0, so a rule
+// like `v is int` denies it. An idle player who last walked "north" kept sending vz = -0 and every pose write was
+// denied: they vanished for everyone. Fix any -0 in plain objects/arrays before a write (sentinels untouched).
+function plainObj(v) { const p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
+export function noNegZero(v) {
+  if (typeof v === 'number') return Object.is(v, -0) ? 0 : v;
+  if (Array.isArray(v)) { let o = v; for (let i = 0; i < v.length; i++) { const n = noNegZero(v[i]); if (!Object.is(n, v[i])) { if (o === v) o = v.slice(); o[i] = n; } } return o; }
+  if (v && typeof v === 'object' && plainObj(v)) { let o = v; for (const k in v) { const n = noNegZero(v[k]); if (!Object.is(n, v[k])) { if (o === v) o = { ...v }; o[k] = n; } } return o; }
+  return v;
+}

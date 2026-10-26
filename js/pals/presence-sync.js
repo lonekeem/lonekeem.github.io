@@ -28,9 +28,12 @@ export function presenceDeny({ indoors, inDen } = {}) {
 // A denied write is usually the 70ms rule (the next try, after the wait, succeeds).
 // If it keeps failing, the new plate field is the likely cause (rules not deployed yet).
 // Stop sending the plate and keep the car code. Never drop dn/velocity.
+// Still denied after 3 tries: send the bare pose (no extras) for a while so I never vanish for others,
+// then put the extras back (RECOVER_MS). Silent: players never see a "too fast" style message.
+export const RECOVER_MS = 15000;
 export function afterPresenceDeny(streak, sendingPlate) {
   const n = (streak || 0) + 1;
-  return { streak: n, dropPlate: !!(sendingPlate && n >= 2) };
+  return { streak: n, dropPlate: !!(sendingPlate && n >= 2), bare: n >= 3 };
 }
 
 export function extrapSec(an, dn) {
@@ -117,7 +120,7 @@ export function presenceVelInt(vx, vz) {
   const c = (n) => {
     const r = Math.round(Number(n) * 10);
     if (!Number.isFinite(r)) return 0;
-    return Math.max(-600, Math.min(600, r));
+    return Math.max(-600, Math.min(600, r)) || 0; // never -0 (stored as a double, denied by `is int`)
   };
   return { vx: c(vx), vz: c(vz) };
 }
