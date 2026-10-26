@@ -55,7 +55,7 @@ function preload(set) {
 }
 function ensureCss() {
   if (document.getElementById('cx-css')) return;
-  const l = document.createElement('link'); l.id = 'cx-css'; l.rel = 'stylesheet'; l.href = 'css/chess.css?v=1';
+  const l = document.createElement('link'); l.id = 'cx-css'; l.rel = 'stylesheet'; l.href = 'css/chess.css?v=2';
   l.onerror = () => document.querySelectorAll('.cx-game').forEach((e) => { e.style.opacity = '1'; });
   document.head.appendChild(l);
 }
@@ -400,7 +400,8 @@ export function createChess(ctx) {
     const side = () => g.players.indexOf(ui.myUid());
     const timed = () => Array.isArray(g.clk) && g.clk.length === 2;
     const tick = setInterval(() => header(), 500);
-    S.unsubs.push(() => { clearInterval(tick); clearTimeout(claimT); if (stopHb) stopHb(); });
+    let gone = false; // a late timer (e.g. the 25 s bot offer) must not paint into the next page
+    S.unsubs.push(() => { gone = true; stopOffer(gid); clearInterval(tick); clearTimeout(claimT); if (stopHb) stopHb(); });
     const elapsed = () => Math.max(0, net.serverNow() - (tsMs(g.turnAt) || net.serverNow()));
     const clocks = () => { if (!timed()) return null; const c = [...g.clk]; if (g.status === 'active' && (g.moveNo || 0) > 0) c[g.turn] = Math.max(0, c[g.turn] - elapsed()); return c; };
     const person = (i) => (g.players[i] ? { uid: g.players[i], name: g.names[i], uname: g.unames && g.unames[i], color: g.colors && g.colors[i], bot: isBot(g.players[i]) } : null);
@@ -453,7 +454,7 @@ export function createChess(ctx) {
       catch (e) { pendingNo = null; iEnded = false; g = serverG.moveNo >= base.moveNo ? serverG : base; draw(); toast(e && e.code === 'stale' ? 'That move already happened.' : friendlyError(e)); }
     }
     function actions() {
-      const box = $('#g-actions'); if (!box) return;
+      const box = $('#g-actions'); if (!box || gone) return;
       const me = side(), sty = '<button class="btn btn-sm btn-ghost" id="cx-style">🎨 Pieces</button>';
       if (g.status === 'waiting') {
         const offer = me === 0 && !g.invitee && g.players.length < 2 && whenOffer(gid, () => actions());

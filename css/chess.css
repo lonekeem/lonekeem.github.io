@@ -219,3 +219,4 @@
   .cx-game { padding-top: 6px; } .cx-stage { margin: 2px 0; }
 }
 .cx-confetti { z-index: 0; } .cx-end > :not(.cx-confetti) { position: relative; z-index: 1; }
+#main:has(.cx-game) { padding-bottom: 76px; } /* scroll room above the fixed music bar */

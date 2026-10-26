@@ -34,7 +34,13 @@ for (; moves < 160; moves++) {
   const m = await pick(); if (!m) break;
   await p.click(`.cx-sq[data-s="${m.f}"]`); await W(60); await p.click(`.cx-sq[data-s="${m.t}"]`);
   if (m.p) { const d = await p.waitForSelector('.cx-promo [data-p=q]', { timeout: 2000 }).catch(() => null); if (d) { await d.click(); promos++; } }
-  if (moves === 6) { await W(450); await p.screenshot({ path: shot + 'board-mid.png' }); }
+  if (moves === 6) { await W(450); await p.screenshot({ path: shot + 'board-mid.png' });
+    // fixed music bar: at rest it must not cover my card; scrolled to the bottom it must clear the last row (emotes)
+    out.musicFit = await p.evaluate(async () => { const gm = document.getElementById('game-music'); const bar = gm && [...gm.querySelectorAll('*')].map((e) => e.getBoundingClientRect()).filter((r) => r.height > 0 && r.width > 0); if (!bar || !bar.length) return 'no bar';
+      const top = Math.min(...bar.map((r) => r.top)); const card = document.querySelector('#cx-bot').getBoundingClientRect().bottom;
+      const y0 = scrollY; scrollTo(0, 1e6); await new Promise((r) => setTimeout(r, 200)); const m = document.getElementById('main'); const kids = [...m.querySelectorAll('*')].filter((e) => e.offsetParent && !e.closest('#game-music')).map((e) => e.getBoundingClientRect().bottom).filter((b) => b > 0); const last = Math.max(...kids); scrollTo(0, y0);
+      return { barTop: Math.round(top), cardBottom: Math.round(card), cardClear: card <= top, lastAtBottom: Math.round(last), bottomClear: last <= top + 1 }; });
+    await p.screenshot({ path: shot + 'board-mid.png' }); }
   await p.waitForFunction(() => !document.querySelector('.cx-pill.mine') || document.querySelector('.cx-result'), null, { timeout: 5000 }).catch(() => { out.stuck = (out.stuck || 0) + 1; });
 }
 out.moves = moves; out.promos = promos;
