@@ -57,7 +57,10 @@ export function createNet(db, uid) {
   function session(code) {
     const S = { code, lobby: null, players: {}, seen: {}, state: null, me: null, subs: new Set(), stops: [] };
     const emit = (k) => S.subs.forEach((f) => { try { f(k); } catch (e) { console.warn(e); } });
-    S.stops.push(onSnapshot(L(code), (d) => { S.lobby = d.exists() ? d.data() : null; emit('lobby'); }));
+    S.stops.push(onSnapshot(L(code), (d) => { const v = d.exists() ? d.data() : null, o = S.lobby;
+      // only the host writes the lobby doc (start, heartbeat), so a change there means the host is alive: don't take over in the quiet gap right after Start
+      if (v && v.host && (!o || o.host !== v.host || ms(o.updatedAt) !== ms(v.updatedAt))) S.seen[v.host] = Date.now();
+      S.lobby = v; emit('lobby'); }));
     S.stops.push(onSnapshot(collection(db, 'zLobbies', code, 'p'), (qs) => { const p = {}; const t = Date.now();
       qs.docs.forEach((d) => { p[d.id] = d.data(); const old = S.players[d.id]; if (!old || ms(old.at) !== ms(d.data().at)) S.seen[d.id] = t; else S.seen[d.id] = S.seen[d.id] || t; });
       S.players = p; if (p[uid]) S.me = S.me || { ...p[uid] }; emit('players'); }));
