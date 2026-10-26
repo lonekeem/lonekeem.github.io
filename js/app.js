@@ -41,6 +41,7 @@ import { initMediaScan, takeHold } from './mediascan.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createDevices } from './devices.js';
 import { createComments } from './comments.js';
+import { initFriends, friendsUser } from './friends.js';
 import * as parental from './parental.js';
 import * as ages from './agegate.js';
 import { burstStar, onDoubleTap } from './tapstar.js';
@@ -324,6 +325,7 @@ try { ['kemy-translate', 'kemy-tx-cache', 'kemy-tx-quota'].forEach((k) => localS
 // Moderators, reports inbox, suspensions (js/moderation.js).
 const mod = createModeration({ secNotice: () => devices.noticeHtml(), secPaint: () => devices.paint(), publishShop: async () => setDoc(doc(db, 'config', 'palShop'), await adminShopDoc()), S, db, main, esc, toast, friendlyError, isAdmin, avatar, timeAgo, getProfile, openModal, closeModal, comments: () => comments,
   onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
+initFriends({ db, S, esc, toast, notify: (...x) => notify(...x), getProfile: (u) => getProfile(u), limited: () => safety.limited(), suspended: () => mod.isSuspended(), STUDIO_UID }); // in-game Add friend (js/friends.js)
 // New-device sign-in alerts + Sign out everywhere (js/devices.js).
 const devices = createDevices({ auth, db, isPrivileged: () => mod.iAmMod(), toast });
 const addComment = (p, text) => comments.addComment(p, text);
@@ -1418,10 +1420,12 @@ async function pageNotifications(asStudio, token) {
   $('#notes').innerHTML = items.length ? items.map((n) => {
     if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings/account"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
+    if ((n.type === 'friend' || n.type === 'friend_ok') && owner === S.user.uid && window.kemyFriends) return window.kemyFriends.noteHtml(n, avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false), shown(n.fromUid, n.fromName), timeAgo(n.createdAt));
     const href = n.type === 'message' ? '#/messages' : n.type === 'game' ? (String(n.text || '').includes('Pal Games') ? `#/games/pals/${esc(n.postId)}` : `#/game/${esc(n.postId)}`) : n.type === 'house' ? '#/street' : n.type === 'daily' ? '#/pals' : n.type === 'announce' ? (String(n.postId || '').startsWith('#/') ? esc(n.postId) : '#/feed') : n.postId ? `#/post/${esc(n.postId)}` : `#/u/${esc(n.fromUsername)}`;
     return `<a class="list-item ${n.read ? '' : 'unread'}" href="${href}">${avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false)}
       <div class="meta"><div><b class="${nameCls('', n.fromUid)}">${shown(n.fromUid, n.fromName)}</b> ${verb[n.type] || ''} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div>${n.text ? `<p>${esc(n.text)}</p>` : ''}</div></a>`;
   }).join('') : '<div class="empty">No notifications yet.</div>';
+  window.kemyFriends?.wireNotes($('#notes'));
   items.filter((n) => !n.read).forEach((n) => updateDoc(doc(db, 'users', owner, 'notifications', n.id), { read: true }).catch(() => {}));
 }
 
@@ -1814,6 +1818,7 @@ async function loadSession() {
   S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = [];
   await safety.underageFlag(uid).catch(() => {});
   await safety.applyYoungFlag().catch(() => {});
+  friendsUser(true);
   if (!window.__kemyHideWatch) window.__kemyHideWatch = watchHides(db);
   await mod.loadMine();
   mod.watchInvite();
@@ -1896,7 +1901,7 @@ onAuthStateChanged(auth, async (user) => {
   S.ready = false;
   S.user = user; S.profile = null; S.liked.clear();
   S.following = new Set(); S.blocked = new BlockSet([], S.hidden); S.saved = new Set();
-  S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; S.unreadNotes = S.unreadChats = false;
+  S.globalUnsubs.forEach((u) => u()); S.globalUnsubs = []; S.unreadNotes = S.unreadChats = false; friendsUser(false);
   if (user) {
     try {
       await Promise.race([Promise.all([loadSession(), loadOfficialAdmins()]), new Promise((r) => setTimeout(r, 8000))]);

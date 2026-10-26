@@ -316,7 +316,7 @@ export function createZombieGame(ctx) {
       for (const [u, t] of team) if (!P[u]) { scene.remove(t.g, t.label, t.bub, t.sh); team.delete(u); msg(`👋 ${esc2(t.name)} left`, 1.2); }
       teamHud(); }
     const esc2 = (x) => String(x).replace(/[&<>"']/g, '');
-    function teamHud() { const el2 = $('.zg-team'); if (!el2 || !coop) return; el2.innerHTML = [...team.entries()].map(([u, t]) => `<div class="${t.down ? 'dn' : ''}">${esc2(t.name).slice(0, 14)} ${!net.fresh(u) ? '📶 away' : t.down ? '💤 down' : ''}<i style="width:${Math.max(0, Math.min(100, t.hp || 0))}%"></i></div>`).join(''); }
+    function teamHud() { const el2 = $('.zg-team'); if (!el2 || !coop) return; el2.innerHTML = [...team.entries()].map(([u, t]) => `<div class="${t.down ? 'dn' : ''}" data-kf-uid="${esc2(u)}" data-kf-name="${esc2(t.name)}">${esc2(t.name).slice(0, 14)} ${!net.fresh(u) ? '📶 away' : t.down ? '💤 down' : ''}<i style="width:${Math.max(0, Math.min(100, t.hp || 0))}%"></i></div>`).join(''); }
     function applyState() { const st = net && net.state; if (!st) return; if (isHost()) return;
       if (st.wave !== lastWaveSeen) { if (st.wave > lastWaveSeen && lastWaveSeen >= 1) grant(waveCoins(lastWaveSeen)); if (st.wave > lastWaveSeen && st.wave) { msg(`🌙 Wave ${st.wave}${st.wave % 5 === 0 ? ' · BOSS' : ''}`); snd('wave'); } lastWaveSeen = st.wave; }
       wave = st.wave; score = st.score; teamN = st.n || teamN; dias = Math.min(RUN_CAP, (st.dia || {})[uid] || dias); { const nk = (st.kills || {})[uid] || 0; if (nk > kills) grant((nk - kills) * killCoins('run', wave)); kills = nk; } toSpawn = st.ts || 0; breakT = st.brk || 0;
@@ -462,6 +462,7 @@ export function createZombieGame(ctx) {
       const nb = { wave: Math.max(best.wave || 0, wave), score: Math.max(best.score || 0, score) }; try { localStorage.setItem(bestK, JSON.stringify(nb)); } catch { /* */ }
       const d = panel(`<h2>${quit ? '🚪 Run ended' : coop ? '😵 Team wiped!' : '😵 Splatted!'}</h2><p>${coop ? `Your team of ${teamN} survived to wave <b>${wave}</b>.` : `Your Pal survived to wave <b>${wave}</b>.`}</p><div class="zg-stats"><div>Score<b>${score}</b></div><div>Zombies poofed<b>${kills}</b></div><div>Diamonds<b>💎 ${dias}</b></div><div>Best wave<b>${nb.wave}</b></div><div>Splat coins<b>🪙 ${runCoins}</b></div><div>Wallet<b>🪙 ${coinsShown}</b></div></div>
         <p class="small" data-dia style="opacity:.85;margin-top:10px">${dias ? 'Saving your Diamonds…' : ''}</p><div class="row"><button data-again>🔁 Play again</button><button class="ghost" data-shop>🛒 Weapon Shop</button><a class="ghost" href="#/arcade/armory">🛡️ Armory</a><a class="ghost" href="#/arcade">🎮 Arcade</a></div><p class="small" style="opacity:.75;margin-top:8px">Written by Lone Keem</p>`);
+      if (coop && window.kemyFriends) { const fr = window.kemyFriends.row([...team.keys()], (u) => team.get(u) && team.get(u).name); if (fr) d.querySelector('.zg-card .row')?.before(fr); } // ➕ Add friend (js/friends.js)
       d.querySelector('[data-shop]').onclick = () => openShop(false);
       d.querySelector('[data-again]').onclick = () => { destroy(); if (coop) { location.hash = '#/arcade/zombie'; dispatchEvent(new HashChangeEvent('hashchange')); } else open(); };
       d.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => destroy()));

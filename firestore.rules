@@ -545,7 +545,7 @@ service cloud.firestore {
         function z55() { let qq = request.resource.data; return signedIn() && !isBlocked(uid, qq.fromUid)
           && exists(userPath(uid))
           && qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
-          && qq.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode', 'house']
+          && qq.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode', 'house', 'friend', 'friend_ok']
           && actingAs(qq.fromUid)
           && qq.fromUid != uid
           && qq.fromName == get(userPath(qq.fromUid)).data.displayName
@@ -1138,8 +1138,60 @@ service cloud.firestore {
             || getAfter(userPath(me())).data.get('lastFollowAt', null) == request.time)
         && qq.createdAt == request.time; }
       allow create: if z43();
+      // Friend request accepted (friendreq/{a}_{b} goes pending -> accepted in this same batch, written by b):
+      // b writes both follows (a->b and b->a). Nobody else can make b follow anyone.
+      function frAccepted(a) { let r = /databases/$(database)/documents/friendreq/$(a + '_' + me());
+        return get(r).data.status == 'pending' && getAfter(r).data.status == 'accepted'; }
+      function z43f() { let qq = request.resource.data; return signedIn()
+        && qq.keys().hasOnly(['follower', 'followee', 'createdAt'])
+        && qq.follower is string && qq.followee is string
+        && fid == qq.follower + '_' + qq.followee
+        && qq.createdAt == request.time
+        && ((qq.followee == me() && frAccepted(qq.follower)) || (qq.follower == me() && frAccepted(qq.followee))); }
+      allow create: if z43f();
       allow delete: if signedIn()
         && (resource.data.follower == me() || resource.data.followee == me() || isAdmin());
+    }
+
+    // ---------- Friend requests (js/friends.js; id = fromUid_toUid) ----------
+    // Only the sender creates (or re-sends) one; only the receiver accepts or declines it.
+    // 13+ with a known age on both sides (same as follows), no blocks either way, not paused/timed out.
+    // 20 a day (friendcap/{uid}), one per person until answered, 3 days before re-asking after a decline.
+    function frOn(u) { return knownTeen(get(userPath(u)).data) && !exists(u13Path(u)); }
+    match /friendcap/{uid} {
+      allow read: if signedIn() && uid == me();
+      allow create, update: if signedIn() && uid == me()
+        && request.resource.data.keys().hasOnly(['start', 'n', 'at'])
+        && request.resource.data.at == request.time
+        && ((resource == null || request.time > resource.data.start + duration.value(1, 'd'))
+            ? (request.resource.data.n == 1 && request.resource.data.start == request.time)
+            : (request.resource.data.n == resource.data.n + 1 && request.resource.data.n <= 20
+               && request.resource.data.start == resource.data.start));
+    }
+    match /friendreq/{rid} {
+      allow read: if signedIn() && (resource == null ? me() in rid.split('_') : (resource.data.from == me() || resource.data.to == me()));
+      function frSend() { let qq = request.resource.data; return signedIn() && notBanned()
+        && qq.keys().hasOnly(['from', 'to', 'name', 'uname', 'status', 'at'])
+        && qq.from == me() && qq.to is string && qq.to != me() && rid == me() + '_' + qq.to
+        && qq.status == 'pending' && qq.at == request.time
+        && qq.name == get(userPath(me())).data.displayName && qq.uname == get(userPath(me())).data.username
+        && !isBlocked(qq.to, me()) && !isBlocked(me(), qq.to)
+        && (isAdmin() || frOn(me())) && frOn(qq.to)
+        && getAfter(/databases/$(database)/documents/friendcap/$(me())).data.at == request.time; }
+      allow create: if frSend();
+      // the sender asks again: after an accept (they unfollowed since) or 3 days after a decline
+      allow update: if frSend() && resource.data.from == me()
+        && (resource.data.status == 'accepted'
+            || (resource.data.status == 'declined' && request.time > resource.data.at + duration.value(3, 'd')));
+      // the receiver answers a pending request
+      allow update: if signedIn() && resource.data.to == me() && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'at'])
+        && request.resource.data.status in ['accepted', 'declined'] && request.resource.data.at == request.time
+        && (request.resource.data.status == 'declined'
+            || (notBanned() && !isBlocked(me(), resource.data.from) && !isBlocked(resource.data.from, me())
+                && (isAdmin() || frOn(me())) && frOn(resource.data.from)));
+      // the receiver can clear it; the sender only once it was accepted (so a decline's cooldown can't be skipped)
+      allow delete: if signedIn() && (resource.data.to == me() || (resource.data.from == me() && resource.data.status == 'accepted') || isAdmin());
     }
 
     // ---------- Direct messages (id = sortedUidA_sortedUidB) ----------

@@ -706,7 +706,7 @@ export function openBingo(ctx, q = {}) {
       if (priv) { codeEl.setAttribute('role', 'button'); codeEl.style.cursor = 'pointer'; codeEl.title = 'Copy room code'; codeEl.onclick = () => { navigator.clipboard?.writeText(roomId).then(() => toast('Code copied: ' + roomId), () => toast('Code: ' + roomId)); }; } else { codeEl.removeAttribute('role'); codeEl.onclick = null; } }
     const people = roomPeople();
     const countEl = main.querySelector('[data-count]'); if (countEl) countEl.textContent = '👤 ' + String(people.length).padStart(2, '0');
-    const namesEl = main.querySelector('[data-names]'); if (namesEl) namesEl.textContent = people.map((p) => p.name).join(' · ');
+    const namesEl = main.querySelector('[data-names]'); if (namesEl) { const k = people.map((p) => p.id + ':' + p.name).join('|'); if (namesEl.dataset.k !== k) { namesEl.dataset.k = k; namesEl.innerHTML = people.map((p) => `<span${p.id !== uid ? ` data-kf-uid="${esc(p.id)}" data-kf-name="${esc(p.name)}" data-kf-inline` : ''}>${esc(p.name)}</span>`).join(' · '); } } // ➕ Add friend on other players (js/friends.js)
     const starsEl = main.querySelector('[data-stars]');
     if (starsEl && tickN % 4 === 0) { const w = window.kemyWallet && window.kemyWallet.walletState && window.kemyWallet.walletState(); starsEl.textContent = !w || w.c == null ? '⭐ …' : (w.admin ? '⭐ ∞' : '⭐ ' + w.c); }
     const grid = main.querySelector('[data-grid]');

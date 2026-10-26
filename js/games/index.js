@@ -101,6 +101,11 @@ export function createGames(ctx) {
     openModal(`<div class="g-result ${win ? 'win' : ''} ${cls || ''}">${html != null ? html : `<div class="g-result-star">${STAR()}</div><h2>${esc(title)}</h2><p>${esc(sub || '')}</p>`}
       <div class="btns">${buttons.map((b, i) => `<${b.href ? 'a' : 'button'} class="btn ${i ? 'btn-ghost' : ''}" ${b.href ? `href="${b.href}" data-close` : `data-i="${i}"`}>${esc(b.label)}</${b.href ? 'a' : 'button'}>`).join('')}</div></div>`);
     const m = document.querySelector('.modal');
+    if (!spectator && window.kemyFriends) { // ➕ Add friend (js/friends.js); the seat list may be from before a friend joined, so read the game again
+      const addFr = (ids, nameOf) => { const fr = window.kemyFriends.row(ids, nameOf); m.querySelector('.kf-row')?.remove(); if (fr) m.querySelector('.g-result .btns')?.before(fr); };
+      if (curPlayers) addFr(curPlayers);
+      if (curGid) net.fs.getDoc(net.fs.doc(db, 'games', curGid)).then((s) => { if (!s.exists() || !document.body.contains(m)) return; const d = s.data(), ps = [...(d.players || []), ...(d.left || [])];
+        addFr(ps, (u) => { const i = (d.players || []).indexOf(u); return i >= 0 && d.names && d.names[i] ? { name: d.names[i], uname: (d.unames || [])[i] || '' } : null; }); }).catch(() => {}); }
     buttons.forEach((b, i) => { if (b.onClick) { const el = m.querySelector(`[data-i="${i}"]`); if (el) el.onclick = () => { closeModal(); b.onClick(); }; } });
     const lbBtn = document.createElement('a'); lbBtn.className = 'btn btn-ghost lb-btn'; lbBtn.href = '#/scores/' + (curType || 'all'); lbBtn.textContent = '🏆 Scoreboard'; lbBtn.dataset.close = ''; m.querySelector('.btns')?.appendChild(lbBtn);
     if (!vsBot && !noReward && curType && signedIn() && !spectator && !/^Game cancelled/i.test(title)) {

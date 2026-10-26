@@ -559,6 +559,7 @@ export function createPark3D(ctx) {
         const tools = document.createElement('span');
         tools.className = 'p3-safe';
         tools.innerHTML = '<button type="button" data-act="report">Report</button><button type="button" data-act="block">Block</button>';
+        if (window.kemyFriends && o.uid) { const fb = document.createElement('button'); fb.type = 'button'; fb.className = 'kf-plus kf-inline'; fb.dataset.kfPlus = o.uid; fb.dataset.kfName = o.name || ''; fb.dataset.kfUname = o.uname || ''; fb.hidden = true; tools.prepend(fb); } // ➕ Add friend (js/friends.js)
         tools.addEventListener('click', (e) => {
           e.stopPropagation();
           const act = e.target.closest('button')?.dataset.act;
@@ -676,7 +677,7 @@ export function createPark3D(ctx) {
     function playerCard(o) {
       const isM = muted.has(o.uid);
       openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><div class="park-card"><h2 class="${isAdminUid(o.uid) ? 'kemy-admin-name' : ''}">${esc(faceName(o.uid, o.name))}</h2><p class="muted">@${esc(o.uname)} · with ${esc((o.pal && o.pal.name) || 'their Pal')}</p>
-        <div class="btns"><a class="btn btn-sm" href="#/u/${esc(o.uname)}" data-close>View profile</a><button class="btn btn-sm btn-ghost" id="pc-pet">🐾 Pet their Pal</button><button class="btn btn-sm btn-ghost" id="pc-mute">${isM ? '🔈 Unmute' : '🔇 Mute chat'}</button><button class="btn btn-sm btn-ghost" id="pc-rep">Report</button><button class="btn btn-sm btn-ghost" id="pc-block">Block</button></div></div>`);
+        <div class="btns">${window.kemyFriends ? window.kemyFriends.buttonHtml(o.uid, o.name, o.uname) : ''}<a class="btn btn-sm" href="#/u/${esc(o.uname)}" data-close>View profile</a><button class="btn btn-sm btn-ghost" id="pc-pet">🐾 Pet their Pal</button><button class="btn btn-sm btn-ghost" id="pc-mute">${isM ? '🔈 Unmute' : '🔇 Mute chat'}</button><button class="btn btn-sm btn-ghost" id="pc-rep">Report</button><button class="btn btn-sm btn-ghost" id="pc-block">Block</button></div></div>`);
       document.getElementById('pc-pet').onclick = () => { closeModal(); emote('🐾', o.uid); toast(`You petted ${(o.pal && o.pal.name) || 'their Pal'}! 💜`); };
       document.getElementById('pc-mute').onclick = () => { if (isM) muted.delete(o.uid); else muted.add(o.uid); lss(MK, JSON.stringify([...muted])); closeModal(); toast(isM ? `Unmuted @${o.uname}` : `Muted @${o.uname}. You won’t see their chat.`); };
       document.getElementById('pc-rep').onclick = () => { closeModal(); if (window.kemyModReport) window.kemyModReport({ targetType: 'user', targetId: o.uid, targetUid: o.uid, name: '@' + (o.uname || 'player'), hideKey: hideKey('park', o.uid, o.say || '') }); else report(o); };

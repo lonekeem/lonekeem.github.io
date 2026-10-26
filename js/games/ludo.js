@@ -121,7 +121,7 @@ export function createLudo(ctx) {
       if (i == null) return `<div class="lx-c lx-empty" data-pos="${pos}"></div>`;
       const p = v.seats[i], col = v.st.cols[i], mine = i === v.mySeat;
       const mate = v.team && v.mySeat >= 0 && i === (v.mySeat + 2) % 4;
-      return `<div class="lx-c lx-${side}${mine ? ' me' : ''}" data-pos="${pos}" data-seat="${i}" style="--lc:${L.COLORS[col]};--ld:${L.DARK[col]}">
+      return `<div class="lx-c lx-${side}${mine ? ' me' : ''}" data-pos="${pos}" data-seat="${i}"${!mine && !p.bot && !isBot(p.uid) && p.uid ? ` data-kf-uid="${esc(p.uid)}" data-kf-name="${esc(p.name || '')}"` : ''} style="--lc:${L.COLORS[col]};--ld:${L.DARK[col]}">
         <div class="lx-main"><div class="lx-av"><svg viewBox="0 0 80 80" class="lx-ring" aria-hidden="true"><circle cx="40" cy="40" r="37" class="lx-ring-bg"/><circle cx="40" cy="40" r="37" class="lx-ring-p" stroke-dasharray="${RING_C.toFixed(1)}" stroke-dashoffset="${RING_C.toFixed(1)}"/></svg><span class="lx-face">${faceSvg(p.bot || isBot(p.uid) ? p.name : mine ? 'Mochi' : p.name, 56)}${mine ? '<canvas width="96" height="96" class="lx-pal"></canvas>' : ''}</span></div><div class="lx-dslot"></div></div>
         <div class="lx-name"><span>${esc(mine ? 'You' : p.name)}</span>${mate ? '<em>Partner</em>' : ''}${v.team && !mine && !mate ? '<em class="foe">Rival</em>' : ''}<i class="lx-home">0/4</i><i class="lx-flag" hidden title="A move didn’t check out">⚠</i></div>
         ${mine ? '<div class="lx-pills"><button type="button" class="lx-auto" id="lx-auto" aria-pressed="false"><span class="lx-box"></span>AUTO</button><button type="button" class="lx-pill" id="lx-emo" aria-expanded="false">😊 EMOJI</button></div>' : ''}</div>`;
