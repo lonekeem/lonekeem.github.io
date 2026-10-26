@@ -1,0 +1,86 @@
+/* Kemy Hill Rush (lazy-loaded). Rounded glossy Kemy controls, single bar style. */
+html.rush-on, html.rush-on body { overflow: hidden; overscroll-behavior: none; }
+html.rush-on .gm-music, html.rush-on #gm-music { z-index: 10010; }
+.rush-run { position: fixed; inset: 0; z-index: 10000; background: #6cc8ff; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.rush-cv { position: absolute; inset: 0; display: block; }
+.rush-hud { position: absolute; left: max(10px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top)); right: 120px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; pointer-events: none; }
+.rush-pause { pointer-events: auto; width: 44px; height: 44px; border-radius: 50%; border: 3px solid #2b1d4a; background: linear-gradient(#fff, #e7defc); color: #2b1d4a; font-weight: 900; font-size: 14px; box-shadow: 0 3px 0 #2b1d4a, inset 0 2px 0 #fff; cursor: pointer; }
+.rush-cap { display: grid; gap: 5px; padding: 7px 12px 7px 8px; border-radius: 999px; background: linear-gradient(rgba(255,255,255,.95), rgba(236,228,255,.92)); border: 3px solid #2b1d4a; box-shadow: 0 3px 0 #2b1d4a; min-width: 170px; }
+.rush-bar { display: flex; align-items: center; gap: 6px; }
+.rush-bar .ic { font-style: normal; width: 18px; text-align: center; font-size: 13px; }
+.rush-bar .ic.drop { width: 14px; height: 17px; margin: 0 2px; background: #2ed3b7; border: 2px solid #2b1d4a; border-radius: 50% 50% 50% 50% / 62% 62% 40% 40%; transform: rotate(0); clip-path: none; position: relative; }
+.rush-bar b { flex: 1; height: 11px; border-radius: 99px; background: #d9d0f2; overflow: hidden; box-shadow: inset 0 2px 0 rgba(43,29,74,.18); }
+.rush-bar s { display: block; height: 100%; width: 100%; transform-origin: left; border-radius: 99px; background: linear-gradient(#7ff0d8, #22bfa3); transition: transform .12s linear; }
+.rush-bar.spd s { background: linear-gradient(#ffe57a, #ffb13b); }
+.rush-bar.prog s { background: linear-gradient(#d7b8ff, #8a55dc); }
+.rush-bar.fuel.low s { background: linear-gradient(#ffb3c4, #ff5c7f); animation: rushBlink .5s infinite alternate; }
+@keyframes rushBlink { to { opacity: .45; } }
+.rush-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.rush-dist, .rush-chip { padding: 6px 11px; border-radius: 999px; background: rgba(255,255,255,.94); border: 3px solid #2b1d4a; box-shadow: 0 3px 0 #2b1d4a; font-weight: 900; color: #2b1d4a; font-size: 15px; line-height: 1; }
+.rush-dist { background: linear-gradient(#fff6c6, #ffd23f); font-size: 17px; }
+.rush-chip em { font-style: normal; }
+.rush-chip.pos { background: linear-gradient(#e9dcff, #b996ff); }
+.rush-pedal { position: absolute; bottom: max(14px, env(safe-area-inset-bottom)); width: clamp(92px, 24vmin, 140px); height: clamp(92px, 24vmin, 140px); border-radius: 34px; border: 4px solid #2b1d4a;
+  display: grid; place-items: center; align-content: center; gap: 0; color: #2b1d4a; font-weight: 900; cursor: pointer; touch-action: none; box-shadow: 0 6px 0 #2b1d4a, inset 0 4px 0 rgba(255,255,255,.7); transition: transform .05s; -webkit-tap-highlight-color: transparent; }
+.rush-pedal span { font-size: clamp(34px, 9vmin, 52px); line-height: 1; }
+.rush-pedal small { font-size: 12px; letter-spacing: .08em; }
+.rush-pedal.brake { left: max(14px, env(safe-area-inset-left)); background: linear-gradient(#ffc2cf, #ff6f8f); }
+.rush-pedal.gas { right: max(14px, env(safe-area-inset-right)); background: linear-gradient(#b8ffe6, #2ed3b7); }
+.rush-pedal.on { transform: translateY(5px); box-shadow: 0 1px 0 #2b1d4a, inset 0 4px 0 rgba(255,255,255,.4); filter: brightness(1.06); }
+.rush-pops { position: absolute; left: 0; right: 0; top: 30%; display: grid; justify-items: center; gap: 6px; pointer-events: none; }
+.rush-pop { padding: 7px 16px; border-radius: 999px; background: #fff; border: 3px solid #2b1d4a; box-shadow: 0 3px 0 #2b1d4a; font-weight: 900; color: #2b1d4a; animation: rushPop 1.5s ease-out forwards; }
+.rush-pop.big { background: linear-gradient(#fff6c6, #ffd23f); font-size: 19px; }
+.rush-pop.bad { background: linear-gradient(#ffe0e7, #ff9ab0); }
+@keyframes rushPop { 0% { transform: scale(.4); opacity: 0; } 12% { transform: scale(1.1); opacity: 1; } 22% { transform: scale(1); } 80% { opacity: 1; } 100% { transform: translateY(-40px); opacity: 0; } }
+.rush-count { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-size: clamp(64px, 20vmin, 140px); font-weight: 900; color: #fff; -webkit-text-stroke: 5px #2b1d4a; paint-order: stroke; pointer-events: none; text-shadow: 0 6px 0 #2b1d4a; }
+.rush-count.pulse.on { animation: rushCount .9s ease-out; }
+.rush-count.go { color: #5cf2b5; animation: rushCount .7s ease-out; }
+@keyframes rushCount { 0% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { opacity: .9; } }
+.rush-pausebox, .rush-over { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(30,18,60,.55); z-index: 3; padding: 16px; }
+.rush-pausebox[hidden] { display: none; }
+.rush-card { width: min(360px, 100%); max-height: 100%; overflow: auto; background: linear-gradient(#ffffff, #f1ebff); border: 4px solid #2b1d4a; border-radius: 26px; box-shadow: 0 6px 0 #2b1d4a; padding: 18px; display: grid; gap: 10px; text-align: center; color: #2b1d4a; }
+.rush-card h3 { margin: 0; font-size: 24px; }
+@media (orientation: portrait) { .rush-hud { right: 64px; } .rush-cap { min-width: 140px; } }
+.rush-rot { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(14px, env(safe-area-inset-bottom)) + clamp(92px, 24vmin, 140px) + 20px); display: none; align-items: center; gap: 8px;
+  max-width: calc(100% - 28px); padding: 7px 7px 7px 14px; border-radius: 999px; background: rgba(255,255,255,.95); border: 3px solid #2b1d4a; box-shadow: 0 3px 0 #2b1d4a; color: #2b1d4a; font-weight: 800; font-size: 13px; white-space: nowrap; z-index: 2; }
+.rush-rot button { width: 28px; height: 28px; flex: none; border-radius: 50%; border: 2px solid #2b1d4a; background: #efe7ff; color: #2b1d4a; font-weight: 900; font-size: 12px; cursor: pointer; padding: 0; }
+@media (orientation: portrait) and (max-width: 900px) { .rush-rot { display: flex; } }
+/* short landscape phones (e.g. 667x375): smaller HUD so it clears the notch side and the pedals */
+@media (orientation: landscape) and (max-height: 420px) { .rush-hud { gap: 6px; left: max(10px, env(safe-area-inset-left)); right: max(120px, calc(env(safe-area-inset-right) + 110px)); }
+  .rush-cap { min-width: 150px; padding: 5px 10px 5px 7px; } .rush-dist, .rush-chip { font-size: 14px; padding: 5px 9px; } .rush-dist { font-size: 15px; } .rush-pause { width: 40px; height: 40px; }
+  .rush-pedal { width: clamp(84px, 25vmin, 110px); height: clamp(84px, 25vmin, 110px); bottom: max(12px, env(safe-area-inset-bottom)); } .rush-pops { top: 24%; } }
+
+/* ---------- menu, garage, stages */
+.rush-page { display: grid; gap: 14px; }
+.rush-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rush-bank { display: inline-flex; gap: 6px; align-items: center; padding: 8px 14px; border-radius: 999px; background: linear-gradient(#fff6c6, #ffd23f); border: 3px solid #2b1d4a; font-weight: 900; color: #2b1d4a; box-shadow: 0 3px 0 #2b1d4a; }
+.rush-hero { position: relative; border-radius: 24px; overflow: hidden; border: 3px solid #2b1d4a; box-shadow: 0 5px 0 #2b1d4a; aspect-ratio: 16/8; background: #6cc8ff; }
+.rush-hero canvas { width: 100%; height: 100%; display: block; }
+.rush-hero .rush-go { position: absolute; right: 12px; bottom: 12px; }
+.rush-modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.rush-mode { display: grid; gap: 4px; padding: 14px; border-radius: 20px; border: 3px solid #2b1d4a; box-shadow: 0 4px 0 #2b1d4a; background: linear-gradient(#ffffff, #eee6ff); color: #2b1d4a; text-align: left; font: inherit; cursor: pointer; text-decoration: none; }
+.rush-mode b { font-size: 17px; } .rush-mode small { opacity: .75; }
+.rush-mode.go { background: linear-gradient(#b8ffe6, #2ed3b7); }
+.rush-mode.on { background: linear-gradient(#ffe0ec, #ff9ec4); }
+.rush-mode.cpu { background: linear-gradient(#fff6c6, #ffd23f); }
+.rush-h { margin: 6px 0 0; font-size: 18px; color: var(--ink, #2b1d4a); }
+.rush-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.rush-card2 { position: relative; display: grid; gap: 6px; padding: 8px; border-radius: 20px; border: 3px solid #2b1d4a; background: #fff; box-shadow: 0 4px 0 #2b1d4a; color: #2b1d4a; font: inherit; text-align: left; cursor: pointer; }
+.rush-card2 canvas { width: 100%; aspect-ratio: 16/10; border-radius: 14px; display: block; background: #e8f4ff; }
+.rush-card2 b { font-size: 15px; } .rush-card2 small { font-size: 12px; opacity: .8; }
+.rush-card2.sel { outline: 4px solid #2ed3b7; outline-offset: 2px; }
+.rush-card2.lock canvas { filter: grayscale(.85) brightness(.8); }
+.rush-card2 .lk { position: absolute; top: 14px; right: 14px; padding: 4px 9px; border-radius: 999px; background: #2b1d4a; color: #fff; font-weight: 800; font-size: 12px; }
+.rush-card2 .best { font-weight: 800; color: #8a55dc; font-size: 12px; }
+.rush-ups { display: grid; gap: 8px; }
+.rush-up { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 16px; border: 3px solid #2b1d4a; background: #fff; color: #2b1d4a; }
+.rush-up .pips { display: flex; gap: 3px; margin-top: 3px; } .rush-up .pips i { width: 16px; height: 8px; border-radius: 4px; background: #ddd3f5; } .rush-up .pips i.on { background: #2ed3b7; }
+.rush-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 12px; font-size: 13px; color: var(--ink, #2b1d4a); }
+.rush-stats div { display: flex; align-items: center; gap: 6px; } .rush-stats b { flex: 1; height: 8px; border-radius: 4px; background: #ddd3f5; overflow: hidden; } .rush-stats s { display: block; height: 100%; background: #ffb13b; }
+.rush-res { display: grid; gap: 6px; text-align: left; }
+.rush-res div { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 12px; background: #f4efff; font-weight: 700; }
+.rush-res div.me { background: #d9fff2; }
+.rush-wait { display: grid; gap: 10px; }
+.rush-seat { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 16px; border: 3px solid #2b1d4a; background: #fff; color: #2b1d4a; font-weight: 800; }
+.rush-seat canvas { width: 54px; height: 54px; }
+.rush-code { font-size: 28px; font-weight: 900; letter-spacing: .14em; padding: 6px 14px; border-radius: 14px; background: #fff; border: 3px dashed #8a55dc; color: #2b1d4a; }

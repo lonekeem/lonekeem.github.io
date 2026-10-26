@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff">
+<canvas id="c"></canvas>
+<script type="module">
+import { VEHICLES } from '../../js/rush/data.js';
+import { makeDriver, drawVehicle, KEMY, CAPY } from '../../js/rush/driver.js';
+const pals = [KEMY, CAPY, { ...KEMY, species: 'giraffe', name: 'Giraffe' }, { ...KEMY, species: 'elephant', name: 'Elephant' }, { ...KEMY, species: 'bunny', name: 'Bunny' }, { ...KEMY, species: 'dragon', name: 'Dragon' }];
+const moods = new URLSearchParams(location.search).get('mood') || 'idle';
+const CW = 300, CH = 210, PPM = 52, cv = document.getElementById('c'); cv.width = 130 + CW * pals.length; cv.height = 40 + CH * VEHICLES.length;
+const c = cv.getContext('2d'); c.fillStyle = '#f4f1ff'; c.fillRect(0, 0, cv.width, cv.height);
+c.font = 'bold 16px sans-serif'; c.fillStyle = '#2b1d4a';
+pals.forEach((p, i) => c.fillText(p.species, 140 + i * CW + 100, 26));
+const cache = new Map();
+VEHICLES.forEach((v, r) => { c.fillStyle = '#2b1d4a'; c.fillText(v.name, 8, 40 + r * CH + CH / 2);
+  pals.forEach((p, i) => { const d = makeDriver(p, v, cache); c.save(); c.translate(130 + i * CW + CW / 2, 40 + r * CH + CH * 0.62); c.scale(PPM, PPM);
+    drawVehicle(c, v, d, { mood: moods, t: 1 });
+    if (location.search.includes('head')) { c.beginPath(); c.arc(d.head.x, d.head.y, d.head.r, 0, 7); c.strokeStyle = 'red'; c.lineWidth = 0.03; c.stroke(); }
+    c.restore(); }); });
+document.title = 'done';
+</script>

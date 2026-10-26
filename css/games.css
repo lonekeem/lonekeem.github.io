@@ -616,6 +616,16 @@
 .cxh-hero:active .cxh-play{transform:translateY(3px);box-shadow:0 1px 0 #7a4a1e!important}
 @media (max-width:380px){.cxh-art{width:44%}.cxh-hero .zf-txt small{font-size:.76rem}}
 @media (min-width:600px){.cxh-art{width:auto;height:calc(100% - 34px);max-width:none}}
+/* Kemy Hill Rush hero card (Games hub, under Capy Chess) */
+.rsh-hero{background:radial-gradient(120% 100% at 85% 10%,#9be7ff 0,#4fb6f0 30%,#2b7fd0 58%,#1d4f9a 100%);border-color:rgba(190,240,255,.8)}
+.rsh-hero::after{background:linear-gradient(#7ed957,#3f9d2f);opacity:.85;height:12px}
+.rsh-hero .zf-txt{max-width:50%}
+.rsh-hero .zf-txt b{text-shadow:0 2px 0 #123a6e,0 0 12px rgba(160,230,255,.7)}
+.rsh-hero .zf-txt small{text-shadow:0 1px 2px rgba(0,20,60,.75);opacity:1}
+.rsh-art{transform:translateY(-50%) rotate(-2deg);border-color:rgba(220,248,255,.85);background:#6cc8f5}
+.rsh-play{background:linear-gradient(#b8ff8a,#4cc23a)!important;color:#103a0a!important;box-shadow:0 4px 0 #2a7a1e,0 6px 14px rgba(0,0,0,.4)!important}
+.rsh-hero:active .rsh-play{transform:translateY(3px);box-shadow:0 1px 0 #2a7a1e!important}
+@media (max-width:380px){.rsh-hero .zf-txt small{font-size:.76rem}}
 /* Join with code + room code box (every online game) */
 .g-joincode { align-items: center; flex-wrap: wrap; }
 .g-joincode-l { font-weight: 700; white-space: nowrap; }

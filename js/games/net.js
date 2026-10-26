@@ -69,7 +69,7 @@ export function createNet({ db, S }) {
       const g = s.data();
       if (g.players.includes(m.uid)) return g;
       if (g.status !== 'waiting') throw new Error('That game already started. You can watch it.');
-      const max = TWO_P.includes(g.type) ? 2 : g.type === 'trivia' ? 8 : g.type === 'ludo' ? Math.max(2, Math.min(4, +g.mode || 4)) : 6;
+      const max = TWO_P.includes(g.type) ? 2 : g.type === 'trivia' ? 8 : g.type === 'ludo' ? Math.max(2, Math.min(4, +g.mode || 4)) : g.type === 'rush' ? 4 : 6;
       if (g.players.length >= max) throw new Error('That room is full.');
       if (g.invitee && g.invitee !== m.uid) throw new Error('This game is for someone else.');
       const upd = {

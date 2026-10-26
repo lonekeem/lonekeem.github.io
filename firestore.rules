@@ -1172,7 +1172,7 @@ service cloud.firestore {
     // answers and heartbeats. Results are written by participants with consistency checks.
     function gBoardType(t) { return t in ['stardrop', 'klgrid', 'checkers']; }
     function gTwoP(t) { return gBoardType(t) || t == 'pool' || t == 'chess'; }
-    function gMax(t) { return gTwoP(t) ? 2 : t == 'trivia' ? 8 : t == 'ludo' ? 4 : 6; }
+    function gMax(t) { return gTwoP(t) ? 2 : t == 'trivia' ? 8 : t == 'ludo' || t == 'rush' ? 4 : 6; }
     // Chess: clocks in ms; the mover's clock may only go down by at least the real elapsed time
     // (White's clock starts with the first move, so move 1 only can't go up).
     function gClockOk(o, n) {
@@ -1254,7 +1254,7 @@ service cloud.firestore {
                                 'createdAt', 'updatedAt', 'winnerUid', 'endReason', 'rematch', 'hb', 'board', 'turn', 'moveNo',
                                 'last', 'turnAt', 'round', 'qs', 'roundAt', 'roundLen', 'scores', 'pv', 'seedHash', 'seeds', 'intent', 'call', 'from',
                                 'pos', 'ps', 'shot', 'cx', 'ml', 'clk', 'lv', 'rv', 'rk', 'left'])
-        && nd().type in ['stardrop', 'klgrid', 'checkers', 'trivia', 'starcards', 'pool', 'chess', 'ludo']
+        && nd().type in ['stardrop', 'klgrid', 'checkers', 'trivia', 'starcards', 'pool', 'chess', 'ludo', 'rush']
         && isStr(nd().mode, 0, 20)
         && nd().status == 'waiting' && nd().host == me() && nd().players[0] == me() && validNames(nd())
         && nd().names[0] == gProfile().displayName && nd().unames[0] == gProfile().username
@@ -1267,7 +1267,8 @@ service cloud.firestore {
         && (nd().type != 'chess' || (nd().players.size() == 1 && nd().board == 'rnbqkbnrpppppppp' + '................................' + 'PPPPPPPPRNBQKBNR'
                                      && nd().cx == 'w KQkq - 0 1' && nd().ml == '' && nd().turn == 0 && nd().moveNo == 0
                                      && nd().clk == (nd().mode == '5' ? [300000, 300000] : nd().mode == '10' ? [600000, 600000] : [])))
-        && (nd().type != 'ludo' || (nd().mode in ['2', '3', '4'] && nd().lv == null && nd().rv == {} && nd().rk == {} && nd().left == [] && nd().moveNo == 0));
+        && (nd().type != 'ludo' || (nd().mode in ['2', '3', '4'] && nd().lv == null && nd().rv == {} && nd().rk == {} && nd().left == [] && nd().moveNo == 0))
+        && (nd().type != 'rush' || nd().mode.matches('^[a-z]{3,12}-(sprint|classic)$'));
       // room host runs Trivia / Star Cards / Ludo lobby (seats incl. computer players, rounds, scores)
       function hostRun() {
         return (member() && !gTwoP(od().type) && od().host == me() && od().status != 'done'
@@ -1283,6 +1284,10 @@ service cloud.firestore {
       function z42() { let tt = request.time; return signedIn() && (
         // Star Cards host first: with 5-6 seats the full chain below hits the 1000-expression cap
         (od().type == 'starcards' && hostRun())
+        // Kemy Hill Rush host: stage pick, seats, start (roundAt + seed in round), finish
+        || (od().type == 'rush' && hostRun() && nd().mode.matches('^[a-z]{3,12}-(sprint|classic)$')
+            && (nd().get('winnerUid', '') == '' || (nd().winnerUid in od().players
+                && (nd().get('endReason', '') != 'finish' || get(/databases/$(database)/documents/games/$(gid)/car/$(nd().winnerUid)).data.fin == true))))
         // heartbeat
         || (member() && hbOnly())
         // Chess move: only the side to move; shape checks on the board (one king each, the mover
@@ -1433,6 +1438,22 @@ service cloud.firestore {
                   && request.resource.data.hand is list
                   && request.resource.data.hand.size() == room().pv.counts[request.resource.data.seat]));
       }
+      // Kemy Hill Rush: each racer posts their own car (position, distance, finish) a few times a second
+      match /car/{uid} {
+        function cg() { return get(gPath()).data; }
+        function cd() { return request.resource.data; }
+        allow read: if true;
+        allow create, update: if signedIn() && uid == me() && cg().type == 'rush' && me() in cg().players
+          && cg().status in ['waiting', 'active']
+          && cd().keys().hasOnly(['x', 'y', 'a', 'v', 'd', 'fin', 'ft', 'st', 'pal', 'vid', 'at'])
+          && (!('vid' in cd()) || (cd().vid is string && cd().vid.matches('^[a-z]{2,12}$')))
+          && cd().x is number && cd().y is number && cd().a is number && cd().v is number && cd().d is number
+          && cd().fin is bool && cd().ft is number && cd().st is number && cd().at == request.time
+          && (resource == null || request.time > resource.data.at + duration.value(200, 'ms'))
+          && (resource == null || !resource.data.fin || (cd().fin && cd().ft == resource.data.ft))
+          && (!cd().fin || (cg().status == 'active' && request.time > cg().roundAt + duration.value(15, 's')))
+          && (!('pal' in cd()) || (cd().pal is map && cd().pal.size() <= 8));
+      }
       // Result receipts: one per player per game, so a result is counted once.
       match /rec/{uid} {
         allow read: if true;
@@ -1459,7 +1480,7 @@ service cloud.firestore {
         return lb().keys().hasOnly(['uid', 'game', 'name', 'uname', 'color', 'pal', 'score', 'wins', 'losses', 'draws', 'games', 'best', 'wk', 'wkScore', 'updatedAt'])
           && lb().keys().hasAll(['uid', 'game', 'name', 'uname', 'color', 'score', 'wins', 'losses', 'draws', 'games', 'best', 'wk', 'wkScore', 'updatedAt'])
           && lb().uid == me()
-          && lb().game in ['stardrop', 'starcards', 'pool', 'chess', 'ludo', 'trivia', 'klgrid', 'checkers', 'pals', 'quest', 'bingo', 'all']
+          && lb().game in ['stardrop', 'starcards', 'pool', 'chess', 'ludo', 'rush', 'trivia', 'klgrid', 'checkers', 'pals', 'quest', 'bingo', 'all']
           && docId == me() + '_' + lb().game
           && lb().name == get(userPath(me())).data.displayName && lb().uname == get(userPath(me())).data.username
           && isStr(lb().color, 0, 20)

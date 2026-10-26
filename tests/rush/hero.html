@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#222}canvas{display:block}</style><title>loading</title></head><body><canvas id="c"></canvas>
+<script type="module">
+import { drawScene } from '../../js/rush/scene.js';
+import { STAGE } from '../../js/rush/data.js';
+import { KEMY, CAPY } from '../../js/rush/driver.js';
+import { makeTerrain } from '../../js/rush/terrain.js';
+const q = new URLSearchParams(location.search); const W = +q.get('w') || 520, H = +q.get('h') || 390, k = +q.get('k') || 2;
+const cv = document.getElementById('c'); cv.width = W * k; cv.height = H * k; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+const c = cv.getContext('2d'); c.scale(k, k);
+const X = +q.get('x') || 30, seed = +q.get('seed') || 4242; const TT = makeTerrain(seed, STAGE[q.get('st') || 'countryside']); const terrY = (x) => TT.at(x);
+const TY = (x) => terrY(x); const pal = q.get('pal') ? JSON.parse(q.get('pal')) : KEMY;
+drawScene(c, W, H, { stage: STAGE[q.get('st') || 'countryside'], seed, camX: X, ax: 0.5, ay: +q.get('ay') || 0.6, ppm: H / (+q.get('z') || 8), t: 2,
+  cars: [{ vid: q.get('back') || 'hauler', pal: CAPY, x: X - 5.0, mood: 'happy', s: 0.9 }, { vid: q.get('v') || 'stomp', pal, x: X + 1.2, lift: +q.get('lift') || 1.1, spin: +q.get('spin') || 0.18, mood: 'happy', s: 1.05 }],
+  items: [['star', -2.8, 2.6], ['dia', -1.4, 5.4], ['star', 4.2, 3.4], ['dia', 5.6, 2.2], ['star', 7.4, 3.0], ['star', -6.6, 4.2]].map(([t, dx, dy]) => ({ t, x: X + dx, y: TY(X + dx) + dy, s: 1.25 })) });
+document.title = 'done';
+</script></body></html>

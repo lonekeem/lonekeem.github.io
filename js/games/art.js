@@ -58,6 +58,10 @@ COVERS.ludo = frame(`<g transform="translate(36 16)">
     <polygon points="20,20 28,20 24,24" fill="#f2b31b"/><polygon points="28,20 28,28 24,24" fill="#2bb5a8"/><polygon points="28,28 20,28 24,24" fill="#e2558f"/><polygon points="20,28 20,20 24,24" fill="#8a2be2"/>
     <circle cx="10" cy="10" r="4.5" fill="#fff"/><circle cx="38" cy="38" r="4.5" fill="#fff"/></g>
     <g transform="translate(90 52) rotate(14)"><rect x="-9" y="-9" width="18" height="18" rx="4.5" fill="#fff3c4" stroke="url(#gc-g)" stroke-width="1.5"/><circle cx="-4" cy="-4" r="1.8" fill="#2a0f4d"/><circle cx="4" cy="4" r="1.8" fill="#2a0f4d"/><circle cx="0" cy="0" r="1.8" fill="#2a0f4d"/></g>`);
+COVERS.rush = frame(`<path d="M0 62C22 50 36 44 58 50s40 2 62-12V80H0z" fill="#5a1fa6"/><path d="M0 62C22 50 36 44 58 50s40 2 62-12" fill="none" stroke="url(#gc-g)" stroke-width="2.4"/>
+    <g transform="translate(60 40) rotate(-12)"><rect x="-17" y="-8" width="34" height="11" rx="4.5" fill="#2bb5a8" stroke="#fff" stroke-width="1.2"/><path d="M-9-8l3-9h12l5 9z" fill="#c9a6ff" stroke="#fff" stroke-width="1.2"/>
+    <circle cx="0" cy="-12" r="3.6" fill="#fff3c4"/><circle cx="-10" cy="4" r="5.6" fill="#1a0b33" stroke="#c9a6ff" stroke-width="1.6"/><circle cx="10" cy="4" r="5.6" fill="#1a0b33" stroke="#c9a6ff" stroke-width="1.6"/></g>
+    ${gstar(26, 26, 6, 'url(#gc-g)')}${gstar(92, 18, 5, '#ffc83d')}<path d="M100 30l4 4-4 5-4-5z" fill="#7fe3ff" stroke="#fff" stroke-width=".8"/>`);
 export const GAMES = [
   { id: 'stardrop', name: 'Star Drop', blurb: 'Drop gold and purple stars. Four in a row wins.', players: '2 players' },
   { id: 'starcards', name: 'Star Cards', blurb: 'Shed your hand first. Shout LAST STAR! at one card.', players: '2-6 players' },
@@ -66,6 +70,7 @@ export const GAMES = [
   { id: 'ludo', name: 'Pal Ludo', blurb: 'Roll fair dice, race four tokens home.', players: '2-4 players' },
   { id: 'trivia', name: 'Studio Trivia', blurb: 'Fast party quiz: music, movies and more.', players: '2-8 players' },
   { id: 'klgrid', name: 'KL Grid', blurb: 'K vs L on a 3x3 grid, or go Ultimate 9x9.', players: '2 players' },
-  { id: 'checkers', name: 'Checkers', blurb: 'Jump, crown and clear the purple board.', players: '2 players' }
+  { id: 'checkers', name: 'Checkers', blurb: 'Jump, crown and clear the purple board.', players: '2 players' },
+  { id: 'rush', name: 'Kemy Hill Rush', blurb: 'Drive your Pal over bouncy hills. Flip, collect stars, race friends.', players: '1-4 players' }
 ];
 export const gameName = (id) => (GAMES.find((g) => g.id === id) || { name: 'Game' }).name;

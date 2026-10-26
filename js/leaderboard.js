@@ -12,10 +12,10 @@ export const LB_GAMES = [
   { id: 'starcards', name: 'Star Cards', emoji: '🃏' }, { id: 'ludo', name: 'Ludo', emoji: '🎲' }, { id: 'stardrop', name: 'Star Drop', emoji: '⭐' },
   { id: 'klgrid', name: 'KL Grid', emoji: '#️⃣' }, { id: 'trivia', name: 'Studio Trivia', emoji: '❓' },
   { id: 'quest', name: 'Bubble Quest', emoji: '🫧' }, { id: 'pals', name: 'Pal Games', emoji: '🐾' },
-  { id: 'bingo', name: 'Pal Bingo', emoji: '⭐' }
+  { id: 'bingo', name: 'Pal Bingo', emoji: '⭐' }, { id: 'rush', name: 'Kemy Hill Rush', emoji: '🚙' }
 ];
 export const lbName = (g) => (LB_GAMES.find((x) => x.id === g) || { name: 'Game' }).name;
-const MATCH = ['chess', 'checkers', 'pool', 'starcards', 'ludo', 'stardrop', 'klgrid', 'trivia', 'pals'];
+const MATCH = ['chess', 'checkers', 'pool', 'starcards', 'ludo', 'stardrop', 'klgrid', 'trivia', 'pals', 'rush'];
 const CAP = (g) => (g === 'quest' || g === 'all' ? 300 : 3);
 export function weekId(d = new Date()) {   // ISO week, e.g. 2026-W43
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);

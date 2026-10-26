@@ -4,7 +4,7 @@ export const ROOM_CODE = /^[A-Z0-9]{6}$/;
 export const cleanCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 const ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const newRoomCode = () => Array.from({ length: 6 }, () => ABC[Math.floor(Math.random() * ABC.length)]).join('');
-const maxSeats = (g, pal) => pal ? 2 : g.type === 'ludo' ? Math.max(2, Math.min(4, +g.mode || 4)) : g.type === 'trivia' ? 8 : g.type === 'starcards' ? 6 : 2;
+const maxSeats = (g, pal) => pal ? 2 : g.type === 'ludo' ? Math.max(2, Math.min(4, +g.mode || 4)) : g.type === 'rush' ? 4 : g.type === 'trivia' ? 8 : g.type === 'starcards' ? 6 : 2;
 const ms = (t) => (t && t.toMillis ? t.toMillis() : 0);
 const fail = (m) => { const e = new Error(m); e.friendly = true; return e; };
 
