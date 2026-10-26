@@ -18,7 +18,7 @@ import { prefsStore as sharedPrefsStore } from './interests.js';
 import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from './autoplay.js';
 import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 import { faceName, adminNameClass } from './kemy-name.js';
-import { sheriffCard } from './sheriff-card.js';
+import { sheriffCard, sheriffFeedPost, SHERIFF_COUNT } from './sheriff-card.js';
 let soundMod = null, sounds = null;
 function loadSounds() {
   if (!soundMod) soundMod = import('./sounds.js').then((m) => { sounds = m; return m; }).catch(() => null);
@@ -154,8 +154,41 @@ export function createWatch(ctx) {
       </section>`;
   }
 
+  // Studio Original Episode 1 as a real feed video (static mp4, lazy like every feed video: preload none,
+  // src only when it is the current or next slide). Long, so it previews muted like a movie; the CTA opens the series.
+  function sheriffSlideHtml(p, i) {
+    const following = S.following.has(p.authorId);
+    return `
+      <section class="vslide vsh-ep" data-i="${i}" data-id="${esc(p.id)}" data-kind="video" data-cat="" aria-roledescription="video" aria-label="Lone Keem Studios: ${esc(p.text)}">
+        <div class="vbg" style="background-image:url('${esc(p.poster)}')" aria-hidden="true"></div>
+        <video class="vvideo" playsinline webkit-playsinline loop muted preload="none" disablepictureinpicture controlslist="nodownload noplaybackrate"
+           poster="${esc(p.poster)}" data-src="${esc(p.mediaUrl)}" aria-label="${esc(p.text)}" oncontextmenu="return false;"></video>
+        <div class="vstate" aria-hidden="true">${IC.play}</div><div class="vspin" aria-hidden="true"></div>
+        <div class="vprogress" aria-hidden="true"><span></span></div>
+        <div class="vscrub" hidden><input type="range" min="0" max="1000" step="1" value="0" aria-label="Seek in video"><span class="vtime" aria-hidden="true">0:00 / 0:00</span></div>
+        <div class="vfail" hidden><p>This video couldn’t load. Try again later.</p></div>
+        <div class="vgrad" aria-hidden="true"></div>
+        <div class="vmeta">
+          <div class="vsh-tags"><span class="sh-orig">Lone Keem Studios Original</span> <span class="sh-badge">Everyone</span> <span class="vsh-epn">Episode 1 of ${SHERIFF_COUNT()}</span></div>
+          <div class="vcreator">
+            ${avatar({ uid: p.authorId, displayName: p.authorName, username: p.authorUsername }, '', true)}
+            <a class="vname" href="#/u/${esc(p.authorUsername)}">Lone Keem Studios</a>${badge(p.authorId)}
+            <button class="vfollow ${following ? 'on' : ''}" data-a="follow" data-uid="${esc(p.authorId)}" aria-pressed="${following}">${following ? 'Following' : 'Follow'}</button>
+          </div>
+          <p class="vcaption"><b>The Sheriff of Lone Keem</b> · Episode 1: ${esc(p.text.split(': ').slice(1).join(': '))}</p>
+          <a class="btn btn-sm vsh-cta" href="#/series/sheriff" data-a="series">▶ Watch the full series</a>
+        </div>
+        <div class="vrail">
+          <a class="vact" href="#/series/sheriff/1" data-a="series" aria-label="Watch Episode 1 full screen"><span class="vext-ic" aria-hidden="true">▶</span><span>Ep 1</span></a>
+          <a class="vact" href="#/series/sheriff" data-a="series" aria-label="Open the series"><span class="vext-ic" aria-hidden="true">📺</span><span>Series</span></a>
+          <button class="vact" data-a="share" aria-label="Share">${IC.share}<span>Share</span></button>
+        </div>
+      </section>`;
+  }
+
   // ------------------------------------------------------------ slide markup
   function slideHtml(p, i) {
+    if (p.sheriff) return sheriffSlideHtml(p, i);
     if (p.external) return externalSlideHtml(p, i);
     const kind = kindOf(p);
     const mine = S.user && p.authorId === S.user.uid;
@@ -244,10 +277,12 @@ export function createWatch(ctx) {
   async function render(postId, token, tab = 'foryou') {
     if (!FEED_TABS.some(([t]) => t === tab)) tab = 'foryou';
     const posts = (await buildTab(tab)).filter((p) => !(p.ytBlocked || isYtBlocked(p.ytId || (p.linkUrl && youTubeId(p.linkUrl)))));
+    const shp = tab === 'foryou' ? sheriffFeedPost(STUDIO_UID) : null;   // Studio Original Ep 1: 4th item in For You
+    if (shp && !window.kemyParental?.hidePost?.(shp)) posts.splice(Math.min(3, posts.length), 0, shp);
     if (stale(token)) return;
     const st = prefsStore();
     let startId = postId || '';
-    if (postId && /^(yt|news)-/.test(postId) && !posts.some((p) => p.id === postId)) startId = '';
+    if (postId && /^(yt|news|sheriff)-/.test(postId) && !posts.some((p) => p.id === postId)) startId = '';
     else if (postId && !posts.some((p) => p.id === postId)) {
       const snap = await getDoc(doc(db, 'posts', postId));
       if (stale(token)) return;
@@ -280,8 +315,12 @@ export function createWatch(ctx) {
     const feed = $('#vfeed'), wrap = $('#vwrap'), muteBtn = $('#vmute'), hint = $('#vunmute-hint'), sheetRoot = $('#vsheet-root');
     const slides = [...feed.querySelectorAll('.vslide:not(.vdon)')];
     if (tab === 'foryou') window.kemyDonate?.feedSlides(feed, 25);
-    if (tab === 'foryou' && slides.length) { // Studio Original promo: its own full-height card after the 2nd video (never over a video)
-      const at = slides[Math.min(1, slides.length - 1)];
+    // Studio Original promo card: its own full-height card (never over a video). Episode 1 already plays as the
+    // 4th item, so the card sits well after it (8 slides later) as a reminder, and is skipped in short feeds.
+    const shAt = slides.findIndex((x) => x.dataset.id === 'sheriff-ep1');
+    const promoAt = shAt < 0 ? Math.min(1, slides.length - 1) : shAt + 8;
+    if (tab === 'foryou' && slides[promoAt]) {
+      const at = slides[promoAt];
       at.insertAdjacentHTML('afterend', sheriffCard('slide'));
       const sp = at.nextElementSibling;
       sp.querySelector('[data-vsh-skip]').onclick = () => sp.nextElementSibling?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -574,6 +613,7 @@ export function createWatch(ctx) {
       if (a === 'more') { if (!ev.target.closest('a')) btn.classList.toggle('open'); return; }
       if (a === 'replay') { slides[0].scrollIntoView({ behavior: 'smooth' }); return; }
       if (a === 'outlink') { st.signal(p, 'open'); return; }
+      if (a === 'series') { if (p) st.signal(p, 'open'); return; }
       if (a === 'share') return share(p);
       if (a === 'comment') { st.signal(p, 'open'); return openComments(p, sl); }
       if (a === 'watch') { st.signal(p, 'watch', 1); sl.classList.remove('yt-wait'); delete sl.dataset.userPaused; return autoEmbed(sl); }
@@ -630,7 +670,7 @@ export function createWatch(ctx) {
     }
     async function share(p) {
       const url = p.external ? (p.kind === 'news' ? p.url : p.linkUrl) : location.origin + location.pathname + '#/watch/' + p.id;
-      const title = p.external ? `${p.text.slice(0, 80)} (${p.source})` : `${p.authorName} on Lone Keem Studios`;
+      const title = p.sheriff ? 'The Sheriff of Lone Keem, a Lone Keem Studios Original on Kemy' : p.external ? `${p.text.slice(0, 80)} (${p.source})` : `${p.authorName} on Lone Keem Studios`;
       if (navigator.share) {
         try { await navigator.share({ title, text: p.external ? '' : (p.text || '').slice(0, 120), url }); countShare(p); return; }
         catch (e) { if (e && e.name === 'AbortError') return; }

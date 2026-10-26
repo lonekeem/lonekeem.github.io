@@ -12,7 +12,7 @@ import { mountGameMusic, hideGameMusic } from './gamemusic.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
-import { sheriffCard } from './sheriff-card.js';
+import { sheriffCard, sheriffStudio, sheriffGridTiles } from './sheriff-card.js';
 import { deliveryUrls, LIMITS, safePhotoURL, keepTrying } from './media-config.js';
 import { createStories } from './stories.js';
 import { createSearch, SEARCH_ICON } from './search.js';
@@ -1152,6 +1152,7 @@ async function pageProfile(username, tab, token) {
         ${!mine && S.user && uid !== STUDIO_UID ? (blocked ? `<button class="btn btn-sm btn-danger" id="unblock">Unblock</button>` : `<button class="btn btn-sm btn-danger" id="block">Block</button>`) : ''}
       </div>
     </section>
+    ${uid === STUDIO_UID && !blocked ? sheriffStudio() : ''}
     <nav class="tabs" aria-label="Profile"><a href="#/u/${esc(u.username)}" class="${tab ? '' : 'active'}">Posts</a><a href="#/u/${esc(u.username)}/movies" class="${tab === 'movies' ? 'active' : ''}">Movies</a><a href="#/u/${esc(u.username)}/songs" class="${tab === 'songs' ? 'active' : ''}">Songs</a><a href="#/u/${esc(u.username)}/series" class="${tab === 'series' ? 'active' : ''}">Series</a>${mine ? `<a href="#/u/${esc(u.username)}/saved" class="${tab === 'saved' ? 'active' : ''}">Saved</a>` : ''}</nav>
     <div id="posts"><div class="spinner"></div></div>`;
   $('#add-bio')?.addEventListener('click', () => sessionStorage.setItem('lks-focus-bio', '1'));
@@ -1191,16 +1192,26 @@ async function pageProfile(username, tab, token) {
     if (stale(token)) return;
     $('#posts').innerHTML = '<div class="wgrid"></div>';
     await ser.renderTiles($('#posts .wgrid'), list, `<div class="empty">No series yet.${mine ? ' <a href="#/series/new">Start a series</a>.' : ''}</div>`);
+    if (uid === STUDIO_UID && !stale(token)) { const g = $('#posts .wgrid'); if (g.querySelector('.empty')) g.innerHTML = ''; g.insertAdjacentHTML('afterbegin', sheriffCard('tile')); }
   } else if (tab === 'movies' || tab === 'songs') {
     const ps = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(100)));
     if (stale(token)) return;
     const kind = tab === 'movies' ? 'movie' : 'song';
     getWorks().grid($('#posts'), ps.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.type === kind), mine ? `No ${tab} yet. <a href="#/new/${kind}">Share your first ${kind}</a>.` : `No ${tab} yet.`);
+    if (uid === STUDIO_UID && kind === 'movie') { const box = $('#posts'); if (!box.querySelector('.wgrid')) box.innerHTML = '<div class="wgrid"></div>'; box.querySelector('.wgrid').insertAdjacentHTML('afterbegin', sheriffCard('tile')); }
   } else {
     const ps = await getDocs(query(collection(db, 'posts'), where('authorId', '==', uid), orderBy('createdAt', 'desc'), limit(40)));
     if (stale(token)) return;
     renderGrid($('#posts'), ps.docs.map((d) => ({ id: d.id, ...d.data() })), mine ? 'You haven’t posted yet. <a href="#/new">Make your first post</a>.' : 'No posts yet.');
+    if (uid === STUDIO_UID) studioEpisodeTiles($('#posts'));
   }
+}
+// Studio profile grids: "The Sheriff of Lone Keem" episodes lead the studio's own videos.
+function studioEpisodeTiles(box) {
+  if (!box) return;
+  let g = box.querySelector('.pgrid');
+  if (!g) { box.querySelector('.empty')?.remove(); box.insertAdjacentHTML('afterbegin', '<div class="pgrid"></div>'); g = box.querySelector('.pgrid'); }
+  g.insertAdjacentHTML('afterbegin', sheriffGridTiles());
 }
 // Instagram / TikTok style 3-column grid of a user's posts. Media opens in the For You player.
 const GRID_IC = {
