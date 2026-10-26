@@ -63,6 +63,7 @@ function ensureAudio() {
   audio.addEventListener('playing', () => { paint(); fire('play'); });
   audio.addEventListener('pause', () => { paint(); if (!audio.ended) fire('stop'); });
   audio.addEventListener('error', () => { if (wantPlay) setTimeout(next, 400); });
+  (window.__kemyAud || (window.__kemyAud = new Set())).add(audio); audio.addEventListener('playing', () => { audio.__kbAt = performance.now(); }); // so the Pals can dance to its beat (js/pals/musicbeat.js)
   return audio;
 }
 async function pick(id) {

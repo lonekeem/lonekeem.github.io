@@ -92,6 +92,7 @@ function ensureEl() {
   el.addEventListener('ended', () => { const pk = getPick(); if (pk !== 'all' && pk !== 'shuffle') { el.currentTime = 0; el.play().catch(() => {}); return; } loadTrack(nextIndex(), { fetch: true }); el.play().catch(() => {}); }); el.setAttribute('playsinline', '');
   try { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { actx = new AC(); gain = actx.createGain(); gain.gain.value = 0; const srcN = actx.createMediaElementSource(el); srcN.connect(gain); gain.connect(actx.destination); analyser = actx.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.5; srcN.connect(analyser); /* analyser is a dead end: it never changes loudness */ } } catch { actx = null; gain = null; }
   el.addEventListener('play', emit); el.addEventListener('pause', () => { emit(); paintFab(); });
+  (window.__kemyAud || (window.__kemyAud = new Set())).add(el); el.addEventListener('playing', () => { el.__kbAt = performance.now(); }); // so the Pals can dance to its beat (js/pals/musicbeat.js)
   return el;
 }
 function ramp(to, sec) {

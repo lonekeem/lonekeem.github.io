@@ -23,7 +23,8 @@ import { PHRASES as SAFE_SAY, PHRASE_NOTE, phraseOnly, isPhrase } from '../safe-
 import { hideKey, isHidden } from '../chat-hide.js';
 import { KEMY_NAME, faceName, isAdminUid, noteAdminUid } from '../kemy-name.js';
 import { emoteMs, EMOTE_BY_ID } from './emotes.js';
-import { WORLD_DANCES, WORLD_DANCE_BY_ID } from './dance-menu.js';
+import { WORLD_DANCES, WORLD_DANCE_BY_ID, GROOVE, grooveMove } from './dance-menu.js';
+import { musicBeat } from './musicbeat.js';
 import { parkGames } from './park-games.js';
 import { MINIGAMES } from './minigames.js';
 import { addParkHD } from './park-hd.js';
@@ -38,7 +39,6 @@ const W = 100, H = 75;                                // world half-size (200 m 
 const MAX_ROOM = 100, ROOMS = 20, CELL = 160, MAX_DRAWN = 30, HB_MS = HEARTBEAT_MS, STALE_MS = STALE_PRESENCE_MS;
 const PORTAL_NAME = { race: 'Pal Race', bubbles: 'Bubble Pop', stars: 'Star Catch', dance: 'Dance-Off' };
 const EMO_DANCE = { '👋': 'wave', '💜': 'happyshimmy', '😂': 'bounce', '😮': 'woah', '🎉': 'groove', '😴': 'slowmo', '⭐': 'twirl', '🐾': 'hopclap' };
-const BPM = 112;
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const lsg = (k) => { try { return localStorage.getItem(k); } catch { return null; } }, lss = (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } };
@@ -417,10 +417,10 @@ export function createPark3D(ctx) {
     let runT = false;
     tc = createControls(view, { tutorialKey: 'park', tutorialTitle: '🌳 Welcome to Pal Park!', keys: { ' ': 'jump', v: 'cam' },
       onZoom: (z) => { C.dist = Math.max(2.5, Math.min(16, C.dist * z)); },
-      tips: ['🕹️ Put your thumb down anywhere on the left and slide to walk. Slide all the way to run.', '👆 Drag to look. Two-finger drag looks. Pinch or scroll zooms. Q and E turn.', '⤒ Jump. E or Space enters a door or car when the button is showing. F talks to Kemy Patrol.', '😊 Emote or dance (with music on, everyone dances to the beat!)', '👁 Switch between behind-your-Pal and through-your-Pal’s eyes.', '📱 Turn your phone sideways for a bigger view, or tap 🔄 to rotate.', 'A controller walks with the left stick and looks with the right stick.'],
-      buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'run', icon: '🏃', label: 'Run' }, { id: 'emote', icon: '😊', label: 'Emote' }, { id: 'dance', icon: '🕺', label: 'Dance' }, { id: 'cam', icon: '👁', label: 'Camera' }] });
+      tips: ['🕹️ Put your thumb down anywhere on the left and slide to walk. Slide all the way to run.', '👆 Drag to look. Two-finger drag looks. Pinch or scroll zooms. Q and E turn.', '⤒ Jump. E or Space enters a door or car when the button is showing. F talks to Kemy Patrol.', '😊 Emote, or 💃 pick a dance move. While music plays, tap 🕺 Dance to dance to the song’s beat (move to stop).', '👁 Switch between behind-your-Pal and through-your-Pal’s eyes.', '📱 Turn your phone sideways for a bigger view, or tap 🔄 to rotate.', 'A controller walks with the left stick and looks with the right stick.'],
+      buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'run', icon: '🏃', label: 'Run' }, { id: 'emote', icon: '😊', label: 'Emote' }, { id: 'dance', icon: '💃', label: 'Moves' }, { id: 'cam', icon: '👁', label: 'Camera' }, { id: 'groove', icon: '🕺', label: 'Dance' }] });
     tc.on('jump', () => { jumpQ = true; }); tc.on('run', () => { runT = !runT; tc.root.querySelector('[data-b=run]')?.classList.toggle('lock', runT); hint(runT ? 'Running 🏃' : 'Walking'); });
-    tc.on('emote', () => openEmotes()); tc.on('dance', () => openDances()); tc.on('cam', () => toggleCam());
+    tc.on('emote', () => openEmotes()); tc.on('dance', () => openDances()); tc.on('groove', () => toggleGroove()); { const gb = tc.root.querySelector('[data-b=groove]'); if (gb) gb.hidden = true; } tc.on('cam', () => toggleCam());
     paintCam(); $('#p3-set').onclick = () => tc.settings();
     attachGfxSettings(tc, (e) => { if (e.fps) { fpsEl.hidden = !(gfxShowFps() || dbgFps); return; } if (e.changed) { tc.root.querySelector('.kc-set')?.remove(); setTimeout(() => page(), 50); } }); // Graphics tier: rebuild the scene with the new tier
     { // tap a Pal. Two-finger look, pinch, and scroll zoom live in the shared controls.
@@ -697,7 +697,17 @@ export function createPark3D(ctx) {
 
     // ---------------------------------------------------------------- music: the theme playlist, softly, looping (🎵 player stays available)
     let gm = null; import('../gamemusic.js').then(async (m) => { gm = m; await m.mountGameMusic({ corner: 'top-right' }); if (!m.isPlaying() && document.body.contains(cv)) m.playStation('theme', { volume: 0.18 }); }).catch(() => {});
-    const beatNow = () => { const a = gm && gm.audioEl && gm.audioEl(); if (a && !a.paused) return { on: true, beat: a.currentTime * BPM / 60 }; return { on: false, beat: performance.now() / 1000 * BPM / 60 }; };
+    // the beat of whatever is playing (game radio, theme player or a house TV), from each song's measured beat grid (musicbeat.js)
+    const beatNow = () => musicBeat();
+    // 🕺 Dance: shows only while music plays (not while driving). Tap = dance to the beat, tap again or move = stop; stops when the music does.
+    // Presence: just the dn field on the normal write (no forced write, still waits out the write gap), and taps are paced (<= 1 change / 0.7 s).
+    let grooveTap = 0, grooveOff = 0, grooveShown = null, grooveFr = 0; const GROOVE_TAP_MS = 700;
+    const grooveBtn = () => tc.root.querySelector('[data-b=groove]');
+    const grooving = () => P.dance === GROOVE && Date.now() < P.danceUntil;
+    function setGroove(on) { if (on === grooving()) return; P.dance = on ? GROOVE : ''; P.danceUntil = on ? Date.now() + 864e5 : 0; P.tgt = ''; dirty = true; send(false); paintDanceBtn(); grooveBtn()?.classList.toggle('lock', on); if (window.__p3) window.__p3.grooveSets = (window.__p3.grooveSets || 0) + 1; }
+    function toggleGroove() { const now = Date.now(); if (now - grooveTap < GROOVE_TAP_MS) return; grooveTap = now; const b = beatNow(); if (grooving()) { setGroove(false); hint('Dance stopped'); return; } if (!b.on || W3.driving()) { hint('🎵 Play some music to dance'); return; } setGroove(true); hint(`🕺 Dancing to the beat (${Math.round(b.bpm)} bpm). Move or tap again to stop.`); }
+    function grooveTick(bt) { const gNow = performance.now(); if (gNow - grooveFr < 200) return; grooveFr = gNow; const drv = !!W3.driving(), show = bt.on && !drv; if (show !== grooveShown) { grooveShown = show; const el = grooveBtn(); if (el) el.hidden = !show; }
+      if (grooving()) { if (bt.on && !drv) grooveOff = 0; else if (!grooveOff) grooveOff = Date.now(); else if (Date.now() - grooveOff > 1500) { grooveOff = 0; setGroove(false); hint('🎵 Music stopped'); } } else grooveBtn()?.classList.remove('lock'); }
 
     // distance culling for the whole Pal Park build (terrain, trees, grass, flowers, props): one group, hidden when you are far
     // away (e.g. driving in the southern towns it used to cost ~1M triangles + ~150 draw calls for things you cannot see);
@@ -791,7 +801,7 @@ export function createPark3D(ctx) {
       if (P.danceUntil && Date.now() > P.danceUntil && P.dance) { P.dance = ''; dirty = true; } // tell others the dance ended
       const aboard = !!(W3.driving && W3.driving()); if (!aboard) { me.position.set(P.x, P.y, P.z); me.rotation.y = P.yaw; }
       // animation on the rig
-      const bt = beatNow(); const dancing = P.dance && P.dance[0] !== '~' && Date.now() < P.danceUntil;
+      const bt = beatNow(); grooveTick(bt); const dancing = P.dance && P.dance[0] !== '~' && Date.now() < P.danceUntil;
       P.t += dt * 60; const dt60 = dt * 60; const gv = sp; P.turnS = (P.turnS || 0) * 0.85 + (P.lastYaw != null ? Math.atan2(Math.sin(P.yaw - P.lastYaw), Math.cos(P.yaw - P.lastYaw)) / Math.max(dt, 1e-3) * 0.15 * 0.15 : 0); P.lastYaw = P.yaw;
       let mode = 'idle'; const st = { t: P.t, dt60, turn: Math.max(-1, Math.min(1, P.turnS)) };
       if (!P.onGround) { mode = 'hop'; st.jumpK = Math.max(0.15, Math.min(0.85, 0.5 - P.vy / (JUMP * 2) * 0.7)); }
@@ -837,7 +847,7 @@ export function createPark3D(ctx) {
       W3.update(dt, now); if (!R.shadowMap.autoUpdate) R.shadowMap.needsUpdate = (++shN % 3) === 0; R.render(scene, cam); const cms = performance.now() - c0; window.__p3.cpu = window.__p3.cpu * 0.95 + cms * 0.05;
       window.__p3.pos = { x: P.x, y: P.y, z: P.z, onGround: P.onGround, mode: st.mode, dance: st.dance3d || '', yaw: P.yaw, pov, cam: cam.position.toArray(), camDist: C.cur, others: others.size, room };
     }
-    window.__p3 = { fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, camState: () => ({ yaw: C.yaw, pitch: C.pitch, dist: C.dist }), gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; dirty = true; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; }, dance: () => P.dance };
+    window.__p3 = { groove: () => { const b = beatNow(); return { on: grooving(), shown: grooveShown, music: b.on, bpm: b.bpm, key: b.key, beat: b.beat, move: grooveMove(b.beat), dn: P.dance, sets: (window.__p3 && window.__p3.grooveSets) || 0 }; }, toggleGroove: () => toggleGroove(), fps: 0, frame: 0, view: viewInfo, cpu: 0, net, oth: others, scene: () => scene, merged: () => mergedInfo, camState: () => ({ yaw: C.yaw, pitch: C.pitch, dist: C.dist }), gfx: () => ({ calls: R.info.render.calls, triangles: R.info.render.triangles, geometries: R.info.memory.geometries, textures: R.info.memory.textures }), extras: () => extras, pos: null, input: (o) => { jv.test = true; if ('x' in o) jv.x = o.x; if ('y' in o) jv.y = o.y; if (o.jump) jumpQ = true; if ('run' in o) runT = o.run; }, toggleCam: () => toggleCam(), othersInfo: () => [...others.values()].map((o) => ({ y: o.y, th: o.th, dn: o.dn, ground: ground(o.x, o.z) })), treeTest: () => { let best = null, bd = 1e9; for (const t of trees) { const d = Math.hypot(t.x - P.x, t.z - P.z); if (d < bd && d > 6) { bd = d; best = t; } } if (!best) return null; const a = Math.atan2(best.x - P.x, best.z - P.z); P.x = best.x - Math.sin(a) * 4; P.z = best.z - Math.cos(a) * 4; P.y = ground(P.x, P.z); C.yaw = a + Math.PI; return { tx: best.x, tz: best.z, r: 0.45 * best.s }; }, emoteDance: (id) => emoteDance(id), teleport: (x, z, y) => { P.x = x; P.z = z; P.y = (y ?? ground(x, z)) + 0.1; dirty = true; }, colliders: () => ({ cyl: cyl.length, box: box.length }), ground, STUDIO, PLAY, HUB, portals: () => portals.map((p) => ({ id: p.id, x: p.x, z: p.z })), emote, say: (t) => say(t), setYaw: (y) => { C.yaw = y; }, dance: () => P.dance };
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);

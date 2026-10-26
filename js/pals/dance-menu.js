@@ -85,5 +85,36 @@ add('tinycrown', 2, [
   { aL: [168, 20, 30], aR: [168, 20, 30], hy: -0.02 },
 ], { gentle: 1 });
 
+// 🕺 Dance (the music button): a 32-beat routine of four kid-friendly moves, 8 beats (2 bars) each, so it changes every
+// couple of bars: bounce, arm swing, side step, paw wave. Two keys per beat and beat-indexed, so it locks to the song's beat
+// grid (js/pals/musicbeat.js) and everyone in the room who hears the same song dances in step.
+export const GROOVE = 'groove';
+{
+  const rep = (ks, n) => Array.from({ length: n }, () => ks).flat();
+  const bounce = [
+    { hy: -0.12, hx: -0.05, hrz: 0.07, aL: [36, 28, 70], aR: [28, 8, 50], nx: 0.08 },
+    { hy: 0.03, hx: 0.05, hrz: -0.07, aL: [28, 8, 50], aR: [36, 28, 70], nx: -0.06 },
+  ];
+  const swing = [
+    { aL: [150, 20, 28], aR: [36, -20, 70], hrz: 0.1, cz: 0.08, hy: -0.1 },
+    { aL: [96, 4, 40], aR: [96, 4, 40], hy: 0.02 },
+    { aL: [36, -20, 70], aR: [150, 20, 28], hrz: -0.1, cz: -0.08, hy: -0.1 },
+    { aL: [96, 4, 40], aR: [96, 4, 40], hy: 0.02 },
+  ];
+  const step = [
+    { hx: 0.1, hry: 0.22, hy: -0.08, lL: [16, 22, 24], aL: [28, 22, 64], aR: [24, -12, 48] },
+    { hx: -0.1, hry: -0.22, hy: -0.03, lR: [16, 22, 24], aL: [24, -12, 48], aR: [28, 22, 64] },
+  ];
+  const wave = [
+    { aR: [150, 16, 24], aL: [30, 10, 40], nz: -0.12, hy: -0.06 },
+    { aR: [120, 8, 48], aL: [30, 10, 40], nz: 0.1, hy: 0 },
+    { aL: [150, 16, 24], aR: [30, 10, 40], nz: 0.12, hy: -0.06 },
+    { aL: [120, 8, 48], aR: [30, 10, 40], nz: -0.1, hy: 0 },
+  ];
+  add(GROOVE, 32, [...rep(bounce, 8), ...rep(swing, 4), ...rep(step, 8), ...rep(wave, 4)], { ease: 'smooth' });
+}
+// which of the four moves is on at a beat (for the hint chip + tests)
+export const grooveMove = (beat) => ['Bounce', 'Arm Swing', 'Side Step', 'Paw Wave'][Math.floor((((beat % 32) + 32) % 32) / 8)];
+
 export const worldDanceIds = () => WORLD_DANCES.map((d) => d.id);
 export const worldDanceReady = () => WORLD_DANCES.every((d) => has3D(d.id) && d.id.length <= 20);
