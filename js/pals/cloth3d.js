@@ -11,13 +11,14 @@ export function rAt(y) { // torso radius at height y (monotonic in y along the s
   if (y <= PROF[0].y) return PROF[0].x; for (let i = 1; i < PROF.length; i++) if (PROF[i].y >= y) { const a = PROF[i - 1], b = PROF[i]; const k = (y - a.y) / Math.max(1e-6, b.y - a.y); return a.x + (b.x - a.x) * k; } return 0;
 }
 // body types: [width, height, depth] for the torso group
-const TYPES = { small: [0.9, 0.9, 0.92], medium: [1, 1, 1], large: [1.1, 1.05, 1.06], long: [0.93, 1.12, 0.94], round: [1.15, 0.95, 1.1] };
+const TYPES = { small: [0.9, 0.9, 0.92], medium: [1, 1, 1], large: [1.1, 1.05, 1.06], long: [0.93, 1.12, 0.94], round: [1.15, 0.95, 1.1], barrel: [1.24, 0.9, 1.26] };
 const BY = {
-  round: 'panda bear koala hamster hamsterb piglet penguin seal walrus manatee capybara sloth hippo pufferfish owl yeti rxyeti rxpanda whale rxwhale gorilla golem cupcake boba mole badger',
+  round: 'panda bear koala hamster hamsterb piglet penguin seal walrus manatee sloth hippo pufferfish owl yeti rxyeti rxpanda whale rxwhale gorilla golem cupcake boba mole badger',
   large: 'elephant rhino moose cow camel lion tiger trex triceratops bronto wolf husky rxdragon dragon griffin stego',
   long: 'giraffe deer fox otter flamingo swan seahorse rxkitsune zebra horse pegasus kirin unicorn alpaca dalmatian shark dolphin narwhal mermaid ptero',
   small: 'chick duckling mouse bee ladybug hummingbird butterfly firefly robin fairy caterpillar snail cherub rxmoth crab starfish clownfish',
 };
+BY.barrel = 'capybara'; // wide, deep barrel body (capybara)
 const TYPE_OF = {}; for (const [t, s] of Object.entries(BY)) for (const id of s.split(' ')) TYPE_OF[id] = t;
 export const bodyType = (id) => TYPE_OF[id] || 'medium';
 export const bodyScale = (id) => TYPES[bodyType(id)];

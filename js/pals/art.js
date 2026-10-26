@@ -95,7 +95,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   c.translate(0, bob); if (spin) { c.translate(0, -10); c.rotate(spin * face); c.translate(0, 10); }
   c.rotate(tilt); c.scale(face * sx * grow, sy * grow);
   // ---------------- rig: joints for arms (shoulder/elbow/hand) and legs (hip/knee/foot)
-  const hasLegs = kind === 'blob' && sp.feet !== 'none' && !floaty, legH = hasLegs ? 3.4 : 0;
+  const hasLegs = kind === 'blob' && sp.feet !== 'none' && !floaty, legH = hasLegs ? (ex.has('capyface') ? 2.3 : 3.4) : 0; // capybara: short stubby legs
   const armKind = kind !== 'blob' ? '' : ex.has('wings') ? 'wing' : ex.has('flippers') ? 'flipper' : 'paw';
   const RG = rigPose(st.mode === 'react' ? 'happy' : st.mode || 'idle', t, st.rig, leg);
   c.translate(0, -legH);
@@ -128,11 +128,11 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   drawWear(c, 'back', pal.outfit, WG());
   // ---------------- feet + body
   const feet = sp.feet;
-  const feetPos = hasLegs ? drawLegs(c, RG, { B, dark, line, light, feet, bodyG, legH, sp }) : null;
+  const feetPos = hasLegs ? drawLegs(c, RG, { B, dark, line, light, feet, bodyG, legH, sp, lw: ex.has('capyface') ? 3.5 : 2.9 }) : null;
   if (feetPos) drawWear(c, 'feet', pal.outfit, { ...WG(), feet: feetPos });
   if (!hasLegs && feet === 'flippers') { for (const s of [-1, 1]) { ell(c, s * 5, -0.8, 3.4, 1.3, s * 0.3); fillS(dark); } }
   if (kind === 'blob') {
-    ell(c, 0, -5.5 * bodyG, 6.8 * bodyG, 5.2 * bodyG); const g = c.createLinearGradient(0, -11, 0, 0); g.addColorStop(0, light); g.addColorStop(1, B); fillS(g);
+    if (ex.has('capyface')) { c.beginPath(); c.roundRect(-8 * bodyG, -11.2 * bodyG, 16 * bodyG, 11.6 * bodyG, 5.4 * bodyG); } else ell(c, 0, -5.5 * bodyG, 6.8 * bodyG, 5.2 * bodyG); const g = c.createLinearGradient(0, -11, 0, 0); g.addColorStop(0, light); g.addColorStop(1, B); fillS(g);
     if (ex.has('belly')) { c.fillStyle = sp.id === 'penguin' || sp.id === 'owl' ? '#fbf6ff' : shade(B, 0.55); ell(c, 0.5, -4.6 * bodyG, 4 * bodyG, 3.6 * bodyG); c.fill(); }
     if (ex.has('stripes')) { c.strokeStyle = A; c.lineWidth = 1.3; for (const a of [-4, 0, 4]) { c.beginPath(); c.moveTo(a, -10 * bodyG); c.lineTo(a + 1, -7 * bodyG); c.stroke(); } c.lineWidth = 1; c.strokeStyle = line; }
     if (ex.has('giraffespots')) { c.fillStyle = A; for (const [a, b] of [[-3, -7], [3, -5], [-1, -3], [4, -9]]) { ell(c, a, b * bodyG, 1.5, 1.2); c.fill(); } }
@@ -145,7 +145,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   const ears = sp.ears;
   const earPair = (fn) => { for (const s of [-1, 1]) P(() => fn(s)); };
   if (ears === 'round') earPair((s) => { ell(c, s * 6.5, hy - 6, 2.9, 2.9); fillS(ex.has('eyepatch') ? A : B); ell(c, s * 6.5, hy - 6, 1.5, 1.5); c.fillStyle = ex.has('eyepatch') ? shade(A, 0.2) : shade(A === '#ffffff' ? B : A, 0.45); c.fill(); });
-  if (ears === 'capy') earPair((s) => { c.translate(s * 5.9, hy - 6.5); c.rotate(s * (0.15 + earF)); ell(c, 0, 0, 1.8, 1.5); fillS(shade(B, -0.08)); ell(c, 0, 0.3, 0.9, 0.7); c.fillStyle = shade(A, 0.1); c.fill(); });
+  if (ears === 'capy') earPair((s) => { c.translate(s * 5.9, hy - 7.3); c.rotate(s * (0.35 + earF)); c.lineWidth = 0.6; ell(c, 0, 0, 1.1, 0.75); fillS(shade(B, -0.35)); ell(c, 0, 0.1, 0.45, 0.25); c.fillStyle = shade(A, -0.1); c.fill(); }); // tiny, high, toward the back
   if (ears === 'biground') earPair((s) => { ell(c, s * 8, hy - 4, 4.6, 4.6); fillS(B); ell(c, s * 8, hy - 4, 2.8, 2.8); c.fillStyle = A; c.fill(); });
   if (ears === 'pointy') earPair((s) => { c.translate(s * 5.8, hy - 5); c.rotate(s * (0.25 + earF)); c.beginPath(); c.moveTo(-3.4, 2); c.lineTo(0, -6 - stage); c.lineTo(3.4, 2); c.closePath(); fillS(sp.id === 'fox' || sp.id === 'redpanda' ? B : B); c.beginPath(); c.moveTo(-1.6, 1); c.lineTo(0, -3.6 - stage); c.lineTo(1.6, 1); c.closePath(); c.fillStyle = sp.id === 'piglet' ? A : shade('#ff9fc8', 0.3); c.fill(); });
   if (ears === 'long') earPair((s) => { c.translate(s * 3.8, hy - 6); c.rotate(s * (0.18 + earF)); ell(c, 0, -6, 2.8, 7 + stage); fillS(B); ell(c, 0, -6, 1.3, 5 + stage); c.fillStyle = A; c.fill(); });
@@ -157,7 +157,9 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (ex.has('mane')) P(() => { c.fillStyle = A; for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ell(c, Math.cos(a) * (hr + 1), hy + Math.sin(a) * 8.6, 3.4 + stage * 0.5, 3.4 + stage * 0.5); c.fill(); } });
   if (ex.has('wool')) P(() => { c.fillStyle = '#fff'; for (const [a, b] of [[-6, -6], [-2, -8], [2, -8], [6, -6], [0, -9]]) { ell(c, a, hy + b, 3.4, 3); c.fill(); c.stroke(); } });
   // ---------------- head
-  if (kind === 'blob') { ell(c, 0, hy, hr * (ex.has('cheeks') ? cheek * 1.05 : ex.has('capyface') ? 1.06 : 1), ex.has('capyface') ? 7.3 : 7.6); const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(0.6, shade(B, 0.25)); g.addColorStop(1, B); fillS(g); }
+  if (kind === 'blob' && ex.has('capyface')) { c.beginPath(); c.roundRect(-10.4, hy - 7.2, 20.8, 13.8, [7.6, 7.6, 6, 6]); const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 12); g.addColorStop(0, shade(B, 0.45)); g.addColorStop(0.6, shade(B, 0.15)); g.addColorStop(1, B); fillS(g); // boxy loaf head
+    P(() => { c.strokeStyle = shade(B, -0.28); c.lineWidth = 0.55; for (const [a, b, d] of [[-3.2, -7, -0.5], [-1.6, -7.4, 0], [0, -7.3, 0.4], [-8.6, -1, -0.9], [-9.4, 1.6, -0.8], [9.4, 1.8, 0.8], [8.8, -1.2, 0.9]]) { c.beginPath(); c.moveTo(a, hy + b + 0.9); c.lineTo(a + d * 0.6, hy + b - 0.5); c.stroke(); } }); } // shaggy tufts
+  else if (kind === 'blob') { ell(c, 0, hy, hr * (ex.has('cheeks') ? cheek * 1.05 : 1), 7.6); const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(0.6, shade(B, 0.25)); g.addColorStop(1, B); fillS(g); }
   if (kind === 'jelly') { c.beginPath(); c.moveTo(-10, hy + 6); c.bezierCurveTo(-10, hy - 10, 10, hy - 10, 10, hy + 6); c.quadraticCurveTo(5, hy + 9, 0, hy + 7); c.quadraticCurveTo(-5, hy + 9, -10, hy + 6); c.globalAlpha = 0.92; const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(1, B); fillS(g); c.globalAlpha = 1; }
   if (ex.has('cheeks')) { c.fillStyle = shade(B, 0.45); ell(c, -6.5, hy + 3, 3.4 * cheek, 2.8 * cheek); c.fill(); ell(c, 7.5, hy + 3, 3.4 * cheek, 2.8 * cheek); c.fill(); }
   if (ex.has('mask')) { c.fillStyle = '#fff6ee'; ell(c, -4.5, hy + 2, 3.4, 2.6); c.fill(); ell(c, 6, hy + 2, 3.4, 2.6); c.fill(); c.fillStyle = shade(B, 0.6); ell(c, 1, hy - 4.5, 1.6, 1.2); c.fill(); }
@@ -176,18 +178,23 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (ex.has('eyepatch')) { c.fillStyle = A; ell(c, -2.6, hy + 0.2, 2.9, 3.3, 0.4); c.fill(); ell(c, 4.8, hy + 0.2, 2.9, 3.3, -0.4); c.fill(); }
   if (ex.has('frogeyes')) for (const s of [-1, 1]) { ell(c, s * 4 + 1, hy - 6, 3.4, 3.2); fillS(B); }
   // ---------------- face
-  const fx = 1.2, ey = ex.has('frogeyes') ? hy - 6 : kind === 'star' ? hy + 1.5 : kind === 'cloud' ? -9 : hy - 0.1;
-  c.fillStyle = '#ff9fc8'; c.globalAlpha = ex.has('blush2') ? 0.95 : 0.75; ell(c, fx - 6, (ex.has('frogeyes') ? hy : ey) + 2.5, 1.9, 1.1); c.fill(); ell(c, fx + 6, (ex.has('frogeyes') ? hy : ey) + 2.5, 1.9, 1.1); c.fill(); c.globalAlpha = 1;
+  const CF = ex.has('capyface'), fx = 1.2, ey = ex.has('frogeyes') ? hy - 6 : CF ? hy - 2 : kind === 'star' ? hy + 1.5 : kind === 'cloud' ? -9 : hy - 0.1;
+  c.fillStyle = '#ff9fc8'; c.globalAlpha = ex.has('blush2') ? 0.95 : 0.75; const bx = CF ? 7.5 : 6, by = CF ? hy + 1.4 : (ex.has('frogeyes') ? hy : ey) + 2.5; ell(c, fx - bx, by, 1.9, 1.1); c.fill(); ell(c, fx + bx, by, 1.9, 1.1); c.fill(); c.globalAlpha = 1;
   const closed = mode === 'sleep' || (mode === 'happy' && Math.sin(t * 0.4) > 0.6) || (mode === 'idle' && t % 200 < 7) || mode === 'shake' || R === 'roar' || R === 'relax';
-  const eyeL = fx - 3.6, eyeR = fx + 3.6; const eyeCol = ex.has('eyepatch') ? '#1a1020' : E;
+  const eyeL = fx - (CF ? 4.3 : 3.6), eyeR = fx + (CF ? 4.3 : 3.6); const eyeCol = ex.has('eyepatch') ? '#1a1020' : E;
   if (closed) { c.strokeStyle = ex.has('eyepatch') ? '#fff' : E; c.lineWidth = 1.1; const u = mode === 'happy' || R ? -1.4 : 1; c.beginPath(); c.moveTo(eyeL - 1.5, ey); c.quadraticCurveTo(eyeL, ey + u, eyeL + 1.5, ey); c.moveTo(eyeR - 1.5, ey); c.quadraticCurveTo(eyeR, ey + u, eyeR + 1.5, ey); c.stroke(); }
+  else if (CF) { for (const x of [eyeL, eyeR]) { c.fillStyle = eyeCol; c.beginPath(); c.ellipse(x, ey - 0.2, 1.55, 1.7, 0, 0, Math.PI); c.closePath(); c.fill(); c.fillStyle = '#fff'; ell(c, x + 0.55, ey + 0.45, 0.42, 0.42); c.fill(); // sleepy half-lidded eyes
+      c.strokeStyle = E; c.lineWidth = 0.9; c.beginPath(); c.moveTo(x - 2, ey - 0.05); c.quadraticCurveTo(x, ey - 0.75, x + 2, ey - 0.05); c.stroke(); } }
   else if (ex.has('tinyeyes')) { c.fillStyle = eyeCol; ell(c, eyeL, ey - 0.6, 1.25, 1.45); c.fill(); ell(c, eyeR, ey - 0.6, 1.25, 1.45); c.fill(); c.fillStyle = '#fff'; ell(c, eyeL + 0.45, ey - 1.2, 0.5, 0.5); c.fill(); ell(c, eyeR + 0.45, ey - 1.2, 0.5, 0.5); c.fill(); ell(c, eyeL - 0.4, ey - 0.1, 0.22, 0.22); c.fill(); ell(c, eyeR - 0.4, ey - 0.1, 0.22, 0.22); c.fill(); }
   else { c.fillStyle = eyeCol; ell(c, eyeL, ey, 2, 2.3); c.fill(); ell(c, eyeR, ey, 2, 2.3); c.fill(); c.fillStyle = '#fff'; ell(c, eyeL + 0.6, ey - 0.9, 0.75, 0.75); c.fill(); ell(c, eyeR + 0.6, ey - 0.9, 0.75, 0.75); c.fill(); }
   c.strokeStyle = '#24133f'; c.lineWidth = 0.8;
-  const my = (ex.has('frogeyes') ? hy + 1 : ey) + 3; const snout = sp.snout;
+  const my = CF ? hy + 3.7 : (ex.has('frogeyes') ? hy + 1 : ey) + 3; const snout = sp.snout;
   if (snout === 'muzzle') { c.fillStyle = shade(B, 0.6); ell(c, fx, my - 0.4, 3.2, 2.3); c.fill(); }
-  if (snout === 'capy') { c.fillStyle = shade(B, -0.1); c.beginPath(); c.roundRect(fx - 5.4, my - 3.6, 10.8, 6, 3); c.fill(); c.fillStyle = shade(B, 0.12); ell(c, fx, my - 1.6, 3.6, 1.4); c.globalAlpha = 0.5; c.fill(); c.globalAlpha = 1;
-    c.fillStyle = shade(A, -0.35); c.beginPath(); c.roundRect(fx - 2.8, my - 2.9, 5.6, 2.1, 1.05); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; ell(c, fx - 0.9, my - 2.2, 0.8, 0.35); c.fill(); }
+  if (snout === 'capy') { const top = hy - 0.9; // big, tall, blunt rectangular muzzle (lower half of the face) + dark nose pad with two nostrils on top
+    c.fillStyle = shade(B, -0.2); c.strokeStyle = shade(B, -0.45); c.lineWidth = 0.6; c.beginPath(); c.roundRect(fx - 6.7, top, 13.4, 8.6, [3.8, 3.8, 4.4, 4.4]); c.fill(); c.stroke();
+    c.fillStyle = shade(B, 0.05); c.globalAlpha = 0.45; c.beginPath(); c.roundRect(fx - 5.4, top + 0.6, 10.8, 1.6, 0.8); c.fill(); c.globalAlpha = 1;
+    c.fillStyle = shade(A, -0.15); c.beginPath(); c.roundRect(fx - 3.5, top + 0.7, 7, 2.6, 1.3); c.fill(); c.fillStyle = '#1a0d06'; ell(c, fx - 1.5, top + 1.9, 0.6, 0.38, 0.4); c.fill(); ell(c, fx + 1.5, top + 1.9, 0.6, 0.38, -0.4); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.35)'; ell(c, fx - 1.6, top + 1.1, 0.9, 0.3); c.fill(); c.strokeStyle = shade(A, -0.3); c.lineWidth = 0.6; c.beginPath(); c.moveTo(fx, top + 3.3); c.lineTo(fx, my - 0.1); c.stroke(); c.strokeStyle = '#24133f'; c.lineWidth = 0.8; }
   if (snout === 'pig') { c.fillStyle = A; ell(c, fx, my - 0.6, 2.8, 2); c.fill(); c.stroke(); c.fillStyle = shade(A, -0.4); ell(c, fx - 1, my - 0.6, 0.5, 0.8); c.fill(); ell(c, fx + 1, my - 0.6, 0.5, 0.8); c.fill(); }
   if (snout === 'beak') { c.fillStyle = A; c.beginPath(); c.moveTo(fx - 1.4, my - 0.8); c.lineTo(fx + 1.4, my - 0.8); c.lineTo(fx, my + 1 + mouthOpen); c.closePath(); c.fill(); }
   if (snout === 'duckbill') { c.fillStyle = A; ell(c, fx + 0.6, my - 0.2, 3.2, 1.3 + mouthOpen * 0.6); c.fill(); c.strokeStyle = shade(A, -0.3); c.stroke(); }
@@ -260,12 +267,12 @@ function drawArms(c, R, { B, line, light, bodyG, sp, ex }) {
   }
   c.lineWidth = 1; c.strokeStyle = line;
 }
-function drawLegs(c, R, { B, dark, line, light, feet, bodyG, legH }) {
+function drawLegs(c, R, { B, dark, line, light, feet, bodyG, legH, lw = 2.9 }) {
   const hipY = -1.6, hipX = 3.1 * bodyG, L = (legH - hipY) / 2 + 0.15, out = [];
   for (const s of [-1, 1]) {
     const h = (s < 0 ? R.hL : R.hR) * D2R, k = (s < 0 ? R.kL : R.kR) * D2R;
     const x0 = s * hipX, y0 = hipY, x1 = x0 + Math.sin(h) * L, y1 = y0 + Math.cos(h) * L, x2 = x1 + Math.sin(h - k) * L, y2 = Math.min(legH, y1 + Math.cos(h - k) * L);
-    limb(c, x0, y0, x1, y1, x2, y2, 2.9 * bodyG, B, line);
+    limb(c, x0, y0, x1, y1, x2, y2, lw * bodyG, B, line);
     c.lineWidth = 0.9; c.strokeStyle = line;
     if (feet === 'webbed') { c.fillStyle = '#ffa53a'; c.strokeStyle = '#a8600f'; c.beginPath(); c.moveTo(x2 - 0.6, y2 - 0.6); c.lineTo(x2 - 1.4, y2 + 0.5); c.lineTo(x2 + 3.4, y2 + 0.5); c.closePath(); c.fill(); c.stroke(); }
     else if (feet === 'flippers') { c.fillStyle = dark; ell(c, x2 + 1, y2, 3.2, 1.2, 0.15); c.fill(); c.stroke(); }
