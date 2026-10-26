@@ -513,47 +513,44 @@ service cloud.firestore {
 
       match /notifications/{nid} {
         allow read, delete: if actingAs(uid);
+        // shared note shape (all four create paths below)
+        function nShape(qq) { return qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read']) && qq.createdAt == request.time && qq.read == false; }
         // "Kemy Security" new-device alert, written by the owner's own new device to their own inbox.
         function z58() { let qq = request.resource.data; return signedIn() && uid == me() && sessionOk(uid)
-          && qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && nShape(qq)
           && qq.type == 'security' && qq.fromUid == me()
           && qq.fromName == 'Kemy Security' && qq.fromUsername == ''
           && isStr(qq.postId, 0, 40) && isStr(qq.text, 1, 200)
-          && qq.text.matches('^New sign-in on .*')
-          && qq.createdAt == request.time && qq.read == false; }
+          && qq.text.matches('^New sign-in on .*'); }
         allow create: if z58();
         // The invited user tells the admin who invited them how they answered.
         function z57() { let qq = request.resource.data; return signedIn() && qq.type == 'mod_invite' && qq.fromUid == me()
-          && qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && nShape(qq)
           && exists(/databases/$(database)/documents/modInvites/$(me()))
           && get(/databases/$(database)/documents/modInvites/$(me())).data.by == uid
           && qq.fromName == get(userPath(me())).data.displayName
           && qq.fromUsername == get(userPath(me())).data.username
-          && qq.postId == '' && cleanStr(qq.text, 0, 140)
-          && qq.createdAt == request.time && qq.read == false; }
+          && qq.postId == '' && cleanStr(qq.text, 0, 140); }
         allow create: if z57();
         // Moderator notices ("Thanks, we took action" / warnings / suspensions), shown as "Kemy Moderators".
         function z56() { let qq = request.resource.data; return isMod() && exists(userPath(uid))
-          && qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && nShape(qq)
           && qq.type == 'mod' && qq.fromUid == me()
           && qq.fromName == 'Kemy Moderators' && qq.fromUsername == ''
-          && isStr(qq.postId, 0, 100) && cleanStr(qq.text, 1, 400)
-          && qq.createdAt == request.time && qq.read == false; }
+          && isStr(qq.postId, 0, 100) && cleanStr(qq.text, 1, 400); }
         allow create: if z56();
         allow update: if actingAs(uid)
           && changed().hasOnly(['read']) && request.resource.data.read is bool;
         function z55() { let qq = request.resource.data; return signedIn() && !isBlocked(uid, qq.fromUid)
           && exists(userPath(uid))
-          && qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read'])
+          && nShape(qq)
           && qq.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode', 'house', 'friend', 'friend_ok']
           && actingAs(qq.fromUid)
           && qq.fromUid != uid
           && qq.fromName == get(userPath(qq.fromUid)).data.displayName
           && qq.fromUsername == get(userPath(qq.fromUid)).data.username
           && isStr(qq.postId, 0, 100)
-          && cleanStr(qq.text, 0, 140)
-          && qq.createdAt == request.time
-          && qq.read == false; }
+          && cleanStr(qq.text, 0, 140); }
         allow create: if z55();
       }
     }
@@ -2552,9 +2549,9 @@ service cloud.firestore {
         && (!('floors' in d) || (isStr(d.floors, 1, 160) && d.floors.matches('^([c]?[LKBTHU]:#[0-9a-fA-F]{6})(,[c]?[LKBTHU]:#[0-9a-fA-F]{6})*$')))
         && (!('items' in d) || isStr(d.items, 0, 2000)) && (!('ext' in d) || extOk(d.ext)) && (!('v' in d) || d.v is int); }
       // open house / invites (uids + usernames for display), house radio, decor: owner-only, size-limited
-      function extrasOk() { return (!('open' in hd()) || hd().open is bool) && (!('inv' in hd()) || (hd().inv is list && hd().inv.size() <= 50)) && (!('invN' in hd()) || (hd().invN is list && hd().invN.size() <= 50))
-        && (!('radio' in hd()) || radioOk(hd().radio)) && (!('decor' in hd()) || decorOk(hd().decor)) && (!('cars' in hd()) || carsOk(hd().cars))
-        && (!('door' in hd()) || (hd().door is map && hd().door.size() <= 20)); }
+      function capL(k) { return !(k in hd()) || (hd()[k] is list && hd()[k].size() <= 50); }
+      function extrasOk() { return (!('open' in hd()) || hd().open is bool) && capL('inv') && capL('invN') && (!('door' in hd()) || (hd().door is map && hd().door.size() <= 20))
+        && (!('radio' in hd()) || radioOk(hd().radio)) && (!('decor' in hd()) || decorOk(hd().decor)) && (!('cars' in hd()) || carsOk(hd().cars)); }
       // Gold palace sign. Only homes/h489, admin writes (update already requires isAdmin there). 24 letters on the client; 48 covers emoji.
       function signOk() { return !('sign' in hd()) || (plot == 'h489' && cleanStr(hd().sign, 1, 48) && kidSafe(hd().sign)); }
       function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor', 'cars', 'sign', 'door']) && extrasOk() && signOk() && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 7
@@ -2668,11 +2665,9 @@ service cloud.firestore {
     // Closed sale houses stay owner / open-house / invite only, plus a doorbell let-in (homes.door[uid] = until ms; never a blocked visitor).
     match /houseHere/{plot}/who/{uid} {
       function hp() { return /databases/$(database)/documents/homes/$(plot); }
-      function houseOpen() {
-        return !exists(hp()) || plot == 'h489' || get(hp()).data.owner == me()
-          || get(hp()).data.get('open', false) == true || me() in get(hp()).data.get('inv', [])
-          || (get(hp()).data.get('door', {}).get(me(), 0) > request.time.toMillis() && !blockedBy(get(hp()).data.owner));
-      }
+      function hOk(h) { return h.owner == me() || h.get('open', false) == true || me() in h.get('inv', [])
+          || (h.get('door', {}).get(me(), 0) > request.time.toMillis() && !blockedBy(h.owner)); }
+      function houseOpen() { return !exists(hp()) || plot == 'h489' || hOk(get(hp()).data); }
       function hh() {
         let d = request.resource.data;
         let meDoc = get(userPath(uid)).data;
