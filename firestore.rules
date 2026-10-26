@@ -1144,7 +1144,6 @@ service cloud.firestore {
         return get(r).data.status == 'pending' && getAfter(r).data.status == 'accepted'; }
       function z43f() { let qq = request.resource.data; return signedIn()
         && qq.keys().hasOnly(['follower', 'followee', 'createdAt'])
-        && qq.follower is string && qq.followee is string
         && fid == qq.follower + '_' + qq.followee
         && qq.createdAt == request.time
         && ((qq.followee == me() && frAccepted(qq.follower)) || (qq.follower == me() && frAccepted(qq.followee))); }
@@ -1160,36 +1159,29 @@ service cloud.firestore {
     function frOn(u) { return knownTeen(get(userPath(u)).data) && !exists(u13Path(u)); }
     match /friendcap/{uid} {
       allow read: if signedIn() && uid == me();
-      allow create, update: if signedIn() && uid == me()
-        && request.resource.data.keys().hasOnly(['start', 'n', 'at'])
-        && request.resource.data.at == request.time
-        && ((resource == null || request.time > resource.data.start + duration.value(1, 'd'))
-            ? (request.resource.data.n == 1 && request.resource.data.start == request.time)
-            : (request.resource.data.n == resource.data.n + 1 && request.resource.data.n <= 20
-               && request.resource.data.start == resource.data.start));
+      allow create, update: if signedIn() && uid == me() && frCap(request.resource.data,
+        resource == null || request.time > resource.data.start + duration.value(1, 'd'));
+      function frCap(d, s) { return d.keys().hasOnly(['start', 'n', 'at']) && d.at == request.time && d.n <= 20
+        && d.n == (s ? 1 : resource.data.n + 1) && d.start == (s ? request.time : resource.data.start); }
     }
     match /friendreq/{rid} {
       allow read: if signedIn() && (resource == null ? me() in rid.split('_') : (resource.data.from == me() || resource.data.to == me()));
-      function frSend() { let qq = request.resource.data; return signedIn() && notBanned()
+      // both sides ok: not banned/paused, no block either way, 13+ known age
+      function frOk(o) { return notBanned() && !isBlocked(o, me()) && !isBlocked(me(), o) && (isAdmin() || frOn(me())) && frOn(o); }
+      function frSend() { let qq = request.resource.data; let u = get(userPath(me())).data; return signedIn()
         && qq.keys().hasOnly(['from', 'to', 'name', 'uname', 'status', 'at'])
-        && qq.from == me() && qq.to is string && qq.to != me() && rid == me() + '_' + qq.to
+        && qq.from == me() && qq.to != me() && rid == me() + '_' + qq.to
         && qq.status == 'pending' && qq.at == request.time
-        && qq.name == get(userPath(me())).data.displayName && qq.uname == get(userPath(me())).data.username
-        && !isBlocked(qq.to, me()) && !isBlocked(me(), qq.to)
-        && (isAdmin() || frOn(me())) && frOn(qq.to)
+        && qq.name == u.displayName && qq.uname == u.username && frOk(qq.to)
         && getAfter(/databases/$(database)/documents/friendcap/$(me())).data.at == request.time; }
       allow create: if frSend();
       // the sender asks again: after an accept (they unfollowed since) or 3 days after a decline
-      allow update: if frSend() && resource.data.from == me()
-        && (resource.data.status == 'accepted'
+      allow update: if frSend() && (resource.data.status == 'accepted'
             || (resource.data.status == 'declined' && request.time > resource.data.at + duration.value(3, 'd')));
-      // the receiver answers a pending request
-      allow update: if signedIn() && resource.data.to == me() && resource.data.status == 'pending'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'at'])
-        && request.resource.data.status in ['accepted', 'declined'] && request.resource.data.at == request.time
-        && (request.resource.data.status == 'declined'
-            || (notBanned() && !isBlocked(me(), resource.data.from) && !isBlocked(resource.data.from, me())
-                && (isAdmin() || frOn(me())) && frOn(resource.data.from)));
+      // the receiver answers a pending request (a yes re-checks both sides)
+      allow update: if signedIn() && resource.data.to == me() && resource.data.status == 'pending' && frAns(request.resource.data);
+      function frAns(d) { return d.diff(resource.data).affectedKeys().hasOnly(['status', 'at']) && d.at == request.time
+        && (d.status == 'declined' || (d.status == 'accepted' && frOk(resource.data.from))); }
       // the receiver can clear it; the sender only once it was accepted (so a decline's cooldown can't be skipped)
       allow delete: if signedIn() && (resource.data.to == me() || (resource.data.from == me() && resource.data.status == 'accepted') || isAdmin());
     }
