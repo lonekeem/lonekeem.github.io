@@ -178,6 +178,18 @@ export const HOUSE_BY_ID = Object.fromEntries(HOUSES.map((h) => [h.id, h]));
 const sstep = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 export function segD(x, z, r) { const [ax, az] = r.a, [bx, bz] = r.b; const dx = bx - ax, dz = bz - az; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - ax - dx * t, z - az - dz * t); }
 export const roadD = (x, z) => { let d = 1e9; for (const r of ROADS.concat(ROADS2, ROADS3, ROADS4)) d = Math.min(d, segD(x, z, r) - r.w / 2); return d; };
+// poles (street lamps, sign posts, lot lights) must stand fully off the asphalt: their whole footprint (radius r) clears every road,
+// crossing and country road. The old fixed 22 m lamp loop never looked at the cross streets, so some lamps landed in a0/a1/a2/pa.
+export const POLE_R = 0.45; // lamp cap radius 0.4 + a hair
+export const poleClear = (x, z, r = POLE_R) => roadD(x, z) >= r;
+// Kemy Street lamps: one every 22 m on alternating curbs (on the sidewalk, 0.6 m in from the kerb). A spot that would land on a
+// crossing road (or too close to another lamp) slides along its own curb to the nearest clear spot, or is dropped.
+export function streetLamps() { const lamps = [];
+  for (const r of ROADS) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az);
+    for (let t0 = 6; t0 < len; t0 += 22) { const s = (Math.floor(t0 / 22) % 2) ? 1 : -1; const ox = Math.cos(ang) * s * (r.w / 2 + 0.6), oz = -Math.sin(ang) * s * (r.w / 2 + 0.6);
+      for (const dt of [0, 3, -3, 6, -6, 9, -9, 12, -12]) { const t = t0 + dt; if (t < 1 || t > len - 1) continue; const k = t / len, x = ax + (bx - ax) * k + ox, z = az + (bz - az) * k + oz;
+        if (!poleClear(x, z) || lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 9)) continue; lamps.push({ x, z, s, ang, road: r.id, moved: dt !== 0 }); break; } } }
+  return lamps; }
 
 // ---------------------------------------------------------------- big-world ground: flat country, rivers, sea, rim hills, hillside estates
 const rectD = (r, x, z) => { const dx = Math.max(r.x0 - x, x - r.x1), dz = Math.max(r.z0 - z, z - r.z1); return dx > 0 || dz > 0 ? Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) : Math.max(dx, dz); }; // < 0 inside

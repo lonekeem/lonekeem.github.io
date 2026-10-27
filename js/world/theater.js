@@ -4,7 +4,7 @@
 // Presence inside reuses the house presence channel (houseHere/h990), sitting reuses P.sit, snacks are Star Coins only
 // (the normal Pal Shop path). One shared doc theater/lone-keem-studio holds colors, decor, lights and the screen; only the
 // admin / ∞ Pass (isUnlimited, the same unlimitedFor() path in firestore.rules) can write it.
-import { THEATER, FLAT, roomState } from './layout.js';
+import { THEATER, FLAT, roomState, poleClear } from './layout.js';
 import { buildCar, poseCar, CARS } from './cars.js';
 import { SURF, DEF, hexOk, parseT, serT, makeKit, buildExterior, buildInterior, IN } from './theater-build.js';
 import { THEATER_SONGS } from './theater-songs.js';
@@ -149,6 +149,7 @@ export function attachTheater(api, W, K, { far }) {
     for (const c of [...grp.children]) { c.removeFromParent(); c.geometry && c.geometry.dispose(); }
     const seats = [];
     for (const it of L) {
+      if (out && ['xl', 'xp'].includes(it.c) && !poleClear(OX + it.x, OZ + it.z, it.c === 'xl' ? 0.3 : 0.6)) continue; // never a lamp / planter (or its collider) on the road
       y0 = out ? 0 : z === 'li' ? IN.LY : yIn(it.x, it.z);
       for (const s of kit.piece('d', 'dg', it, y0, !out)) seats.push({ x: s.x + (out ? OX : RX), z: s.z + (out ? OZ : RZ), y: s.y + FLAT, yaw: s.yaw, fl: y0 + FLAT, zone: z });
       if (out && ['xl', 'xp'].includes(it.c)) { const ft = it.c === 'xl' ? 0.25 : 0.55; const b = { x0: OX + it.x - ft, x1: OX + it.x + ft, z0: OZ + it.z - ft, z1: OZ + it.z + ft, top: FLAT + (it.c === 'xl' ? 99 : 1.2), bot: FLAT - 1, theaterDecor: 1 }; odBoxes.push(b); api.box.push(b); }

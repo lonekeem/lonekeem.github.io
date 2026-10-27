@@ -3,7 +3,7 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
-import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear } from './layout.js';
+import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear, streetLamps } from './layout.js';
 import { attachCities, applyExt, forgetTagged } from './cities.js';
 import { attachMap } from './map.js';
 const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
@@ -153,9 +153,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const batIM = new THREE.InstancedMesh(batG, new THREE.MeshBasicMaterial({ color: '#4c3a78', side: THREE.DoubleSide }), Math.max(1, bats.length * 3)); batIM.count = bats.length * 3; root.add(batIM); // paper bat garlands (cute, purple)
 
   // ---------------------------------------------------------------- street lamps (instanced) + pooled point lights
-  for (const r of ROADS) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az);
-    for (let t = 6; t < len; t += 22) { const k = t / len, s = (Math.floor(t / 22) % 2) ? 1 : -1; const ox = Math.cos(ang) * s * (r.w / 2 + 0.6), oz = -Math.sin(ang) * s * (r.w / 2 + 0.6); const x = ax + (bx - ax) * k + ox, z = az + (bz - az) * k + oz;
-      if (lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 9)) continue; lamps.push({ x, z, s, ang }); cyl.push({ x, z, r: 0.14, top: 99 }); } }
+  for (const l of streetLamps()) { lamps.push(l); cyl.push({ x: l.x, z: l.z, r: 0.14, top: 99 }); } // placed off every road (layout.js)
   const postIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.11, 4.4, 8), std('#2b2840', { r: 0.4, m: 0.6 }), lamps.length), headIM = new THREE.InstancedMesh(new THREE.SphereGeometry(0.28, 14, 10), new THREE.MeshStandardMaterial({ color: '#fff3c4', emissive: '#ffe08a', emissiveIntensity: 2.4 }), lamps.length);
   const capIM = new THREE.InstancedMesh(new THREE.ConeGeometry(0.4, 0.3, 12), std('#2b2840', { r: 0.4, m: 0.6 }), lamps.length);
   lamps.forEach((l, i) => { tmpM.compose(tv.set(l.x, FLAT + 2.2, l.z), tq.identity(), ts.set(1, 1, 1)); postIM.setMatrixAt(i, tmpM); tmpM.compose(tv.set(l.x, FLAT + 4.45, l.z), tq.identity(), ts.set(1, 1, 1)); headIM.setMatrixAt(i, tmpM); tmpM.compose(tv.set(l.x, FLAT + 4.75, l.z), tq.identity(), ts.set(1, 1, 1)); capIM.setMatrixAt(i, tmpM); });

@@ -2,7 +2,7 @@
 // Sunny Shore beach. Geometry is merged per 64 m chunk and whole chunks are hidden when far (chunked streaming /
 // culling); trees, palms, lamps and umbrellas are instanced. NPC cars drive the loop both ways and always stop for
 // people. All names and designs are original. Written by Lone Keem.
-import { ROADS2, HWY, DOWNTOWN, FIELDS, SHORE, SEA_Y, FLAT, EAST, segD, SNOW, DESERT, LAKE, TOWNS, HOUSES } from './layout.js';
+import { ROADS2, HWY, DOWNTOWN, FIELDS, SHORE, SEA_Y, FLAT, EAST, segD, SNOW, DESERT, LAKE, TOWNS, HOUSES, poleClear } from './layout.js';
 import { buildCar, poseCar, CARS } from './cars.js';
 
 const CH = 64;
@@ -39,7 +39,7 @@ export function attachEast(api, W, K) {
         else if (!(rd.id === 'd2' && (cz < DOWNTOWN.z0 - 10 || cz > DOWNTOWN.z1 + 12))) for (const s of [-1, 1]) P2('walk', G.box, '#c9c4bb', cx - dz * s * (rd.w / 2 + 1.3), FLAT + 0.09, cz + dx * s * (rd.w / 2 + 1.3), ang, 2.6, 0.14, l); }
       for (let t = 3; t < len - 3; t += rd.hw ? 7 : 4) { const k = t / len; P2('mark', G.plane, rd.hw ? '#f5f5f5' : '#ffd84a', ax + (bx - ax) * k, y + 0.018, az + (bz - az) * k, ang, 0.18, 1, rd.hw ? 3 : 2); } }
     // highway lamps (instanced, no real lights: it's daytime out east)
-    const spots = []; for (const rd of ROADS2.filter((q) => q.hw)) { const [ax, az] = rd.a, [bx, bz] = rd.b; const len = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / len, dz = (bz - az) / len; for (let t = 10; t < len - 6; t += LOW ? 36 : 24) { const x = ax + dx * t - dz * (rd.w / 2 + 1.2), z = az + dz * t + dx * (rd.w / 2 + 1.2); if (inRoad(x, z, 1)) continue; spots.push([x, z, Math.atan2(-dz, dx)]); } }
+    const spots = []; for (const rd of ROADS2.filter((q) => q.hw)) { const [ax, az] = rd.a, [bx, bz] = rd.b; const len = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / len, dz = (bz - az) / len; for (let t = 10; t < len - 6; t += LOW ? 36 : 24) { const x = ax + dx * t - dz * (rd.w / 2 + 1.2), z = az + dz * t + dx * (rd.w / 2 + 1.2); if (inRoad(x, z, 1) || !poleClear(x, z, 1)) continue; spots.push([x, z, Math.atan2(-dz, dx)]); } }
     const poleG = new THREE.CylinderGeometry(0.09, 0.12, 6, 8); poleG.translate(0, 3, 0); const headG = new THREE.BoxGeometry(1.4, 0.18, 0.4); headG.translate(0.6, 6, 0);
     const poleIM = new THREE.InstancedMesh(poleG, std('#5b6170', { m: 0.6, r: 0.4 }), spots.length), headIM = new THREE.InstancedMesh(headG, std('#fff7d6', { e: '#fff3c4', ei: 0.6 }), spots.length);
     spots.forEach(([x, z, a], i) => { tq.setFromAxisAngle(UP, a); M.compose(tv.set(x, ground(x, z), z), tq, ts.set(1, 1, 1)); poleIM.setMatrixAt(i, M); headIM.setMatrixAt(i, M); cyl.push({ x, z, r: 0.2, top: 99 }); }); root.add(poleIM, headIM); }
@@ -77,15 +77,15 @@ export function attachEast(api, W, K) {
 
   // ---------------------------------------------------------------- Sunny Shore: palms, umbrellas, towels, lifeguard hut, sandcastles, a pier
   const umb = [];
-  { const palms = []; for (let x = 108; x < 378; x += LOW ? 16 : 10) { const z = SHORE.z0 + 2 + r() * 5; if (inRoad(x, z, 2)) continue; palms.push([x, z, r()]); }
-    for (let x = 140; x < 360; x += 24) for (let z = SHORE.z0 + 6; z < SHORE.z0 + 13; z += 6) if (!inRoad(x, z, 1)) palms.push([x + r() * 6, z, r()]);
+  { const palms = []; for (let x = 108; x < 378; x += LOW ? 16 : 10) { const z = SHORE.z0 + 2 + r() * 5; if (inRoad(x, z, 2) || !poleClear(x, z, 2)) continue; palms.push([x, z, r()]); }
+    for (let x = 140; x < 360; x += 24) for (let z = SHORE.z0 + 6; z < SHORE.z0 + 13; z += 6) if (!inRoad(x, z, 1)) { const jx = x + r() * 6, k = r(); if (poleClear(jx, z, 1)) palms.push([jx, z, k]); }
     const trunkG = new THREE.CylinderGeometry(0.16, 0.26, 6, 7); trunkG.translate(0, 3, 0); const leafG = new THREE.ConeGeometry(2.6, 1.2, 7); leafG.translate(0, 6.2, 0);
     const tI = new THREE.InstancedMesh(trunkG, std('#9a7148', { r: 0.9 }), palms.length), lI = new THREE.InstancedMesh(leafG, std('#2fa84f', { r: 0.7 }), palms.length);
     palms.forEach(([x, z, k], i) => { tq.setFromEuler(new THREE.Euler(0.08 * (k - 0.5), k * 6, 0.1 * (k - 0.5))); M.compose(tv.set(x, ground(x, z), z), tq, ts.set(1, 0.85 + k * 0.35, 1)); tI.setMatrixAt(i, M); lI.setMatrixAt(i, M); cyl.push({ x, z, r: 0.35, top: 99 }); }); tI.castShadow = lI.castShadow = !LOW; root.add(tI, lI);
     const NU = LOW ? 8 : 16; const capG = new THREE.ConeGeometry(1.6, 0.6, 10); capG.translate(0, 2.3, 0); const stickG = new THREE.CylinderGeometry(0.04, 0.04, 2.3, 6); stickG.translate(0, 1.15, 0);
     const cI = new THREE.InstancedMesh(capG, std('#fff', { r: 0.6 }), NU), sI = new THREE.InstancedMesh(stickG, std('#f8fafc'), NU), towI = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.03, 2), std('#fff'), NU);
     const UC = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ec4899'];
-    for (let i = 0; i < NU; i++) { const x = 130 + i * (230 / NU) + r() * 6, z = SHORE.z0 + 9 + r() * 4; if (inRoad(x, z, 1)) continue; const y = ground(x, z); M.compose(tv.set(x, y, z), tq.identity(), ts.set(1, 1, 1)); cI.setMatrixAt(i, M); sI.setMatrixAt(i, M); cI.setColorAt(i, col.set(UC[i % UC.length])); tq.setFromAxisAngle(UP, r()); M.compose(tv.set(x + 1.4, y + 0.03, z + 0.4), tq, ts.set(1, 1, 1)); towI.setMatrixAt(i, M); towI.setColorAt(i, col.set(UC[(i + 3) % UC.length])); umb.push([x, z]); }
+    for (let i = 0; i < NU; i++) { const x = 130 + i * (230 / NU) + r() * 6, z = SHORE.z0 + 9 + r() * 4; if (inRoad(x, z, 1) || !poleClear(x, z, 1.7)) continue; const y = ground(x, z); M.compose(tv.set(x, y, z), tq.identity(), ts.set(1, 1, 1)); cI.setMatrixAt(i, M); sI.setMatrixAt(i, M); cI.setColorAt(i, col.set(UC[i % UC.length])); tq.setFromAxisAngle(UP, r()); M.compose(tv.set(x + 1.4, y + 0.03, z + 0.4), tq, ts.set(1, 1, 1)); towI.setMatrixAt(i, M); towI.setColorAt(i, col.set(UC[(i + 3) % UC.length])); umb.push([x, z]); }
     root.add(cI, sI, towI);
     // lifeguard hut + sandcastles
     const lx = 250, lz = SHORE.z0 + 8, ly = ground(lx, lz); for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) P2('wood', G.box, '#f5f5f4', lx + dx, ly + 1.5, lz + dz, 0, 0.18, 3, 0.18); P2('bld', G.box, '#ef4444', lx, ly + 3.6, lz, 0, 2.6, 1.6, 2.6); P2('roof', G.cone4, '#fef08a', lx, ly + 4.9, lz, Math.PI / 4, 4, 1, 4); box.push({ x0: lx - 1.3, x1: lx + 1.3, z0: lz - 1.3, z1: lz + 1.3, top: 99, bot: -99 });
