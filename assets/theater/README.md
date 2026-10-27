@@ -19,9 +19,10 @@ Countdowns run 5:00 before each start (A :55, A :40, B :55, B :25, B :40). Each 
 the first 4 s are the poster title card, the **last 4 s (`CARD`) a full-screen credit card** (black, gold frame, big
 white/gold type: title, makers, "Licensed under CC BY 4.0", the license deed address and the source page), so no
 start time moves. Multi-part films get it once, before part 1. The seat "Screen view" fills the phone with it.
-While a film (or its card) is up, a **credit line** (credit + license, 13 px, top-left of the theater HUD) stays on
-screen; tap it, or **📜 Film credits & licenses** in the 🕒 Showtimes list, for the **credits panel** (every film, makers,
-license + deed, source page, the BY-SA "shown unmodified except split/re-encoded" note). Web addresses there and on
+When a film (or each back-to-back short) starts, or you walk in mid-film, a one-line **credit line** (title, makers
+truncated with …, license; under the Stuck button / minimap) shows for 8 s, then fades to a small round 🎬 button. It is off
+while the big card is up (your own name tag hides then too, so it never covers "Starting in"). Tap it, or **📜 Film credits & licenses** in the 🕒 Showtimes list, for the **credits panel** (every film, makers,
+license + deed, source page, the BY-SA "shown unmodified except split/re-encoded" note; the Stuck and top-right buttons hide while a theater panel is open). Web addresses there and on
 `#/sounds` are plain selectable text, never links (kid-directed app: no `<a href>` / `window.open` to outside sites).
 Singularity (6:31) joined after the 2-hour program was laid out: the 8 quarter-hour steps are all used
 (Ada 45 min, Pepper&Carrot 30, three 15-min slots), so it plays right after Ada in the same slot instead of on its own quarter hour.

@@ -265,9 +265,9 @@ export function attachTheater(api, W, K, { far }) {
   let econ = null, held = null, heldSpr = null;
   async function econReady() { if (!uid) throw new Error('Sign in to buy snacks.'); if (!econ) { const [{ createEconomy }, sn] = await Promise.all([import('../pals/economy.js'), import('./theater-snacks.js')]); await sn.registerTheaterSnacks(); econ = createEconomy(db, uid); } return econ; }
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  let panel = null; function closePanels() { if (panel) { panel.remove(); panel = null; } if (editP) { editP.remove(); editP = null; } }
+  let panel = null; function closePanels() { document.body.classList.remove('th-pnl'); if (panel) { panel.remove(); panel = null; } if (editP) { editP.remove(); editP = null; } }
   async function snackMenu(who) {
-    closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; panel = d; K.hud.appendChild(d);
+    closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; panel = d; K.hud.appendChild(d); document.body.classList.add('th-pnl');
     d.innerHTML = `<div class="ks-card th-card"><h3>🍿 Snack Bar</h3><p class="th-sub">${who ? esc(who) + ': ' : ''}Everything is paid with ⭐ Star Coins you earn in Kemy. No real money, ever.</p><div class="th-w">⭐ …</div><div class="th-grid"></div><h4>🎒 My snacks</h4><div class="th-mine">…</div><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`;
     d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('.th-x')) closePanels(); });
     let E; try { E = await econReady(); } catch (e) { d.querySelector('.th-w').textContent = e.message || 'Sign in to buy snacks.'; return; }
@@ -289,7 +289,7 @@ export function attachTheater(api, W, K, { far }) {
   // ---------------------------------------------------------------- HUD (inside): snacks, view, sound, edit, exit
   if (!document.getElementById('th-css')) { const c = document.createElement('style'); c.id = 'th-css'; c.textContent = `
 .th-hud{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 172px);display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:auto;z-index:7}
-.th-hud[hidden]{display:none}.th-crl{position:absolute;left:max(10px,env(safe-area-inset-left));bottom:calc(max(10px,env(safe-area-inset-bottom)) + 270px);max-width:min(72vw,340px);z-index:6;pointer-events:auto;text-align:left;border:1px solid rgba(212,175,55,.6);border-radius:10px;background:rgba(0,0,0,.66);color:#fff;font:700 13px/1.3 Inter,system-ui,sans-serif;padding:6px 9px;text-shadow:0 1px 2px #000}.th-crl[hidden]{display:none}@media (orientation:landscape){.th-crl{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 62px);max-width:min(36vw,340px)}}.th-crl small{display:block;color:#ffd36b;font-size:11px;font-weight:800;margin-top:2px}
+.th-hud[hidden]{display:none}.th-crl{position:absolute;left:max(10px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + 312px);z-index:6;pointer-events:auto;display:flex;align-items:center;gap:6px;max-width:min(72vw,340px);height:30px;box-sizing:border-box;border:1px solid rgba(212,175,55,.6);border-radius:15px;background:rgba(0,0,0,.62);color:#fff;font:700 12px/1 Inter,system-ui,sans-serif;padding:0 10px 0 8px;white-space:nowrap;text-shadow:0 1px 2px #000;transition:opacity .6s ease}.th-crl[hidden]{display:none}.th-crl.fo{opacity:0}.th-crl b{flex:none;font-weight:800}.th-crl .mk{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:600;opacity:.9}.th-crl i{flex:none;font-style:normal;font-weight:800;color:#ffd36b}.th-crl.mini{width:34px;height:34px;max-width:none;padding:0;border-radius:50%;justify-content:center;font-size:17px;background:rgba(0,0,0,.55)}@media (orientation:landscape){.th-crl{top:calc(max(8px,env(safe-area-inset-top)) + 164px);max-width:min(45vw,380px)}}body.th-pnl .kh-stuck,body.th-pnl #p3-rot,body.th-pnl #p3-set,body.th-pnl #game-music,body.th-pnl .th-crl,body.th-cardup .p3-tag.me>span{visibility:hidden}
 .th-cf{padding:8px 10px;margin:6px 0;border-radius:12px;background:rgba(255,255,255,.07);font-size:14px;line-height:1.4}.th-cf b{color:#fff6dc;font-size:16px}.th-cf p{margin:3px 0}.th-cf .th-k{color:#ffd36b;font-weight:800}.th-url{user-select:text;-webkit-user-select:text;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#fff;word-break:break-all;background:rgba(0,0,0,.3);padding:0 4px;border-radius:4px}.th-cbtn{width:100%;margin-top:6px}
 .th-hud button{min-height:40px;border-radius:999px;border:1px solid rgba(212,175,55,.7);background:rgba(60,4,18,.82);color:#fff6dc;font:800 13px Inter,system-ui,sans-serif;padding:0 12px}
 .th-card{background:#3a0712!important;border:2px solid #d4af37}.th-card h3{color:#ffd36b}.th-card h4{margin:12px 0 6px;color:#ffd36b}.th-sub{margin:0 0 8px;opacity:.85;font-size:13px}.th-w{font-weight:900;margin:4px 0 8px}
@@ -303,10 +303,17 @@ export function attachTheater(api, W, K, { far }) {
 @media (max-height:500px){.th-hud{top:calc(max(6px,env(safe-area-inset-top)) + 62px);gap:5px}.th-hud button{min-height:32px;font-size:12px;padding:0 10px}.th-bub{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 58px);max-height:calc(100vh - 140px);overflow:auto}}`; document.head.appendChild(c); }
   const hudEl = document.createElement('div'); hudEl.className = 'th-hud'; hudEl.hidden = true; K.hud.appendChild(hudEl);
   // the current film's credit + license, always on screen while a film (or its title card) is up; tap = credits panel
-  const crEl = document.createElement('button'); crEl.type = 'button'; crEl.className = 'th-crl'; crEl.hidden = true; crEl.dataset.thCredit = ''; K.hud.appendChild(crEl); let crKey = '';
+  const crEl = document.createElement('button'); crEl.type = 'button'; crEl.className = 'th-crl'; crEl.hidden = true; crEl.dataset.thCredit = ''; crEl.title = crEl.ariaLabel = 'Film credits & licenses'; K.hud.appendChild(crEl);
+  let crKey = '', crMode = '', crUntil = 0; const CR_FULL = 8000; // full line for 8 s when a film starts (or you walk in mid-film), then a small 🎬 button
   crEl.addEventListener('click', () => creditsPanel());
-  function paintCredit() { const sh = inside && !playing() ? show() : null, f = sh && (sh.phase === 'movie' || (sh.phase === 'title' && !(sh.left <= CARD && sh.film.makers))) && sh.film && sh.film.credit ? sh.film : null;
-    const k = f ? f.id : ''; if (k === crKey) return; crKey = k; crEl.hidden = !f; if (f) crEl.innerHTML = `🎬 ${esc(f.credit)}<small>Licensed under ${esc(f.lic)} · tap for film credits</small>`; }
+  function paintCredit() { const sh = inside && !playing() ? show() : null, f = sh && (sh.phase === 'movie' || sh.phase === 'title') && sh.film && sh.film.credit ? sh.film : null, now = performance.now();
+    const card = f && sh.phase === 'title' && sh.left <= CARD && f.makers; // the big screen card already says it all
+    document.body.classList.toggle('th-cardup', !!card); const k = f && sh.phase === 'movie' ? f.id + ':' + sh.start : ''; if (k && k !== crKey) crUntil = now + CR_FULL; if (f ? sh.phase === 'movie' : true) crKey = k;
+    const mode = !f || card ? 'off' : now < crUntil ? 'full' : now < crUntil + 650 ? 'fade' : 'mini', id = f ? f.id : '';
+    if (mode + id === crMode) return; const was = crMode; crMode = mode + id; crEl.hidden = mode === 'off'; if (mode === 'off') return;
+    crEl.classList.toggle('fo', mode === 'fade'); crEl.classList.toggle('mini', mode === 'mini'); crEl.dataset.mode = mode;
+    if (mode === 'mini') crEl.textContent = '🎬';
+    else if (!was.startsWith('fade') || !was.endsWith(id)) crEl.innerHTML = `🎬 <b>${esc(f.title)}</b><span class="mk">by ${esc(f.makers || f.credit)}</span><i>${esc(f.lic)}</i>`; }
   function paintHud() {
     hudEl.hidden = !inside; if (!inside) return; const aud = P.sit && P.sit.th && P.sit.seat && P.sit.seat.aud;
     hudEl.innerHTML = `<button type="button" data-h="times">🕒 Showtimes</button><button type="button" data-h="snack">🍿 Snacks</button>${held ? `<button type="button" data-h="eat">😋 Eat ${held.e}</button>` : ''}${aud ? `<button type="button" data-h="view">🎥 ${seatCam ? 'Free look' : 'Screen view'}</button>` : ''}${soundBlocked || movieBlocked ? '<button type="button" data-h="sound">🔊 Tap for sound</button>' : ''}${owner ? '<button type="button" data-h="edit">🎨 Edit theater</button>' : ''}<button type="button" data-h="exit">🚪 Exit</button>`;
@@ -319,7 +326,7 @@ export function attachTheater(api, W, K, { far }) {
   // ---------------------------------------------------------------- showtimes: 2D list (HUD button, the lobby board, a prompt by it)
   const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time'; } catch { return 'local time'; } })();
   function timesPanel() {
-    closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; d.dataset.thTimes = ''; panel = d; K.hud.appendChild(d); let key = '';
+    closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; d.dataset.thTimes = ''; panel = d; K.hud.appendChild(d); document.body.classList.add('th-pnl'); let key = '';
     const paint = () => { if (panel !== d) { clearInterval(iv); return; } const now = Date.now(), L = list(); const k = clockStr(now) + JSON.stringify(L.map((e) => [e.id, e.now, e.next, e.times])); if (k === key) return; key = k;
       d.innerHTML = `<div class="ks-card th-card th-times"><h3>🕒 Showtimes · Auditorium 1</h3><p class="th-sub">Free entry. Times are in your time zone (${esc(tz)}), now ${esc(clockStr(now))}. Every show starts with a 5:00 countdown.</p>${L.length ? L.map((e) => `<div class="th-tr${e.now ? ' now' : e.next ? ' next' : ''}" data-film="${e.id}"><img src="${esc(e.film.poster)}" alt="" loading="lazy" decoding="async" width="54" height="87"><div class="th-ti"><b>${esc(e.film.title)}</b><small>${esc(runtime(e.film))} · ${esc(e.film.rating)}</small><small class="th-cr">${e.film.credit ? esc(e.film.credit) : 'A Lone Keem original'}</small></div><div class="th-tt">${e.now ? '<em class="th-now">● NOW PLAYING</em>' : e.next ? '<em class="th-next">UP NEXT</em>' : ''}<span>${e.times.map((t) => esc(clockStr(t))).join('<br>')}</span></div></div>`).join('') : '<p>Showtimes are paused right now. Check back soon!</p>'}<p class="th-sub th-lic">${esc(boardFooter(L))}. Shown unchanged (re-encoded for the app).</p><button type="button" class="th-cbtn" data-credits>📜 Film credits &amp; licenses</button><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`; };
     const iv = setInterval(paint, 1000); paint(); d.addEventListener('click', (e) => { if (e.target.closest('[data-credits]')) creditsPanel(); else if (e.target === d || e.target.closest('.th-x')) closePanels(); });
@@ -327,7 +334,7 @@ export function attachTheater(api, W, K, { far }) {
   // 📜 Film credits & licenses: every film, its makers, license (deed address) and source page. Addresses are plain
   // selectable text, never links (no <a href>, no window.open): Kemy is kid-directed.
   function creditsPanel() {
-    closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; d.dataset.thCredits = ''; panel = d; K.hud.appendChild(d);
+    closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; d.dataset.thCredits = ''; panel = d; K.hud.appendChild(d); document.body.classList.add('th-pnl');
     const u = (x) => `<span class="th-url">${esc(bareUrl(x))}</span>`;
     const row = (f) => { const sa = /-SA/.test(f.lic), parts = f.reels.length > 1 ? `split into ${f.reels.length} parts played back to back, and ` : '';
       return `<div class="th-cf" data-cf="${f.id}"><b>${esc(f.title)}</b>${f.sub ? ` <span>— ${esc(f.sub)}</span>` : ''} <span>(${esc(String(f.year))})</span>
@@ -420,6 +427,6 @@ export function attachTheater(api, W, K, { far }) {
     prompt, action, update,
     destroy() { try { leave(true); } catch { /* */ } if (unsub) unsub(); clearTimeout(saveT); for (const f of cleanup) try { f(); } catch { /* */ }
       for (const c of ex.cols) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } for (const b of odBoxes) { const i = api.box.indexOf(b); if (i >= 0) api.box.splice(i, 1); }
-      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); crEl.remove(); hush.leave(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
+      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); crEl.remove(); document.body.classList.remove('th-pnl', 'th-cardup'); hush.leave(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
   };
 }

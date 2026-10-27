@@ -265,7 +265,7 @@ export function drawCreditCard(g, w, h, f, left) {
   g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.095); g.fillText(`Licensed under ${f.lic}`, cx, h * 0.6, tw);
   g.fillStyle = '#ffffff'; g.font = F(700, h * 0.058); g.fillText(licDeed(f.lic), cx, h * 0.715, tw);
   g.fillStyle = '#f3e3c3'; g.font = F(700, h * 0.062); g.fillText('Source: ' + bareUrl(f.page || f.src).replace(/\/$/, ''), cx, h * 0.83, tw);
-  if (left != null) { g.fillStyle = 'rgba(255,255,255,.75)'; g.font = F(700, h * 0.045); g.fillText(`Starting in ${mmss(left)}`, cx, h * 0.925, tw); }
+  if (left != null) { g.fillStyle = 'rgba(255,255,255,.8)'; g.font = F(800, h * 0.05); g.fillText(`Starting in ${mmss(left)}`, cx, h * 0.915, tw); } // your own name tag hides while this card is up (theater.js th-card)
   return true;
 }
 // whole screen (canvas is mirrored onto the curved screen by its texture). Returns true when it drew.
