@@ -1,5 +1,5 @@
 // 🎬 Lone Keem Studio showings: a clock-based rotating program on the big curved screen.
-//   "The Sheriff of Lone Keem" (all released episodes back to back, 13+) plus four Blender Foundation open movies
+//   "The Sheriff of Lone Keem" (13+, only when SHERIFF_IN_THEATER is on; off for now) plus four Blender Foundation open movies
 //   (CC BY, files in assets/theater/films/, credits in assets/theater/README.md).
 // Lazy: theater.js imports this only near the theater, and the <video> is created only while you are INSIDE (unloaded on leave).
 // Sync needs no writes and no rules change: every client computes the same timeline from the clock.
@@ -12,6 +12,12 @@
 // Sheriff slot, on their own screen only (local, no writes).
 // Late joiners seek straight to the right spot in the right reel. A playing song (owner Play) overrides the movie.
 import { SHERIFF_EPISODES, isOut } from '../sheriff-data.js';
+
+// ⭐ The Sheriff of Lone Keem in the theater: OFF for now (Keem: not in the theater yet). false = everyone gets the family
+// lineup in the :00 slot (Caminandes 2 + 3), no Sheriff poster/plate/marquee/board row anywhere in the theater, and no
+// Sheriff video is ever loaded there. Flip to true to bring it back (13+ only; under-13 still get the family lineup).
+// The Kemy series page (#/series/sheriff) and its 13+ gate don't use this flag.
+export const SHERIFF_IN_THEATER = false;
 
 const DIR = new URL('../../assets/series/sheriff/', import.meta.url).href;
 const FD = new URL('../../assets/theater/films/', import.meta.url).href;
@@ -34,7 +40,10 @@ export const COUNTDOWN = 300; // "starts in five minutes"
 export const TC = 8; // title card with the film's credit (inside the countdown, or between double-feature films)
 const STEP = 900; // slots are whole 15-minute steps so shows start on :00 :15 :30 :45 (+5:00)
 // the hourly program. kid = what under-13 / unknown-age players see in that slot (same length, same clock)
-const PROGRAM = [{ films: ['sheriff'], kid: ['c2', 'c3'] }, { films: ['bbb'] }, { films: ['spring'] }, { films: ['c2', 'c3', 'wing'] }];
+const PROGRAM = [{ films: ['sheriff'], kid: ['c2', 'c3'] }, { films: ['bbb'] }, { films: ['spring'] }, { films: ['c2', 'c3', 'wing'] }]
+  .map((p) => (SHERIFF_IN_THEATER || !p.kid ? p : { films: p.kid })); // flag off: the family lineup for everyone
+// true when this viewer must not see the Sheriff in the theater (under 13 / unknown age, or the flag is off)
+export const familyOnly = (kid) => !!kid || !SHERIFF_IN_THEATER;
 const mod = (a, n) => ((a % n) + n) % n;
 // segments of one slot: {k:'card'|'reel', id, o (s from slot start), dur, reel?, ri}
 function segsOf(ids) {
@@ -62,7 +71,7 @@ export function anchorFor(k, nowMs, countdown = false) { const s = SLOTS[mod(k, 
 export const A0 = -COUNTDOWN * 1000;
 export function showAt(nowMs, anchor = 0, off = false, kid = false) {
   anchor = anchor || A0;
-  if (off || !EPS.length) return { phase: 'off' };
+  if (off || (SHERIFF_IN_THEATER && !EPS.length)) return { phase: 'off' };
   const ph = mod(nowMs - anchor, PERIOD * 1000) / 1000; let si = 0; while (si < SLOTS.length - 1 && ph >= SLOTS[si + 1].o) si++;
   const S = SLOTS[si], v = kid ? S.kids : S.adult, t = ph - S.o, at = nowMs - t * 1000; // at = ms this slot's countdown began
   const nS = SLOTS[(si + 1) % SLOTS.length], nv = kid ? nS.kids : nS.adult, nAt = at + S.len * 1000, nextSlot = nAt + filmStart(nv, nv.ids[0]) * 1000;
@@ -220,7 +229,7 @@ export function drawNowShowing(g, w, h, sh) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = 10; g.strokeRect(5, 5, w - 10, h - 10);
   const playing = sh.phase === 'movie' || sh.phase === 'title', ids = sh.phase === 'end' ? sh.nextIds : sh.ids;
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd36b'; g.font = F(900, w * 0.11); g.fillText(playing ? 'NOW SHOWING' : 'UP NEXT', w / 2, h * 0.06, w - 30);
-  const pw = w * 0.74, ph = pw * 868 / 540, px = (w - pw) / 2, py = h * 0.105; const src = sh.phase === 'off' ? FILMS.sheriff.poster : playing ? sh.film.poster : slotPoster(ids);
+  const pw = w * 0.74, ph = pw * 868 / 540, px = (w - pw) / 2, py = h * 0.105; const src = sh.phase === 'off' ? (SHERIFF_IN_THEATER ? FILMS.sheriff.poster : DOUBLE_POSTER) : playing ? sh.film.poster : slotPoster(ids);
   const im = img(src); if (ok(im)) cover(g, im, px, py, pw, ph); else { g.fillStyle = '#3b1d0e'; g.fillRect(px, py, pw, ph); }
   const y = py + ph + (h - py - ph) / 2; let a = '', b = '';
   if (sh.phase === 'off') { a = 'Showtimes paused'; b = 'Check back soon'; }

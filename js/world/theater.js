@@ -14,7 +14,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from '../fsq.js';
 import { startHouseParty } from './housemates.js';
 import { attachTheaterNpcs } from './theater-npcs.js';
 import { createTheaterHush } from './theater-hush.js';
-import { FILMS, MOVIE, TC, DOUBLE_POSTER, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
+import { FILMS, MOVIE, TC, familyOnly, DOUBLE_POSTER, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
 import { sheriffOk } from '../sheriff-age.js';
 
 const TID = 'lone-keem-studio', LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -39,7 +39,8 @@ export function attachTheater(api, W, K, { far }) {
   const kit = makeKit(THREE); const cleanup = [];
   // The Sheriff is 13+ (trusted age, js/safety.js viewerAge): under-13 / unknown-age players get the family program
   // locally (same clock, same slots, nothing written). The feature poster follows it (facade + lobby frame).
-  const kid = () => !sheriffOk(); let artKid = kid(); const artUrl = (k) => (k ? DOUBLE_POSTER : FILMS.sheriff.poster);
+  // While SHERIFF_IN_THEATER (theater-movie.js) is off, everyone gets that family view.
+  const kid = () => familyOnly(!sheriffOk()); let artKid = kid(); const artUrl = (k) => (k ? DOUBLE_POSTER : FILMS.sheriff.poster);
   artMeshes.length = 0; setMovieArt(artUrl(artKid));
   function swapArt() { const k = kid(); if (k === artKid) return; artKid = k; const url = artUrl(k); setMovieArt(url); const t = new THREE.TextureLoader().load(url); t.colorSpace = THREE.SRGBColorSpace; t.userData.src = url;
     const old = new Set(); for (const m of artMeshes) { if (m.material.map) old.add(m.material.map); m.material.map = t; m.material.needsUpdate = true; } for (const o of old) o.dispose(); for (const p of [...(ib ? ib.lobbyPosters : []), ...(ex ? ex.extPosters : [])]) p.key = ''; nsT = 0; bdT = 0; extT = 0; }

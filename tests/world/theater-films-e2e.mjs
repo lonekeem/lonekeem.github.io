@@ -1,5 +1,6 @@
 // Theater films + showtimes e2e on the Firebase EMULATORS only (never the live DB). Every film in the program loads, fills the
-// screen (cover for wide films, sharp centre + blurred sides for the portrait Sheriff) and plays; the lobby board, 6 framed
+// screen (cover-fit) and plays (SHERIFF_IN_THEATER is off: the :00 slot is the Caminandes double feature for everyone,
+// and no Sheriff poster / plate / board row / marquee / video anywhere in the theater); the lobby board, 6 framed
 // posters, 2D showtimes list (board tap + button), title card with credit, portrait + landscape iPhone 13 with no console
 // errors, and the Sheriff 13+ gate for a 13+ account and an under-13 account (family film swapped in locally, same clock).
 // Needs: emulators (auth+firestore; FS_PORT / AUTH_PORT, default 8199/9199, project lone-keem-studios) and a RANGE-capable
@@ -55,29 +56,39 @@ await step('age-adult', async () => { const a = await p.evaluate(async () => (aw
   const g = await p.evaluate(() => ({ card: !!document.querySelector('[data-sheriff-age]'), video: !!document.querySelector('main video, #main video, video') })); await p.screenshot({ path: shot + 'age-13plus-sheriff-page.png' });
   check('13+ account: Sheriff page is not gated', a >= 13 && !g.card, { a, g }); return { a, ...g }; });
 await setAnchor(await (async () => 0)()); // regular schedule
+// SHERIFF_IN_THEATER is off: from here on (street + theater) no Sheriff video may ever be requested
+const sherReq = []; p.on('request', (r) => { if (/assets\/series\/sheriff\/.*\.mp4/.test(r.url())) sherReq.push(r.url().split('/').slice(-2).join('/')); });
+const noSheriffTxt = (x) => !/Sheriff/i.test(typeof x === 'string' ? x : JSON.stringify(x));
 await step('world', async () => { await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/street'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 90000 }); await W(p, 3000);
-  await p.evaluate(() => window.__p3.teleport(63, 207)); await p.waitForFunction(() => window.__theater && window.__theater.M && window.__theaterDbg, null, { timeout: 60000 }); await W(p, 1500);
+  for (let i = 0; i < 36 && !(await p.evaluate(() => !!(window.__theater && window.__theater.M && window.__theaterDbg))); i++) { await p.evaluate(() => window.__p3.teleport(63, 207)); await W(p, 5000); } // busy boxes: keep nudging until the theater loads
+  await p.waitForFunction(() => window.__theater && window.__theater.M && window.__theaterDbg, null, { timeout: 10000 }); await W(p, 1500);
   const v0 = await p.evaluate(() => document.querySelectorAll('video').length); check('no video element outside the theater', v0 === 0, v0); return v0; });
-await step('marquee-outside', async () => { await p.evaluate(() => { window.__p3.teleport(75, 207); window.__p3.setYaw(-Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: shot + 'marquee-outside.png' }); return await p.evaluate(() => window.__theaterDbg.marq()); });
-await step('exterior-adult', async () => { const e = await extShots('adult'); if (EXT === 'exterior-after-') { const want = { sheriff: 'ep1.webp', bbb: 'big-buck-bunny.webp', spring: 'spring.webp', c2: 'caminandes-2.webp', c3: 'caminandes-3.webp', wing: 'wing-it.webp' };
-  check('facade: 6 lit poster cases with the new posters (loaded lazily on approach)', e && e.length === 6 && e.every((q) => q.ok && q.src === want[q.id]), e); check('facade: plates show title + next show', e && e.every((q) => /\|(Next show|▶ Now playing)/.test(q.plate)), e); }
+await step('marquee-outside', async () => { await p.evaluate(() => { window.__p3.teleport(75, 207); window.__p3.setYaw(-Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: shot + 'marquee-outside.png' }); const m = await p.evaluate(() => window.__theaterDbg.marq()); check('marquee names no Sheriff (13+ account)', noSheriffTxt(m), m); return m; });
+await step('exterior-adult', async () => { const e = await extShots('adult'); if (EXT === 'exterior-after-') { const want = { sheriff: 'caminandes-double.webp', bbb: 'big-buck-bunny.webp', spring: 'spring.webp', c2: 'caminandes-2.webp', c3: 'caminandes-3.webp', wing: 'wing-it.webp' };
+  check('facade: 6 lit poster cases with the new posters (loaded lazily on approach)', e && e.length === 6 && e.every((q) => q.ok && q.src === want[q.id]), e); check('facade: plates show title + next show', e && e.every((q) => /\|(Next show|▶ Now playing)/.test(q.plate)), e);
+  check('facade: no Sheriff poster or plate for a 13+ player (family poster in its case)', e && noSheriffTxt(e.map((q) => q.plate).join(' ')) && e.find((q) => q.id === 'sheriff').plate.startsWith('Caminandes Double Feature|'), e);
+  await p.setViewportSize({ width: 844, height: 390 }); await p.evaluate(() => { window.__p3.teleport(65.5, 216.5); window.__p3.setYaw(Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/no-sheriff-exterior-cases.png' });
+  await p.evaluate(() => { window.__p3.teleport(90, 207); window.__p3.setYaw(Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/no-sheriff-exterior-facade.png' }); }
   await p.setViewportSize({ width: 390, height: 844 }); await p.evaluate(() => window.__p3.teleport(63, 207)); await W(p, 1500); return e; });
 await step('lobby', async () => { await p.evaluate(() => window.__theaterDbg.enter()); await W(p, 3000); await p.evaluate(() => window.__theaterDbg.drawPlates(window.__theaterDbg.list()));
   const L = await p.evaluate(() => window.__theaterDbg.list().map((e) => ({ id: e.id, n: e.times.length, now: e.now, next: e.next })));
-  check('board lists 6 films with 3 times each', L.length === 6 && L.every((e) => e.n === 3), L);
+  check('board lists 5 films with 3 times each, no Sheriff', L.length === 5 && L.every((e) => e.n === 3) && !L.some((e) => e.id === 'sheriff'), L);
   const pl = await plates(); check('6 framed lobby posters with title + next show', pl.length === 6 && pl.every((s) => /\|(Next show \d|▶ Now playing)/.test(s)), pl);
+  check('lobby: the east-wall gold frame shows the family poster, no Sheriff on any plate (13+ account)', /^sheriff => Caminandes Double Feature\|/.test(pl[0]) && noSheriffTxt(pl.join(' ').replace(/^sheriff => /, '').replace(/ sheriff => /g, ' ')), pl);
+  const ns = await p.evaluate(() => ({ title: window.__theaterDbg.show().title, line: window.__theaterDbg.line(), kid: window.__theaterDbg.kid() })); check('Now Showing / show title name no Sheriff (13+ account)', noSheriffTxt(ns.title + ns.line), ns);
+  await p.setViewportSize({ width: 844, height: 390 }); await W(p, 600); await view(1.5, 8, 16, 8); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/no-sheriff-lobby-board.png' }); await view(9, 13.5, 16, 13.5); await W(p, 6000); await p.screenshot({ path: '/workspace/theater/no-sheriff-lobby-east-wall.png' });
     await posterShots('lobby-'); return { L, pl }; });
 await step('board-tap', async () => { await view(8.5, 8, 16, 8); await W(p, 1500); const xy = await p.evaluate(() => window.__theaterDbg.boardXY());
   await p.touchscreen.tap(xy.x, xy.y); await W(p, 1200); let open = await p.evaluate(() => !!document.querySelector('[data-th-times]'));
   check('tapping the board opens the 2D list', open, xy); await p.screenshot({ path: shot + 'showtimes-2d-list.png' });
   const rows = await p.evaluate(() => [...document.querySelectorAll('[data-th-times] .th-tr')].map((r) => r.innerText.replace(/\s+/g, ' ').slice(0, 160)));
-  check('2D list: 6 rows with credits', rows.length === 6 && rows.filter((r) => /Blender Foundation \| studio\.blender\.org, CC BY/.test(r)).length === 5, rows);
+  check('2D list: 5 rows with credits, no Sheriff', rows.length === 5 && rows.filter((r) => /Blender Foundation \| studio\.blender\.org, CC BY/.test(r)).length === 5 && noSheriffTxt(rows.join(' ')), rows);
   await p.evaluate(() => window.__theaterDbg.closePanels()); await W(p, 300);
   const b = p.locator('button[data-h="times"]'); await b.first().click({ force: true }); await W(p, 800); open = await p.evaluate(() => !!document.querySelector('[data-th-times]')); check('Showtimes button opens the 2D list', open, ''); await p.evaluate(() => window.__theaterDbg.closePanels());
   return rows; });
 await step('films', async () => { const s = await p.evaluate(() => window.__theaterDbg.seats()); const m = s.filter((q) => Math.abs(q.x) < 2).sort((a, b) => a.z - b.z)[Math.floor(s.filter((q) => Math.abs(q.x) < 2).length * 0.5)] || s[0];
   await p.evaluate((m) => { const D = window.__theaterDbg; D.tp(m.x, m.z); const q = D.findSeat(); if (q) D.sitAt(q); }, m); await W(p, 1500);
-  const r = {}; for (const id of ['sheriff', 'bbb', 'spring', 'c2', 'c3', 'wing']) { await anchorTo(id, 40); await W(p, 8000); const a = await vstate(); await W(p, 2500); const b = await vstate(); r[id] = { a, b };
+  const r = {}; for (const id of ['bbb', 'spring', 'c2', 'c3', 'wing']) { await anchorTo(id, 40); await W(p, 8000); const a = await vstate(); await W(p, 2500); const b = await vstate(); r[id] = { a, b };
     const fileOk = FILE[id] instanceof RegExp ? FILE[id].test(a.src || '') : a.src === FILE[id];
     check(`film ${id}: loads + plays + fills (${a.mode})`, a.phase === 'movie' && a.id === id && fileOk && a.rs >= 2 && !b.paused && b.t > a.t + 1 && a.mode === (id === 'sheriff' ? 'portrait' : 'cover') && a.one && b.one, { a, b }); // ONE reused <video> (kept off the DOM)
     if (id === 'bbb') await p.screenshot({ path: shot + 'wide-film-seated.png' }); if (id === 'spring') await p.screenshot({ path: shot + 'wide-film-seated-spring.png' }); if (id === 'sheriff') await p.screenshot({ path: shot + 'portrait-sheriff-seated.png' }); }
@@ -108,7 +119,7 @@ await step('age-kid', async () => { await p.setViewportSize({ width: 390, height
   const a = await p.evaluate(async () => (await import('/js/safety.js')).viewerAge()); await p.evaluate(() => { location.hash = '#/series/sheriff'; }); await W(p, 3500); await p.evaluate(() => { const m = document.getElementById('modal-root'); if (m) m.innerHTML = ''; });
   const g = await p.evaluate(() => ({ card: !!document.querySelector('[data-sheriff-age]'), txt: (document.querySelector('[data-sheriff-age]') || {}).innerText || '', video: !!document.querySelector('main video') })); await p.screenshot({ path: shot + 'age-under13-sheriff-card.png' });
   check('under-13 account: Sheriff page shows the friendly 13+ card', a < 13 && g.card && !g.video, { a, g }); return { a, ...g }; });
-await step('kid-theater', async () => { await anchorTo('sheriff', 30); await p.evaluate(() => { location.hash = '#/street'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 90000 }); await W(p, 3000);
+await step('kid-theater', async () => { await anchorTo('c2', 30); await p.evaluate(() => { location.hash = '#/street'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 90000 }); await W(p, 3000);
   await p.evaluate(() => window.__p3.teleport(63, 207)); await p.waitForFunction(() => window.__theaterDbg && window.__theaterDbg.kid, null, { timeout: 60000 }); await W(p, 1500);
   const marq = await p.evaluate(() => window.__theaterDbg.marq()); await p.evaluate(() => { window.__p3.teleport(75, 207); window.__p3.setYaw(-Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: shot + 'kid-marquee-outside.png' });
   const ext = await extShots('kid'); if (EXT === 'exterior-after-') check('under-13: facade shows the family poster, no Sheriff outside', ext && ext.find((q) => q.id === 'sheriff').src === 'caminandes-double.webp' && ext.every((q) => q.ok) && !/Sheriff/i.test(ext.map((q) => q.plate).join(' ')), ext);
@@ -123,6 +134,7 @@ await step('kid-theater', async () => { await anchorTo('sheriff', 30); await p.e
   check('under-13: Sheriff frame shows the family poster/title', /^sheriff => Caminandes Double Feature\|/.test(pl[0]), pl);
   check('under-13: marquee + Now Showing name no Sheriff', !/Sheriff/i.test(JSON.stringify(marq) + k.title + k.line), { marq, title: k.title, line: k.line });
   await p.evaluate(() => window.__theaterDbg.leave()); return { k, pl, rows, v, marq }; });
+check('no Sheriff video requested anywhere in the theater/street', sherReq.length === 0, sherReq);
 if (prev && prev.fields) await seed(TDOC, prev.fields); else await fetch(EMU + TDOC, { method: 'DELETE', headers: H });
 const fails = Object.entries(result).filter(([, v]) => v !== 'PASS');
 console.log(JSON.stringify({ result, errors }, null, 1)); console.log(`${Object.keys(result).length - fails.length}/${Object.keys(result).length} checks passed, ${errors.length} console errors`);

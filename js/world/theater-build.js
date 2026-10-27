@@ -138,7 +138,8 @@ export function buildExterior(THREE, kit, parent, T, F, LOW) {
   // lit poster cases on the facade: 3 each side of the doors, gold frame + backlit glass + lamp hood + title plate.
   // Reading left to right from the street: Spring, Big Buck Bunny, The Sheriff | doors | Caminandes 2, Caminandes 3, Wing It!
   // Textures are lazy: theater.js calls loadExtPosters() the first time a player comes near (small webp, < 40 KB each).
-  // Slot 'sheriff' shows ART (a family film poster for under-13 / unknown-age players, swapped live by theater.js).
+  // Slot 'sheriff' shows ART (a family film poster for under-13 / unknown-age players, swapped live by theater.js; and for
+  // everyone while SHERIFF_IN_THEATER is off).
   const extPosters = []; const glowM = new THREE.MeshBasicMaterial({ color: '#fff1c9', toneMapped: false }), lampM = new THREE.MeshBasicMaterial({ color: '#ffe6a8', toneMapped: false });
   const pw = 1.75, ph = pw * 694 / 432, py = F + 2.15, ty = py + ph / 2 + 0.36;
   [[7.0, 'sheriff'], [9.35, 'bbb'], [11.7, 'spring'], [-7.0, 'c2'], [-9.35, 'c3'], [-11.7, 'wing']].forEach(([o, id]) => { const z = dz + o;
@@ -285,7 +286,7 @@ export function buildInterior(THREE, kit, parent, LOW) {
   const audCv = textCanvas(512, 96, (g) => { g.fillStyle = '#111'; g.fillRect(0, 0, 512, 96); g.fillStyle = '#d4af37'; g.font = '900 46px Inter, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('★ AUDITORIUM 1 ★', 256, 50); });
   { const ab = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 1.0), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(audCv), toneMapped: false })); ab.position.set(0, LY + 4.0, 4.33); parent.add(ab); }
   // a framed poster for every film in the rotation (gold frames, the Sheriff style), each with a small title plate on top
-  // (title + next showtime, drawn by theater.js ~1x a second in the lobby). Slot 'sheriff' shows ART (a family film for kids).
+  // (title + next showtime, drawn by theater.js ~1x a second in the lobby). Slot 'sheriff' shows ART (a family film for kids, and for everyone while SHERIFF_IN_THEATER is off).
   const pf = [[LX - 0.05, 13.5, -Math.PI / 2, 'sheriff'], [-LX + 0.05, 13.5, Math.PI / 2, 'bbb'], [-LX + 0.05, 18.5, Math.PI / 2, 'spring'], [LX - 0.05, 18.5, -Math.PI / 2, 'wing'], [6.5, Z1 - 0.05, Math.PI, 'c2'], [-6.5, Z1 - 0.05, Math.PI, 'c3']];
   const lobbyPosters = [];
   for (const [x, z, ry, id] of pf) { const nx = Math.sin(ry), nz = Math.cos(ry), big = id === 'sheriff', pw = big ? 2.55 : 2.2, ph = pw * 694 / 432, py = LY + (big ? 3.3 : 3.2);

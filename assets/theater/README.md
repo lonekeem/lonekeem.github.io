@@ -8,7 +8,7 @@ every show **starts on a quarter hour**:
 
 | Starts | Film | Runtime | Ends |
 |---|---|---|---|
-| :00 | **The Sheriff of Lone Keem** (13+, ep 1–3) | 9:43 | :09:43 |
+| :00 | **Caminandes Double Feature:** Caminandes 2 (:00:00), Caminandes 3 (:02:34) | 2:26 + 2:30 | :05:04 |
 | :15 | **Big Buck Bunny** | 9:56 | :24:56 |
 | :30 | **Spring** | 7:44 | :37:44 |
 | :45 | **Triple feature:** Caminandes 2 (:45:00), Caminandes 3 (:47:34), Wing It! (:50:12) | 2:26 + 2:30 + 3:58 | :54:10 |
@@ -16,7 +16,11 @@ every show **starts on a quarter hour**:
 Countdowns run :55–:00, :10–:15, :25–:30, :40–:45. Each Blender film is preceded by an 8 s title
 card that shows its credit.
 
-- **13+ gate:** The Sheriff needs age 13+ from the trusted age source (`viewerAge()` in `js/safety.js`,
+- **The Sheriff is not in the theater yet.** `SHERIFF_IN_THEATER = false` in `js/world/theater-movie.js`
+  gives everyone the family lineup in the :00 slot, and no Sheriff poster, plate, board row, marquee or
+  video appears anywhere in the theater. Set it to `true` to bring it back (13+ only, ep 1–3, 9:43 at :00).
+  The Kemy series page `#/series/sheriff` and its 13+ gate are separate and unchanged.
+- **13+ gate (when the flag is on):** The Sheriff needs age 13+ from the trusted age source (`viewerAge()` in `js/safety.js`,
   wrapped by `js/sheriff-age.js`). Under-13 or unknown-age viewers see the friendly card on the
   Sheriff page, and in the theater the :00 slot becomes a **Caminandes Double Feature**
   (Caminandes 2 then 3, same clock) on the screen, board, 2D list, lobby poster and marquee. This is
