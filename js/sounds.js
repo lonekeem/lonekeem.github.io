@@ -328,8 +328,9 @@ export async function creditsPage(root) {
     </section>
     <section class="card pad ks-page" data-film-credits><h2>🎬 Lone Keem Studio films</h2><p class="muted small">Open films shown on the theater's big screen on Kemy Street.</p><ul class="ks-credits"></ul></section>`;
   // the theater's open-movie credits (small module, loaded only here)
-  import('./world/theater-movie.js').then(({ FILMS, PEPPER_EPISODES }) => { const ul = root.querySelector('[data-film-credits] ul'); if (!ul) return;
-    const a = (href, t) => `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`;
-    const eps = (f) => (f.id === 'pepper' ? `<br><span class="muted">Episodes: ${PEPPER_EPISODES.map((e) => a(e.page, `${e.n}. ${e.title}`)).join(' · ')}. Original comic: ${a('https://www.peppercarrot.com', 'peppercarrot.com')} by David Revoy (CC BY 4.0).</span>` : '');
-    ul.innerHTML = Object.values(FILMS).filter((f) => f.credit).map((f) => `<li><b>${esc(f.title)}</b>${f.sub ? ` — ${esc(f.sub)}` : ''} (${esc(f.year)}) — ${esc(f.org)} · ${licLink({ license: f.lic })} · ${a(f.src, 'Source')}<br><span class="muted">${esc(f.credit)}. Re-encoded to 720p for the app${f.reels.length > 1 ? ` (played in ${f.reels.length} parts, back to back)` : ''}; otherwise unchanged.</span>${eps(f)}</li>`).join(''); }).catch(() => {});
+  // web addresses are plain selectable text here, never links (kid-directed app)
+  import('./world/theater-movie.js').then(({ FILMS, PEPPER_EPISODES, licDeed, bareUrl }) => { const ul = root.querySelector('[data-film-credits] ul'); if (!ul) return;
+    const u = (x) => `<span class="ks-url" style="user-select:text;-webkit-user-select:text;font-family:ui-monospace,Menlo,monospace">${esc(bareUrl(x))}</span>`;
+    const eps = (f) => (f.id === 'pepper' ? `<br><span class="muted">Episodes: ${PEPPER_EPISODES.map((e) => `${e.n}. ${esc(e.title)} (${u(e.page)})`).join(' · ')}. Original comic: Pepper&amp;Carrot by David Revoy, ${u('www.peppercarrot.com')} (CC BY 4.0).</span>` : '');
+    ul.innerHTML = Object.values(FILMS).filter((f) => f.credit).map((f) => `<li><b>${esc(f.title)}</b>${f.sub ? ` — ${esc(f.sub)}` : ''} (${esc(f.year)}) — ${esc(f.makers || f.org)} · ${esc(f.lic)} ${u(licDeed(f.lic))} · Source: ${u(f.page || f.src)}<br><span class="muted">${esc(f.credit)}. ${/-SA/.test(f.lic) ? 'Shown unmodified, except' : 'Shown unchanged, except'}${f.reels.length > 1 ? ` split into ${f.reels.length} parts (played back to back) and` : ''} re-encoded to 720p for the app.</span>${eps(f)}</li>`).join(''); }).catch(() => {});
 }

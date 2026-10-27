@@ -15,7 +15,14 @@ hour). Logic: `js/world/theater-movie.js` (`PROGRAM`, `showAt`, `listings`). Eve
 | B (odd) | :45 | **Triple feature:** Caminandes 2 (:45:00), Caminandes 3 (:47:34), Wing It! (:50:12) | 2:26 + 2:30 + 3:58 | :54:10 |
 
 Countdowns run 5:00 before each start (A :55, A :40, B :55, B :25, B :40). Each film is preceded by an
-8 s title card that shows its credit (inside the countdown, or between Ada & Zangemann and Singularity).
+8 s title card (inside the countdown, or between Ada & Zangemann and Singularity / between the triple-feature shorts):
+the first 4 s are the poster title card, the **last 4 s (`CARD`) a full-screen credit card** (black, gold frame, big
+white/gold type: title, makers, "Licensed under CC BY 4.0", the license deed address and the source page), so no
+start time moves. Multi-part films get it once, before part 1. The seat "Screen view" fills the phone with it.
+While a film (or its card) is up, a **credit line** (credit + license, 13 px, top-left of the theater HUD) stays on
+screen; tap it, or **📜 Film credits & licenses** in the 🕒 Showtimes list, for the **credits panel** (every film, makers,
+license + deed, source page, the BY-SA "shown unmodified except split/re-encoded" note). Web addresses there and on
+`#/sounds` are plain selectable text, never links (kid-directed app: no `<a href>` / `window.open` to outside sites).
 Singularity (6:31) joined after the 2-hour program was laid out: the 8 quarter-hour steps are all used
 (Ada 45 min, Pepper&Carrot 30, three 15-min slots), so it plays right after Ada in the same slot instead of on its own quarter hour.
 
@@ -56,11 +63,11 @@ Singularity (6:31) joined after the 2-hour program was laid out: the 8 quarter-h
 
 All films are shown unchanged (re-encoded to H.264 + AAC, faststart, 720p, ~0.8–1.2 Mbps, every file
 under 50 MB, webp posters under 100 KB). The credit is shown on each title card, in the countdown, on
-the board and 2D list, and on `#/sounds` with the license link.
+the board and 2D list, in the in-play credit line and credits panel, and on `#/sounds` (license deed as plain text).
 
 **Blender Foundation** (studio.blender.org), from official Blender sources:
 
-> *Title* © Blender Foundation | studio.blender.org, CC BY
+> *Title* © Blender Foundation | studio.blender.org, CC BY *version* (makers: Blender Studio / Blender Foundation; source page studio.blender.org/films/*file*/)
 
 | File | Film | Year | License | Size |
 |---|---|---|---|---|

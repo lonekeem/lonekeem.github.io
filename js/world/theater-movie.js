@@ -24,7 +24,7 @@ const DIR = new URL('../../assets/series/sheriff/', import.meta.url).href;
 const FD = new URL('../../assets/theater/films/', import.meta.url).href;
 export const CREDIT = '© Blender Foundation | studio.blender.org, CC BY';
 const EPS = SHERIFF_EPISODES.filter(isOut).map((e) => ({ n: e.n, title: e.title, dur: e.dur, src: `${DIR}ep${e.n}.mp4`, w: 720, h: 1156 }));
-const blender = (id, title, file, dur, w, h, lic, year) => ({ id, title, short: title, poster: FD + file + '.webp', reels: [{ src: FD + file + '.mp4', dur, w, h }], dur, credit: `${title} ${CREDIT}`, by: CREDIT, org: 'Blender Foundation', src: 'https://studio.blender.org', lic, year, rating: 'All ages' });
+const blender = (id, title, file, dur, w, h, lic, year) => ({ id, title, short: title, poster: FD + file + '.webp', reels: [{ src: FD + file + '.mp4', dur, w, h }], dur, credit: `${title} ${CREDIT}${lic.slice(5)}`, by: CREDIT, org: 'Blender Foundation', makers: 'Blender Studio / Blender Foundation', src: 'https://studio.blender.org', page: `https://studio.blender.org/films/${file}/`, lic, year, rating: 'All ages' });
 // a film in consecutive keyframe-cut reels (each < 50 MB): played back to back, the next reel preloaded so the handoff has no gap
 const reels = (file, durs, w = 1280, h = 720) => durs.map((dur, i) => ({ src: FD + file(i) + '.mp4', dur, w, h, i }));
 const sum = (L) => +L.reduce((a, r) => a + r.dur, 0).toFixed(3);
@@ -46,8 +46,8 @@ export const FILMS = {
   c2: blender('c2', 'Caminandes 2: Gran Dillama', 'caminandes-2', 146.048, 1280, 720, 'CC BY 3.0', 2013),
   c3: blender('c3', 'Caminandes 3: Llamigos', 'caminandes-3', 150.14, 1280, 720, 'CC BY 3.0', 2016),
   wing: blender('wing', 'Wing It!', 'wing-it', 237.917, 1280, 720, 'CC BY 4.0', 2023),
-  ada: { id: 'ada', title: 'Ada & Zangemann', short: 'Ada & Zangemann', sub: 'A Tale of Software, Skateboards, and Raspberry Ice Cream', poster: FD + 'ada-zangemann.webp', reels: ADA_REELS, dur: sum(ADA_REELS), credit: ADA_CREDIT, by: 'FSFE (Kirschner, Brandstätter, Monströös), CC BY-SA 4.0', org: 'Free Software Foundation Europe', src: 'https://fsfe.org/activities/ada-zangemann/', lic: 'CC BY-SA 4.0', year: 2024, rating: 'All ages' },
-  pepper: { id: 'pepper', title: 'Pepper&Carrot', short: 'Pepper&Carrot', sub: 'Motion Comic · Episodes 3, 4, 5 and 6', poster: FD + 'pepper-carrot.webp', reels: PEPPER_REELS, dur: sum(PEPPER_REELS), credit: PEPPER_CREDIT, by: 'Morevna Project, after David Revoy, CC BY-SA 4.0', org: 'Morevna Project', src: 'https://morevnaproject.org/pepper-and-carrot/', lic: 'CC BY-SA 4.0', year: '2018–2022', rating: 'All ages' },
+  ada: { id: 'ada', title: 'Ada & Zangemann', short: 'Ada & Zangemann', sub: 'A Tale of Software, Skateboards, and Raspberry Ice Cream', poster: FD + 'ada-zangemann.webp', reels: ADA_REELS, dur: sum(ADA_REELS), credit: ADA_CREDIT, by: 'FSFE (Kirschner, Brandstätter, Monströös), CC BY-SA 4.0', org: 'Free Software Foundation Europe', makers: 'Free Software Foundation Europe (Matthias Kirschner, Sandra Brandstätter, Monströös)', src: 'https://fsfe.org/activities/ada-zangemann/', page: 'https://fsfe.org/activities/ada-zangemann/', lic: 'CC BY-SA 4.0', year: 2024, rating: 'All ages' },
+  pepper: { id: 'pepper', title: 'Pepper&Carrot', short: 'Pepper&Carrot', sub: 'Motion Comic · Episodes 3, 4, 5 and 6', poster: FD + 'pepper-carrot.webp', reels: PEPPER_REELS, dur: sum(PEPPER_REELS), credit: PEPPER_CREDIT, by: 'Morevna Project, after David Revoy, CC BY-SA 4.0', org: 'Morevna Project', makers: 'Morevna Project, based on Pepper&Carrot by David Revoy', src: 'https://morevnaproject.org/pepper-and-carrot/', page: 'https://morevnaproject.org/pepper-and-carrot/', lic: 'CC BY-SA 4.0', year: '2018–2022', rating: 'All ages' },
   sing: blender('sing', 'Singularity', 'singularity', 391.008, 1280, 536, 'CC BY 4.0', 2026)
 };
 FILMS.sing.credit = 'Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0'; // Blender Studio's own credit line
@@ -59,6 +59,15 @@ export const MOVIE = { title: FILMS.sheriff.title, poster: FILMS.sheriff.poster,
 export const MOVIE_LEN = FILMS.sheriff.dur; // ~583.4 s
 export const COUNTDOWN = 300; // "starts in five minutes"
 export const TC = 8; // title card with the film's credit (inside the countdown, or between double-feature films)
+// the last CARD s of every title card = a full-screen credit card (title, makers, license, source) in big high-contrast type.
+// It lives inside the existing title card, so no start time moves and mid-movie joins stay on the clock.
+export const CARD = 4;
+// plain-text web addresses (never links: kid-directed app) for the license deed and the source page
+export const bareUrl = (u) => String(u || '').replace(/^https?:\/\//, '');
+export const licDeed = (lic) => { const m = /^CC (BY(?:-SA)?) (\d\.\d)$/.exec(lic || ''); return m ? `creativecommons.org/licenses/${m[1].toLowerCase()}/${m[2]}/` : ''; };
+export const licName = (lic) => (/-SA/.test(lic) ? `Creative Commons Attribution-ShareAlike ${lic.slice(-3)}` : `Creative Commons Attribution ${lic.slice(-3)}`);
+// the films with a credit, in program order (credits panel)
+export const creditFilms = () => [...new Set(['ada', 'sing', 'bbb', 'pepper', 'spring', 'c2', 'c3', 'wing'])].map((id) => FILMS[id]).filter((f) => f && f.credit);
 const STEP = 900; // slots are whole 15-minute steps so shows start on :00 :15 :30 :45 (+5:00)
 // the 2-hour program (by the clock, same for everyone). kid = what under-13 / unknown-age players see in that slot (same clock)
 //   hour A  :00 Ada & Zangemann (31:33) then Singularity (6:31, from :31:41; one 45-min slot)   :45 Big Buck Bunny (the Sheriff slot when SHERIFF_IN_THEATER is on)
@@ -241,6 +250,24 @@ const bg = (g, w, h, now) => { const gr = g.createLinearGradient(0, 0, w, h); gr
 export const creditOf = (ids) => [...new Set(ids.map((id) => FILMS[id]).filter((f) => f.credit).map((f) => (f.by === CREDIT ? CREDIT : f.credit)))].join(' · ');
 const ORG = { 'Blender Foundation': 'Blender Foundation (CC BY)', 'Free Software Foundation Europe': 'Ada & Zangemann © FSFE (CC BY-SA 4.0)', 'Morevna Project': 'Pepper&Carrot © Morevna Project, after David Revoy (CC BY-SA 4.0)' };
 export const boardFooter = (list) => 'Open films: ' + [...new Set(list.map((e) => e.film.org).filter(Boolean))].map((o) => ORG[o] || o).join(' · ');
+// word-wrap for canvas text (max n lines; the last one is squeezed by fillText's maxWidth)
+function wrap(g, text, maxW, n = 2) { const out = []; let cur = '';
+  for (const wd of String(text).split(' ')) { const t = cur ? cur + ' ' + wd : wd; if (cur && g.measureText(t).width > maxW && out.length < n - 1) { out.push(cur); cur = wd; } else cur = t; }
+  if (cur) out.push(cur); return out; }
+// full-screen credit card (the last CARD s before each film): black, gold frame, big white / gold type, no posters
+export function drawCreditCard(g, w, h, f, left) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowBlur = 0;
+  g.fillStyle = '#000000'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = Math.max(4, h * 0.012); g.strokeRect(h * 0.03, h * 0.03, w - h * 0.06, h - h * 0.06);
+  const cx = w / 2, tw = w * 0.86;
+  g.fillStyle = '#ffffff'; g.font = F(900, h * 0.15); g.fillText(f.title, cx, h * 0.17, tw);
+  g.font = F(700, h * 0.072); const by = wrap(g, 'by ' + f.makers, tw, 2); g.fillStyle = '#ffffff';
+  by.forEach((l, i) => g.fillText(l, cx, h * (by.length > 1 ? 0.34 : 0.37) + i * h * 0.088, tw));
+  g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.095); g.fillText(`Licensed under ${f.lic}`, cx, h * 0.6, tw);
+  g.fillStyle = '#ffffff'; g.font = F(700, h * 0.058); g.fillText(licDeed(f.lic), cx, h * 0.715, tw);
+  g.fillStyle = '#f3e3c3'; g.font = F(700, h * 0.062); g.fillText('Source: ' + bareUrl(f.page || f.src).replace(/\/$/, ''), cx, h * 0.83, tw);
+  if (left != null) { g.fillStyle = 'rgba(255,255,255,.75)'; g.font = F(700, h * 0.045); g.fillText(`Starting in ${mmss(left)}`, cx, h * 0.925, tw); }
+  return true;
+}
 // whole screen (canvas is mirrored onto the curved screen by its texture). Returns true when it drew.
 export function drawMovieScreen(g, w, h, sh, now) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -255,6 +282,7 @@ export function drawMovieScreen(g, w, h, sh, now) {
   }
   bg(g, w, h, now);
   const ph = h * 0.86, pw = ph * 540 / 868, px = w * 0.07, py = (h - ph) / 2, hx = w - px - pw, cx = w / 2, tw = w - 2 * (px + pw) - 40;
+  if (sh.phase === 'title' && sh.left <= CARD && sh.film.makers) return drawCreditCard(g, w, h, sh.film, sh.left); // last 4 s: the big credit card
   if (sh.phase === 'title') { // the title card: the film + its credit line (CC BY attribution) before it starts
     const f = sh.film; framed(g, f.poster, px, py, pw, ph); framed(g, f.poster, hx, py, pw, ph);
     g.fillStyle = '#d4af37'; g.font = F(800, h * 0.055); g.fillText('LONE KEEM STUDIO PRESENTS', cx, h * 0.17, tw);

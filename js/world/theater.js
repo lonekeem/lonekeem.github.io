@@ -14,7 +14,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from '../fsq.js';
 import { startHouseParty } from './housemates.js';
 import { attachTheaterNpcs } from './theater-npcs.js';
 import { createTheaterHush } from './theater-hush.js';
-import { FILMS, MOVIE, TC, familyOnly, SHERIFF_SLOT, SHERIFF_FAMILY, boardFooter, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
+import { FILMS, MOVIE, TC, familyOnly, creditFilms, CARD, licDeed, licName, bareUrl, PEPPER_EPISODES, SHERIFF_SLOT, SHERIFF_FAMILY, boardFooter, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
 import { sheriffOk } from '../sheriff-age.js';
 
 const TID = 'lone-keem-studio', LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -289,7 +289,9 @@ export function attachTheater(api, W, K, { far }) {
   // ---------------------------------------------------------------- HUD (inside): snacks, view, sound, edit, exit
   if (!document.getElementById('th-css')) { const c = document.createElement('style'); c.id = 'th-css'; c.textContent = `
 .th-hud{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 172px);display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:auto;z-index:7}
-.th-hud[hidden]{display:none}.th-hud button{min-height:40px;border-radius:999px;border:1px solid rgba(212,175,55,.7);background:rgba(60,4,18,.82);color:#fff6dc;font:800 13px Inter,system-ui,sans-serif;padding:0 12px}
+.th-hud[hidden]{display:none}.th-crl{position:absolute;left:max(10px,env(safe-area-inset-left));bottom:calc(max(10px,env(safe-area-inset-bottom)) + 270px);max-width:min(72vw,340px);z-index:6;pointer-events:auto;text-align:left;border:1px solid rgba(212,175,55,.6);border-radius:10px;background:rgba(0,0,0,.66);color:#fff;font:700 13px/1.3 Inter,system-ui,sans-serif;padding:6px 9px;text-shadow:0 1px 2px #000}.th-crl[hidden]{display:none}@media (orientation:landscape){.th-crl{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 62px);max-width:min(36vw,340px)}}.th-crl small{display:block;color:#ffd36b;font-size:11px;font-weight:800;margin-top:2px}
+.th-cf{padding:8px 10px;margin:6px 0;border-radius:12px;background:rgba(255,255,255,.07);font-size:14px;line-height:1.4}.th-cf b{color:#fff6dc;font-size:16px}.th-cf p{margin:3px 0}.th-cf .th-k{color:#ffd36b;font-weight:800}.th-url{user-select:text;-webkit-user-select:text;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#fff;word-break:break-all;background:rgba(0,0,0,.3);padding:0 4px;border-radius:4px}.th-cbtn{width:100%;margin-top:6px}
+.th-hud button{min-height:40px;border-radius:999px;border:1px solid rgba(212,175,55,.7);background:rgba(60,4,18,.82);color:#fff6dc;font:800 13px Inter,system-ui,sans-serif;padding:0 12px}
 .th-card{background:#3a0712!important;border:2px solid #d4af37}.th-card h3{color:#ffd36b}.th-card h4{margin:12px 0 6px;color:#ffd36b}.th-sub{margin:0 0 8px;opacity:.85;font-size:13px}.th-w{font-weight:900;margin:4px 0 8px}
 .th-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.th-card .th-sn{display:flex;flex-direction:column;align-items:center;gap:2px;margin:0;padding:6px 2px;min-height:76px;background:rgba(255,255,255,.1);color:#fff;font:700 11px Inter,sans-serif}.th-sn b{font-size:26px}.th-sn i{font-style:normal;color:#ffd36b}
 .th-times{max-height:min(86vh,680px);overflow:auto}.th-tr{display:flex;align-items:center;gap:10px;padding:6px;margin:4px 0;border-radius:12px;background:rgba(255,255,255,.06)}.th-tr.now{background:rgba(212,175,55,.28)}.th-tr.next{background:rgba(212,175,55,.14)}
@@ -300,6 +302,11 @@ export function attachTheater(api, W, K, { far }) {
 .th-bub .th-bn{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.th-bub button{min-height:42px;border-radius:999px;border:0;background:#800020;color:#fff6dc;font:800 13px Inter,sans-serif;padding:0 12px}.th-bub button.ghost{background:#eee;color:#3a0712}
 @media (max-height:500px){.th-hud{top:calc(max(6px,env(safe-area-inset-top)) + 62px);gap:5px}.th-hud button{min-height:32px;font-size:12px;padding:0 10px}.th-bub{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 58px);max-height:calc(100vh - 140px);overflow:auto}}`; document.head.appendChild(c); }
   const hudEl = document.createElement('div'); hudEl.className = 'th-hud'; hudEl.hidden = true; K.hud.appendChild(hudEl);
+  // the current film's credit + license, always on screen while a film (or its title card) is up; tap = credits panel
+  const crEl = document.createElement('button'); crEl.type = 'button'; crEl.className = 'th-crl'; crEl.hidden = true; crEl.dataset.thCredit = ''; K.hud.appendChild(crEl); let crKey = '';
+  crEl.addEventListener('click', () => creditsPanel());
+  function paintCredit() { const sh = inside && !playing() ? show() : null, f = sh && (sh.phase === 'movie' || (sh.phase === 'title' && !(sh.left <= CARD && sh.film.makers))) && sh.film && sh.film.credit ? sh.film : null;
+    const k = f ? f.id : ''; if (k === crKey) return; crKey = k; crEl.hidden = !f; if (f) crEl.innerHTML = `🎬 ${esc(f.credit)}<small>Licensed under ${esc(f.lic)} · tap for film credits</small>`; }
   function paintHud() {
     hudEl.hidden = !inside; if (!inside) return; const aud = P.sit && P.sit.th && P.sit.seat && P.sit.seat.aud;
     hudEl.innerHTML = `<button type="button" data-h="times">🕒 Showtimes</button><button type="button" data-h="snack">🍿 Snacks</button>${held ? `<button type="button" data-h="eat">😋 Eat ${held.e}</button>` : ''}${aud ? `<button type="button" data-h="view">🎥 ${seatCam ? 'Free look' : 'Screen view'}</button>` : ''}${soundBlocked || movieBlocked ? '<button type="button" data-h="sound">🔊 Tap for sound</button>' : ''}${owner ? '<button type="button" data-h="edit">🎨 Edit theater</button>' : ''}<button type="button" data-h="exit">🚪 Exit</button>`;
@@ -314,8 +321,22 @@ export function attachTheater(api, W, K, { far }) {
   function timesPanel() {
     closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; d.dataset.thTimes = ''; panel = d; K.hud.appendChild(d); let key = '';
     const paint = () => { if (panel !== d) { clearInterval(iv); return; } const now = Date.now(), L = list(); const k = clockStr(now) + JSON.stringify(L.map((e) => [e.id, e.now, e.next, e.times])); if (k === key) return; key = k;
-      d.innerHTML = `<div class="ks-card th-card th-times"><h3>🕒 Showtimes · Auditorium 1</h3><p class="th-sub">Free entry. Times are in your time zone (${esc(tz)}), now ${esc(clockStr(now))}. Every show starts with a 5:00 countdown.</p>${L.length ? L.map((e) => `<div class="th-tr${e.now ? ' now' : e.next ? ' next' : ''}" data-film="${e.id}"><img src="${esc(e.film.poster)}" alt="" loading="lazy" decoding="async" width="54" height="87"><div class="th-ti"><b>${esc(e.film.title)}</b><small>${esc(runtime(e.film))} · ${esc(e.film.rating)}</small><small class="th-cr">${e.film.credit ? esc(e.film.credit) : 'A Lone Keem original'}</small></div><div class="th-tt">${e.now ? '<em class="th-now">● NOW PLAYING</em>' : e.next ? '<em class="th-next">UP NEXT</em>' : ''}<span>${e.times.map((t) => esc(clockStr(t))).join('<br>')}</span></div></div>`).join('') : '<p>Showtimes are paused right now. Check back soon!</p>'}<p class="th-sub th-lic">${esc(boardFooter(L))}. Shown unchanged (re-encoded for the app); full credits and license links in Settings → Sounds.</p><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`; };
-    const iv = setInterval(paint, 1000); paint(); d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('.th-x')) closePanels(); });
+      d.innerHTML = `<div class="ks-card th-card th-times"><h3>🕒 Showtimes · Auditorium 1</h3><p class="th-sub">Free entry. Times are in your time zone (${esc(tz)}), now ${esc(clockStr(now))}. Every show starts with a 5:00 countdown.</p>${L.length ? L.map((e) => `<div class="th-tr${e.now ? ' now' : e.next ? ' next' : ''}" data-film="${e.id}"><img src="${esc(e.film.poster)}" alt="" loading="lazy" decoding="async" width="54" height="87"><div class="th-ti"><b>${esc(e.film.title)}</b><small>${esc(runtime(e.film))} · ${esc(e.film.rating)}</small><small class="th-cr">${e.film.credit ? esc(e.film.credit) : 'A Lone Keem original'}</small></div><div class="th-tt">${e.now ? '<em class="th-now">● NOW PLAYING</em>' : e.next ? '<em class="th-next">UP NEXT</em>' : ''}<span>${e.times.map((t) => esc(clockStr(t))).join('<br>')}</span></div></div>`).join('') : '<p>Showtimes are paused right now. Check back soon!</p>'}<p class="th-sub th-lic">${esc(boardFooter(L))}. Shown unchanged (re-encoded for the app).</p><button type="button" class="th-cbtn" data-credits>📜 Film credits &amp; licenses</button><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`; };
+    const iv = setInterval(paint, 1000); paint(); d.addEventListener('click', (e) => { if (e.target.closest('[data-credits]')) creditsPanel(); else if (e.target === d || e.target.closest('.th-x')) closePanels(); });
+  }
+  // 📜 Film credits & licenses: every film, its makers, license (deed address) and source page. Addresses are plain
+  // selectable text, never links (no <a href>, no window.open): Kemy is kid-directed.
+  function creditsPanel() {
+    closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; d.dataset.thCredits = ''; panel = d; K.hud.appendChild(d);
+    const u = (x) => `<span class="th-url">${esc(bareUrl(x))}</span>`;
+    const row = (f) => { const sa = /-SA/.test(f.lic), parts = f.reels.length > 1 ? `split into ${f.reels.length} parts played back to back, and ` : '';
+      return `<div class="th-cf" data-cf="${f.id}"><b>${esc(f.title)}</b>${f.sub ? ` <span>— ${esc(f.sub)}</span>` : ''} <span>(${esc(String(f.year))})</span>
+<p>${esc(f.credit)}</p><p><span class="th-k">Made by:</span> ${esc(f.makers)}</p>
+<p><span class="th-k">License:</span> ${esc(f.lic)} (${esc(licName(f.lic))}) · ${u(licDeed(f.lic))}</p>
+<p><span class="th-k">Source:</span> ${u(f.page || f.src)}</p>${f.id === 'pepper' ? `<p><span class="th-k">Episodes:</span> ${PEPPER_EPISODES.map((e) => `${e.n}. ${esc(e.title)} ${u(e.page)}`).join(' · ')}</p><p>Original comic: Pepper&amp;Carrot by David Revoy, ${u('www.peppercarrot.com')} (CC BY 4.0).</p>` : ''}
+<p class="th-sub">${sa ? `Kemy shows this film unmodified, except that it is ${parts}re-encoded to 720p for the app. It stays under ${esc(f.lic)}.` : `Shown unchanged, except ${parts}re-encoded to 720p for the app.`}</p></div>`; };
+    d.innerHTML = `<div class="ks-card th-card th-times"><h3>📜 Film credits &amp; licenses</h3><p class="th-sub">Lone Keem Studio plays these open films under Creative Commons licenses. Web addresses are plain text: type one into a browser to read the license or visit the source.</p>${creditFilms().map(row).join('')}<button type="button" class="ghost" data-back style="width:100%">🕒 Back to showtimes</button><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`;
+    d.addEventListener('click', (e) => { if (e.target.closest('[data-back]')) timesPanel(); else if (e.target === d || e.target.closest('.th-x')) closePanels(); });
   }
   // lobby posters: title plate + next time (redrawn only when the text changes)
   function drawPlates(L, arr = ib && ib.lobbyPosters) { if (!arr) return; const by = new Map(L.map((e) => [e.id, e])), k = kid();
@@ -347,7 +368,7 @@ export function attachTheater(api, W, K, { far }) {
   }
   rebuildDecor('lo'); applyOutside(); { const [a, b] = marqText(); drawMarq(a, b); }
   // ---------------------------------------------------------------- per frame
-  let extT = 0, extLoaded = false; let bulbT = 0, bulbStep = 0, autoT = 0, fadeAt = 0, marqT = 0, bdT = 0, artT = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
+  let extT = 0, extLoaded = false, crT = 0; let bulbT = 0, bulbStep = 0, autoT = 0, fadeAt = 0, marqT = 0, bdT = 0, artT = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
   function update(dt, now) {
     const dx = P.x - (T.x0 + T.x1) / 2, dz = P.z - (T.z0 + T.z1) / 2, nearOut = !inside && dx * dx + dz * dz < 160 * 160;
     if (nearOut && (bulbT -= dt) <= 0) { bulbT = 0.28; bulbStep++; bc.set(sv('oMarq')).lerp(bd.set('#fff8dc'), 0.55); bd.set(sv('oMarq')).multiplyScalar(0.3); for (let i = 0; i < ex.bulbN; i++) ex.bulbs.setColorAt(i, (i + bulbStep) % 3 ? bc : bd); ex.bulbs.instanceColor.needsUpdate = true; }
@@ -366,6 +387,7 @@ export function attachTheater(api, W, K, { far }) {
       if (owner && st.pl.on && s && pos() > durNow(s) + 2.5 && Date.now() - st.pl.at > 4000) { if (songs().length > 1) transport('next'); else transport('stop'); }
     } else if ((seatChk -= dt) <= 0) { seatChk = 0.3; seatNear = !P.sit && Math.hypot(P.x - OX, P.z - OZ) < 30 ? findSeat() : null; }
     if (held && heldSpr) { const me = api.me; if (me) { hp.set(P.x + Math.sin(P.yaw) * 0.38, P.y + 0.8, P.z + Math.cos(P.yaw) * 0.38); heldSpr.position.copy(hp); } if (Date.now() - (P.eAt || 0) > 5000) { P.e = held.e; P.eAt = Date.now(); api.markDirty && api.markDirty(); } }
+    { const tc = performance.now(); if (tc - crT > 400) { crT = tc; paintCredit(); } } // wall clock: dt is capped at low fps
     npc.update(dt, now);
   }
   function prompt() {
@@ -391,13 +413,13 @@ export function attachTheater(api, W, K, { far }) {
     else if (a === 'th-snack') snackMenu(); else if (a === 'th-times') timesPanel(); else if (a === 'th-ticket') { emote('🎟️'); K.say('🎟️ Here is your ticket! Entry is free today. Enjoy the show!'); }
     else if (a === 'th-npc') { const n = npc.nearest(); if (n) npc.talk(n); } else if (a === 'th-edit') openEdit();
   }
-  window.__theaterDbg = { get st() { return st; }, get ex() { return ex; }, get hush() { return hush; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, movieCmd, show, list, kid, timesPanel, drawPlates, marq: () => marqText(), line: () => movieLine(), boardXY() { if (!ib || !ib.bdMesh || !api.cam || !api.view) return null; const v = new THREE.Vector3(); ib.bdMesh.getWorldPosition(v); v.project(api.cam); const r = (api.view.querySelector("canvas") || api.view).getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height, z: v.z }; }, get movie() { return movie; }, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
+  window.__theaterDbg = { get st() { return st; }, get ex() { return ex; }, get hush() { return hush; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, movieCmd, show, list, kid, timesPanel, creditsPanel, drawPlates, marq: () => marqText(), line: () => movieLine(), boardXY() { if (!ib || !ib.bdMesh || !api.cam || !api.view) return null; const v = new THREE.Vector3(); ib.bdMesh.getWorldPosition(v); v.project(api.cam); const r = (api.view.querySelector("canvas") || api.view).getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height, z: v.z }; }, get movie() { return movie; }, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
     standUp: () => standUp(), seats: () => allSeats().map((q) => ({ x: q.x - RX, z: q.z - RZ, y: q.y })),
     tp(lx, lz, cy) { if (!LOCAL || !inside) return; P.x = RX + lx; P.z = RZ + lz; P.y = FLAT + yIn(lx, lz); P.vy = 0; P.onGround = true; if (cy != null) try { window.__p3.setYaw(cy); } catch { /* */ } } };
   return {
     prompt, action, update,
     destroy() { try { leave(true); } catch { /* */ } if (unsub) unsub(); clearTimeout(saveT); for (const f of cleanup) try { f(); } catch { /* */ }
       for (const c of ex.cols) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } for (const b of odBoxes) { const i = api.box.indexOf(b); if (i >= 0) api.box.splice(i, 1); }
-      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); hush.leave(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
+      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); crEl.remove(); hush.leave(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
   };
 }
