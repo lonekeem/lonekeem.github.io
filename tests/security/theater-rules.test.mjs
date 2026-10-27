@@ -15,6 +15,8 @@ const good = (by) => ({ col: { aSeatC: '#b0121f' }, li: '', la: '', lo: '', lt: 
 await ok('admin writes the theater doc', assertSucceeds(setDoc(T(ADM), good('keem'))));
 await ok('signed-in kid reads it', assertSucceeds(getDoc(T(KID))));
 await ok('signed-out cannot read', assertFails(getDoc(T(env.unauthenticatedContext().firestore()))));
+await ok('admin sets movie anchor + off (pl.ma / pl.mo) with no rules change', assertSucceeds(setDoc(T(ADM), { ...good('keem'), pl: { i: 0, s: 0, p: 0, on: false, at: 2, ma: 1793102400000, mo: false } })));
+await ok('kid cannot set the movie anchor', assertFails(setDoc(T(KID), { ...good('kid'), pl: { i: 0, s: 0, p: 0, on: false, at: 2, ma: 1 } })));
 await ok('kid cannot write', assertFails(setDoc(T(KID), good('kid'))));
 await ok('unverified admin email cannot write', assertFails(setDoc(T(UNV), good('fake'))));
 await ok('∞ Pass holder can write', assertSucceeds(setDoc(T(PASS), good('pass'))));

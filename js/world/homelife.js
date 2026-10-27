@@ -52,13 +52,14 @@ export function attachHomeLife(api, H) { // H: { P, room(): {I, cx, cz}|null, in
     const sat = P.sit && P.sit.seat; if (sat) { if (sat.c[0] === 'b') return { id: 'kh:life:sleep', label: '😴 Sleep' }; if (held && !/^(juice|milk|water)$/.test(held)) return { id: 'kh:life:eat', label: '😋 Eat ' + ALL[held][1] }; if (held) return { id: 'kh:life:drinkheld', label: '🥤 Drink ' + ALL[held][1] }; return null; }
     for (const q of spots()) if (near(q)) { if (q.k === 'fridge') return { id: 'kh:life:fridge', label: '🧊 Open fridge' }; if (q.k === 'stove') return { id: 'kh:life:stove', label: '🍳 Cook' }; if (q.k === 'sink') return { id: 'kh:life:sink', label: '🚰 Drink water' }; if (q.k === 'shower') return { id: 'kh:life:shower', label: '🚿 Shower' }; }
     if (held) return { id: 'kh:life:eatnow', label: (/^(juice|milk)$/.test(held) ? '🥤 Drink ' : '😋 Eat ') + ALL[held][1] }; return null; }
+  let showerOv = null;
   function act(k) { const spot = (n) => spots().find((q) => q.k === n);
     if (k === 'fridge') { const r = H.room(); if (r && r.I.fridgeDoor) r.I.fridgeDoor.userData.want = 1; P.yaw = spot('fridge').yaw; openMenu('🧊 Fridge · pick a snack', FOODS, (it) => { held = it; setDn('hold_' + it); H.say(ALL[it][0] + ' Got ' + ALL[it][1] + '! Sit at a table or chair to eat it.'); }); }
     else if (k === 'stove') { const q = spot('stove'); P.yaw = q.yaw; openMenu('🍳 Cook a meal', MEALS, (it) => { hiss('sizzle', 4); start('cook', 4, 'cook', () => { stopHiss(); held = it; setDn('hold_' + it); H.say(ALL[it][0] + ' ' + ALL[it][1] + ' ready! Find a seat to eat.'); }); }); }
     else if (k === 'sink') { const q = spot('sink'); P.yaw = q.yaw; hiss('water', 1.2); start('drink', 3, 'drink_water', () => { setDn(restDn()); bump({ hunger: 2, happy: 2 }); H.say('💧 Ahh, fresh water!'); }); }
     else if (k === 'shower') { const q = spot('shower'); H.sitAt({ x: q.o[0], z: q.o[1], y: q.y + 0.6, yaw: q.yaw, back: [q.s[0], q.s[1], q.y], dn: 'shower' }); hiss('water', 6); { const dx = q.s[0] - q.o[0], dz = q.s[1] - q.o[1], L = Math.hypot(dx, dz) || 1; const R = Math.max(1.25, L + 0.3), cx = q.o[0] + dx / L * R, cz = q.o[1] + dz / L * R; /* roomy shower camera: high up by the bath mat, looking at the curtain (no orbit squeezed into the walls) */
-      roomState.camOv = (cam) => { cam.position.set(cx, q.y + 2.72, cz); cam.lookAt(q.o[0], q.y + 0.75, q.o[1]); if (cam.fov !== 84) { cam.fov = 84; cam.updateProjectionMatrix(); } return true; }; }
-      start('shower', 6, 'shower', () => { roomState.camOv = null; stopHiss(); H.unsit(); start('fresh', 2, 'fresh', () => { setDn(restDn()); }); bump({ clean: 30, happy: 4 }); H.say('✨ Squeaky clean!'); }); }
+      roomState.camOv = showerOv = (cam) => { cam.position.set(cx, q.y + 2.72, cz); cam.lookAt(q.o[0], q.y + 0.75, q.o[1]); if (cam.fov !== 84) { cam.fov = 84; cam.updateProjectionMatrix(); } return true; }; }
+      start('shower', 6, 'shower', () => { if (roomState.camOv === showerOv) roomState.camOv = null; showerOv = null; stopHiss(); H.unsit(); start('fresh', 2, 'fresh', () => { setDn(restDn()); }); bump({ clean: 30, happy: 4 }); H.say('✨ Squeaky clean!'); }); }
     else if (k === 'sleep') { const s = P.sit.seat; const r0 = H.room(); const pr = r0 && r0.I.seats().find((q) => q !== s && q.c === s.c && Math.abs(q.yaw - s.yaw) < 0.01 && Math.hypot(q.x - s.x, q.z - s.z) < 1.3); const mx = pr ? (s.x + pr.x) / 2 : s.x, mz = pr ? (s.z + pr.z) / 2 : s.z; const cxb = mx - s.fx * 0.9, czb = mz - s.fz * 0.9; H.sitAt({ x: cxb + s.fx * 0.35, z: czb + s.fz * 0.35, y: s.y + 0.02, yaw: s.yaw, back: P.sit.back, dn: 'sleep', seat: s }); busy = { k: 'sleep', t: 0, t0: performance.now(), dur: 1e9 }; setDn('sleep'); dim(true); H.say('😴 Sweet dreams… tap Wake up any time.'); }
     else if (k === 'wake') { const slept = busy && busy.t; busy = null; dim(false); H.unsit(); setDn(restDn()); if (slept > 5) bump({ energy: Math.min(40, Math.round(slept / 3)), happy: 3 }); H.say('☀️ Good morning!'); }
     else if (k === 'eat' || k === 'drinkheld' || k === 'eatnow') { const it = held; if (!it) return; const drink = /^(juice|milk|water)$/.test(it); start('eat', 4, (drink || !P.sit ? (drink ? 'drink_' : 'hold_') : 'eat_') + it, () => { held = null; setDn(P.sit ? 'sit' : ''); crumbs = drink ? 0 : 1.5; P.e = '😋'; P.eAt = Date.now(); api.markDirty && api.markDirty(); bump({ hunger: MEALS[it] ? 30 : drink ? 8 : 15, happy: MEALS[it] ? 8 : 4 }); H.say(ALL[it][0] + ' Yum!'); }); } }
@@ -86,7 +87,7 @@ export function attachHomeLife(api, H) { // H: { P, room(): {I, cx, cz}|null, in
       else if (u.c != null) { const k = (t * 0.6 + u.c / 3) % 1; c.position.set(0, (u.c ? 1.1 + k * 0.7 : 1.0), 0.75); c.material.opacity = u.c ? 1 - k : 0.9; c.visible = true; }
       else if (u.hand) { const bob = u.hand === 'eat' || u.hand === 'drink' ? Math.max(0, Math.sin(t * 5)) : 0; c.position.set(-0.28, (u.hand === 'drink' ? 1.05 : 0.75) + bob * 0.3, 0.35 - bob * 0.1); } } }
   let T = 0; const crumbS = [];
-  function update(dt) { if (roomState.camOv && !(busy && busy.k === 'shower')) roomState.camOv = null; T += dt;
+  function update(dt) { if (showerOv && roomState.camOv === showerOv && !(busy && busy.k === 'shower')) { roomState.camOv = null; showerOv = null; } // only our own shower camera (the theater seat view uses camOv too) T += dt;
     if (busy) { busy.t = (performance.now() - busy.t0) / 1000; if (busy.t >= busy.dur) { const d = busy.done; busy = null; d && d(); } }
     if (!H.inside()) { if (busy && busy.k === 'sleep') act('wake'); if (menu) closeMenu(); if (held) { held = null; } }
     // fridge door swing
@@ -96,7 +97,7 @@ export function attachHomeLife(api, H) { // H: { P, room(): {I, cx, cz}|null, in
     if (api.others) for (const o of api.others.values()) propsFor(o.obj, H.inside() && o.dn, T);
     if (crumbs > 0) { crumbs -= dt; if (!crumbS.length) for (let i = 0; i < 5; i++) { const c = sprite(THREE, '🟤', 0.05); api.scene.add(c); crumbS.push(c); } crumbS.forEach((c, i) => { const k = 1 - crumbs / 1.5; c.position.set(P.x + Math.sin(i * 2.3) * 0.25, P.y + 0.9 - k * 0.8 + i * 0.02, P.z + Math.cos(i * 2.3) * 0.25); c.visible = true; }); }
     else if (crumbS.length) { crumbS.forEach((c) => { api.scene.remove(c); c.material.dispose(); }); crumbS.length = 0; } }
-  function destroy() { roomState.camOv = null; closeMenu(); css.remove(); dim(false); stopHiss(); flush(); for (const [o, e] of props) if (e.g) o.remove(e.g); props.clear(); }
+  function destroy() { if (showerOv && roomState.camOv === showerOv) roomState.camOv = null; showerOv = null; closeMenu(); css.remove(); dim(false); stopHiss(); flush(); for (const [o, e] of props) if (e.g) o.remove(e.g); props.clear(); }
   addEventListener('pagehide', flush);
   return { prompt, act, update, destroy, held: () => held, busy: () => busy && busy.k, flush };
 }

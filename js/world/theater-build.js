@@ -100,6 +100,8 @@ export function posterCanvas(p) {
   g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '700 11px Inter, Arial, sans-serif'; g.fillText('LONE KEEM STUDIO · COMING SOON', 96, 262, 184);
   return cv;
 }
+const ART = new URL('../../assets/series/sheriff/ep1.webp', import.meta.url).href; // the movie's real poster (no copy: same file as the series page)
+function movieArt(THREE) { const t = new THREE.TextureLoader().load(ART); t.colorSpace = THREE.SRGBColorSpace; return t; }
 export function textCanvas(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h); return cv; }
 
 // ---------------------------------------------------------------- outside: building, marquee, sign, doors, posters, plaza, lot
@@ -143,7 +145,7 @@ export function buildExterior(THREE, kit, parent, T, F, LOW) {
   p('oDoor', G.box, X1 + 0.1, F + 3.55, dz, 0.24, 0.3, 12.2);
   // poster cases on the facade
   const posters = [];
-  [[dz - 9.7, 0], [dz - 6.6, 1], [dz + 6.6, 2], [dz + 9.7, 3]].forEach(([z, i]) => { p('oMarq', G.box, X1 + 0.12, F + 2.6, z, 0.18, 3.5, 2.5); const tx = new THREE.CanvasTexture(posterCanvas(POSTERS[i])); tx.colorSpace = THREE.SRGBColorSpace; const pm = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 3.1), new THREE.MeshBasicMaterial({ map: tx })); pm.position.set(X1 + 0.23, F + 2.6, z); pm.rotation.y = Math.PI / 2; parent.add(pm); posters.push(pm); });
+  [[dz - 9.7, 0], [dz - 6.6, 1], [dz + 6.6, 2], [dz + 9.7, 3]].forEach(([z, i]) => { p('oMarq', G.box, X1 + 0.12, F + 2.6, z, 0.18, 3.5, 2.5); const tx = i === 0 ? movieArt(THREE) : new THREE.CanvasTexture(posterCanvas(POSTERS[i])); tx.colorSpace = THREE.SRGBColorSpace; const pm = new THREE.Mesh(new THREE.PlaneGeometry(i === 0 ? 1.93 : 2.1, 3.1), new THREE.MeshBasicMaterial({ map: tx })); pm.position.set(X1 + 0.23, F + 2.6, z); pm.rotation.y = Math.PI / 2; parent.add(pm); posters.push(pm); });
   // plaza / sidewalks (the lot itself has NO colliders so cars park freely)
   const Lt = T.lot; p('oWalk', G.box, X1 + 2, F + 0.03, cz, 4, 0.06, D + 8); p('oWalk', G.box, (X1 + Lt.x1) / 2, F + 0.03, Lt.z0 - 1.2, Lt.x1 - X1, 0.06, 2.4); p('oWalk', G.box, (X1 + Lt.x1) / 2, F + 0.03, Lt.z1 + 1.2, Lt.x1 - X1, 0.06, 2.4);
   p('oWalk', G.box, cx, F + 0.03, T.z0 - 1.5, W + 2, 0.06, 3); p('oWalk', G.box, cx, F + 0.03, T.z1 + 1.5, W + 2, 0.06, 3); p('oWalk', G.box, T.x0 - 1.5, F + 0.03, cz, 3, 0.06, D + 6);
@@ -282,7 +284,18 @@ export function buildInterior(THREE, kit, parent, LOW) {
   { const ab = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 1.0), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(audCv), toneMapped: false })); ab.position.set(0, LY + 4.0, 4.33); parent.add(ab); }
   // posters in gold frames along the lobby walls (original art)
   const pf = [[-LX + 0.05, 13.5, Math.PI / 2, 4], [-LX + 0.05, 18.5, Math.PI / 2, 5], [LX - 0.05, 13.5, -Math.PI / 2, 0], [LX - 0.05, 18.5, -Math.PI / 2, 1], [-6.5, Z1 - 0.05, Math.PI, 2], [6.5, Z1 - 0.05, Math.PI, 3]];
-  for (const [x, z, ry, i] of pf) { const nx = Math.sin(ry), nz = Math.cos(ry); put('lPoster', G.box, new THREE.Color(1, 1, 1), x, LY + 3.3, z, ry, 2.5, 3.5, 0.12); const tx = new THREE.CanvasTexture(posterCanvas(POSTERS[i])); tx.colorSpace = THREE.SRGBColorSpace; const pm = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 3.1), new THREE.MeshBasicMaterial({ map: tx, toneMapped: false })); pm.position.set(x + nx * 0.07, LY + 3.3, z + nz * 0.07); pm.rotation.y = ry; parent.add(pm); }
+  // the real poster for the movie that plays here (assets/series/sheriff/ep1.webp, Keem's own art) in a bigger gold frame
+  for (const [x, z, ry, i] of pf) { if (i === 0) { const nx = Math.sin(ry), nz = Math.cos(ry); put('lPoster', G.box, new THREE.Color(1, 1, 1), x, LY + 3.4, z, ry, 2.95, 4.55, 0.14); put('lTrim', G.box, new THREE.Color(1, 1, 1), x + nx * 0.02, LY + 5.95, z + nz * 0.02, ry, 2.2, 0.32, 0.12);
+      const pm = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 4.1), new THREE.MeshBasicMaterial({ map: movieArt(THREE), toneMapped: false })); pm.position.set(x + nx * 0.08, LY + 3.4, z + nz * 0.08); pm.rotation.y = ry; parent.add(pm);
+      const lb = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.27), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(textCanvas(512, 72, (g) => { g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, 512, 72); g.fillStyle = '#d4af37'; g.font = '900 38px Inter, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('NOW SHOWING · AUDITORIUM 1', 256, 38, 490); })), toneMapped: false }));
+      lb.position.set(x + nx * 0.09, LY + 5.95, z + nz * 0.09); lb.rotation.y = ry; parent.add(lb); continue; }
+    const nx = Math.sin(ry), nz = Math.cos(ry); put('lPoster', G.box, new THREE.Color(1, 1, 1), x, LY + 3.3, z, ry, 2.5, 3.5, 0.12); const tx = new THREE.CanvasTexture(posterCanvas(POSTERS[i])); tx.colorSpace = THREE.SRGBColorSpace; const pm = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 3.1), new THREE.MeshBasicMaterial({ map: tx, toneMapped: false })); pm.position.set(x + nx * 0.07, LY + 3.3, z + nz * 0.07); pm.rotation.y = ry; parent.add(pm); }
+  // "Now Showing" stand by the entrance: the poster + next showtime (canvas drawn by theater-movie.js once a second)
+  const NS = { x: 5.2, z: 13.2, ry: -0.45 }; const nsCv = textCanvas(384, 640, (g) => { g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, 384, 640); }); const nsTex = new THREE.CanvasTexture(nsCv); nsTex.colorSpace = THREE.SRGBColorSpace;
+  { const nx = Math.sin(NS.ry), nz = Math.cos(NS.ry); put('lPoster', G.box, new THREE.Color(1, 1, 1), NS.x, LY + 2.15, NS.z, NS.ry, 2.25, 3.55, 0.12); put('lTrim', G.box, new THREE.Color(1, 1, 1), NS.x, LY + 0.06, NS.z, NS.ry, 1.4, 0.12, 0.8);
+    for (const s of [-1, 1]) put('lTrim', G.box, new THREE.Color(1, 1, 1), NS.x + Math.cos(NS.ry) * s * 0.85 - nx * 0.12, LY + 0.2, NS.z - Math.sin(NS.ry) * s * 0.85 - nz * 0.12, NS.ry, 0.08, 0.4, 0.08);
+    const nm = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 3.33), new THREE.MeshBasicMaterial({ map: nsTex, toneMapped: false })); nm.position.set(NS.x + nx * 0.07, LY + 2.15, NS.z + nz * 0.07); nm.rotation.y = NS.ry; parent.add(nm);
+    solid(NS.x - 0.8, NS.x + 0.8, NS.z - 0.55, NS.z + 0.55, 99); }
   // flush everything into one mesh per surface
   const meshes = {};
   for (const k of Object.keys(SURF)) { if (k[0] === 'o' || k === 'aScreen') continue; const m = flush(k, basic(k), parent, false); if (m) meshes[k] = m; }
@@ -294,7 +307,7 @@ export function buildInterior(THREE, kit, parent, LOW) {
   const fI = new THREE.InstancedMesh(fG, basic('aSeatF'), seats.length), cI = new THREE.InstancedMesh(cG, basic('aSeatC'), seats.length);
   { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3(); seats.forEach((s, i) => { e.set(0, s.yaw, 0); q.setFromEuler(e); m.compose(v.set(s.x, s.y, s.z), q, one); fI.setMatrixAt(i, m); cI.setMatrixAt(i, m); }); }
   parent.add(fI); parent.add(cI);
-  return { mats, meshes, boxes, seats, screen, scrCv, scrTex, beam, beamM, spotCone, spotDisc, spotM, discM, tipM, scM, lobM, menuCv, menuTex, SN, TK, AH, LH, LX };
+  return { mats, meshes, boxes, seats, screen, scrCv, scrTex, nsCv, nsTex, NS, beam, beamM, spotCone, spotDisc, spotM, discM, tipM, scM, lobM, menuCv, menuTex, SN, TK, AH, LH, LX };
 }
 // rounded box (indexed): grid points pulled onto a radius-r skin; bulge puffs one face (y = top, z = front) like a plush cushion
 function rbox(THREE, w, h, d, r, s, bulge = 0, ax = 'z') {

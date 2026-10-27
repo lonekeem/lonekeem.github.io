@@ -122,7 +122,7 @@ export function attachTheaterNpcs(api, W, K, o) {
       if (t === 'x') closeBub();
       else if (t === 'wave') { o.emote('👋'); n.anim = 'wave'; n.animUntil = Date.now() + 3000; sayN(pick(WAVE)); }
       else if (t === 'hi') { o.emote('💜'); sayN(`${pick(HI)} I’m ${n.short}.`); }
-      else if (t === 'movie') { const m = o.nowShowing(); sayN(m ? `We’re showing “${m}” right now! Sing along! 🎤` : pick(SOON)); }
+      else if (t === 'movie') { const m = o.nowShowing(); const ml = o.movieLine ? o.movieLine() : ''; sayN(m ? `We’re showing “${m}” right now! Sing along! 🎤` : ml || pick(SOON)); }
       else if (t === 'dance') { o.emote('🎉'); n.anim = 'groove'; n.animUntil = Date.now() + 5000; sayN('Let’s dance! 💃🕺'); }
       else if (t === 'snack') { closeBub(); o.snackMenu(n.short); }
       else if (t === 'ticket') { closeBub(); o.ticket(); sayN('Enjoy the show! 🎟️'); }

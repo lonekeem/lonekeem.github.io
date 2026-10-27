@@ -22,7 +22,7 @@ export function openTheaterEditor(o) {
   const strip = (cur, on) => { const rec = recentColors(uid); const sw = (h, n) => `<button type="button" class="sw${hexOk(cur) === h ? ' on' : ''}" style="background:${h}" title="${esc(n)}" aria-label="${esc(n)}" data-c="${h}"></button>`;
     on.cb = true; return (rec.length ? `<h4>Recent</h4><div class="row">${rec.map((h) => sw(h, h)).join('')}</div>` : '') + FAMILIES.map((f) => `<h4>${esc(f.name)}</h4><div class="row">${f.colors.map(([h, n]) => sw(h, n)).join('')}</div>`).join('') + `<h4>Custom</h4><div class="row"><input type="color" data-custom value="${hexOk(cur) || '#800020'}"><button type="button" data-reset>↺ Default</button></div>`; };
   function paint() {
-    const S = st(); let h = `<div class="tabs">${[['col', '🎨 Colors'], ['add', '🪑 Decor'], ['lt', '💡 Lights'], ['scr', '🎵 Screen']].map(([k, n]) => `<button type="button" data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}<button type="button" class="x" data-close aria-label="Close">✕</button></div>`;
+    const S = st(); let h = `<div class="tabs">${[['col', '🎨 Colors'], ['add', '🪑 Decor'], ['lt', '💡 Lights'], ['scr', '🎬 Screen']].map(([k, n]) => `<button type="button" data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}<button type="button" class="x" data-close aria-label="Close">✕</button></div>`;
     if (tab === 'col') {
       h += `<div class="row">${Object.entries(ZONES).map(([k, n]) => `<button type="button" data-zone="${k}" class="${zc === k ? 'on' : ''}">${n}</button>`).join('')}</div><h4>Surfaces</h4><div class="row">`;
       h += Object.entries(SURF).filter(([, v]) => v[2] === zc).map(([k, v]) => `<button type="button" class="chip${target === k ? ' on' : ''}" data-surf="${k}"><span class="sw" style="display:inline-block;width:12px;height:12px;vertical-align:-1px;background:${o.sv(k)}"></span> ${esc(v[0])}</button>`).join('') + '</div>';
@@ -36,12 +36,15 @@ export function openTheaterEditor(o) {
       if (L.length) { h += `<h4>Placed</h4><div class="row">${L.map((it, i) => `<button type="button" class="chip${sel === i ? ' on' : ''}" data-sel="${i}">${esc(ALL_DECOR[it.c].e || '')} ${esc(ALL_DECOR[it.c].n)}</button>`).join('')}</div>`;
         if (sel >= 0 && L[sel]) h += `<h4>Move</h4><div class="row"><button type="button" data-mv="-1,0">⬅️</button><button type="button" data-mv="1,0">➡️</button><button type="button" data-mv="0,-1">⬆️</button><button type="button" data-mv="0,1">⬇️</button><button type="button" data-rot>🔄 Turn</button><button type="button" data-here>📍 To me</button><button type="button" data-del>🗑️ Remove</button></div>`; }
     } else if (tab === 'lt') {
-      const lt = S.lt; const manual = lt.at > S.pl.at;
-      h += `<p>${manual ? 'Manual lights (auto-dim comes back on the next Play).' : 'Auto: lights dim when a song plays and come up on pause.'}</p><h4>House lights</h4><div class="row"><span>🌑</span><input type="range" min="0" max="100" value="${Math.round((manual ? lt.h : 1) * 100)}" data-h><span>☀️</span></div>
+      const lt = S.lt; const manual = o.manualLights ? o.manualLights() : lt.at > S.pl.at;
+      h += `<p>${manual ? 'Manual lights (auto-dim comes back when the next movie or song starts or ends).' : 'Auto: lights dim while the movie or a song plays and come back up after.'}</p><h4>House lights</h4><div class="row"><span>🌑</span><input type="range" min="0" max="100" value="${Math.round((manual ? lt.h : 1) * 100)}" data-h><span>☀️</span></div>
         <div class="row"><button type="button" data-lv="1">☀️ House lights up</button><button type="button" data-lv="0.12">🌙 Dim</button><button type="button" data-lv="0">🌑 Dark</button><button type="button" data-auto class="${manual ? '' : 'on'}">🤖 Auto</button></div>
         <h4>Light color</h4><div class="row">${TINTS.map(([c, n]) => `<button type="button" class="chip${(lt.tint || '') === c ? ' on' : ''}" data-tint="${c}">${esc(n)}</button>`).join('')}</div>
         <h4>Spotlight</h4><div class="row"><button type="button" data-sp class="${lt.sp ? 'on' : ''}">🔦 ${lt.sp ? 'On' : 'Off'}</button><input type="color" data-spc value="${hexOk(lt.spc) || '#ffffff'}"></div>`;
     } else {
+      if (o.movieInfo) { const { sh, title } = o.movieInfo(); const tm = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); const m = (x) => { const c = Math.ceil(Math.max(0, x)); return `${Math.floor(c / 60)}:${String(c % 60).padStart(2, '0')}`; };
+        h += `<h4>🎬 Movie: ${esc(title)}</h4><p>${sh.phase === 'off' ? 'Showtimes are off. The screen shows Coming Soon.' : sh.phase === 'movie' ? `▶️ Playing now (${m(sh.left)} left). Next show ${tm(sh.next)}.` : sh.phase === 'end' ? `Thanks card. Next show ${tm(sh.next)}.` : `⏱️ Next showing ${tm(sh.start)} (in ${m(sh.left)}).`} A show every 15 minutes: 5-minute countdown, then the movie. Everyone sees the same spot. A song you Play below takes over the screen until it ends.</p>
+        <div class="row"><button type="button" data-mv2="now">▶️ Start movie now</button><button type="button" data-mv2="count">⏱️ Start 5-min countdown</button><button type="button" data-mv2="sched">📅 Regular times</button>${sh.phase === 'off' ? '<button type="button" data-mv2="on">✅ Showtimes on</button>' : '<button type="button" data-mv2="off">⏹️ Showtimes off</button>'}</div><h4>🎵 Songs</h4>`; }
       const L = o.songs(); const cur = o.songAt(S.pl.i); const on = o.playing();
       h += `<p>${cur ? (on ? '▶️ Playing: ' : '⏸️ Ready: ') + esc(cur.title || cur.key) : 'No songs yet. The screen shows <b>Now Showing: Coming Soon</b>.'}</p>`;
       if (L.length) { h += `<div class="row"><button type="button" data-tp="play">▶️ Play</button><button type="button" data-tp="pause">⏸️ Pause</button><button type="button" data-tp="next">⏭️ Next</button><button type="button" data-tp="stop">⏹️ Stop</button></div><h4>Playlist</h4><div class="row">${L.map((s, i) => `<button type="button" class="chip${cur === s ? ' on' : ''}" data-song="${i}">🎵 ${esc(s.title || s.key)}${s.artist ? ' · ' + esc(s.artist) : ''}</button>`).join('')}</div>`; }
@@ -74,7 +77,7 @@ export function openTheaterEditor(o) {
     else if ('del' in d) { const z = iz(); const L = o.items(z); if (L[sel]) { L.splice(sel, 1); o.setItems(z, L); sel = -1; } }
     else if (d.lv) lights({ h: +d.lv }); else if ('auto' in d) { const S = st(); o.save({ lt: { ...S.lt, at: 0 } }); o.applyLights(true); }
     else if (d.tint != null) lights({ tint: d.tint }); else if ('sp' in d) lights({ sp: !st().lt.sp });
-    else if (d.tp) o.transport(d.tp); else if (d.song != null) o.transport('play', +d.song);
+    else if (d.mv2) o.movieCmd && o.movieCmd(d.mv2); else if (d.tp) o.transport(d.tp); else if (d.song != null) o.transport('play', +d.song);
     paint();
   });
   paint(); el.repaint = paint; return el;
