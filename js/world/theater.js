@@ -157,11 +157,13 @@ export function attachTheater(api, W, K, { far }) {
     const cv = ib.scrCv, g = cv.getContext('2d'), w = cv.width, h = cv.height, s = songAt(st.pl.i), on = playing();
     if (!on && !(st.pl.p > 0 && s)) { // idle: Coming Soon (redrawn ~2x a second)
       if (now - idleT < 0.5) return; idleT = now;
-      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#2a0208'); gr.addColorStop(1, '#050002'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      g.globalAlpha = 0.5; for (let i = 0; i < 40; i++) { const x = (i * 97.3 + now * 9 * (1 + (i % 3))) % w, y = (i * 53.7) % h; g.fillStyle = i % 2 ? '#d4af37' : '#fff'; g.fillRect(x, y, 2, 2); } g.globalAlpha = 1;
-      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#d4af37'; g.shadowColor = '#d4af37'; g.shadowBlur = 20; g.font = `900 ${Math.round(h * 0.17)}px Inter, Arial, sans-serif`; g.fillText('LONE KEEM STUDIO', w / 2, h * 0.36, w * 0.9); g.shadowBlur = 0;
-      g.fillStyle = '#fff6dc'; g.font = `700 ${Math.round(h * 0.075)}px Inter, Arial, sans-serif`; g.fillText('Now Showing', w / 2, h * 0.58);
-      g.fillStyle = '#ffffff'; g.font = `900 ${Math.round(h * 0.12)}px Inter, Arial, sans-serif`; g.globalAlpha = 0.75 + 0.25 * Math.sin(now * 2); g.fillText('Coming Soon', w / 2, h * 0.74); g.globalAlpha = 1;
+      // classy bright idle screen (the reference look: big white screen), burgundy + gold type
+      const gr = g.createRadialGradient(w / 2, h * 0.45, h * 0.1, w / 2, h / 2, w * 0.62); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.7, '#f3f0ea'); gr.addColorStop(1, '#d9d4cb'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      g.globalAlpha = 0.35; for (let i = 0; i < 26; i++) { const x = (i * 97.3 + now * 6 * (1 + (i % 3))) % w, y = (i * 53.7) % h; g.fillStyle = '#d4af37'; g.fillRect(x, y, 3, 3); } g.globalAlpha = 1;
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#800020'; g.font = `900 ${Math.round(h * 0.17)}px Inter, Arial, sans-serif`; g.fillText('LONE KEEM STUDIO', w / 2, h * 0.36, w * 0.9);
+      g.fillStyle = '#b8962e'; g.fillRect(w * 0.3, h * 0.49, w * 0.4, Math.max(2, h * 0.008));
+      g.fillStyle = '#8a6d14'; g.font = `700 ${Math.round(h * 0.075)}px Inter, Arial, sans-serif`; g.fillText('Now Showing', w / 2, h * 0.585);
+      g.fillStyle = '#800020'; g.font = `900 ${Math.round(h * 0.12)}px Inter, Arial, sans-serif`; g.globalAlpha = 0.8 + 0.2 * Math.sin(now * 2); g.fillText('Coming Soon', w / 2, h * 0.74); g.globalAlpha = 1;
       ib.scrTex.needsUpdate = true; return;
     }
     idleT = -1; if (now - scrT < (LOW ? 1 / 20 : 1 / 30)) return; scrT = now;
@@ -174,6 +176,7 @@ export function attachTheater(api, W, K, { far }) {
   // ---------------------------------------------------------------- enter / leave
   const driving = () => { try { const m = W.drive && W.drive.mine && W.drive.mine(); return !!(m && m.state && m.state !== 'parked'); } catch { return false; } };
   function enter() {
+    { const rt = document.getElementById('p3-rotip'); if (rt) rt.hidden = true; }
     if (inside) return; if (driving()) { K.say('🚗 Park your car first, then walk in!'); return; }
     if (roomState.inId) { K.say('Leave this place first.'); return; }
     buildIn(); inside = true; inG.visible = true; for (const b of inBoxes) api.box.push(b);
@@ -248,7 +251,7 @@ export function attachTheater(api, W, K, { far }) {
 .th-row{display:flex;align-items:center;gap:6px;margin:4px 0}.th-row span{flex:1;font-weight:700}.th-card .th-row button{margin:0;min-height:40px;padding:0 10px;font-size:13px}
 .th-bub{position:absolute;left:50%;bottom:calc(max(18px,env(safe-area-inset-bottom)) + 130px);transform:translateX(-50%);background:#fff;color:#3a0712;border-radius:18px;padding:10px;pointer-events:auto;z-index:9;box-shadow:0 6px 18px rgba(0,0,0,.35);max-width:min(92vw,360px);font:700 14px Inter,sans-serif;text-align:center}
 .th-bub .th-bn{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.th-bub button{min-height:42px;border-radius:999px;border:0;background:#800020;color:#fff6dc;font:800 13px Inter,sans-serif;padding:0 12px}.th-bub button.ghost{background:#eee;color:#3a0712}
-@media (max-height:500px){.th-hud{right:auto;left:50%;transform:translateX(-50%);top:calc(max(6px,env(safe-area-inset-top)) + 90px);flex-direction:row;flex-wrap:wrap;justify-content:center;max-width:60vw}.th-hud button{min-height:36px}.th-bub{bottom:12px}}`; document.head.appendChild(c); }
+@media (max-height:500px){.th-hud{top:calc(max(6px,env(safe-area-inset-top)) + 62px);gap:5px}.th-hud button{min-height:32px;font-size:12px;padding:0 10px}.th-bub{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 58px);max-height:calc(100vh - 140px);overflow:auto}}`; document.head.appendChild(c); }
   const hudEl = document.createElement('div'); hudEl.className = 'th-hud'; hudEl.hidden = true; K.hud.appendChild(hudEl);
   function paintHud() {
     hudEl.hidden = !inside; if (!inside) return; const aud = P.sit && P.sit.th && P.sit.seat && P.sit.seat.aud;
@@ -304,6 +307,7 @@ export function attachTheater(api, W, K, { far }) {
     if (P.x < 392 && Math.hypot(P.x - T.door[0], P.z - T.door[1]) < 3.6) return { id: 'th-in', label: '🎬 Enter Lone Keem Studio' };
     const n = npc.nearest(); if (n) return { id: 'th-npc', label: `💬 Talk to ${n.name}` };
     if (seatNear && !P.sit) return { id: 'th-sit', label: '🪑 Sit' };
+    if (owner && P.x < 392 && Math.hypot(P.x - T.door[0], P.z - T.door[1]) < 14) return { id: 'th-edit', label: '🎨 Edit theater outside' };
     return null;
   }
   function action(a) {
@@ -311,7 +315,8 @@ export function attachTheater(api, W, K, { far }) {
     else if (a === 'th-snack') snackMenu(); else if (a === 'th-ticket') { emote('🎟️'); K.say('🎟️ Here is your ticket! Entry is free today. Enjoy the show!'); }
     else if (a === 'th-npc') { const n = npc.nearest(); if (n) npc.talk(n); } else if (a === 'th-edit') openEdit();
   }
-  window.__theaterDbg = { get st() { return st; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; } };
+  window.__theaterDbg = { get st() { return st; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
+    tp(lx, lz, cy) { if (!LOCAL || !inside) return; P.x = RX + lx; P.z = RZ + lz; P.y = FLAT + yIn(lx, lz); P.vy = 0; P.onGround = true; if (cy != null) try { window.__p3.setYaw(cy); } catch { /* */ } } };
   return {
     prompt, action, update,
     destroy() { try { leave(true); } catch { /* */ } if (unsub) unsub(); clearTimeout(saveT); for (const f of cleanup) try { f(); } catch { /* */ }

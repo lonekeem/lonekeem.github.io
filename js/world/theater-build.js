@@ -6,7 +6,7 @@ import { DECOR, SEATS } from './interior.js';
 // Default look = the red reference auditorium + a burgundy/gold lobby and facade. Keys are what the owner recolors.
 export const SURF = {
   aCarpet: ['Carpet', '#8f1d22', 'a'], aWall: ['Padded walls', '#a3191f', 'a'], aPanel: ['Side panels', '#7a1016', 'a'], aStage: ['Stage', '#111111', 'a'],
-  aFrame: ['Screen frame', '#0b0b0b', 'a'], aScreen: ['Screen', '#f5f5f5', 'a'], aCeil: ['Ceiling', '#1a1a1e', 'a'], aTruss: ['Light truss', '#2b2b2f', 'a'],
+  aFrame: ['Screen frame', '#0b0b0b', 'a'], aScreen: ['Screen', '#f5f5f5', 'a'], aCeil: ['Ceiling', '#3a080c', 'a'], aTruss: ['Light truss', '#2b2b2f', 'a'],
   aRail: ['Handrails', '#c9ccd1', 'a'], aSeatF: ['Seat frames', '#5e0d12', 'a'], aSeatC: ['Seat cushions', '#c4161c', 'a'], aStep: ['Step edges', '#ffffff', 'a'],
   aCurt: ['Curtains', '#8b0f17', 'a'], aLight: ['House light color', '#fff1d6', 'a'], aAisle: ['Aisle lights', '#ffb14a', 'a'], aSpot: ['Spotlight color', '#ffffff', 'a'],
   lFloor: ['Lobby carpet', '#5a0f14', 'l'], lWall: ['Lobby walls', '#2a1416', 'l'], lCeil: ['Lobby ceiling', '#1b1012', 'l'], lCounter: ['Counters', '#800020', 'l'],
@@ -174,16 +174,32 @@ export function buildExterior(THREE, kit, parent, T, F, LOW) {
 // ---------------------------------------------------------------- inside (local coords around the hidden room centre)
 // Auditorium z -22..4 (screen at the -z end), lobby z 4..22 at floor height LY. Rows step up 0.5 m every 1.4 m.
 export const IN = { X: 21, Z0: -22, Z1: 22, LY: 4, ROWS: 8, RZ: -11, RD: 1.4, RH: 0.5, SCR: { w: 32, h: 13.4, y: 2.6, z: -21.3, R: 60 } };
+export const CURVE = 0.003; const cz = (x) => -CURVE * x * x; // rows bow toward the screen (about 1 m at the ends)
 const BLOCKS = [[-18, -9.6, 8], [-7, 7, 14], [9.6, 18, 8]]; const AISLES = [[-21, -18], [-9.6, -7], [7, 9.6], [18, 21]];
 export function buildInterior(THREE, kit, parent, LOW) {
   const { put, flush, G } = kit; const mats = {}; const basic = (k, o = {}) => { const m = new THREE.MeshBasicMaterial({ color: DEF[k], vertexColors: true, toneMapped: false, ...o }); (mats[k] = mats[k] || []).push(m); return m; };
   const p = (k, geo, x, y, z, sx, sy, sz, sh = 1, ry = 0) => put(k, geo, new THREE.Color(sh, sh, sh), x, y, z, ry, sx, sy, sz);
   const { X, Z0, Z1, LY, ROWS, RZ, RD, RH } = IN; const boxes = []; const solid = (x0, x1, z0, z1, top, bot = -2) => boxes.push({ x0, x1, z0, z1, top, bot });
-  // --- auditorium shell
+  // --- auditorium shell: long, gently curved stadium rows (custom stepped surface that follows the curve)
   p('aCarpet', G.box, 0, -0.05, (Z0 + RZ) / 2, 2 * X, 0.1, RZ - Z0); // flat front floor
-  for (let r = 0; r < ROWS; r++) { const z0 = RZ + r * RD, z1 = r === ROWS - 1 ? 4 : z0 + RD, top = RH * (r + 1);
-    for (const [a, b] of BLOCKS) { p('aCarpet', G.box, (a + b) / 2, top / 2, (z0 + z1) / 2, b - a, top, z1 - z0, 0.92); solid(a, b, z0, z1, top); p('aStep', G.box, (a + b) / 2, top + 0.005, z0 + 0.03, b - a, 0.02, 0.06, 0.6); }
-    for (const [a, b] of AISLES) for (let h = 0; h < 2; h++) { const zz0 = z0 + h * RD / 2, zz1 = h ? z1 : z0 + RD / 2, t = RH * r + RH / 2 * (h + 1); p('aCarpet', G.box, (a + b) / 2, t / 2, (zz0 + zz1) / 2, b - a, t, zz1 - zz0, 0.85); solid(a, b, zz0, zz1, t); p('aStep', G.box, (a + b) / 2, t + 0.006, zz0 + 0.05, b - a, 0.03, 0.1); p('aAisle', G.box, (a + b) / 2, t - 0.08, zz0 - 0.005, (b - a) * 0.7, 0.04, 0.02); } }
+  const QD = new Map(); const Q = (k, sh, a, b, c, d) => { const key = k + '|' + sh; if (!QD.has(key)) QD.set(key, []); QD.get(key).push(a, b, c, a, c, d); };
+  function stairs(x0, x1, fronts, back, o) { // fronts: [[zBase, top]] front to back; every z follows the curve except the flat back wall
+    const n = Math.max(1, Math.ceil((x1 - x0) / 0.5)), cs = Math.max(1, Math.round((x1 - x0) / 2.2));
+    for (let k = 0; k < fronts.length; k++) {
+      const [zb, top] = fronts[k], prev = k ? fronts[k - 1][1] : 0, nb = k < fronts.length - 1 ? fronts[k + 1][0] : null;
+      const zf = (x) => zb + cz(x), ze = (x) => (nb == null ? back : nb + cz(x));
+      for (let i = 0; i < n; i++) { const xa = x0 + (x1 - x0) * i / n, xb = x0 + (x1 - x0) * (i + 1) / n, za = zf(xa), zB = zf(xb);
+        Q('aCarpet', o.sh * 0.78, [xa, prev, za], [xa, top, za], [xb, top, zB], [xb, prev, zB]);
+        Q('aCarpet', o.sh, [xa, top, za], [xa, top, ze(xa)], [xb, top, ze(xb)], [xb, top, zB]);
+        Q('aStep', o.esh, [xa, top + 0.006, za], [xa, top + 0.006, za + o.ew], [xb, top + 0.006, zB + o.ew], [xb, top + 0.006, zB]);
+        if (o.lit) { const m = (xa + xb) / 2, ok = Math.abs(m - (x0 + x1) / 2) < (x1 - x0) * 0.36; if (ok) Q('aAisle', 1, [xa, top - 0.12, za - 0.01], [xa, top - 0.06, za - 0.01], [xb, top - 0.06, zB - 0.01], [xb, top - 0.12, zB - 0.01]); } }
+      for (const [x, sg] of [[x0, -1], [x1, 1]]) { const a = [x, 0, zf(x)], b = [x, 0, ze(x)], c = [x, top, ze(x)], d = [x, top, zf(x)]; if (sg < 0) Q('aCarpet', o.sh * 0.7, a, b, c, d); else Q('aCarpet', o.sh * 0.7, d, c, b, a); }
+      for (let j = 0; j < cs; j++) { const xa = x0 + (x1 - x0) * j / cs, xb = x0 + (x1 - x0) * (j + 1) / cs, xm = (xa + xb) / 2; solid(xa, xb, zf(xm), ze(xm), top); }
+    }
+  }
+  for (const [a, b] of BLOCKS) stairs(a, b, Array.from({ length: ROWS }, (_, r) => [RZ + r * RD, RH * (r + 1)]), 4, { sh: 0.92, esh: 0.55, ew: 0.05 });
+  for (const [a, b] of AISLES) { const f = []; for (let r = 0; r < ROWS; r++) { f.push([RZ + r * RD, RH * r + RH / 2]); f.push([RZ + r * RD + RD / 2, RH * (r + 1)]); } stairs(a, b, f, 4, { sh: 0.85, esh: 1, ew: 0.09, lit: true }); }
+  for (const [key, pts] of QD) { const [k, sh] = key.split('|'); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3)); g.computeVertexNormals(); put(k, g, new THREE.Color(+sh, +sh, +sh), 0, 0, 0); g.dispose(); }
   // walls (padded panels), ceiling, front wall, back wall with doorway + projector window
   const AH = 17; p('aWall', G.box, -X - 0.2, AH / 2, (Z0 + 4) / 2, 0.4, AH, 4 - Z0); p('aWall', G.box, X + 0.2, AH / 2, (Z0 + 4) / 2, 0.4, AH, 4 - Z0);
   for (let z = Z0 + 1.5; z < 3.5; z += 2.2) for (let y = 1; y < AH - 1; y += 2.4) for (const s of [-1, 1]) p('aWall', G.box, s * (X - 0.02), y + 1, z, 0.16, 2.2, 2.05, 0.9 + ((Math.round(z) + Math.round(y)) % 2) * 0.06);
@@ -217,11 +233,13 @@ export function buildInterior(THREE, kit, parent, LOW) {
   const sconce = []; for (const s of [-1, 1]) for (let z = Z0 + 4; z < 3; z += 5) sconce.push([s * (X - 0.25), 6.5, z]);
   const scM = new THREE.MeshBasicMaterial({ color: DEF.aLight, toneMapped: false }); const sc = new THREE.InstancedMesh(new THREE.SphereGeometry(0.28, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), scM, sconce.length);
   { const m = new THREE.Matrix4(); sconce.forEach(([x, y, z], i) => { m.compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)), new THREE.Vector3(1, 1.6, 1)); sc.setMatrixAt(i, m); }); } parent.add(sc);
-  // handrails: along the side-stair walls + front of the first row + the cross aisle (no colliders)
-  const rail = (x0, y0, z0, x1, y1, z1) => { const dx = x1 - x0, dy = y1 - y0, dz2 = z1 - z0, L = Math.hypot(dx, dy, dz2); const g = new THREE.Mesh(G.cyl); g.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz2 / L)); g.scale.set(0.07, L, 0.07); g.updateMatrix(); const gg = G.cyl.toNonIndexed(); gg.applyMatrix4(g.matrix); const n = gg.attributes.position.count; gg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3)); gg.setAttribute('uv', gg.attributes.uv || new THREE.BufferAttribute(new Float32Array(n * 2), 2)); railGs.push(gg); };
+  // metal handrails: down every aisle (with posts), along the front row and the back cross aisle (curved), no colliders
   const railGs = []; const top = RH * ROWS;
-  for (const s of [-1, 1]) { rail(s * 18.05, 1.0, RZ, s * 18.05, top + 1.0, RZ + RD * ROWS - 0.6); rail(s * 20.7, 1.0, RZ, s * 20.7, top + 1.0, RZ + RD * ROWS - 0.6); for (let r = 0; r <= ROWS; r += 2) rail(s * 18.05, RH * r + 0.25 * (r > 0), RZ + RD * r + 0.2, s * 18.05, RH * r + 1.0, RZ + RD * r + 0.2); }
-  for (const [a, b] of BLOCKS) { rail(a + 0.2, 0.95, RZ - 0.2, b - 0.2, 0.95, RZ - 0.2); rail(a + 0.2, top + 0.95, RZ + RD * ROWS + 0.05, b - 0.2, top + 0.95, RZ + RD * ROWS + 0.05); }
+  const rail = (x0, y0, z0, x1, y1, z1, r = 0.07) => { const dx = x1 - x0, dy = y1 - y0, dz2 = z1 - z0, L = Math.hypot(dx, dy, dz2); if (L < 1e-3) return; const g = new THREE.Object3D(); g.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz2 / L)); g.scale.set(r, L, r); g.updateMatrix(); const gg = G.cyl.toNonIndexed(); gg.applyMatrix4(g.matrix); const n = gg.attributes.position.count, N = gg.attributes.normal.array, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = 0.7 + 0.3 * Math.max(0, N[i * 3 + 1] * 0.6 + N[i * 3] * 0.3 + N[i * 3 + 2] * 0.5); gg.setAttribute('color', new THREE.BufferAttribute(c, 3)); railGs.push(gg); };
+  const curveRail = (a, b, y, zb) => { const n = Math.max(2, Math.ceil((b - a) / 1)); for (let i = 0; i < n; i++) { const xa = a + (b - a) * i / n, xb = a + (b - a) * (i + 1) / n; rail(xa, y, zb + cz(xa), xb, y, zb + cz(xb)); } for (let x = a; x <= b + 0.01; x += (b - a) / Math.max(1, Math.round((b - a) / 2.4))) rail(x, y - 0.95, zb + cz(x), x, y, zb + cz(x), 0.05); };
+  const aisleRail = (x) => { const z0 = RZ + cz(x), z1 = RZ + RD * ROWS - 0.6 + cz(x); rail(x, 1.0, z0, x, top + 1.0, z1); for (let r = 0; r <= ROWS; r += 2) { const zz = Math.min(z1, RZ + RD * r + 0.2 + cz(x)), yy = Math.min(top, RH * r + RH / 2); rail(x, yy, zz, x, 1.0 + (top) * (zz - z0) / (z1 - z0), zz, 0.05); } };
+  for (const s of [-1, 1]) { aisleRail(s * 18.05); aisleRail(s * 20.7); aisleRail(s * 8.3); }
+  for (const [a, b] of BLOCKS) { curveRail(a + 0.2, b - 0.2, 0.95, RZ - 0.25); curveRail(a + 0.2, b - 0.2, top + 0.95, RZ + RD * ROWS + 0.05); }
   // green exit signs (always lit) + glow strip over the doorway
   const exitCv = textCanvas(128, 48, (g) => { g.fillStyle = '#0a7d3a'; g.fillRect(0, 0, 128, 48); g.fillStyle = '#eafff1'; g.font = '900 30px Inter, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('EXIT', 64, 26); });
   const exitM = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(exitCv), toneMapped: false });
@@ -269,21 +287,41 @@ export function buildInterior(THREE, kit, parent, LOW) {
   const meshes = {};
   for (const k of Object.keys(SURF)) { if (k[0] === 'o' || k === 'aScreen') continue; const m = flush(k, basic(k), parent, false); if (m) meshes[k] = m; }
   if (railGs.length) { kit; const merged = (() => { let n = 0; railGs.forEach((g) => (n += g.attributes.position.count)); const out = new THREE.BufferGeometry(); for (const [a, s] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3]]) { const arr = new Float32Array(n * s); let o = 0; for (const g of railGs) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; } out.setAttribute(a, new THREE.BufferAttribute(arr, s)); } return out; })(); const rm = new THREE.Mesh(merged, basic('aRail')); parent.add(rm); meshes.aRail = rm; }
-  // --- seats: two InstancedMeshes (frame + cushion), gently curved rows facing the screen; ALL sittable
+  // --- seats: two InstancedMeshes (frame + cushion), long gently curved rows facing the screen; ALL sittable
   const seats = []; for (let r = 0; r < ROWS; r++) { const top = RH * (r + 1), zr = RZ + r * RD;
-    for (const [a, b, n] of BLOCKS) { const pitch = (b - a) / n; for (let i = 0; i < n; i++) { const x = a + pitch * (i + 0.5); const z = zr + 0.78 - 0.0009 * x * x; const fx = -x, fz = -40 - z, yaw = Math.atan2(fx, fz); seats.push({ x, z, y: top, yaw, row: r, fl: top }); } } }
-  const fG = seatGeo(THREE, G, true), cG = seatGeo(THREE, G, false);
+    for (const [a, b, n] of BLOCKS) { const pitch = (b - a) / n; for (let i = 0; i < n; i++) { const x = a + pitch * (i + 0.5); const z = zr + 0.78 + cz(x); const fx = -x, fz = -40 - z, yaw = Math.atan2(fx, fz); seats.push({ x, z, y: top, yaw, row: r, fl: top }); } } }
+  const fG = seatGeo(THREE, true, LOW), cG = seatGeo(THREE, false, LOW);
   const fI = new THREE.InstancedMesh(fG, basic('aSeatF'), seats.length), cI = new THREE.InstancedMesh(cG, basic('aSeatC'), seats.length);
   { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3(); seats.forEach((s, i) => { e.set(0, s.yaw, 0); q.setFromEuler(e); m.compose(v.set(s.x, s.y, s.z), q, one); fI.setMatrixAt(i, m); cI.setMatrixAt(i, m); }); }
   parent.add(fI); parent.add(cI);
   return { mats, meshes, boxes, seats, screen, scrCv, scrTex, beam, beamM, spotCone, spotDisc, spotM, discM, tipM, scM, lobM, menuCv, menuTex, SN, TK, AH, LH, LX };
 }
-// theater seat facing +z in its own space (rotated by yaw + PI so it faces the screen): frame = arms + base, cushion = seat + back
-function seatGeo(THREE, G, frame) {
-  const parts = frame ? [[0, 0.2, -0.05, 0.86, 0.36, 0.5, 0.7], [0.45, 0.55, 0.02, 0.09, 0.42, 0.62, 1], [-0.45, 0.55, 0.02, 0.09, 0.42, 0.62, 1], [0, 0.85, -0.42, 0.88, 0.9, 0.06, 0.6]]
-    : [[0, 0.44, 0.04, 0.8, 0.16, 0.62, 1.05], [0, 0.88, -0.34, 0.8, 0.82, 0.16, 0.95], [0, 1.25, -0.33, 0.78, 0.1, 0.18, 1.1]];
-  const gs = parts.map(([x, y, z, sx, sy, sz, sh]) => { const g = G.box.toNonIndexed(); g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(z < -0.3 ? -0.12 : 0, 0, 0)), new THREE.Vector3(sx, sy, sz))); const n = g.attributes.position.count, N = g.attributes.normal.array, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const f = sh * (0.62 + 0.38 * Math.max(0, N[i * 3 + 1] * 0.8 + N[i * 3 + 2] * 0.5)); c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = f; } g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g; });
-  let n = 0; gs.forEach((g) => (n += g.attributes.position.count)); const out = new THREE.BufferGeometry();
-  for (const [a, s] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3]]) { const arr = new Float32Array(n * s); let o = 0; for (const g of gs) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; } out.setAttribute(a, new THREE.BufferAttribute(arr, s)); }
-  out.computeBoundingSphere(); return out;
+// rounded box (indexed): grid points pulled onto a radius-r skin; bulge puffs one face (y = top, z = front) like a plush cushion
+function rbox(THREE, w, h, d, r, s, bulge = 0, ax = 'z') {
+  const g = new THREE.BoxGeometry(w, h, d, s, s, s), P = g.attributes.position, N = g.attributes.normal, H = [w / 2, h / 2, d / 2], I = H.map((v) => Math.max(0.001, v - r));
+  const remap = (t, i) => { const a = Math.abs(t) / H[i]; return a > 0.99 ? Math.sign(t) * H[i] : a < 0.01 ? 0 : Math.sign(t) * I[i]; }; // interior grid lines sit where the rounding starts
+  const v = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let i = 0; i < P.count; i++) { v.set(remap(P.getX(i), 0), remap(P.getY(i), 1), remap(P.getZ(i), 2)); c.set(Math.max(-I[0], Math.min(I[0], v.x)), Math.max(-I[1], Math.min(I[1], v.y)), Math.max(-I[2], Math.min(I[2], v.z)));
+    n.copy(v).sub(c); if (n.lengthSq() < 1e-10) n.set(N.getX(i), N.getY(i), N.getZ(i)); n.normalize(); v.copy(c).addScaledVector(n, r);
+    if (bulge) { if (ax === 'z' && v.z > 0) v.z += bulge * Math.max(0, 1 - (v.x / H[0]) ** 2) * Math.max(0, 1 - (v.y / H[1]) ** 2); if (ax === 'y' && v.y > 0) v.y += bulge * Math.max(0, 1 - (v.x / H[0]) ** 2) * Math.max(0, 1 - (v.z / H[2]) ** 2); }
+    P.setXYZ(i, v.x, v.y, v.z); N.setXYZ(i, n.x, n.y, n.z); }
+  g.deleteAttribute('uv'); return g;
+}
+// cinema seat facing +z in its own space (rotated by its yaw toward the screen):
+// frame = two armrests (shared look of real theater seats) + the back shell; cushion = plush seat + tall rounded backrest
+function seatGeo(THREE, frame, LOW) {
+  const sg = LOW ? 2 : 4, L = new THREE.Vector3(0.25, 0.8, 0.55).normalize();
+  const parts = frame
+    ? [[0.445, 0.36, -0.03, 0.1, 0.72, 0.64, 0.045, 0, 0, 1], [-0.445, 0.36, -0.03, 0.1, 0.72, 0.64, 0.045, 0, 0, 1], [0, 0.66, -0.43, 0.84, 1.08, 0.08, 0.035, -0.14, 0, 0.8], [0, 0.17, -0.12, 0.62, 0.3, 0.36, 0.04, 0, 0, 0.6]]
+    : [[0, 0.45, 0.04, 0.78, 0.17, 0.58, 0.07, -0.06, 0.035, 1.05, 'y'], [0, 0.97, -0.33, 0.76, 0.86, 0.17, 0.075, -0.14, 0.04, 1], [0, 1.38, -0.39, 0.7, 0.16, 0.2, 0.07, -0.14, 0, 1.08]];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), pv = new THREE.Vector3();
+  const gs = parts.map(([x, y, z, w, h, d, r, rx, bu, sh, ax]) => { const g = rbox(THREE, w, h, d, r, (w < 0.2 || d < 0.1) && !LOW ? 3 : sg, bu, ax || 'z'); g.applyMatrix4(m.compose(pv.set(x, y, z), q.setFromEuler(e.set(rx, 0, 0)), one));
+    const P = g.attributes.position, N = g.attributes.normal, c = new Float32Array(P.count * 3);
+    for (let i = 0; i < P.count; i++) { const dl = N.getX(i) * L.x + N.getY(i) * L.y + N.getZ(i) * L.z; const ao = 0.72 + 0.28 * Math.min(1, P.getY(i) / 0.9); const f = sh * ao * (0.58 + 0.42 * Math.max(0, dl)); c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = f; }
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g; });
+  let nv = 0, ni = 0; gs.forEach((g) => { nv += g.attributes.position.count; ni += g.index.count; });
+  const out = new THREE.BufferGeometry(), idx = new Uint32Array(ni); let vo = 0, io = 0;
+  for (const [a, s] of [['position', 3], ['normal', 3], ['color', 3]]) { const arr = new Float32Array(nv * s); let o = 0; for (const g of gs) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; } out.setAttribute(a, new THREE.BufferAttribute(arr, s)); }
+  for (const g of gs) { const ix = g.index.array; for (let i = 0; i < ix.length; i++) idx[io + i] = ix[i] + vo; io += ix.length; vo += g.attributes.position.count; g.dispose(); }
+  out.setIndex(new THREE.BufferAttribute(idx, 1)); out.computeBoundingSphere(); return out;
 }

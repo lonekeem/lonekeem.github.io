@@ -67,7 +67,7 @@ body.p3-on .gm.top-right { z-index: 95; }
 #p3-set { right: max(10px, env(safe-area-inset-right)); }
 #p3-rot { right: calc(max(10px, env(safe-area-inset-right)) + 50px); }
 #p3-rot.on { background: #7c3aed; }
-.p3-rotip { position: absolute; left: 50%; top: 48%; transform: translateX(-50%); z-index: 8; max-width: min(340px, calc(100vw - 150px)); margin: 0; border: 2px solid #ffd23f; border-radius: 16px; background: rgba(43,29,85,.94); color: #fff; padding: 10px 14px; font: 800 14px/1.35 Inter, system-ui, sans-serif; text-align: center; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.p3-rotip { position: absolute; left: 50%; top: calc(max(8px, env(safe-area-inset-top)) + 118px); transform: translateX(-50%); z-index: 8; max-width: min(300px, calc(100vw - 150px)); margin: 0; border: 2px solid #ffd23f; border-radius: 16px; background: rgba(43,29,85,.94); color: #fff; padding: 7px 12px; font: 800 12.5px/1.3 Inter, system-ui, sans-serif; text-align: center; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
 .p3-rotip[hidden] { display: none; }
 .p3-top { min-width: 0; overflow: hidden; } .p3-top > span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 400px) { .p3-top b { display: none; } }
@@ -111,5 +111,5 @@ body.p3-on .rs-q[hidden], body.p3-drive .rs-q { display: none !important; }
   body.p3-on .p3-view .kc { --kc: 52px !important; }
   body.p3-on .p3-view .kc-btns { bottom: max(8px, env(safe-area-inset-bottom)) !important; right: max(8px, env(safe-area-inset-right)); gap: 6px; }
   body.p3-on .p3-view .kc-b small { font-size: 9px; }
-  body.p3-on .p3-rotip { top: 42%; max-width: min(420px, calc(100vw - 300px)); }
+  body.p3-on .p3-rotip { display: none; }
 }

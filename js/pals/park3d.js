@@ -692,9 +692,12 @@ export function createPark3D(ctx) {
       const KEY = 'kemy-rot-tip'; let n = 0;
       try { n = parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch { return; }
       if (n >= 3) return;
-      const el = $('#p3-rotip'); if (!el) return;
+      const el = $('#p3-rotip'); if (!el || window.innerWidth > window.innerHeight) return;
       try { localStorage.setItem(KEY, String(n + 1)); } catch { /* still show it this time */ }
-      el.hidden = false; el.onclick = () => { el.hidden = true; };
+      // portrait only, brief, and never parked over the middle of the view
+      if (window.innerWidth > window.innerHeight) return;
+      const hide = () => { el.hidden = true; window.removeEventListener('resize', onR); }; const onR = () => { if (window.innerWidth > window.innerHeight) hide(); };
+      el.hidden = false; el.onclick = hide; window.addEventListener('resize', onR); setTimeout(hide, 5000);
     }
     setTimeout(() => { const p = tc.tutorial(); if (p && p.then) p.then(showRotTip); else showRotTip(); }, 600);
 
