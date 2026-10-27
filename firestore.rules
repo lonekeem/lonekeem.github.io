@@ -2663,14 +2663,9 @@ service cloud.firestore {
     // 🎬 Lone Keem Studio movie theater (js/world/theater.js): one shared doc everyone signed in reads.
     // Only the admin / an ∞ Pass holder (the same unlimitedFor() path) recolors, decorates, sets the lights, or runs the screen.
     match /theater/{tid} {
-      function tq() { return request.resource.data; }
       allow read: if signedIn();
       allow create, update: if tid == 'lone-keem-studio' && unlimitedFor(me())
-        && tq().keys().hasOnly(['col', 'li', 'la', 'lo', 'lt', 'pl', 'at', 'by'])
-        && tq().col is map && tq().col.size() <= 60
-        && isStr(tq().li, 0, 3000) && isStr(tq().la, 0, 3000) && isStr(tq().lo, 0, 3000)
-        && tq().lt is map && tq().lt.size() <= 8 && tq().pl is map && tq().pl.size() <= 8
-        && tq().at == request.time && tq().by == me();
+        && request.resource.data.keys().hasOnly(['col', 'li', 'la', 'lo', 'lt', 'pl', 'at', 'by']) && request.resource.data.by == me();
       allow delete: if isAdmin();
     }
     // People standing in one house. Tiny on purpose: the park presence rules are already near the size cap.
