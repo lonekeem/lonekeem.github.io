@@ -283,13 +283,13 @@ export function attachTheater(api, W, K, { far }) {
   }
   rebuildDecor('lo'); applyOutside(); drawMarq('');
   // ---------------------------------------------------------------- per frame
-  let bulbT = 0, bulbStep = 0, autoT = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
+  let bulbT = 0, bulbStep = 0, autoT = 0, fadeAt = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
   function update(dt, now) {
     const dx = P.x - (T.x0 + T.x1) / 2, dz = P.z - (T.z0 + T.z1) / 2, nearOut = !inside && dx * dx + dz * dz < 160 * 160;
     if (nearOut && (bulbT -= dt) <= 0) { bulbT = 0.28; bulbStep++; bc.set(sv('oMarq')).lerp(bd.set('#fff8dc'), 0.55); bd.set(sv('oMarq')).multiplyScalar(0.3); for (let i = 0; i < ex.bulbN; i++) ex.bulbs.setColorAt(i, (i + bulbStep) % 3 ? bc : bd); ex.bulbs.instanceColor.needsUpdate = true; }
     const s = songAt(st.pl.i); drawMarq(playing() && s ? s.title || s.key : '');
     if (inside && ib) {
-      if (Math.abs(lvl - lvlT) > 0.002 || lvlT !== targetLevel()) { lvlT = targetLevel(); lvl += (lvlT - lvl) * Math.min(1, dt / 0.8); if (Math.abs(lvl - lvlT) < 0.003) lvl = lvlT; applyLights(); }
+      if (Math.abs(lvl - lvlT) > 0.002 || lvlT !== targetLevel()) { lvlT = targetLevel(); const tw = performance.now(), fdt = Math.min(0.5, Math.max(dt, (tw - (fadeAt || tw)) / 1000)); fadeAt = tw; lvl += (lvlT - lvl) * Math.min(1, fdt / 0.8); if (Math.abs(lvl - lvlT) < 0.003) lvl = lvlT; applyLights(); } else fadeAt = 0;
       drawScreen(now); if ((autoT -= dt) <= 0) { autoT = 0.5; syncAudio(); }
       if ((seatChk -= dt) <= 0) { seatChk = 0.2; const nb = P.sit ? null : findSeat(); if (nb !== seatNear) seatNear = nb; }
       // owner client advances the playlist when a song ends
