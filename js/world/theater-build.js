@@ -88,7 +88,7 @@ let ART = new URL('../../assets/series/sheriff/ep1.webp', import.meta.url).href;
 export function setMovieArt(url) { ART = url; }
 export const artMeshes = []; // the meshes showing ART (exterior facade + lobby frame)
 // the open-movie posters for the lobby frames (assets/theater/films, CC BY Blender Foundation)
-const FILM_ART = Object.fromEntries(['big-buck-bunny:bbb', 'spring:spring', 'caminandes-2:c2', 'caminandes-3:c3', 'wing-it:wing'].map((s) => { const [f, id] = s.split(':'); return [id, new URL(`../../assets/theater/films/${f}.webp`, import.meta.url).href]; }));
+const FILM_ART = Object.fromEntries(['big-buck-bunny:bbb', 'spring:spring', 'caminandes-2:c2', 'caminandes-3:c3', 'wing-it:wing', 'singularity:sing'].map((s) => { const [f, id] = s.split(':'); return [id, new URL(`../../assets/theater/films/${f}.webp`, import.meta.url).href]; }));
 function movieArt(THREE) { const t = new THREE.TextureLoader().load(ART); t.colorSpace = THREE.SRGBColorSpace; t.userData.src = ART; return t; }
 // load the facade poster textures (once, when a player first comes near the building)
 export function loadExtPosters(THREE, list) { for (const q of list) { if (q.loaded) continue; q.loaded = true; const m = q.mesh.material;
@@ -287,7 +287,7 @@ export function buildInterior(THREE, kit, parent, LOW) {
   { const ab = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 1.0), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(audCv), toneMapped: false })); ab.position.set(0, LY + 4.0, 4.33); parent.add(ab); }
   // a framed poster for every film in the rotation (gold frames, the Sheriff style), each with a small title plate on top
   // (title + next showtime, drawn by theater.js ~1x a second in the lobby). Slot 'sheriff' shows ART (a family film for kids, and for everyone while SHERIFF_IN_THEATER is off).
-  const pf = [[LX - 0.05, 13.5, -Math.PI / 2, 'sheriff'], [-LX + 0.05, 13.5, Math.PI / 2, 'bbb'], [-LX + 0.05, 18.5, Math.PI / 2, 'spring'], [LX - 0.05, 18.5, -Math.PI / 2, 'wing'], [6.5, Z1 - 0.05, Math.PI, 'c2'], [-6.5, Z1 - 0.05, Math.PI, 'c3']];
+  const pf = [[LX - 0.05, 13.5, -Math.PI / 2, 'sheriff'], [-LX + 0.05, 13.5, Math.PI / 2, 'bbb'], [-LX + 0.05, 18.5, Math.PI / 2, 'spring'], [LX - 0.05, 18.5, -Math.PI / 2, 'wing'], [6.5, Z1 - 0.05, Math.PI, 'c2'], [-6.5, Z1 - 0.05, Math.PI, 'c3'], [-11.5, Z1 - 0.05, Math.PI, 'sing']];
   const lobbyPosters = [];
   for (const [x, z, ry, id] of pf) { const nx = Math.sin(ry), nz = Math.cos(ry), big = id === 'sheriff', pw = big ? 2.55 : 2.2, ph = pw * 694 / 432, py = LY + (big ? 3.3 : 3.2);
     put('lPoster', G.box, new THREE.Color(1, 1, 1), x, py, z, ry, pw + 0.4, ph + 0.45, 0.14);

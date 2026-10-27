@@ -1,5 +1,5 @@
 // 🎬 Lone Keem Studio showings: a clock-based rotating program on the big curved screen.
-//   "The Sheriff of Lone Keem" (13+, only when SHERIFF_IN_THEATER is on; off for now) plus four Blender Foundation open movies
+//   "The Sheriff of Lone Keem" (13+, only when SHERIFF_IN_THEATER is on; off for now) plus six Blender Foundation open movies
 //   (CC BY, files in assets/theater/films/, credits in assets/theater/README.md).
 // Lazy: theater.js imports this only near the theater, and the <video> is created only while you are INSIDE (unloaded on leave).
 // Sync needs no writes and no rules change: every client computes the same timeline from the clock.
@@ -30,8 +30,10 @@ export const FILMS = {
   spring: blender('spring', 'Spring', 'spring', 464.167, 1280, 536, 'CC BY 4.0', 2019),
   c2: blender('c2', 'Caminandes 2: Gran Dillama', 'caminandes-2', 146.048, 1280, 720, 'CC BY 3.0', 2013),
   c3: blender('c3', 'Caminandes 3: Llamigos', 'caminandes-3', 150.14, 1280, 720, 'CC BY 3.0', 2016),
-  wing: blender('wing', 'Wing It!', 'wing-it', 237.917, 1280, 720, 'CC BY 4.0', 2023)
+  wing: blender('wing', 'Wing It!', 'wing-it', 237.917, 1280, 720, 'CC BY 4.0', 2023),
+  sing: blender('sing', 'Singularity', 'singularity', 391.008, 1280, 536, 'CC BY 4.0', 2026)
 };
+FILMS.sing.credit = 'Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0'; // Blender Studio's own credit line
 FILMS.c2.short = 'Caminandes 2'; FILMS.c3.short = 'Caminandes 3';
 export const DOUBLE_POSTER = FD + 'caminandes-double.webp';
 export const MOVIE = { title: FILMS.sheriff.title, poster: FILMS.sheriff.poster, hero: FILMS.sheriff.hero };
@@ -40,7 +42,9 @@ export const COUNTDOWN = 300; // "starts in five minutes"
 export const TC = 8; // title card with the film's credit (inside the countdown, or between double-feature films)
 const STEP = 900; // slots are whole 15-minute steps so shows start on :00 :15 :30 :45 (+5:00)
 // the hourly program. kid = what under-13 / unknown-age players see in that slot (same length, same clock)
-const PROGRAM = [{ films: ['sheriff'], kid: ['c2', 'c3'] }, { films: ['bbb'] }, { films: ['spring'] }, { films: ['c2', 'c3', 'wing'] }]
+// :00 the cartoon triple (Caminandes 2 + 3 + Wing It!), :15 Big Buck Bunny, :30 Spring, :45 Singularity (6:31; it didn't fit
+// beside Spring or Wing It! inside 15 minutes, so Wing It! moved up to :00 and Singularity took :45)
+const PROGRAM = [{ films: ['sheriff'], kid: ['c2', 'c3', 'wing'] }, { films: ['bbb'] }, { films: ['spring'] }, { films: ['sing'] }]
   .map((p) => (SHERIFF_IN_THEATER || !p.kid ? p : { films: p.kid })); // flag off: the family lineup for everyone
 // true when this viewer must not see the Sheriff in the theater (under 13 / unknown age, or the flag is off)
 export const familyOnly = (kid) => !!kid || !SHERIFF_IN_THEATER;
