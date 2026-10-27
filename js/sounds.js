@@ -326,8 +326,10 @@ export async function creditsPage(root) {
       <h3>Trending</h3><ul class="ks-credits">${free.filter((t) => Number(t.trending) > 0).sort((a, b) => Number(a.trending) - Number(b.trending)).map(row).join('')}</ul>
       ${MOODS.map(([id, name]) => `<h3>${name}</h3><ul class="ks-credits">${free.filter((t) => t.mood === id).map(row).join('')}</ul>`).join('')}
     </section>
-    <section class="card pad ks-page" data-film-credits><h2>🎬 Lone Keem Studio films</h2><p class="muted small">Short films shown on the theater's big screen on Kemy Street.</p><ul class="ks-credits"></ul></section>`;
+    <section class="card pad ks-page" data-film-credits><h2>🎬 Lone Keem Studio films</h2><p class="muted small">Open films shown on the theater's big screen on Kemy Street.</p><ul class="ks-credits"></ul></section>`;
   // the theater's open-movie credits (small module, loaded only here)
-  import('./world/theater-movie.js').then(({ FILMS }) => { const ul = root.querySelector('[data-film-credits] ul'); if (!ul) return;
-    ul.innerHTML = Object.values(FILMS).filter((f) => f.credit).map((f) => `<li><b>${esc(f.title)}</b> (${f.year}) — Blender Foundation · ${licLink({ license: f.lic })} · <a href="https://studio.blender.org" target="_blank" rel="noopener noreferrer">Source</a><br><span class="muted">${esc(f.credit)}. Re-encoded to 720p for the app; otherwise unchanged.</span></li>`).join(''); }).catch(() => {});
+  import('./world/theater-movie.js').then(({ FILMS, PEPPER_EPISODES }) => { const ul = root.querySelector('[data-film-credits] ul'); if (!ul) return;
+    const a = (href, t) => `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`;
+    const eps = (f) => (f.id === 'pepper' ? `<br><span class="muted">Episodes: ${PEPPER_EPISODES.map((e) => a(e.page, `${e.n}. ${e.title}`)).join(' · ')}. Original comic: ${a('https://www.peppercarrot.com', 'peppercarrot.com')} by David Revoy (CC BY 4.0).</span>` : '');
+    ul.innerHTML = Object.values(FILMS).filter((f) => f.credit).map((f) => `<li><b>${esc(f.title)}</b>${f.sub ? ` — ${esc(f.sub)}` : ''} (${esc(f.year)}) — ${esc(f.org)} · ${licLink({ license: f.lic })} · ${a(f.src, 'Source')}<br><span class="muted">${esc(f.credit)}. Re-encoded to 720p for the app${f.reels.length > 1 ? ` (played in ${f.reels.length} parts, back to back)` : ''}; otherwise unchanged.</span>${eps(f)}</li>`).join(''); }).catch(() => {});
 }

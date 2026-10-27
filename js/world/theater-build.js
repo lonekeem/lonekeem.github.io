@@ -87,8 +87,8 @@ let ART = new URL('../../assets/series/sheriff/ep1.webp', import.meta.url).href;
 // theater.js picks the feature poster before building (a family film for under-13 / unknown-age players) and can swap it live
 export function setMovieArt(url) { ART = url; }
 export const artMeshes = []; // the meshes showing ART (exterior facade + lobby frame)
-// the open-movie posters for the lobby frames (assets/theater/films, CC BY Blender Foundation)
-const FILM_ART = Object.fromEntries(['big-buck-bunny:bbb', 'spring:spring', 'caminandes-2:c2', 'caminandes-3:c3', 'wing-it:wing', 'singularity:sing'].map((s) => { const [f, id] = s.split(':'); return [id, new URL(`../../assets/theater/films/${f}.webp`, import.meta.url).href]; }));
+// the open-film posters for the lobby frames + facade cases (assets/theater/films: Blender CC BY, Singularity CC BY 4.0, Ada & Zangemann + Pepper&Carrot CC BY-SA 4.0)
+const FILM_ART = Object.fromEntries(['big-buck-bunny:bbb', 'spring:spring', 'caminandes-2:c2', 'caminandes-3:c3', 'wing-it:wing', 'ada-zangemann:ada', 'pepper-carrot:pepper', 'singularity:sing'].map((s) => { const [f, id] = s.split(':'); return [id, new URL(`../../assets/theater/films/${f}.webp`, import.meta.url).href]; }));
 function movieArt(THREE) { const t = new THREE.TextureLoader().load(ART); t.colorSpace = THREE.SRGBColorSpace; t.userData.src = ART; return t; }
 // load the facade poster textures (once, when a player first comes near the building)
 export function loadExtPosters(THREE, list) { for (const q of list) { if (q.loaded) continue; q.loaded = true; const m = q.mesh.material;
@@ -135,14 +135,14 @@ export function buildExterior(THREE, kit, parent, T, F, LOW) {
   const glass = new THREE.MeshStandardMaterial({ color: '#9fd3ff', roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.55, emissive: '#3a2a10', emissiveIntensity: 0.5 });
   for (let i = 0; i < 4; i++) { const z = dz - 4.5 + i * 3; p('oDoor', G.box, X1 + 0.1, F + 1.7, z, 0.22, 3.4, 2.9); const gl = new THREE.Mesh(G.box, glass); gl.scale.set(0.05, 2.9, 1.15); for (const s of [-0.65, 0.65]) { const g2 = gl.clone(); g2.position.set(X1 + 0.23, F + 1.65, z + s); parent.add(g2); } p('oMarq', G.box, X1 + 0.3, F + 1.5, z - 0.12, 0.08, 0.5, 0.06); p('oMarq', G.box, X1 + 0.3, F + 1.5, z + 0.12, 0.08, 0.5, 0.06); }
   p('oDoor', G.box, X1 + 0.1, F + 3.55, dz, 0.24, 0.3, 12.2);
-  // lit poster cases on the facade: 3 each side of the doors, gold frame + backlit glass + lamp hood + title plate.
-  // Reading left to right from the street: Spring, Big Buck Bunny, The Sheriff | doors | Caminandes 2, Caminandes 3, Wing It!
+  // lit poster cases on the facade: 3 each side of the doors (+ Pepper&Carrot and Singularity past the pilasters), gold frame + backlit glass + lamp hood + title plate.
+  // Reading left to right from the street: Pepper&Carrot | Spring, Ada & Zangemann, feature (BBB) | doors | Caminandes 2, Caminandes 3, Wing It! | Singularity
   // Textures are lazy: theater.js calls loadExtPosters() the first time a player comes near (small webp, < 40 KB each).
   // Slot 'sheriff' shows ART (a family film poster for under-13 / unknown-age players, swapped live by theater.js; and for
   // everyone while SHERIFF_IN_THEATER is off).
   const extPosters = []; const glowM = new THREE.MeshBasicMaterial({ color: '#fff1c9', toneMapped: false }), lampM = new THREE.MeshBasicMaterial({ color: '#ffe6a8', toneMapped: false });
   const pw = 1.75, ph = pw * 694 / 432, py = F + 2.15, ty = py + ph / 2 + 0.36;
-  [[7.0, 'sheriff'], [9.35, 'bbb'], [11.7, 'spring'], [-7.0, 'c2'], [-9.35, 'c3'], [-11.7, 'wing']].forEach(([o, id]) => { const z = dz + o;
+  [[7.0, 'sheriff'], [9.35, 'ada'], [11.7, 'spring'], [15.4, 'pepper'], [-7.0, 'c2'], [-9.35, 'c3'], [-11.7, 'wing'], [-15.4, 'sing']].forEach(([o, id]) => { const z = dz + o;
     p('oMarq', G.box, X1 + 0.14, py + 0.22, z, 0.22, ph + 1.05, pw + 0.36); // gold case frame (poster + plate)
     p('oSign', G.box, X1 + 0.2, py, z, 0.14, ph + 0.2, pw + 0.2); // dark inner mat
     p('oMarq', G.box, X1 + 0.38, ty + 0.36, z, 0.5, 0.1, pw + 0.4); // lamp hood
@@ -287,7 +287,7 @@ export function buildInterior(THREE, kit, parent, LOW) {
   { const ab = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 1.0), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(audCv), toneMapped: false })); ab.position.set(0, LY + 4.0, 4.33); parent.add(ab); }
   // a framed poster for every film in the rotation (gold frames, the Sheriff style), each with a small title plate on top
   // (title + next showtime, drawn by theater.js ~1x a second in the lobby). Slot 'sheriff' shows ART (a family film for kids, and for everyone while SHERIFF_IN_THEATER is off).
-  const pf = [[LX - 0.05, 13.5, -Math.PI / 2, 'sheriff'], [-LX + 0.05, 13.5, Math.PI / 2, 'bbb'], [-LX + 0.05, 18.5, Math.PI / 2, 'spring'], [LX - 0.05, 18.5, -Math.PI / 2, 'wing'], [6.5, Z1 - 0.05, Math.PI, 'c2'], [-6.5, Z1 - 0.05, Math.PI, 'c3'], [-11.5, Z1 - 0.05, Math.PI, 'sing']];
+  const pf = [[LX - 0.05, 13.5, -Math.PI / 2, 'sheriff'], [-LX + 0.05, 13.5, Math.PI / 2, 'ada'], [-12, Z1 - 0.05, Math.PI, 'pepper'], [-LX + 0.05, 18.5, Math.PI / 2, 'spring'], [LX - 0.05, 18.5, -Math.PI / 2, 'wing'], [6.5, Z1 - 0.05, Math.PI, 'c2'], [-6.5, Z1 - 0.05, Math.PI, 'c3'], [12, Z1 - 0.05, Math.PI, 'sing']];
   const lobbyPosters = [];
   for (const [x, z, ry, id] of pf) { const nx = Math.sin(ry), nz = Math.cos(ry), big = id === 'sheriff', pw = big ? 2.55 : 2.2, ph = pw * 694 / 432, py = LY + (big ? 3.3 : 3.2);
     put('lPoster', G.box, new THREE.Color(1, 1, 1), x, py, z, ry, pw + 0.4, ph + 0.45, 0.14);

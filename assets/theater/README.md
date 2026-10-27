@@ -2,44 +2,51 @@
 
 ## Showtimes (default)
 
-The big screen runs a fixed program every hour (local clock). Logic: `js/world/theater-movie.js`
-(`PROGRAM`, `showAt`, `listings`). Every show gets a 5:00 "Next showing in m:ss" countdown, and
-every show **starts on a quarter hour**:
+The big screen runs a fixed **2-hour program** (local clock; hour A is every even hour, hour B every odd
+hour). Logic: `js/world/theater-movie.js` (`PROGRAM`, `showAt`, `listings`). Every show gets a 5:00
+"Next showing in m:ss" countdown, and every show **starts on a quarter hour**:
 
-| Starts | Film | Runtime | Ends |
-|---|---|---|---|
-| :00 | **Cartoon Shorts Triple Feature:** Caminandes 2 (:00:00), Caminandes 3 (:02:34), Wing It! (:05:12) | 2:26 + 2:30 + 3:58 | :09:10 |
-| :15 | **Big Buck Bunny** | 9:56 | :24:56 |
-| :30 | **Spring** | 7:44 | :37:44 |
-| :45 | **Singularity** | 6:31 | :51:31 |
+| Hour | Starts | Film | Runtime | Ends |
+|---|---|---|---|---|
+| A (even) | :00 | **Ada & Zangemann + Singularity:** Ada & Zangemann – A Tale of Software, Skateboards, and Raspberry Ice Cream (8 parts, :00:00), then Singularity (:31:41) | 31:33 + 6:31 | :38:12 |
+| A (even) | :45 | **Big Buck Bunny** | 9:56 | :54:56 |
+| B (odd) | :00 | **Pepper&Carrot** motion comic, episodes 3, 4, 5, 6 back to back (5 parts) | 16:48 | :16:48 |
+| B (odd) | :30 | **Spring** | 7:44 | :37:44 |
+| B (odd) | :45 | **Triple feature:** Caminandes 2 (:45:00), Caminandes 3 (:47:34), Wing It! (:50:12) | 2:26 + 2:30 + 3:58 | :54:10 |
 
-Countdowns run :55–:00, :10–:15, :25–:30, :40–:45. Each Blender film is preceded by an 8 s title
-card that shows its credit.
+Countdowns run 5:00 before each start (A :55, A :40, B :55, B :25, B :40). Each film is preceded by an
+8 s title card that shows its credit (inside the countdown, or between Ada & Zangemann and Singularity).
+Singularity (6:31) joined after the 2-hour program was laid out: the 8 quarter-hour steps are all used
+(Ada 45 min, Pepper&Carrot 30, three 15-min slots), so it plays right after Ada in the same slot instead of on its own quarter hour.
 
 - **The Sheriff is not in the theater yet.** `SHERIFF_IN_THEATER = false` in `js/world/theater-movie.js`
-  gives everyone the family lineup in the :00 slot (the cartoon triple feature), and no Sheriff poster, plate, board row, marquee or
+  gives everyone the family lineup in the Sheriff slot (A :45, Big Buck Bunny), and no Sheriff poster, plate, board row, marquee or
   video appears anywhere in the theater. Set it to `true` to bring it back (13+ only, ep 1–3, 9:43 at :00).
   The Kemy series page `#/series/sheriff` and its 13+ gate are separate and unchanged.
 - **13+ gate (when the flag is on):** The Sheriff needs age 13+ from the trusted age source (`viewerAge()` in `js/safety.js`,
   wrapped by `js/sheriff-age.js`). Under-13 or unknown-age viewers see the friendly card on the
-  Sheriff page, and in the theater the :00 slot becomes the **Cartoon Shorts Triple Feature**
-  (Caminandes 2, Caminandes 3, Wing It!, same clock) on the screen, board, 2D list, lobby poster and marquee. This is
+  Sheriff page, and in the theater the Sheriff slot (A :45) becomes **Big Buck Bunny**
+  (same clock) on the screen, board, 2D list, lobby poster and marquee. This is
   local only: no writes and no rules change.
 - **Lobby:** the showtimes board (poster thumbs, titles, runtimes, the next 3 times, NOW PLAYING /
   UP NEXT, live) is on the lobby wall. Tap it, or the 🎟 Showtimes button, to open the 2D list.
-  There are 7 gold-framed posters (Singularity hangs left of the entrance doors, next to Caminandes 3) with title plates and the next showtime. Poster textures load
+  There are 8 gold-framed posters (Ada & Zangemann on the west wall, Pepper&Carrot and Singularity on the back wall either side of the auditorium doors) with title plates and the next showtime. Poster textures load
   lazily and are about 20–40 KB webp each.
-- **Outside:** the facade has 6 lit, gold-framed poster cases (Spring, Big Buck Bunny, The Sheriff | doors |
-  Caminandes 2, Caminandes 3, Wing It!), each with a title plate and the next show. The textures load the first time a player
-  comes near. Under-13 and unknown-age players see the Caminandes Double Feature poster in the Sheriff case.
-  Singularity has no facade case yet (lobby frame, board and list only).
+- **Outside:** the facade has 8 lit, gold-framed poster cases (Pepper&Carrot, Spring, Ada & Zangemann,
+  Big Buck Bunny (Sheriff case) | doors | Caminandes 2, Caminandes 3, Wing It!, Singularity), each with a title plate and the next show. The textures load the first time a player
+  comes near. Under-13 and unknown-age players see the Big Buck Bunny poster in the Sheriff case.
 - **Fit:** wide films cover-fit the screen. The portrait Sheriff is shown sharp in the centre with
   blurred sides.
 - Sync needs **no writes and no rules change**: every client works out the same spot from the
   clock, so late joiners seek straight to the right second.
 - The owner's 🎬 Screen tab can start any slot now, start a 5:00 countdown now, go back to the
   clock schedule, or turn showings off (saved as `pl.ma` / `pl.mo` / `pl` slot in the theater doc).
-- There is only ONE `<video>`. It is created only while you are inside and unloaded when you leave.
+- **Long films are split into parts** (< 50 MB each, cut on keyframes). The player has two `<video>`
+  decks (A/B, never in the DOM): about 12 s before a part ends, the next part is buffered paused on the
+  other deck, and at the boundary the screen swaps to it with no gap (the old frame stays up until the
+  new deck has a frame). At most the current and next part are loaded. A mid-movie join loads only the
+  part the clock is in and seeks to the right second. Decks are created only while you are inside and
+  unloaded when you leave.
   Sound plays only in the auditorium (muted in the lobby). If the browser blocks sound (iPhone), a
   "Tap for sound" button shows. House lights dim to 12% during a film.
 - A song started from the editor plays instead of the movie until it ends or is stopped.
@@ -47,10 +54,11 @@ card that shows its credit.
 
 ## Film files and credits (`assets/theater/films/`)
 
-All of these open movies are by the **Blender Foundation** (studio.blender.org). They were downloaded from
-official Blender sources and re-encoded to H.264 + AAC, faststart, 720p, under 50 MB, with webp posters
-under 100 KB. No other changes were made. The required credit, shown on each title card, on the board
-and on `#/sounds`, is:
+All films are shown unchanged (re-encoded to H.264 + AAC, faststart, 720p, ~0.8–1.2 Mbps, every file
+under 50 MB, webp posters under 100 KB). The credit is shown on each title card, in the countdown, on
+the board and 2D list, and on `#/sounds` with the license link.
+
+**Blender Foundation** (studio.blender.org), from official Blender sources:
 
 > *Title* © Blender Foundation | studio.blender.org, CC BY
 
@@ -68,8 +76,31 @@ Source: [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:SINGULARITY_
 (4K HDR AV1, CC BY 4.0, Blender Studio). Tone-mapped from HDR to SDR and re-encoded to 1280x536; the poster is a
 frame from the film (6:31 total, no dialogue).
 
+**Ada & Zangemann** (2024, English, 31:33, all ages), from the Wikimedia Commons webm
+(`File:Ada & Zangemann - A Tale of Software, Skateboards, and Raspberry Ice Cream.webm`), split into 8 parts
+(`ada-zangemann-0.mp4` … `-7.mp4`, 7 × 4:00 + 3:32.6, 23–29 MB each, 210 MB total), poster `ada-zangemann.webp`:
+
+> Ada & Zangemann by Free Software Foundation Europe (Matthias Kirschner, Sandra Brandstätter, Monströös), CC BY-SA 4.0
+
+License [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); source https://fsfe.org/activities/ada-zangemann/.
+
+**Pepper&Carrot Motion Comic** (Morevna Project, 2018–2022), every English episode, played back to back as one
+show, from the official Morevna PeerTube (peertube.touhoppai.moe) downloads, poster `pepper-carrot.webp`:
+
+> Pepper & Carrot Motion Comic by Morevna Project, based on Pepper&Carrot by David Revoy, CC BY-SA 4.0
+
+| File | Episode | Runtime | License | Size |
+|---|---|---|---|---|
+| pepper-carrot-ep3.mp4 | Ep. 3 The Secret Ingredients | 3:25 | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 27.9 MB |
+| pepper-carrot-ep4.mp4 | Ep. 4 Stroke of Genius | 3:35 | CC BY-SA 4.0 | 32.0 MB |
+| pepper-carrot-ep5.mp4 | Ep. 5 Holiday Special (wordless) | 2:13 | CC BY-SA 4.0 | 13.5 MB |
+| pepper-carrot-ep6-0.mp4 + ep6-1.mp4 | Ep. 6 The Potion Contest (2 parts) | 7:35 | CC BY-SA 4.0 | 37.1 + 29.9 MB |
+
+Episode pages: https://morevnaproject.org/pepper-and-carrot/episode-N/. The original comic is
+Pepper&Carrot by David Revoy (peppercarrot.com, CC BY 4.0).
+
 To add a film, put `<key>.mp4` and `<key>.webp` here, add it to `FILMS` and `PROGRAM` in
-`theater-movie.js` (the slot must fit inside 15 minutes, including the 5:00 countdown), update the
+`theater-movie.js` (slots are whole 15-minute steps, including the 5:00 countdown; split long films into `reels`), update the
 schedule test, and bump `sw.js`.
 
 # Songs

@@ -14,7 +14,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from '../fsq.js';
 import { startHouseParty } from './housemates.js';
 import { attachTheaterNpcs } from './theater-npcs.js';
 import { createTheaterHush } from './theater-hush.js';
-import { FILMS, MOVIE, TC, familyOnly, DOUBLE_POSTER, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
+import { FILMS, MOVIE, TC, familyOnly, SHERIFF_SLOT, SHERIFF_FAMILY, boardFooter, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
 import { sheriffOk } from '../sheriff-age.js';
 
 const TID = 'lone-keem-studio', LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -40,7 +40,7 @@ export function attachTheater(api, W, K, { far }) {
   // The Sheriff is 13+ (trusted age, js/safety.js viewerAge): under-13 / unknown-age players get the family program
   // locally (same clock, same slots, nothing written). The feature poster follows it (facade + lobby frame).
   // While SHERIFF_IN_THEATER (theater-movie.js) is off, everyone gets that family view.
-  const kid = () => familyOnly(!sheriffOk()); let artKid = kid(); const artUrl = (k) => (k ? DOUBLE_POSTER : FILMS.sheriff.poster);
+  const kid = () => familyOnly(!sheriffOk()); let artKid = kid(); const artUrl = (k) => (k ? FILMS[SHERIFF_FAMILY[0]].poster : FILMS.sheriff.poster);
   artMeshes.length = 0; setMovieArt(artUrl(artKid));
   function swapArt() { const k = kid(); if (k === artKid) return; artKid = k; const url = artUrl(k); setMovieArt(url); const t = new THREE.TextureLoader().load(url); t.colorSpace = THREE.SRGBColorSpace; t.userData.src = url;
     const old = new Set(); for (const m of artMeshes) { if (m.material.map) old.add(m.material.map); m.material.map = t; m.material.needsUpdate = true; } for (const o of old) o.dispose(); for (const p of [...(ib ? ib.lobbyPosters : []), ...(ex ? ex.extPosters : [])]) p.key = ''; nsT = 0; bdT = 0; extT = 0; }
@@ -217,7 +217,7 @@ export function attachTheater(api, W, K, { far }) {
   }
   // ---------------------------------------------------------------- enter / leave
   // only the movie (or an owner-started theater song) is heard inside: everything else pauses locally, resumes on the way out
-  const hush = createTheaterHush({ ours: () => [audio, movie && movie.video], say: (m) => K.say(m) });
+  const hush = createTheaterHush({ ours: () => [audio, ...(movie ? movie.videos : [])], say: (m) => K.say(m) });
   const driving = () => { try { const m = W.drive && W.drive.mine && W.drive.mine(); return !!(m && m.state && m.state !== 'parked'); } catch { return false; } };
   function enter() {
     { const rt = document.getElementById('p3-rotip'); if (rt) rt.hidden = true; }
@@ -314,12 +314,12 @@ export function attachTheater(api, W, K, { far }) {
   function timesPanel() {
     closePanels(); const d = document.createElement('div'); d.className = 'ks-panel th-p'; d.dataset.thTimes = ''; panel = d; K.hud.appendChild(d); let key = '';
     const paint = () => { if (panel !== d) { clearInterval(iv); return; } const now = Date.now(), L = list(); const k = clockStr(now) + JSON.stringify(L.map((e) => [e.id, e.now, e.next, e.times])); if (k === key) return; key = k;
-      d.innerHTML = `<div class="ks-card th-card th-times"><h3>🕒 Showtimes · Auditorium 1</h3><p class="th-sub">Free entry. Times are in your time zone (${esc(tz)}), now ${esc(clockStr(now))}. Every show starts with a 5:00 countdown.</p>${L.length ? L.map((e) => `<div class="th-tr${e.now ? ' now' : e.next ? ' next' : ''}" data-film="${e.id}"><img src="${esc(e.film.poster)}" alt="" loading="lazy" decoding="async" width="54" height="87"><div class="th-ti"><b>${esc(e.film.title)}</b><small>${esc(runtime(e.film))} · ${esc(e.film.rating)}</small><small class="th-cr">${e.film.credit ? esc(e.film.credit) : 'A Lone Keem original'}</small></div><div class="th-tt">${e.now ? '<em class="th-now">● NOW PLAYING</em>' : e.next ? '<em class="th-next">UP NEXT</em>' : ''}<span>${e.times.map((t) => esc(clockStr(t))).join('<br>')}</span></div></div>`).join('') : '<p>Showtimes are paused right now. Check back soon!</p>'}<p class="th-sub th-lic">Open movies by the Blender Foundation (studio.blender.org), licensed Creative Commons Attribution (CC BY).</p><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`; };
+      d.innerHTML = `<div class="ks-card th-card th-times"><h3>🕒 Showtimes · Auditorium 1</h3><p class="th-sub">Free entry. Times are in your time zone (${esc(tz)}), now ${esc(clockStr(now))}. Every show starts with a 5:00 countdown.</p>${L.length ? L.map((e) => `<div class="th-tr${e.now ? ' now' : e.next ? ' next' : ''}" data-film="${e.id}"><img src="${esc(e.film.poster)}" alt="" loading="lazy" decoding="async" width="54" height="87"><div class="th-ti"><b>${esc(e.film.title)}</b><small>${esc(runtime(e.film))} · ${esc(e.film.rating)}</small><small class="th-cr">${e.film.credit ? esc(e.film.credit) : 'A Lone Keem original'}</small></div><div class="th-tt">${e.now ? '<em class="th-now">● NOW PLAYING</em>' : e.next ? '<em class="th-next">UP NEXT</em>' : ''}<span>${e.times.map((t) => esc(clockStr(t))).join('<br>')}</span></div></div>`).join('') : '<p>Showtimes are paused right now. Check back soon!</p>'}<p class="th-sub th-lic">${esc(boardFooter(L))}. Shown unchanged (re-encoded for the app); full credits and license links in Settings → Sounds.</p><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`; };
     const iv = setInterval(paint, 1000); paint(); d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('.th-x')) closePanels(); });
   }
   // lobby posters: title plate + next time (redrawn only when the text changes)
   function drawPlates(L, arr = ib && ib.lobbyPosters) { if (!arr) return; const by = new Map(L.map((e) => [e.id, e])), k = kid();
-    for (const p of arr) { const id = p.id === 'sheriff' && k ? program(true)[0].ids[0] : p.id, e = by.get(id), title = p.id === 'sheriff' && k ? slotTitle(program(true)[0].ids) : FILMS[id].short;
+    for (const p of arr) { const id = p.id === 'sheriff' && k ? program(true)[SHERIFF_SLOT].ids[0] : p.id, e = by.get(id), title = p.id === 'sheriff' && k ? slotTitle(program(true)[SHERIFF_SLOT].ids) : FILMS[id].short;
       const sub = !e ? 'Coming soon' : e.now ? '▶ Now playing' : `Next show ${clockStr(e.times[0])}`, key = title + '|' + sub; if (key === p.key) continue; p.key = key;
       const g = p.cv.getContext('2d'), w = p.cv.width, h = p.cv.height; g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = 5; g.strokeRect(3, 3, w - 6, h - 6);
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd36b'; g.font = '900 40px Inter, Arial, sans-serif'; g.fillText(title.toUpperCase(), w / 2, 40, w - 30);
