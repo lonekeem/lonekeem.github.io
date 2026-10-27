@@ -95,8 +95,12 @@ export function attachTheaterNpcs(api, W, K, o) {
       if (d < 24) K.tag(n, n.name, wx, y + (st ? 1.5 : 1.85), wz); else K.hideTag(n);
       void showing;
     }
+    // declutter: an NPC name tag never sits on top of a real player's tag or its Report / Block buttons
+    if ((dcT -= dt) <= 0) { dcT = 0.25; const R = []; for (const e of document.querySelectorAll('#p3-tags .p3-tag')) if (e.style.display !== 'none') { const q = e.getBoundingClientRect(); if (q.width) R.push(q); }
+      for (const n of npcs) { const el = n.tagEl; if (!el) continue; let hit = false; if (el.style.display !== 'none' && R.length) { const r = el.getBoundingClientRect(); hit = R.some((q) => r.left < q.right + 4 && r.right > q.left - 4 && r.top < q.bottom + 2 && r.bottom > q.top - 2); } const v = hit ? 'hidden' : ''; if (el.style.visibility !== v) el.style.visibility = v; } }
     if (bub && (Date.now() - bubAt > 15000 || !talking || !talking.obj.visible || talking.d > (talking.d0 || 3) + 3)) closeBub();
   }
+  let dcT = 0;
   function nearest() { let b = null, bd = 9; for (const n of npcs) { if (!n.obj.visible || n.d == null) continue; const lim = n.k === 'staff' ? 2.7 : 2.0; if (n.d < lim && n.d < bd) { bd = n.d; b = n; } } return b; }
   // ---- tap to talk
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
