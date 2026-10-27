@@ -82,24 +82,7 @@ export function makeKit(THREE) {
   return { G, put, merge, flush, piece };
 }
 
-// ---------------------------------------------------------------- canvases (original art only: no real movies, studios or logos)
-export const POSTERS = [
-  { t: 'THE SHERIFF', s: 'OF LONE KEEM', a: '#f59e0b', b: '#3b1d0e', i: '🤠' },
-  { t: 'SPACE PALS', s: 'TO THE STARS', a: '#7dd3fc', b: '#0b1336', i: '🚀' },
-  { t: 'KEMY RACERS', s: 'FULL SPEED', a: '#f43f5e', b: '#1f0a12', i: '🏎️' },
-  { t: 'THE BIG BAKE', s: 'A SWEET STORY', a: '#f9a8d4', b: '#3a0f2a', i: '🧁' },
-  { t: 'DINO PARK', s: 'PALS', a: '#86efac', b: '#0d2a17', i: '🦕' },
-  { t: 'MOON DANCE', s: 'PARTY', a: '#c4b5fd', b: '#1b1035', i: '🌙' }
-];
-export function posterCanvas(p) {
-  const cv = document.createElement('canvas'); cv.width = 192; cv.height = 280; const g = cv.getContext('2d');
-  const gr = g.createLinearGradient(0, 0, 0, 280); gr.addColorStop(0, p.b); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 192, 280);
-  g.fillStyle = p.a; g.globalAlpha = 0.18; for (let i = 0; i < 9; i++) { g.beginPath(); g.arc(96, 120, 20 + i * 14, 0, 7); g.lineWidth = 3; g.strokeStyle = p.a; g.stroke(); } g.globalAlpha = 1;
-  g.font = '86px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.i, 96, 118);
-  g.fillStyle = p.a; g.font = '900 25px Inter, Arial, sans-serif'; g.fillText(p.t, 96, 208, 180); g.fillStyle = '#fff'; g.font = '700 15px Inter, Arial, sans-serif'; g.fillText(p.s, 96, 234, 180);
-  g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '700 11px Inter, Arial, sans-serif'; g.fillText('LONE KEEM STUDIO · COMING SOON', 96, 262, 184);
-  return cv;
-}
+// ---------------------------------------------------------------- poster art (the Sheriff + CC BY Blender open movies) + canvases
 let ART = new URL('../../assets/series/sheriff/ep1.webp', import.meta.url).href; // the movie's real poster (no copy: same file as the series page)
 // theater.js picks the feature poster before building (a family film for under-13 / unknown-age players) and can swap it live
 export function setMovieArt(url) { ART = url; }
@@ -107,6 +90,10 @@ export const artMeshes = []; // the meshes showing ART (exterior facade + lobby 
 // the open-movie posters for the lobby frames (assets/theater/films, CC BY Blender Foundation)
 const FILM_ART = Object.fromEntries(['big-buck-bunny:bbb', 'spring:spring', 'caminandes-2:c2', 'caminandes-3:c3', 'wing-it:wing'].map((s) => { const [f, id] = s.split(':'); return [id, new URL(`../../assets/theater/films/${f}.webp`, import.meta.url).href]; }));
 function movieArt(THREE) { const t = new THREE.TextureLoader().load(ART); t.colorSpace = THREE.SRGBColorSpace; t.userData.src = ART; return t; }
+// load the facade poster textures (once, when a player first comes near the building)
+export function loadExtPosters(THREE, list) { for (const q of list) { if (q.loaded) continue; q.loaded = true; const m = q.mesh.material;
+  m.map = q.id === 'sheriff' ? movieArt(THREE) : (() => { const t = new THREE.TextureLoader().load(FILM_ART[q.id]); t.colorSpace = THREE.SRGBColorSpace; t.userData.src = FILM_ART[q.id]; return t; })();
+  m.color.set('#ffffff'); m.needsUpdate = true; if (q.id === 'sheriff') artMeshes.push(q.mesh); } }
 export function textCanvas(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h); return cv; }
 
 // ---------------------------------------------------------------- outside: building, marquee, sign, doors, posters, plaza, lot
@@ -148,9 +135,22 @@ export function buildExterior(THREE, kit, parent, T, F, LOW) {
   const glass = new THREE.MeshStandardMaterial({ color: '#9fd3ff', roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.55, emissive: '#3a2a10', emissiveIntensity: 0.5 });
   for (let i = 0; i < 4; i++) { const z = dz - 4.5 + i * 3; p('oDoor', G.box, X1 + 0.1, F + 1.7, z, 0.22, 3.4, 2.9); const gl = new THREE.Mesh(G.box, glass); gl.scale.set(0.05, 2.9, 1.15); for (const s of [-0.65, 0.65]) { const g2 = gl.clone(); g2.position.set(X1 + 0.23, F + 1.65, z + s); parent.add(g2); } p('oMarq', G.box, X1 + 0.3, F + 1.5, z - 0.12, 0.08, 0.5, 0.06); p('oMarq', G.box, X1 + 0.3, F + 1.5, z + 0.12, 0.08, 0.5, 0.06); }
   p('oDoor', G.box, X1 + 0.1, F + 3.55, dz, 0.24, 0.3, 12.2);
-  // poster cases on the facade
-  const posters = [];
-  [[dz - 9.7, 0], [dz - 6.6, 1], [dz + 6.6, 2], [dz + 9.7, 3]].forEach(([z, i]) => { p('oMarq', G.box, X1 + 0.12, F + 2.6, z, 0.18, 3.5, 2.5); const tx = i === 0 ? movieArt(THREE) : new THREE.CanvasTexture(posterCanvas(POSTERS[i])); tx.colorSpace = THREE.SRGBColorSpace; const pm = new THREE.Mesh(new THREE.PlaneGeometry(i === 0 ? 1.93 : 2.1, 3.1), new THREE.MeshBasicMaterial({ map: tx })); pm.position.set(X1 + 0.23, F + 2.6, z); pm.rotation.y = Math.PI / 2; parent.add(pm); posters.push(pm); if (i === 0) artMeshes.push(pm); });
+  // lit poster cases on the facade: 3 each side of the doors, gold frame + backlit glass + lamp hood + title plate.
+  // Reading left to right from the street: Spring, Big Buck Bunny, The Sheriff | doors | Caminandes 2, Caminandes 3, Wing It!
+  // Textures are lazy: theater.js calls loadExtPosters() the first time a player comes near (small webp, < 40 KB each).
+  // Slot 'sheriff' shows ART (a family film poster for under-13 / unknown-age players, swapped live by theater.js).
+  const extPosters = []; const glowM = new THREE.MeshBasicMaterial({ color: '#fff1c9', toneMapped: false }), lampM = new THREE.MeshBasicMaterial({ color: '#ffe6a8', toneMapped: false });
+  const pw = 1.75, ph = pw * 694 / 432, py = F + 2.15, ty = py + ph / 2 + 0.36;
+  [[7.0, 'sheriff'], [9.35, 'bbb'], [11.7, 'spring'], [-7.0, 'c2'], [-9.35, 'c3'], [-11.7, 'wing']].forEach(([o, id]) => { const z = dz + o;
+    p('oMarq', G.box, X1 + 0.14, py + 0.22, z, 0.22, ph + 1.05, pw + 0.36); // gold case frame (poster + plate)
+    p('oSign', G.box, X1 + 0.2, py, z, 0.14, ph + 0.2, pw + 0.2); // dark inner mat
+    p('oMarq', G.box, X1 + 0.38, ty + 0.36, z, 0.5, 0.1, pw + 0.4); // lamp hood
+    const lamp = new THREE.Mesh(new THREE.PlaneGeometry(0.36, pw + 0.2), lampM); lamp.position.set(X1 + 0.42, ty + 0.3, z); lamp.rotation.x = Math.PI / 2; parent.add(lamp); // glowing tube under the hood
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(pw + 0.12, ph + 0.12), glowM); glow.position.set(X1 + 0.275, py, z); glow.rotation.y = Math.PI / 2; parent.add(glow);
+    const pm = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({ color: '#3a2618', toneMapped: false })); pm.position.set(X1 + 0.29, py, z); pm.rotation.y = Math.PI / 2; pm.name = 'th-ext-poster-' + id; parent.add(pm);
+    const cv = textCanvas(512, 120, (g) => { g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, 512, 120); }), pt = new THREE.CanvasTexture(cv); pt.colorSpace = THREE.SRGBColorSpace;
+    const lb = new THREE.Mesh(new THREE.PlaneGeometry(pw, pw * 120 / 512), new THREE.MeshBasicMaterial({ map: pt, toneMapped: false })); lb.position.set(X1 + 0.27, ty, z); lb.rotation.y = Math.PI / 2; parent.add(lb);
+    extPosters.push({ id, mesh: pm, cv, tex: pt, key: '' }); });
   // plaza / sidewalks (the lot itself has NO colliders so cars park freely)
   const Lt = T.lot; p('oWalk', G.box, X1 + 2, F + 0.03, cz, 4, 0.06, D + 8); p('oWalk', G.box, (X1 + Lt.x1) / 2, F + 0.03, Lt.z0 - 1.2, Lt.x1 - X1, 0.06, 2.4); p('oWalk', G.box, (X1 + Lt.x1) / 2, F + 0.03, Lt.z1 + 1.2, Lt.x1 - X1, 0.06, 2.4);
   p('oWalk', G.box, cx, F + 0.03, T.z0 - 1.5, W + 2, 0.06, 3); p('oWalk', G.box, cx, F + 0.03, T.z1 + 1.5, W + 2, 0.06, 3); p('oWalk', G.box, T.x0 - 1.5, F + 0.03, cz, 3, 0.06, D + 6);
@@ -175,7 +175,7 @@ export function buildExterior(THREE, kit, parent, T, F, LOW) {
   const meshes = {};
   for (const k of ['oWall', 'oTrim', 'oMarq', 'oSign', 'oDoor', 'oWalk', 'oLot', 'oLine']) meshes[k] = flush(k, lit(k, k === 'oMarq' ? { r: 0.35, m: 0.5 } : k === 'oDoor' ? { r: 0.4, m: 0.3 } : {}), parent, !LOW && ['oWall', 'oTrim', 'oSign', 'oMarq', 'oDoor'].includes(k));
   meshes.oLot && (meshes.oLot.receiveShadow = true); meshes.oWalk && (meshes.oWalk.receiveShadow = true);
-  return { mats, bulbs, bulbN: bulbPts.length, signCv, signTex, bladeCv, bladeTex, marqCv, marqTex, cols, stalls, meshes };
+  return { mats, bulbs, bulbN: bulbPts.length, signCv, signTex, bladeCv, bladeTex, marqCv, marqTex, cols, stalls, meshes, extPosters };
 }
 
 // ---------------------------------------------------------------- inside (local coords around the hidden room centre)

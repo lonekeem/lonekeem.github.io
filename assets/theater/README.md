@@ -25,6 +25,9 @@ card that shows its credit.
   UP NEXT, live) is on the lobby wall. Tap it, or the 🎟 Showtimes button, to open the 2D list.
   There are 6 gold-framed posters with title plates and the next showtime. Poster textures load
   lazily and are about 20–40 KB webp each.
+- **Outside:** the facade has 6 lit, gold-framed poster cases (Spring, Big Buck Bunny, The Sheriff | doors |
+  Caminandes 2, Caminandes 3, Wing It!), each with a title plate and the next show. The textures load the first time a player
+  comes near. Under-13 and unknown-age players see the Caminandes Double Feature poster in the Sheriff case.
 - **Fit:** wide films cover-fit the screen. The portrait Sheriff is shown sharp in the centre with
   blurred sides.
 - Sync needs **no writes and no rules change**: every client works out the same spot from the

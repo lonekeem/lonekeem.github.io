@@ -41,6 +41,11 @@ const vstate = () => p.evaluate(() => { const D = window.__theaterDbg, m = D.mov
 const plates = () => p.evaluate(() => window.__theaterDbg.ib.lobbyPosters.map((q) => q.id + ' => ' + q.key));
 const posterShots = async (pre) => { await p.setViewportSize({ width: 844, height: 390 }); await W(p, 800);
   for (const [n, q] of [['east-sheriff-wing', [3, 16, 16, 16]], ['west-bbb-spring', [-3, 16, -16, 16]], ['back-caminandes', [0, 9.5, 0, 22]], ['board', [1.5, 8, 16, 8]]]) { await view(...q); await W(p, 2500); await p.screenshot({ path: shot + pre + n + '.png' }); } };
+const EXT = process.env.EXT_PRE || 'exterior-after-'; // facade poster cases ('exterior-before-' when shooting the old build)
+const extInfo = () => p.evaluate(() => { const ex = window.__theaterDbg && window.__theaterDbg.ex; return ex && ex.extPosters ? ex.extPosters.map((q) => ({ id: q.id, src: ((q.mesh.material.map && q.mesh.material.map.userData.src) || '').split('/').pop(), ok: !!(q.mesh.material.map && q.mesh.material.map.image && q.mesh.material.map.image.width), plate: q.key })) : null; });
+const extShots = async (who) => { await p.setViewportSize({ width: 844, height: 390 }); await W(p, 800);
+  for (const [n, x, z] of [['facade', 90, 207], ['left-cases', 65.5, 216.5], ['right-cases', 65.5, 197.5]]) { await p.evaluate(([x, z]) => { window.__p3.teleport(x, z); window.__p3.setYaw(Math.PI / 2); }, [x, z]); await W(p, 3500); await p.screenshot({ path: shot + EXT + who + '-' + n + '.png' }); }
+  await p.setViewportSize({ width: 390, height: 844 }); await p.evaluate(() => { window.__p3.teleport(80, 207); window.__p3.setYaw(Math.PI / 2); }); await W(p, 3000); await p.screenshot({ path: shot + EXT + who + '-portrait.png' }); return extInfo(); };
 const FILE = { sheriff: /ep[123]\.mp4/, bbb: 'big-buck-bunny.mp4', spring: 'spring.mp4', c2: 'caminandes-2.mp4', c3: 'caminandes-3.mp4', wing: 'wing-it.mp4' };
 const result = {};
 const check = (n, c, d) => { result[n] = c ? 'PASS' : 'FAIL ' + JSON.stringify(d).slice(0, 300); console.log(result[n].slice(0, 4), n); };
@@ -54,6 +59,9 @@ await step('world', async () => { await p.evaluate(() => { document.getElementBy
   await p.evaluate(() => window.__p3.teleport(63, 207)); await p.waitForFunction(() => window.__theater && window.__theater.M && window.__theaterDbg, null, { timeout: 60000 }); await W(p, 1500);
   const v0 = await p.evaluate(() => document.querySelectorAll('video').length); check('no video element outside the theater', v0 === 0, v0); return v0; });
 await step('marquee-outside', async () => { await p.evaluate(() => { window.__p3.teleport(75, 207); window.__p3.setYaw(-Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: shot + 'marquee-outside.png' }); return await p.evaluate(() => window.__theaterDbg.marq()); });
+await step('exterior-adult', async () => { const e = await extShots('adult'); if (EXT === 'exterior-after-') { const want = { sheriff: 'ep1.webp', bbb: 'big-buck-bunny.webp', spring: 'spring.webp', c2: 'caminandes-2.webp', c3: 'caminandes-3.webp', wing: 'wing-it.webp' };
+  check('facade: 6 lit poster cases with the new posters (loaded lazily on approach)', e && e.length === 6 && e.every((q) => q.ok && q.src === want[q.id]), e); check('facade: plates show title + next show', e && e.every((q) => /\|(Next show|▶ Now playing)/.test(q.plate)), e); }
+  await p.setViewportSize({ width: 390, height: 844 }); await p.evaluate(() => window.__p3.teleport(63, 207)); await W(p, 1500); return e; });
 await step('lobby', async () => { await p.evaluate(() => window.__theaterDbg.enter()); await W(p, 3000); await p.evaluate(() => window.__theaterDbg.drawPlates(window.__theaterDbg.list()));
   const L = await p.evaluate(() => window.__theaterDbg.list().map((e) => ({ id: e.id, n: e.times.length, now: e.now, next: e.next })));
   check('board lists 6 films with 3 times each', L.length === 6 && L.every((e) => e.n === 3), L);
@@ -89,6 +97,8 @@ await step('age-kid', async () => { await p.setViewportSize({ width: 390, height
 await step('kid-theater', async () => { await anchorTo('sheriff', 30); await p.evaluate(() => { location.hash = '#/street'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 90000 }); await W(p, 3000);
   await p.evaluate(() => window.__p3.teleport(63, 207)); await p.waitForFunction(() => window.__theaterDbg && window.__theaterDbg.kid, null, { timeout: 60000 }); await W(p, 1500);
   const marq = await p.evaluate(() => window.__theaterDbg.marq()); await p.evaluate(() => { window.__p3.teleport(75, 207); window.__p3.setYaw(-Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: shot + 'kid-marquee-outside.png' });
+  const ext = await extShots('kid'); if (EXT === 'exterior-after-') check('under-13: facade shows the family poster, no Sheriff outside', ext && ext.find((q) => q.id === 'sheriff').src === 'caminandes-double.webp' && ext.every((q) => q.ok) && !/Sheriff/i.test(ext.map((q) => q.plate).join(' ')), ext);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.evaluate(() => window.__p3.teleport(63, 207)); await W(p, 1500);
   await p.evaluate(() => window.__theaterDbg.enter()); await W(p, 3000); await p.evaluate(() => window.__theaterDbg.drawPlates(window.__theaterDbg.list()));
   const k = await p.evaluate(() => ({ kid: window.__theaterDbg.kid(), show: window.__theaterDbg.show().id, title: window.__theaterDbg.show().title, list: window.__theaterDbg.list().map((e) => e.id), line: window.__theaterDbg.line() }));
   const pl = await plates(); await posterShots('kid-lobby-');

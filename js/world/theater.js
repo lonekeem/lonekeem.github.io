@@ -6,7 +6,7 @@
 // admin / ∞ Pass (isUnlimited, the same unlimitedFor() path in firestore.rules) can write it.
 import { THEATER, FLAT, roomState, poleClear } from './layout.js';
 import { buildCar, poseCar, CARS } from './cars.js';
-import { SURF, DEF, hexOk, parseT, serT, makeKit, buildExterior, buildInterior, IN, setMovieArt, artMeshes } from './theater-build.js';
+import { SURF, DEF, hexOk, parseT, serT, makeKit, buildExterior, buildInterior, IN, setMovieArt, artMeshes, loadExtPosters } from './theater-build.js';
 import { THEATER_SONGS } from './theater-songs.js';
 import { drawLyrics } from './tvlyrics.js';
 import { isUnlimited } from '../inf-pass.js';
@@ -42,7 +42,7 @@ export function attachTheater(api, W, K, { far }) {
   const kid = () => !sheriffOk(); let artKid = kid(); const artUrl = (k) => (k ? DOUBLE_POSTER : FILMS.sheriff.poster);
   artMeshes.length = 0; setMovieArt(artUrl(artKid));
   function swapArt() { const k = kid(); if (k === artKid) return; artKid = k; const url = artUrl(k); setMovieArt(url); const t = new THREE.TextureLoader().load(url); t.colorSpace = THREE.SRGBColorSpace; t.userData.src = url;
-    const old = new Set(); for (const m of artMeshes) { if (m.material.map) old.add(m.material.map); m.material.map = t; m.material.needsUpdate = true; } for (const o of old) o.dispose(); for (const p of ib ? ib.lobbyPosters : []) p.key = ''; nsT = 0; bdT = 0; }
+    const old = new Set(); for (const m of artMeshes) { if (m.material.map) old.add(m.material.map); m.material.map = t; m.material.needsUpdate = true; } for (const o of old) o.dispose(); for (const p of [...(ib ? ib.lobbyPosters : []), ...(ex ? ex.extPosters : [])]) p.key = ''; nsT = 0; bdT = 0; extT = 0; }
   // ---------------------------------------------------------------- outside
   const extG = new THREE.Group(); extG.name = 'theater-ext'; W.root.add(extG);
   const ex = buildExterior(THREE, kit, extG, T, FLAT, LOW); if (far) far.visible = false;
@@ -318,8 +318,8 @@ export function attachTheater(api, W, K, { far }) {
     const iv = setInterval(paint, 1000); paint(); d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('.th-x')) closePanels(); });
   }
   // lobby posters: title plate + next time (redrawn only when the text changes)
-  function drawPlates(L) { if (!ib || !ib.lobbyPosters) return; const by = new Map(L.map((e) => [e.id, e])), k = kid();
-    for (const p of ib.lobbyPosters) { const id = p.id === 'sheriff' && k ? program(true)[0].ids[0] : p.id, e = by.get(id), title = p.id === 'sheriff' && k ? slotTitle(program(true)[0].ids) : FILMS[id].short;
+  function drawPlates(L, arr = ib && ib.lobbyPosters) { if (!arr) return; const by = new Map(L.map((e) => [e.id, e])), k = kid();
+    for (const p of arr) { const id = p.id === 'sheriff' && k ? program(true)[0].ids[0] : p.id, e = by.get(id), title = p.id === 'sheriff' && k ? slotTitle(program(true)[0].ids) : FILMS[id].short;
       const sub = !e ? 'Coming soon' : e.now ? '▶ Now playing' : `Next show ${clockStr(e.times[0])}`, key = title + '|' + sub; if (key === p.key) continue; p.key = key;
       const g = p.cv.getContext('2d'), w = p.cv.width, h = p.cv.height; g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = 5; g.strokeRect(3, 3, w - 6, h - 6);
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd36b'; g.font = '900 40px Inter, Arial, sans-serif'; g.fillText(title.toUpperCase(), w / 2, 40, w - 30);
@@ -347,12 +347,14 @@ export function attachTheater(api, W, K, { far }) {
   }
   rebuildDecor('lo'); applyOutside(); { const [a, b] = marqText(); drawMarq(a, b); }
   // ---------------------------------------------------------------- per frame
-  let bulbT = 0, bulbStep = 0, autoT = 0, fadeAt = 0, marqT = 0, bdT = 0, artT = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
+  let extT = 0, extLoaded = false; let bulbT = 0, bulbStep = 0, autoT = 0, fadeAt = 0, marqT = 0, bdT = 0, artT = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
   function update(dt, now) {
     const dx = P.x - (T.x0 + T.x1) / 2, dz = P.z - (T.z0 + T.z1) / 2, nearOut = !inside && dx * dx + dz * dz < 160 * 160;
     if (nearOut && (bulbT -= dt) <= 0) { bulbT = 0.28; bulbStep++; bc.set(sv('oMarq')).lerp(bd.set('#fff8dc'), 0.55); bd.set(sv('oMarq')).multiplyScalar(0.3); for (let i = 0; i < ex.bulbN; i++) ex.bulbs.setColorAt(i, (i + bulbStep) % 3 ? bc : bd); ex.bulbs.instanceColor.needsUpdate = true; }
     const s = songAt(st.pl.i); if ((marqT -= dt) <= 0) { marqT = 0.5; const [a, b] = marqText(); drawMarq(a, b); }
-    if ((artT -= dt) <= 0) { artT = 2; swapArt(); } // age / profile changed (e.g. signed in): swap the feature poster
+    if ((artT -= dt) <= 0) { artT = 2; swapArt(); }
+    // facade poster cases: textures load the first time you come near; plates (title + next show) redraw every 2 s while near
+    if (nearOut && dx * dx + dz * dz < 120 * 120 && (extT -= dt) <= 0) { extT = 2; if (!extLoaded) { extLoaded = true; loadExtPosters(THREE, ex.extPosters); } drawPlates(list(), ex.extPosters); } // age / profile changed (e.g. signed in): swap the feature poster
     if (inside && ib) {
       if (Math.abs(lvl - lvlT) > 0.002 || lvlT !== targetLevel()) { lvlT = targetLevel(); const tw = performance.now(), fdt = Math.min(0.5, Math.max(dt, (tw - (fadeAt || tw)) / 1000)); fadeAt = tw; lvl += (lvlT - lvl) * Math.min(1, fdt / 0.8); if (Math.abs(lvl - lvlT) < 0.003) lvl = lvlT; applyLights(); } else fadeAt = 0;
       drawScreen(now); if ((autoT -= dt) <= 0) { autoT = 0.5; syncAudio(); hush.tick(); }
@@ -389,7 +391,7 @@ export function attachTheater(api, W, K, { far }) {
     else if (a === 'th-snack') snackMenu(); else if (a === 'th-times') timesPanel(); else if (a === 'th-ticket') { emote('🎟️'); K.say('🎟️ Here is your ticket! Entry is free today. Enjoy the show!'); }
     else if (a === 'th-npc') { const n = npc.nearest(); if (n) npc.talk(n); } else if (a === 'th-edit') openEdit();
   }
-  window.__theaterDbg = { get st() { return st; }, get hush() { return hush; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, movieCmd, show, list, kid, timesPanel, drawPlates, marq: () => marqText(), line: () => movieLine(), boardXY() { if (!ib || !ib.bdMesh || !api.cam || !api.view) return null; const v = new THREE.Vector3(); ib.bdMesh.getWorldPosition(v); v.project(api.cam); const r = (api.view.querySelector("canvas") || api.view).getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height, z: v.z }; }, get movie() { return movie; }, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
+  window.__theaterDbg = { get st() { return st; }, get ex() { return ex; }, get hush() { return hush; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, movieCmd, show, list, kid, timesPanel, drawPlates, marq: () => marqText(), line: () => movieLine(), boardXY() { if (!ib || !ib.bdMesh || !api.cam || !api.view) return null; const v = new THREE.Vector3(); ib.bdMesh.getWorldPosition(v); v.project(api.cam); const r = (api.view.querySelector("canvas") || api.view).getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height, z: v.z }; }, get movie() { return movie; }, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
     standUp: () => standUp(), seats: () => allSeats().map((q) => ({ x: q.x - RX, z: q.z - RZ, y: q.y })),
     tp(lx, lz, cy) { if (!LOCAL || !inside) return; P.x = RX + lx; P.z = RZ + lz; P.y = FLAT + yIn(lx, lz); P.vy = 0; P.onGround = true; if (cy != null) try { window.__p3.setYaw(cy); } catch { /* */ } } };
   return {
