@@ -1,11 +1,12 @@
 // 🎬 Lone Keem Studio showings: a clock-based rotating program on the big curved screen.
-//   "The Sheriff of Lone Keem" (13+, only when SHERIFF_IN_THEATER is on; off for now) plus four Blender Foundation open movies
-//   (CC BY, files in assets/theater/films/, credits in assets/theater/README.md).
+//   "The Sheriff of Lone Keem" (13+, only when SHERIFF_IN_THEATER is on; off for now), five Blender Foundation open movies (CC BY),
+//   "Ada & Zangemann" (FSFE, CC BY-SA 4.0) and the "Pepper & Carrot" motion comics (Morevna Project, CC BY-SA 4.0).
+//   Files in assets/theater/films/, credits in assets/theater/README.md. Long films are split into keyframe-cut reels < 50 MB.
 // Lazy: theater.js imports this only near the theater, and the <video> is created only while you are INSIDE (unloaded on leave).
 // Sync needs no writes and no rules change: every client computes the same timeline from the clock.
-//   The program is one hour of 15-minute slots (a slot grows in whole 15-min steps if a show is longer). Each slot =
+//   The program is two hours of 15-minute slots (a slot grows in whole 15-min steps if a show is longer). Each slot =
 //   5:00 "Up next" countdown (its last 8 s = the film's title card with its credit), the show, then a short end card.
-//   Default hours line up with the clock: countdowns at :00 :15 :30 :45, shows at :05 :20 :35 :50 (local time).
+//   Default hours line up with the clock: shows start on :00 :15 :30 :45 (local time), countdowns 5:00 before.
 //   The owner can restart the program at any show (pl.ma = anchor ms) or switch showtimes off (pl.mo) from the editor:
 //   both ride in the existing `pl` map of theater/lone-keem-studio, which the rules already allow for the owner.
 // Kids: under-13 / unknown-age players (trusted age, see theater.js) get the SAME clock but a family film in the
@@ -23,24 +24,44 @@ const DIR = new URL('../../assets/series/sheriff/', import.meta.url).href;
 const FD = new URL('../../assets/theater/films/', import.meta.url).href;
 export const CREDIT = '© Blender Foundation | studio.blender.org, CC BY';
 const EPS = SHERIFF_EPISODES.filter(isOut).map((e) => ({ n: e.n, title: e.title, dur: e.dur, src: `${DIR}ep${e.n}.mp4`, w: 720, h: 1156 }));
-const blender = (id, title, file, dur, w, h, lic, year) => ({ id, title, short: title, poster: FD + file + '.webp', reels: [{ src: FD + file + '.mp4', dur, w, h }], dur, credit: `${title} ${CREDIT}`, lic, year, rating: 'All ages' });
+const blender = (id, title, file, dur, w, h, lic, year) => ({ id, title, short: title, poster: FD + file + '.webp', reels: [{ src: FD + file + '.mp4', dur, w, h }], dur, credit: `${title} ${CREDIT}`, by: CREDIT, org: 'Blender Foundation', src: 'https://studio.blender.org', lic, year, rating: 'All ages' });
+// a film in consecutive keyframe-cut reels (each < 50 MB): played back to back, the next reel preloaded so the handoff has no gap
+const reels = (file, durs, w = 1280, h = 720) => durs.map((dur, i) => ({ src: FD + file(i) + '.mp4', dur, w, h, i }));
+const sum = (L) => +L.reduce((a, r) => a + r.dur, 0).toFixed(3);
+export const ADA_CREDIT = 'Ada & Zangemann by Free Software Foundation Europe (Matthias Kirschner, Sandra Brandstätter, Monströös), CC BY-SA 4.0';
+export const PEPPER_CREDIT = 'Pepper & Carrot Motion Comic by Morevna Project, based on Pepper&Carrot by David Revoy, CC BY-SA 4.0';
+const ADA_REELS = reels((i) => 'ada-zangemann-' + i, [240, 240, 240, 240, 240, 240, 240, 212.6]);
+// Pepper & Carrot: every released English episode (3, 4, 5, 6; ep 5 is wordless), back to back as one show. ep = which episode a reel is.
+export const PEPPER_EPISODES = [
+  { n: 3, title: 'The Secret Ingredients', files: ['pepper-carrot-ep3'], durs: [205.077], page: 'https://morevnaproject.org/pepper-and-carrot/episode-3/' },
+  { n: 4, title: 'Stroke of Genius', files: ['pepper-carrot-ep4'], durs: [215.063], page: 'https://morevnaproject.org/pepper-and-carrot/episode-4/' },
+  { n: 5, title: 'Holiday Special', files: ['pepper-carrot-ep5'], durs: [133.104], page: 'https://morevnaproject.org/pepper-and-carrot/episode-5/' },
+  { n: 6, title: 'The Potion Contest', files: ['pepper-carrot-ep6-0', 'pepper-carrot-ep6-1'], durs: [240, 214.971], page: 'https://morevnaproject.org/pepper-and-carrot/episode-6/' }
+];
+const PEPPER_REELS = PEPPER_EPISODES.flatMap((e) => e.files.map((f, j) => ({ src: FD + f + '.mp4', dur: e.durs[j], w: 1280, h: 720, epN: e.n, epTitle: e.title }))).map((r, i) => ({ ...r, i }));
 export const FILMS = {
   sheriff: { id: 'sheriff', title: 'The Sheriff of Lone Keem', short: 'The Sheriff', poster: DIR + 'ep1.webp', hero: DIR + 'hero.webp', reels: EPS, dur: EPS.reduce((a, e) => a + e.dur, 0), credit: '', rating: '13+', min: 13 },
   bbb: blender('bbb', 'Big Buck Bunny', 'big-buck-bunny', 596.48, 1280, 720, 'CC BY 3.0', 2008),
   spring: blender('spring', 'Spring', 'spring', 464.167, 1280, 536, 'CC BY 4.0', 2019),
   c2: blender('c2', 'Caminandes 2: Gran Dillama', 'caminandes-2', 146.048, 1280, 720, 'CC BY 3.0', 2013),
   c3: blender('c3', 'Caminandes 3: Llamigos', 'caminandes-3', 150.14, 1280, 720, 'CC BY 3.0', 2016),
-  wing: blender('wing', 'Wing It!', 'wing-it', 237.917, 1280, 720, 'CC BY 4.0', 2023)
+  wing: blender('wing', 'Wing It!', 'wing-it', 237.917, 1280, 720, 'CC BY 4.0', 2023),
+  ada: { id: 'ada', title: 'Ada & Zangemann', short: 'Ada & Zangemann', sub: 'A Tale of Software, Skateboards, and Raspberry Ice Cream', poster: FD + 'ada-zangemann.webp', reels: ADA_REELS, dur: sum(ADA_REELS), credit: ADA_CREDIT, by: 'FSFE (Kirschner, Brandstätter, Monströös), CC BY-SA 4.0', org: 'Free Software Foundation Europe', src: 'https://fsfe.org/activities/ada-zangemann/', lic: 'CC BY-SA 4.0', year: 2024, rating: 'All ages' },
+  pepper: { id: 'pepper', title: 'Pepper&Carrot', short: 'Pepper&Carrot', sub: 'Motion Comic · Episodes 3, 4, 5 and 6', poster: FD + 'pepper-carrot.webp', reels: PEPPER_REELS, dur: sum(PEPPER_REELS), credit: PEPPER_CREDIT, by: 'Morevna Project, after David Revoy, CC BY-SA 4.0', org: 'Morevna Project', src: 'https://morevnaproject.org/pepper-and-carrot/', lic: 'CC BY-SA 4.0', year: '2018–2022', rating: 'All ages' }
 };
 FILMS.c2.short = 'Caminandes 2'; FILMS.c3.short = 'Caminandes 3';
 export const DOUBLE_POSTER = FD + 'caminandes-double.webp';
+// the program slot the Sheriff would use (SHERIFF_IN_THEATER), and the family film shown in it instead (flag off / under 13)
+export const SHERIFF_SLOT = 1, SHERIFF_FAMILY = ['bbb'];
 export const MOVIE = { title: FILMS.sheriff.title, poster: FILMS.sheriff.poster, hero: FILMS.sheriff.hero };
 export const MOVIE_LEN = FILMS.sheriff.dur; // ~583.4 s
 export const COUNTDOWN = 300; // "starts in five minutes"
 export const TC = 8; // title card with the film's credit (inside the countdown, or between double-feature films)
 const STEP = 900; // slots are whole 15-minute steps so shows start on :00 :15 :30 :45 (+5:00)
-// the hourly program. kid = what under-13 / unknown-age players see in that slot (same length, same clock)
-const PROGRAM = [{ films: ['sheriff'], kid: ['c2', 'c3'] }, { films: ['bbb'] }, { films: ['spring'] }, { films: ['c2', 'c3', 'wing'] }]
+// the 2-hour program (by the clock, same for everyone). kid = what under-13 / unknown-age players see in that slot (same clock)
+//   hour A  :00 Ada & Zangemann (31:33, a 45-min slot)   :45 Big Buck Bunny (the Sheriff slot when SHERIFF_IN_THEATER is on)
+//   hour B  :00 Pepper&Carrot (eps 3-6, 16:48, 30 min)   :30 Spring   :45 Caminandes 2 + 3 + Wing It!
+const PROGRAM = [{ films: ['ada'] }, { films: ['sheriff'], kid: SHERIFF_FAMILY }, { films: ['pepper'] }, { films: ['spring'] }, { films: ['c2', 'c3', 'wing'] }]
   .map((p) => (SHERIFF_IN_THEATER || !p.kid ? p : { films: p.kid })); // flag off: the family lineup for everyone
 // true when this viewer must not see the Sheriff in the theater (under 13 / unknown age, or the flag is off)
 export const familyOnly = (kid) => !!kid || !SHERIFF_IN_THEATER;
@@ -54,7 +75,7 @@ function segsOf(ids) {
 }
 const SLOTS = (() => { let o = 0; return PROGRAM.map((p) => { const a = segsOf(p.films), b = segsOf(p.kid || p.films);
   const len = Math.max(STEP, Math.ceil((Math.max(a.end, b.end) + 1) / STEP) * STEP); const s = { o, len, adult: { ids: p.films, ...a }, kids: { ids: p.kid || p.films, ...b } }; o += len; return s; }); })();
-export const PERIOD = SLOTS.reduce((a, s) => a + s.len, 0); // 3600 s
+export const PERIOD = SLOTS.reduce((a, s) => a + s.len, 0); // 7200 s (2 hours)
 export const CYCLE = PERIOD; // (old name)
 const filmStart = (sl, id) => sl.segs.find((g) => g.k === 'reel' && g.id === id).o;
 // the program as plain data (tests / README / editor)
@@ -85,7 +106,8 @@ export function showAt(nowMs, anchor = 0, off = false, kid = false) {
   const f = FILMS[g.id], start = fStart(g.id), end = fEnd(g.id);
   if (g.k === 'card') { const nx = v.segs[v.segs.indexOf(g) + 1]; return { ...base, phase: 'title', id: g.id, film: f, left: (start - nowMs) / 1000, start, end, next: after(g.id), reel: nx.reel }; }
   const epT = t - g.o, ft = (nowMs - start) / 1000;
-  return { ...base, phase: 'movie', id: g.id, film: f, reel: g.reel, ep: g.ri, key: g.reel.src, t: ft, epT, epLeft: g.dur - epT, left: f.dur - ft, start, end, next: after(g.id) };
+  const nx = v.segs[v.segs.indexOf(g) + 1], nextReel = nx && nx.k === 'reel' && nx.id === g.id ? nx.reel : null; // same film's next part (preloaded)
+  return { ...base, phase: 'movie', id: g.id, film: f, reel: g.reel, ep: g.ri, key: g.reel.src, t: ft, epT, epLeft: g.dur - epT, nextReel, left: f.dur - ft, start, end, next: after(g.id) };
 }
 // the showtimes board / 2D list: every film in the program with its next n starts (a film playing now keeps its start)
 export function listings(nowMs, anchor = 0, off = false, kid = false, n = 3) {
@@ -106,9 +128,12 @@ export const mmss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor
 export const runtime = (f) => (f.dur >= 60 ? `${Math.round(f.dur / 60)} min` : `${Math.round(f.dur)} s`);
 export const episodes = () => EPS;
 
-// The player: ONE <video> (only while inside; it streams the shown film directly) on ONE full-width curved panel in
-// front of the screen. Fill mode is picked from the film's aspect ratio:
-//   wide films (Blender, 16:9 / 2.39:1)  -> cover: fill the whole 2.39:1 screen, uniform scale (slight crop, never stretched)
+// The player: TWO <video> decks (only while inside; they stream the shown film directly), A/B, on ONE full-width curved
+// panel in front of the screen. The active deck plays the current reel; ~12 s before a reel ends the other deck loads the
+// same film's NEXT reel (paused at 0), and at the boundary the panel swaps to it: no reload, no black frame (the old
+// texture stays on screen until the new deck has a frame). At most 2 reels are ever loaded: the current and the next.
+// Fill mode is picked from the film's aspect ratio:
+//   wide films (16:9 / 2.39:1)           -> cover: fill the whole 2.39:1 screen, uniform scale (slight crop, never stretched)
 //   portrait (The Sheriff, 720x1156)     -> the sharp film full-height in the centre + both sides filled with a zoomed,
 //                                           blurred, darkened copy of the same frame (same texture, no second decode)
 const VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
@@ -130,50 +155,75 @@ void main() {
   #include <colorspace_fragment>
 }`;
 export const fillMode = (w, h) => (w / h < 1.2 ? 'portrait' : 'cover');
+export const PRELOAD = 12; // s before a reel ends that the next reel starts buffering on the other deck
 export function createMoviePlayer(THREE, ib, { IN, LOW, onBlocked }) {
   const S = IN.SCR, A = S.w / S.h, th = S.w / S.R; // full screen width, same arc as the screen itself
   const geo = new THREE.CylinderGeometry(S.R - 0.03, S.R - 0.03, S.h, 40, 1, true, Math.PI - th / 2, th);
-  let video = null, tex = null, cur = '', dims = '', blocked = false, upT = 0, lastSeek = 0, wantSound = false, mode = '';
+  let blocked = false, upT = 0, lastSeek = 0, wantSound = false, mode = '', act = 0, shown = null, swaps = 0, gaps = 0;
+  const handoffs = []; // test/debug: one entry per reel boundary { from, to, ready, preloaded, t }
+  const D = [0, 1].map((n) => ({ n, video: null, tex: null, src: '', dims: '', reel: null }));
   const uni = { map: { value: null }, cw: { value: 0.26 }, zy: { value: 0.26 }, dim: { value: 0.42 }, mode: { value: 0 }, sx: { value: 1 }, sy: { value: 1 } };
   const mat = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS, fragmentShader: FS, side: THREE.BackSide, toneMapped: false });
   const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(ib.screen.position); mesh.visible = false; ib.screen.parent.add(mesh);
-  function ensure() {
-    if (video) return video; video = document.createElement('video');
+  function ensure(d) {
+    if (d.video) return d.video; const video = d.video = document.createElement('video');
     video.playsInline = true; video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', ''); video.preload = 'auto'; video.crossOrigin = 'anonymous'; video.muted = true; video.disablePictureInPicture = true;
     return video;
   }
   // three r170 sizes the texture from .width/.height (0 on a <video> by default -> black) and allocates it once,
-  // so a film with other dimensions gets a fresh texture
-  function fit(r) {
-    const k = r.w + 'x' + r.h, a = r.w / r.h; if (k !== dims) { dims = k; video.width = r.w; video.height = r.h; if (tex) tex.dispose();
-      tex = new THREE.Texture(video); tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false; uni.map.value = tex; }
-    mode = fillMode(r.w, r.h);
+  // so a reel with other dimensions gets a fresh texture (each deck has its own)
+  function fit(d, r) {
+    const k = r.w + 'x' + r.h; if (k !== d.dims) { d.dims = k; d.video.width = r.w; d.video.height = r.h; if (d.tex) d.tex.dispose();
+      const t = d.tex = new THREE.Texture(d.video); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; }
+  }
+  function show(d) { // point the panel at a deck (only once it has a decoded frame)
+    shown = d; uni.map.value = d.tex; const r = d.reel, a = r.w / r.h; mode = fillMode(r.w, r.h);
     if (mode === 'cover') { uni.mode.value = 1; if (a < A) { uni.sx.value = 1; uni.sy.value = a / A; } else { uni.sx.value = A / a; uni.sy.value = 1; } }
     else { uni.mode.value = 0; uni.cw.value = uni.zy.value = Math.min(1, (S.h * a) / S.w); }
   }
-  function tryPlay() { const v = video; if (!v || !v.paused) return; v.play().catch(() => { if (!v.muted) { v.muted = true; setBlocked(true); v.play().catch(() => {}); } }); }
+  function tryPlay(v) { if (!v || !v.paused) return; v.play().catch(() => { if (!v.muted) { v.muted = true; setBlocked(true); v.play().catch(() => {}); } }); }
   function setBlocked(b) { if (b !== blocked) { blocked = b; onBlocked && onBlocked(b); } }
+  const pauseAll = () => { for (const d of D) if (d.video && !d.video.paused) d.video.pause(); };
   // per frame while inside. sh = showAt(); aud = in the auditorium (sound on + texture updates), lobby = muted
   function update(sh, aud, dt) {
-    if (!sh || sh.phase !== 'movie') { mesh.visible = false; if (video && !video.paused) video.pause();
-      if (sh && sh.reel && sh.reel.src !== cur && ((sh.phase === 'count' && sh.left < 20) || sh.phase === 'title')) load(sh.reel, 0); // buffer the next reel just before it starts
-      else if (sh && sh.phase === 'count' && sh.left < 20 && !sh.reel) { const r = sh.film && sh.film.reels[0]; if (r && r.src !== cur) load(r, 0); }
+    const cd = D[act], od = D[1 - act];
+    if (!sh || sh.phase !== 'movie') { mesh.visible = false; shown = null; pauseAll();
+      const r = sh && (sh.reel || (sh.phase === 'count' && sh.film && sh.film.reels[0]));
+      if (r && ((sh.phase === 'count' && sh.left < 20) || sh.phase === 'title') && cd.src !== r.src) load(cd, r, 0); // buffer the first reel just before it starts
       return; }
-    const v = ensure(); if (cur !== sh.reel.src) load(sh.reel, sh.epT);
-    wantSound = aud; const mute = !aud || blocked; if (v.muted !== mute) { v.muted = mute; }
+    let d = cd;
+    if (cd.src !== sh.reel.src) {
+      if (od.src === sh.reel.src) { // reel boundary: hand off to the preloaded deck
+        handoffs.push({ from: cd.src.split('/').pop(), to: od.src.split('/').pop(), ready: od.video.readyState, preloaded: true, t: +(od.video.currentTime || 0).toFixed(3), at: Date.now() });
+        if (handoffs.length > 20) handoffs.shift(); swaps++; act = 1 - act; d = od; if (cd.video) cd.video.pause();
+        if (sh.epT > 0.4 && Math.abs(d.video.currentTime - sh.epT) > 0.4) try { d.video.currentTime = sh.epT; } catch { /* */ }
+      } else { load(cd, sh.reel, sh.epT); d = cd; } // a join mid-movie (or a missed preload): straight to the clock position
+    }
+    const v = d.video; wantSound = aud; const mute = !aud || blocked; if (v.muted !== mute) v.muted = mute;
+    const o = D[1 - act]; if (o.video && o.video.muted !== true) o.video.muted = true; // the waiting deck is always silent
     const nowP = performance.now();
     if (v.readyState >= 1 && Math.abs(v.currentTime - sh.epT) > 1.5 && nowP - lastSeek > 2500 && sh.epLeft > 1) { lastSeek = nowP; try { v.currentTime = sh.epT; } catch { /* */ } }
-    if (v.paused && !v.ended && sh.epLeft > 0.3) tryPlay();
-    mesh.visible = v.readyState >= 2;
-    if (aud && mesh.visible && (upT -= dt) <= 0) { upT = LOW ? 1 / 15 : 1 / 30; tex.needsUpdate = true; } // only upload frames you can see
+    if (v.paused && !v.ended && sh.epLeft > 0.3) tryPlay(v);
+    // the next reel of the same film: buffer it on the other deck, paused at 0 (so only current + next are ever loaded)
+    if (sh.nextReel && sh.epLeft < PRELOAD) { if (o.src !== sh.nextReel.src) load(o, sh.nextReel, 0, true); }
+    else if (o.src && o.src !== sh.reel.src && sh.epLeft > PRELOAD + 2) free(o); // a stale deck (left over from the last film)
+    if (v.readyState >= 2) { if (shown !== d) show(d); } else if (shown && shown !== d && shown.video && shown.video.readyState < 2) shown = null;
+    const vis = !!shown; if (mesh.visible && !vis) gaps++; mesh.visible = vis;
+    if (aud && vis && (upT -= dt) <= 0) { upT = LOW ? 1 / 15 : 1 / 30; if (shown.tex) shown.tex.needsUpdate = true; } // only upload frames you can see
   }
-  function load(r, at) { const v = ensure(); if (!r) return; cur = r.src; fit(r); v.src = r.src; try { v.currentTime = at || 0; } catch { /* */ } lastSeek = performance.now();
-    v.addEventListener('loadedmetadata', () => { if (at > 0.5) try { v.currentTime = at + (performance.now() - lastSeek) / 1000; } catch { /* */ } }, { once: true }); }
-  function unlockSound() { setBlocked(false); if (video) { video.muted = !wantSound; video.play().catch(() => { video.muted = true; setBlocked(true); video.play().catch(() => {}); }); } }
-  // leave / destroy: stop the download and free the decoder
-  function unload() { if (video) { try { video.pause(); video.removeAttribute('src'); video.load(); } catch { /* */ } } cur = ''; mesh.visible = false; }
-  function dispose() { unload(); mesh.removeFromParent(); geo.dispose(); mat.dispose(); if (tex) tex.dispose(); video = null; tex = null; dims = ''; }
-  return { update, unload, dispose, unlockSound, get blocked() { return blocked; }, get video() { return video; }, get mode() { return mode; }, get src() { return cur; }, mesh };
+  function load(d, r, at, wait = false) { const v = ensure(d); if (!r) return; d.src = r.src; d.reel = r; fit(d, r); v.src = r.src; v.muted = true; try { v.currentTime = at || 0; } catch { /* */ }
+    if (!wait) lastSeek = performance.now(); const t0 = performance.now();
+    v.addEventListener('loadedmetadata', () => { if (at > 0.5) try { v.currentTime = at + (performance.now() - t0) / 1000; } catch { /* */ } }, { once: true });
+    if (wait) v.addEventListener('loadeddata', () => { if (d !== D[act] && d.src === r.src) v.pause(); }, { once: true }); }
+  function free(d) { if (d.video) { try { d.video.pause(); d.video.removeAttribute('src'); d.video.load(); } catch { /* */ } } d.src = ''; d.reel = null; if (shown === d) shown = null; }
+  function unlockSound() { setBlocked(false); const v = D[act].video; if (v) { v.muted = !wantSound; v.play().catch(() => { v.muted = true; setBlocked(true); v.play().catch(() => {}); }); } }
+  // leave / destroy: stop both downloads and free the decoders
+  function unload() { for (const d of D) free(d); shown = null; mesh.visible = false; }
+  function dispose() { unload(); mesh.removeFromParent(); geo.dispose(); mat.dispose(); for (const d of D) { if (d.tex) d.tex.dispose(); d.video = null; d.tex = null; d.dims = ''; } }
+  return { update, unload, dispose, unlockSound, get blocked() { return blocked; }, get video() { return D[act].video; }, get videos() { return D.map((d) => d.video).filter(Boolean); },
+    get decks() { return D.map((d) => ({ n: d.n, active: d.n === act, shown: shown === d, src: d.src ? d.src.split('/').pop() : '', ready: d.video ? d.video.readyState : 0, paused: d.video ? d.video.paused : true, t: d.video ? d.video.currentTime : 0 })); },
+    get loaded() { return D.filter((d) => d.src).length; }, handoffs, get swaps() { return swaps; }, get gaps() { return gaps; },
+    get mode() { return mode; }, get src() { return D[act].src; }, mesh };
 }
 
 // --- canvases (screen around the film, countdown + title card, lobby "Now Showing" stand, showtimes board)
@@ -185,6 +235,10 @@ function framed(g, src, x, y, w, h) { const im = img(src); g.fillStyle = '#d4af3
 const F = (wt, px) => `${wt} ${Math.round(px)}px Inter, Arial, sans-serif`;
 const bg = (g, w, h, now) => { const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#2a0610'); gr.addColorStop(1, '#0d0204'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
   g.globalAlpha = 0.25; for (let i = 0; i < 30; i++) { const x = (i * 97.3 + now * 7 * (1 + (i % 3))) % w, y = (i * 53.7) % h; g.fillStyle = '#d4af37'; g.fillRect(x, y, 3, 3); } g.globalAlpha = 1; };
+// the attribution line for a slot (one per rights holder: the Blender shorts share one line)
+export const creditOf = (ids) => [...new Set(ids.map((id) => FILMS[id]).filter((f) => f.credit).map((f) => (f.by === CREDIT ? CREDIT : f.credit)))].join(' · ');
+const ORG = { 'Blender Foundation': 'Blender Foundation (CC BY)', 'Free Software Foundation Europe': 'Ada & Zangemann © FSFE (CC BY-SA 4.0)', 'Morevna Project': 'Pepper&Carrot © Morevna Project, after David Revoy (CC BY-SA 4.0)' };
+export const boardFooter = (list) => 'Open films: ' + [...new Set(list.map((e) => e.film.org).filter(Boolean))].map((o) => ORG[o] || o).join(' · ');
 // whole screen (canvas is mirrored onto the curved screen by its texture). Returns true when it drew.
 export function drawMovieScreen(g, w, h, sh, now) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -193,6 +247,7 @@ export function drawMovieScreen(g, w, h, sh, now) {
     g.fillStyle = 'rgba(212,175,55,.55)'; g.font = F(900, h * 0.07);
     if (f.id === 'sheriff') { const e = EPS[sh.ep]; g.fillText('THE SHERIFF', w * 0.2, h * 0.42, w * 0.3); g.fillText('OF LONE KEEM', w * 0.2, h * 0.52, w * 0.3);
       g.fillStyle = 'rgba(243,227,195,.45)'; g.font = F(700, h * 0.045); g.fillText(`Episode ${e.n}`, w * 0.8, h * 0.42, w * 0.3); g.fillText(e.title, w * 0.8, h * 0.5, w * 0.3); }
+    else if (sh.reel && sh.reel.epN) { g.fillText(f.title, w / 2, h * 0.4, w * 0.8); g.fillStyle = 'rgba(243,227,195,.5)'; g.font = F(700, h * 0.05); g.fillText(`Episode ${sh.reel.epN}: ${sh.reel.epTitle}`, w / 2, h * 0.52, w * 0.8); g.font = F(700, h * 0.04); g.fillText(f.credit, w / 2, h * 0.62, w * 0.9); }
     else { g.fillText(f.title, w / 2, h * 0.45, w * 0.8); g.fillStyle = 'rgba(243,227,195,.5)'; g.font = F(700, h * 0.045); g.fillText(f.credit, w / 2, h * 0.58, w * 0.9); }
     return true;
   }
@@ -202,7 +257,7 @@ export function drawMovieScreen(g, w, h, sh, now) {
     const f = sh.film; framed(g, f.poster, px, py, pw, ph); framed(g, f.poster, hx, py, pw, ph);
     g.fillStyle = '#d4af37'; g.font = F(800, h * 0.055); g.fillText('LONE KEEM STUDIO PRESENTS', cx, h * 0.17, tw);
     g.fillStyle = '#ffffff'; g.shadowColor = '#d4af37'; g.shadowBlur = 18; g.font = F(900, h * 0.13); g.fillText(f.short, cx, h * 0.37, tw); g.shadowBlur = 0;
-    if (f.short !== f.title) { g.fillStyle = '#ffd36b'; g.font = F(800, h * 0.065); g.fillText(f.title.split(': ')[1] || '', cx, h * 0.5, tw); }
+    if (f.sub || f.short !== f.title) { g.fillStyle = '#ffd36b'; g.font = F(800, h * 0.065); g.fillText(f.sub || f.title.split(': ')[1] || '', cx, h * 0.5, tw); }
     g.fillStyle = '#f3e3c3'; g.font = F(700, h * 0.048); g.fillText(f.credit, cx, h * 0.66, tw);
     g.fillStyle = 'rgba(243,227,195,.75)'; g.font = F(600, h * 0.04); g.fillText(`${f.year} · ${runtime(f)} · Licensed ${f.lic} (creativecommons.org)`, cx, h * 0.76, tw);
     g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.06); g.fillText(`Starting in ${mmss(sh.left)}`, cx, h * 0.88, tw); return true;
@@ -212,7 +267,7 @@ export function drawMovieScreen(g, w, h, sh, now) {
     framed(g, slotPoster(sh.nextIds), px, py, pw, ph); framed(g, sh.poster, hx, py, pw, ph);
     g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.12); g.fillText('Thanks for watching!', cx, h * 0.3, tw);
     g.fillStyle = '#f3e3c3'; g.font = F(700, h * 0.06); g.fillText(sh.title, cx, h * 0.45, tw);
-    if (ids.some((id) => FILMS[id].credit)) { g.fillStyle = 'rgba(243,227,195,.7)'; g.font = F(600, h * 0.04); g.fillText(CREDIT, cx, h * 0.55, tw); }
+    if (ids.some((id) => FILMS[id].credit)) { g.fillStyle = 'rgba(243,227,195,.7)'; g.font = F(600, h * 0.04); g.fillText(creditOf(ids), cx, h * 0.55, tw); }
     g.fillStyle = '#ffffff'; g.font = F(800, h * 0.065); g.fillText(`Up next: ${sh.nextTitle}`, cx, h * 0.7, tw); g.fillStyle = '#ffd36b'; g.fillText(`at ${clockStr(sh.nextSlot)}`, cx, h * 0.81, tw); return true;
   }
   framed(g, left, px, py, pw, ph); framed(g, right, hx, py, pw, ph);
@@ -220,8 +275,8 @@ export function drawMovieScreen(g, w, h, sh, now) {
   g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.085); g.fillText(sh.title, cx, h * 0.28, tw);
   g.fillStyle = '#ffffff'; g.shadowColor = '#d4af37'; g.shadowBlur = 20; g.font = F(900, h * 0.26); g.fillText(mmss(sh.left), cx, h * 0.52, tw); g.shadowBlur = 0;
   const f = sh.film, mins = Math.round(ids.reduce((a, id) => a + FILMS[id].dur, 0) / 60);
-  g.fillStyle = 'rgba(243,227,195,.85)'; g.font = F(700, h * 0.05); g.fillText(`Starts ${clockStr(sh.start)} · ${f.id === 'sheriff' ? `${EPS.length} episodes · ` : ''}${mins} min · ${f.rating}`, cx, h * 0.73, tw);
-  g.fillStyle = 'rgba(243,227,195,.65)'; g.font = F(600, h * 0.04); g.fillText(f.credit ? CREDIT : 'A Lone Keem original', cx, h * 0.83, tw);
+  g.fillStyle = 'rgba(243,227,195,.85)'; g.font = F(700, h * 0.05); g.fillText(`Starts ${clockStr(sh.start)} · ${f.id === 'sheriff' ? `${EPS.length} episodes · ` : f.id === 'pepper' ? `${PEPPER_EPISODES.length} episodes · ` : ''}${mins} min · ${f.rating}`, cx, h * 0.73, tw);
+  g.fillStyle = 'rgba(243,227,195,.65)'; g.font = F(600, h * 0.04); g.fillText(f.credit ? creditOf(ids) : 'A Lone Keem original', cx, h * 0.83, tw);
   return true;
 }
 // lobby "Now Showing" stand by the entrance (portrait canvas): the current or next show + its time
@@ -229,7 +284,7 @@ export function drawNowShowing(g, w, h, sh) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = 10; g.strokeRect(5, 5, w - 10, h - 10);
   const playing = sh.phase === 'movie' || sh.phase === 'title', ids = sh.phase === 'end' ? sh.nextIds : sh.ids;
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd36b'; g.font = F(900, w * 0.11); g.fillText(playing ? 'NOW SHOWING' : 'UP NEXT', w / 2, h * 0.06, w - 30);
-  const pw = w * 0.74, ph = pw * 868 / 540, px = (w - pw) / 2, py = h * 0.105; const src = sh.phase === 'off' ? (SHERIFF_IN_THEATER ? FILMS.sheriff.poster : DOUBLE_POSTER) : playing ? sh.film.poster : slotPoster(ids);
+  const pw = w * 0.74, ph = pw * 868 / 540, px = (w - pw) / 2, py = h * 0.105; const src = sh.phase === 'off' ? (SHERIFF_IN_THEATER ? FILMS.sheriff.poster : FILMS.ada.poster) : playing ? sh.film.poster : slotPoster(ids);
   const im = img(src); if (ok(im)) cover(g, im, px, py, pw, ph); else { g.fillStyle = '#3b1d0e'; g.fillRect(px, py, pw, ph); }
   const y = py + ph + (h - py - ph) / 2; let a = '', b = '';
   if (sh.phase === 'off') { a = 'Showtimes paused'; b = 'Check back soon'; }
@@ -249,9 +304,9 @@ export function drawBoard(g, w, h, list, now) {
     if (e.now || e.next) { g.fillStyle = e.now ? 'rgba(212,175,55,.28)' : 'rgba(212,175,55,.12)'; g.fillRect(pad, y + 3, w - 2 * pad, rh - 6); }
     const im = img(f.poster); if (ok(im)) cover(g, im, pad + 6, y + 5, tw, th); else { g.fillStyle = '#3b1d0e'; g.fillRect(pad + 6, y + 5, tw, th); }
     const x = pad + tw + 22; g.textAlign = 'left'; g.fillStyle = '#fff6dc'; g.font = F(900, Math.min(rh * 0.34, h * 0.05)); g.fillText(f.title, x, y + rh * 0.3, w * 0.5);
-    g.fillStyle = 'rgba(243,227,195,.75)'; g.font = F(600, Math.min(rh * 0.2, h * 0.03)); g.fillText(`${runtime(f)} · ${f.rating}${f.credit ? ' · © Blender Foundation | studio.blender.org, CC BY' : ' · A Lone Keem original'}`, x, y + rh * 0.7, w * 0.56);
+    g.fillStyle = 'rgba(243,227,195,.75)'; g.font = F(600, Math.min(rh * 0.2, h * 0.03)); g.fillText(`${runtime(f)} · ${f.rating}${f.credit ? ' · ' + f.by : ' · A Lone Keem original'}`, x, y + rh * 0.7, w * 0.56);
     g.textAlign = 'right'; const rx = w - pad - 12;
     if (e.now || e.next) { g.fillStyle = e.now ? '#ff5a5a' : '#ffd36b'; g.font = F(900, Math.min(rh * 0.22, h * 0.032)); g.fillText(e.now ? '● NOW PLAYING' : 'UP NEXT', rx, y + rh * 0.28); }
     g.fillStyle = '#ffffff'; g.font = F(800, Math.min(rh * 0.27, h * 0.04)); g.fillText(e.times.map(clockStr).join('  ·  '), rx, y + rh * (e.now || e.next ? 0.66 : 0.5), w * 0.36); });
-  g.textAlign = 'center'; g.fillStyle = 'rgba(243,227,195,.55)'; g.font = F(600, h * 0.028); g.fillText('Open movies © Blender Foundation | studio.blender.org, CC BY' + (list.some((e) => e.id === 'sheriff') ? ' · The Sheriff of Lone Keem © Lone Keem' : ''), w / 2, h * 0.965, w - 40);
+  g.textAlign = 'center'; g.fillStyle = 'rgba(243,227,195,.55)'; g.font = F(600, h * 0.028); g.fillText(boardFooter(list) + (list.some((e) => e.id === 'sheriff') ? ' · The Sheriff of Lone Keem © Lone Keem' : ''), w / 2, h * 0.965, w - 40);
 }
