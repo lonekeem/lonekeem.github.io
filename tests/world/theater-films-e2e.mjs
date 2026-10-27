@@ -84,6 +84,20 @@ await step('films', async () => { const s = await p.evaluate(() => window.__thea
   return r; });
 await step('title-card', async () => { const a = await setFilm('c3', -7); await setAnchor(a); await W(p, 1500); const s = await p.evaluate(() => { const x = window.__theaterDbg.show(); return { phase: x.phase, id: x.id }; }); await p.screenshot({ path: shot + 'title-card-credit.png' });
   check('title card with credit between films', s.phase === 'title' && s.id === 'c3', s); return s; });
+// no projector beam / screen-facing light cone in the theater-in group (auditorium + lobby; street car headlights excluded); auto-dim + owner spotlight still work
+const beams = () => p.evaluate(() => { const D = window.__theaterDbg, ib = D.ib; let root = ib.screen; while (root.parent && root.name !== 'theater-in') root = root.parent; const out = [];
+  root.traverse((o) => { if (!o.isMesh || o === ib.spotCone || o === ib.spotDisc) return; const g = o.geometry && o.geometry.type, m = o.material || {}; if ((g === 'ConeGeometry' || g === 'CylinderGeometry') && m.transparent && (m.blending === 2 || m.opacity < 0.5) && o.visible) out.push(o.name || g); if (o.isSpotLight) out.push('SpotLight'); });
+  root.traverse((o) => { if (o.isSpotLight || o.isPointLight) out.push(o.type); }); return { n: out.length, out, lvl: D.lvl, sp: ib.spotCone.visible, beamKey: 'beam' in ib }; });
+await step('no-beam', async () => { await anchorTo('bbb', 40); await W(p, 7000); const a = await beams(); const v = await vstate(); await p.screenshot({ path: '/workspace/theater/no-beam-movie.png' });
+  check('no projector beam / screen cone while a movie plays (lights auto-dim)', a.n === 0 && !a.beamKey && v.phase === 'movie' && a.lvl < 0.3 && !a.sp, { a, v });
+  const cd = await p.evaluate(async () => (await import('/js/world/theater-movie.js')).anchorFor(0, Date.now() - 60000, true)); await setAnchor(cd); await W(p, 4000);
+  const b = await beams(); const s = await p.evaluate(() => window.__theaterDbg.show().phase); await p.screenshot({ path: '/workspace/theater/no-beam-countdown.png' });
+  check('no beam during the countdown', b.n === 0 && s === 'count', { b, s });
+  await seed(`${TDOC}?updateMask.fieldPaths=lt`, { lt: { mapValue: { fields: { h: { doubleValue: 1 }, sp: { integerValue: '1' }, at: { integerValue: String(Date.now()) } } } } }); await W(p, 2500);
+  const c = await p.evaluate(() => ({ sp: window.__theaterDbg.ib.spotCone.visible, lvl: window.__theaterDbg.lvl }));
+  await seed(`${TDOC}?updateMask.fieldPaths=lt`, { lt: { mapValue: { fields: { h: { doubleValue: 1 }, sp: { integerValue: '0' }, at: { integerValue: '0' } } } } }); await W(p, 2500);
+  const d = await p.evaluate(() => ({ sp: window.__theaterDbg.ib.spotCone.visible, lvl: window.__theaterDbg.lvl }));
+  check('owner light controls still apply (manual full + stage spotlight on, then auto)', c.sp && c.lvl > 0.8 && !d.sp, { c, d }); return { a, b, c, d }; });
 await step('portrait', async () => { await p.setViewportSize({ width: 390, height: 844 }); await anchorTo('wing', 20); await W(p, 6000); const a = await vstate(); await p.screenshot({ path: shot + 'portrait-wing-it-seated.png' }); check('portrait iPhone 13: Wing It! plays', a.id === 'wing' && !a.paused, a);
   await p.evaluate(() => window.__theaterDbg.standUp()); await W(p, 600); await view(8.5, 8, 16, 8); await W(p, 2000); await p.screenshot({ path: shot + 'portrait-board.png' }); return a; });
 await step('leave', async () => { await p.evaluate(() => window.__theaterDbg.leave()); await W(p, 1500); const v = await p.evaluate(() => { const v = window.__theaterDbg.movie?.video; return { src: v ? v.getAttribute('src') : null, paused: v ? v.paused : null }; }); check('video unloaded on exit', !v.src, v); return v; });

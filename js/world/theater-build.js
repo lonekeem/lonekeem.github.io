@@ -251,9 +251,6 @@ export function buildInterior(THREE, kit, parent, LOW) {
   const exitCv = textCanvas(128, 48, (g) => { g.fillStyle = '#0a7d3a'; g.fillRect(0, 0, 128, 48); g.fillStyle = '#eafff1'; g.font = '900 30px Inter, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('EXIT', 64, 26); });
   const exitM = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(exitCv), toneMapped: false });
   for (const [x, y, z, ry] of [[0, LY + 3.7, 3.98, Math.PI], [-X + 0.12, 2.8, Z0 + 3, Math.PI / 2], [X - 0.12, 2.8, Z0 + 3, -Math.PI / 2], [-X + 0.12, top + 3, 2.5, Math.PI / 2], [X - 0.12, top + 3, 2.5, -Math.PI / 2]]) { const e = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.45), exitM); e.position.set(x, y, z); e.rotation.y = ry; parent.add(e); }
-  // projector beam (faint additive cone, brighter while playing)
-  const beamM = new THREE.MeshBasicMaterial({ color: '#cfe6ff', transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
-  const beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 24, 1, true), beamM); { const from = new THREE.Vector3(0, LY + 9.2, 3.9), to = new THREE.Vector3(0, S.y + S.h / 2, S.z + 0.5), L = from.distanceTo(to); beam.scale.set(S.w * 0.42, L, S.h * 0.42); beam.position.copy(from).add(to).multiplyScalar(0.5); beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), to.clone().sub(from).normalize()); } parent.add(beam);
   // owner spotlight (cone + disc on the stage)
   const spotM = new THREE.MeshBasicMaterial({ color: DEF.aSpot, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
   const spotCone = new THREE.Mesh(new THREE.ConeGeometry(2.6, AH - 2.4, 24, 1, true), spotM); spotCone.position.set(0, 1 + (AH - 3.4) / 2, -18); parent.add(spotCone);
@@ -321,7 +318,7 @@ export function buildInterior(THREE, kit, parent, LOW) {
   const fI = new THREE.InstancedMesh(fG, basic('aSeatF'), seats.length), cI = new THREE.InstancedMesh(cG, basic('aSeatC'), seats.length);
   { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3(); seats.forEach((s, i) => { e.set(0, s.yaw, 0); q.setFromEuler(e); m.compose(v.set(s.x, s.y, s.z), q, one); fI.setMatrixAt(i, m); cI.setMatrixAt(i, m); }); }
   parent.add(fI); parent.add(cI);
-  return { mats, meshes, boxes, seats, screen, scrCv, scrTex, nsCv, nsTex, NS, bdCv, bdTex, bdMesh, BD, lobbyPosters, beam, beamM, spotCone, spotDisc, spotM, discM, tipM, scM, lobM, menuCv, menuTex, SN, TK, AH, LH, LX };
+  return { mats, meshes, boxes, seats, screen, scrCv, scrTex, nsCv, nsTex, NS, bdCv, bdTex, bdMesh, BD, lobbyPosters, spotCone, spotDisc, spotM, discM, tipM, scM, lobM, menuCv, menuTex, SN, TK, AH, LH, LX };
 }
 // rounded box (indexed): grid points pulled onto a radius-r skin; bulge puffs one face (y = top, z = front) like a plush cushion
 function rbox(THREE, w, h, d, r, s, bulge = 0, ax = 'z') {

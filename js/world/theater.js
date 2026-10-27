@@ -149,7 +149,6 @@ export function attachTheater(api, W, K, { far }) {
     for (const k of ['lFloor', 'lWall', 'lCeil', 'lCounter', 'lTop', 'lTrim', 'lPoster']) for (const m of ib.mats[k] || []) m.color.set(sv(k));
     ib.lobM.color.set(sv('lLight'));
     const spc = st.lt.spc || sv('aSpot'); ib.spotM.color.set(spc); ib.discM.color.set(spc); ib.spotCone.visible = ib.spotDisc.visible = !!st.lt.sp;
-    ib.beamM.opacity = playing() || movieOn() ? 0.07 * (1 - lvl) + 0.01 : 0;
     if (laMat) laMat.color.setScalar(0.06 + 0.94 * lvl);
   }
   function applyOutside() { for (const [k, ms] of Object.entries(ex.mats)) for (const m of ms) m.color.set(sv(k)); drawSign(); drawBlade(); }
