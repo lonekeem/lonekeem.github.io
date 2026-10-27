@@ -4,7 +4,7 @@
 // spot + a car left on the street are remembered (localStorage + a throttled private Firestore doc).
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, addDoc } from '../fsq.js';
-import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear, palaceBays, PALACE_SIGN, PALACE_SIGN_AT } from './layout.js';
+import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear, palaceBays, PALACE_SIGN, PALACE_SIGN_AT, saleSignAt } from './layout.js';
 import { CAR, CARS, PAINTS, buildCar, poseCar, addPlate } from './cars.js';
 import { parseCar } from './drive.js';
 import { GALLERY } from './cities.js';
@@ -73,7 +73,7 @@ export function attachHomes(api, W, K) {
   // ---------------------------------------------------------------- signs: For Sale / owner nameplate (canvas, redrawn on change)
   const signs = new Map();
   function makeSign(h) { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-    const g = new THREE.Group(); const [sx, sz] = Lw(h, -6.3, h.d / 2 + 4.6); g.position.set(sx, FLAT, sz); g.rotation.y = h.face > 0 ? 0 : Math.PI;
+    const g = new THREE.Group(); const [sx, sz] = saleSignAt(h); g.position.set(sx, FLAT, sz); /* front yard, never on the road beside the plot */ g.rotation.y = h.face > 0 ? 0 : Math.PI;
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.9, 0.12), std('#f8fafc')); post.position.y = 0.95; const bd = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); bd.position.set(0, 1.55, 0.08); g.add(post, bd); root.add(g); signs.set(h.id, { cv, tex, g }); drawSign(h); }
   // signs exist only near the player (hundreds of plots now): made within 90 m, dropped beyond 140 m
   let sT = 0; function signTick(dt) { if ((sT += dt) < 0.6) return; sT = 0; for (const h of housesNear(P.x, P.z, 160)) { if (!h.sale) continue; const d = Math.abs(h.x - P.x) + Math.abs(h.z - P.z); const s0 = signs.get(h.id); if (!s0 && d < 110) makeSign(h); else if (s0 && d > 180) { root.remove(s0.g); s0.tex.dispose(); s0.g.children.forEach((c) => c.geometry && c.geometry.dispose()); signs.delete(h.id); } } }

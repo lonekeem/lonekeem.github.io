@@ -3,7 +3,7 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
-import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear, streetLamps } from './layout.js';
+import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear, streetLamps, STREET_SIGNS, placeSign } from './layout.js';
 import { attachCities, applyExt, forgetTagged } from './cities.js';
 import { attachMap } from './map.js';
 const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
@@ -187,7 +187,8 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     // signposts in the neighbourhood
     gate.traverse((o) => { if (o.isMesh) o.castShadow = !LOW; }); }
   // street name signs
-  for (const [x, z, t] of [[-61, 103, 'Pumpkin Lane'], [61, 103, 'Lantern Way'], [3, 148, 'Candy Court'], [-61, 142, 'Moonbeam Ave']]) { const s = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.6), new THREE.MeshBasicMaterial({ map: signTex(t, '#14532d', '#ffffff'), side: THREE.DoubleSide })); s.position.set(x, FLAT + 3.2, z); root.add(s); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), std('#4b5563')); p.position.set(x, FLAT + 1.6, z); root.add(p); cyl.push({ x, z, r: 0.08, top: 99 }); }
+  // street-name signs stand on a sidewalk corner of each crossing (they used to sit in the middle of the intersection)
+  for (const sg of STREET_SIGNS) { const at = placeSign(sg.t, sg.x, sg.z, sg.foot); if (!at) continue; const [x, z] = at, t = sg.t; const s = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.6), new THREE.MeshBasicMaterial({ map: signTex(t, '#14532d', '#ffffff'), side: THREE.DoubleSide })); s.position.set(x, FLAT + 3.2, z); root.add(s); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), std('#4b5563')); p.position.set(x, FLAT + 1.6, z); root.add(p); cyl.push({ x, z, r: 0.08, top: 99 }); }
 
   // Kemy Patrol station: an open lobby on Kemy Street. Cars park in the lot. The desk opens a report.
   { const y = FLAT; const g = new THREE.Group(); g.name = 'kemy-station'; townG._street.add(g);

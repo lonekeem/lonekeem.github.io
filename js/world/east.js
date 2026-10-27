@@ -2,7 +2,7 @@
 // Sunny Shore beach. Geometry is merged per 64 m chunk and whole chunks are hidden when far (chunked streaming /
 // culling); trees, palms, lamps and umbrellas are instanced. NPC cars drive the loop both ways and always stop for
 // people. All names and designs are original. Written by Lone Keem.
-import { ROADS2, HWY, DOWNTOWN, FIELDS, SHORE, SEA_Y, FLAT, EAST, segD, SNOW, DESERT, LAKE, TOWNS, HOUSES, poleClear } from './layout.js';
+import { ROADS2, HWY, DOWNTOWN, FIELDS, SHORE, SEA_Y, FLAT, EAST, segD, SNOW, DESERT, LAKE, TOWNS, HOUSES, poleClear, LOOP_SIGN, placeSign, bannerAt } from './layout.js';
 import { buildCar, poseCar, CARS } from './cars.js';
 
 const CH = 64;
@@ -126,9 +126,9 @@ export function attachEast(api, W, K) {
   { // 🏖️ Sunny Shore boardwalk (the pier + umbrellas above moved here with the beach)
     for (let x = 110; x < 378; x += 2) if (!inRoad(x, SHORE.z0 + 1, 0.5)) P2('wood', G.box, x % 4 < 2 ? '#c49a6c' : '#b68552', x + 1, FLAT + 0.06, SHORE.z0 + 1, 0, 2, 0.12, 3); }
   // ---------------------------------------------------------------- district banners (arch at each town entrance) + map labels
-  for (const t of TOWNS) { if (!t.gate) continue; const [gx, gz] = t.gate, gy = ground(gx, gz); const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112; const g = cv.getContext('2d'); g.fillStyle = '#1e1b4b'; g.fillRect(0, 0, 512, 112); g.strokeStyle = '#fde68a'; g.lineWidth = 6; g.strokeRect(5, 5, 502, 102); g.fillStyle = '#fff'; g.font = 'bold 44px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t.name, 256, 58);
-    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; const b = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.55), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); b.position.set(gx + 6, gy + 4.2, gz - 6.5); b.rotation.y = Math.PI / 4; chunks.get(chunkOf(gx + 6, gz - 6.5)).add(b);
-    for (const s of [-1, 1]) { P2('trim', G.cyl, '#fde68a', gx + 6 + s * 2.4, gy + 2.2, gz - 6.5 - s * 2.4, 0, 0.22, 4.4, 0.22); cyl.push({ x: gx + 6 + s * 2.4, z: gz - 6.5 - s * 2.4, r: 0.15, top: 99 }); } }
+  for (const t of TOWNS) { if (!t.gate) continue; const at = bannerAt(t); if (!at) continue; const [bxx, bzz] = at, gy = ground(bxx, bzz); /* posts never on a road */ const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112; const g = cv.getContext('2d'); g.fillStyle = '#1e1b4b'; g.fillRect(0, 0, 512, 112); g.strokeStyle = '#fde68a'; g.lineWidth = 6; g.strokeRect(5, 5, 502, 102); g.fillStyle = '#fff'; g.font = 'bold 44px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t.name, 256, 58);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; const b = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.55), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); b.position.set(bxx, gy + 4.2, bzz); b.rotation.y = Math.PI / 4; chunks.get(chunkOf(bxx, bzz)).add(b);
+    for (const s of [-1, 1]) { P2('trim', G.cyl, '#fde68a', bxx + s * 2.4, gy + 2.2, bzz - s * 2.4, 0, 0.22, 4.4, 0.22); cyl.push({ x: bxx + s * 2.4, z: bzz - s * 2.4, r: 0.15, top: 99 }); } }
   W.townLabels = TOWNS;
   // ---------------------------------------------------------------- flush merged chunks
   const MAT = { road: std('#fff', { vc: true, r: 0.92 }), mark: std('#fff', { vc: true, r: 0.6, x: { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 } }), walk: std('#fff', { vc: true, r: 0.85 }), bld: std('#fff', { vc: true, r: 0.75 }), trim: std('#fff', { vc: true, r: 0.6 }), win: std('#fff', { vc: true, e: '#ffe9a8', ei: 0.45, r: 0.3 }), wood: std('#fff', { vc: true, r: 0.9 }), roof: std('#fff', { vc: true, r: 0.7 }), crop: std('#fff', { vc: true, r: 0.95 }), hay: std('#fff', { vc: true, r: 1 }), sand: std('#fff', { vc: true, r: 1 }), water: std('#fff', { vc: true, r: 0.1 }) };
@@ -136,10 +136,10 @@ export function attachEast(api, W, K) {
   // shop signs (canvas textures, original names)
   for (const [name, x, y, z, c] of signs) { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 256, 64); g.fillStyle = '#fff'; g.font = 'bold 30px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, 128, 34);
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.25), new THREE.MeshBasicMaterial({ map: t })); m.position.set(x, y, z); chunks.get(chunkOf(x, z)).add(m); }
-  // welcome sign at the park link
-  { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128; const g = cv.getContext('2d'); g.fillStyle = '#0f766e'; g.fillRect(0, 0, 512, 128); g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeRect(6, 6, 500, 116); g.fillStyle = '#fff'; g.font = 'bold 40px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('🛣️ LOOP HIGHWAY', 256, 56); g.font = '26px system-ui,sans-serif'; g.fillText('Downtown · Clover Fields · Sunny Shore', 256, 98);
-    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const s = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide })); s.position.set(110, ground(110, -6) + 3.4, -6); s.rotation.y = -Math.PI / 2; root.add(s);
-    for (const dz of [-2.8, 2.8]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.4), std('#64748b')); p.position.set(110, ground(110, -6) + 1.7, -6 + dz); root.add(p); } }
+  // welcome sign at the park link (beside e0, both posts on the verge)
+  { const at = placeSign('LOOP HIGHWAY', LOOP_SIGN.x, LOOP_SIGN.z, LOOP_SIGN.foot) || [LOOP_SIGN.x, LOOP_SIGN.z]; const [lx, lz] = at; const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128; const g = cv.getContext('2d'); g.fillStyle = '#0f766e'; g.fillRect(0, 0, 512, 128); g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeRect(6, 6, 500, 116); g.fillStyle = '#fff'; g.font = 'bold 40px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('🛣️ LOOP HIGHWAY', 256, 56); g.font = '26px system-ui,sans-serif'; g.fillText('Downtown · Clover Fields · Sunny Shore', 256, 98);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const s = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide })); s.position.set(lx, ground(lx, lz) + 3.4, lz); s.rotation.y = LOOP_SIGN.ang; root.add(s);
+    for (const dz of LOOP_SIGN.posts) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.4), std('#64748b')); p.position.set(lx, ground(lx, lz) + 1.7, lz + dz); root.add(p); cyl.push({ x: lx, z: lz + dz, r: 0.1, top: 99 }); } }
 
   // ---------------------------------------------------------------- highway traffic (both directions, kid-safe: same stop-for-people logic)
   const HL = [[HWY.x0, HWY.z0], [HWY.x1, HWY.z0], [HWY.x1, HWY.z1], [HWY.x0, HWY.z1]]; const mk = (pts) => ({ pts, len: pts.reduce((s, p, i) => s + Math.hypot(pts[(i + 1) % pts.length][0] - p[0], pts[(i + 1) % pts.length][1] - p[1]), 0) });

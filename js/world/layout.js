@@ -184,11 +184,39 @@ export const POLE_R = 0.45; // lamp cap radius 0.4 + a hair
 export const poleClear = (x, z, r = POLE_R) => roadD(x, z) >= r;
 // Kemy Street lamps: one every 22 m on alternating curbs (on the sidewalk, 0.6 m in from the kerb). A spot that would land on a
 // crossing road (or too close to another lamp) slides along its own curb to the nearest clear spot, or is dropped.
+// Drive surfaces beyond the road strips: parking lots where cars move and park. Poles and signs keep off these too.
+export const LOTS = [{ id: 'theater', ...THEATER.lot }, { id: 'station', x0: 3.8, x1: 9, z0: 115, z1: 129 }];
+const boxD = (r, x, z) => { const dx = Math.max(r.x0 - x, x - r.x1), dz = Math.max(r.z0 - z, z - r.z1); return dx > 0 || dz > 0 ? Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) : Math.max(dx, dz); };
+export const driveD = (x, z) => { let d = roadD(x, z); for (const l of LOTS) d = Math.min(d, boxD(l, x, z)); return d; }; // < 0 on asphalt a car can use
+export const offDrive = (x, z, r = POLE_R) => driveD(x, z) >= r;
+// 🪧 Signs: a footprint is the post(s) plus samples along the board, as [dx, dz, r] offsets from the sign centre.
+// signFoot(w, ang, posts): a board w wide turned by rotation.y = ang, on the given post offsets along the board.
+export function signFoot(w, ang = 0, posts = [0], r = 0.12) { const c = Math.cos(ang), s = -Math.sin(ang); const f = posts.map((t) => [c * t, s * t, r]);
+  for (let i = 0; i <= 4; i++) { const t = (i / 4 - 0.5) * w; f.push([c * t, s * t, 0.05]); } return f; }
+export const footClear = (x, z, foot, pad = 0.3) => foot.every(([dx, dz, r]) => driveD(x + dx, z + dz) >= r + pad);
+// The guard every sign and pole goes through: the nearest spot (within max m, 0.25 m steps) where the whole footprint
+// stands off every road, crossing and parking lot. null when there is none (the caller drops the prop).
+export function clearSpot(x, z, foot = [[0, 0, POLE_R]], max = 12, pad = 0.3) { if (footClear(x, z, foot, pad)) return [x, z];
+  for (let rr = 0.25; rr <= max; rr += 0.25) { const n = Math.max(8, Math.round(rr * 8)); for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2, px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr; if (footClear(px, pz, foot, pad)) return [px, pz]; } }
+  return null; }
+const DEV = typeof location !== 'undefined' && /^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname || '');
+// placeSign: clearSpot plus a loud dev-only warning, so a new sign dropped onto a road gets noticed on localhost.
+export function placeSign(tag, x, z, foot) { const p = clearSpot(x, z, foot); if (DEV && (!p || p[0] !== x || p[1] !== z)) console.warn('[kemy] sign "' + tag + '" was on a road at', x, z, p ? '-> moved to ' + p.map((v) => v.toFixed(2)).join(',') : '-> dropped'); return p; }
+// Kemy Street name signs: one on a sidewalk corner of each crossing (0.9 m back from both kerbs), board facing the cross traffic.
+export const STREET_SIGNS = [[-57.6, 104.9, 'Pumpkin Lane'], [57.6, 104.9, 'Lantern Way'], [6.4, 149.9, 'Candy Court'], [-57.6, 140.1, 'Moonbeam Ave']].map(([x, z, t]) => ({ x, z, t, w: 3.4, foot: signFoot(3.4, 0, [0], 0.08) }));
+// the Loop Highway welcome sign beside e0 (it used to stand with one post in the lane)
+export const LOOP_SIGN = { x: 110, z: -9.6, w: 6, ang: -Math.PI / 2, posts: [-2.8, 2.8] }; LOOP_SIGN.foot = signFoot(6, LOOP_SIGN.ang, LOOP_SIGN.posts, 0.08);
+// district banner at a town gate: board 7 m on two posts 2.4 m out along the diagonal, slid off the roads if needed
+export const BANNER_FOOT = signFoot(7, Math.PI / 4, [-2.4 * Math.SQRT2, 2.4 * Math.SQRT2], 0.15);
+export function bannerAt(t) { const [gx, gz] = t.gate; return clearSpot(gx + 6, gz - 6.5, BANNER_FOOT); }
+// For Sale / owner sign in the front yard (local -6.3, d/2 + 4.6), nudged off a road the plot sits beside
+export const SALE_FOOT = signFoot(1.5, 0, [0], 0.08);
+export function saleSignAt(h) { const lx = -6.3, lz = h.d / 2 + 4.6; const x = h.x + (h.face > 0 ? lx : -lx), z = h.z + (h.face > 0 ? lz : -lz); return clearSpot(x, z, SALE_FOOT, 4) || [x, z]; } // (a plot that itself sits on a road keeps its spot)
 export function streetLamps() { const lamps = [];
   for (const r of ROADS) { const [ax, az] = r.a, [bx, bz] = r.b; const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az);
     for (let t0 = 6; t0 < len; t0 += 22) { const s = (Math.floor(t0 / 22) % 2) ? 1 : -1; const ox = Math.cos(ang) * s * (r.w / 2 + 0.6), oz = -Math.sin(ang) * s * (r.w / 2 + 0.6);
       for (const dt of [0, 3, -3, 6, -6, 9, -9, 12, -12]) { const t = t0 + dt; if (t < 1 || t > len - 1) continue; const k = t / len, x = ax + (bx - ax) * k + ox, z = az + (bz - az) * k + oz;
-        if (!poleClear(x, z) || lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 9)) continue; lamps.push({ x, z, s, ang, road: r.id, moved: dt !== 0 }); break; } } }
+        if (!offDrive(x, z) || lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 9)) continue; lamps.push({ x, z, s, ang, road: r.id, moved: dt !== 0 }); break; } } }
   return lamps; }
 
 // ---------------------------------------------------------------- big-world ground: flat country, rivers, sea, rim hills, hillside estates
