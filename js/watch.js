@@ -19,6 +19,7 @@ import { canAutoplay, soundOn, setSoundOn, claimAudio, loadYT, onUnlock } from '
 import { isYtBlocked, isHardYtError, markYtBlocked } from './ytcheck.js';
 import { faceName, adminNameClass } from './kemy-name.js';
 import { sheriffCard, sheriffFeedPost, SHERIFF_COUNT } from './sheriff-card.js';
+import { sheriffOk } from './sheriff-age.js';
 import { isSheriffPost, sheriffEpOf, sheriffPostId } from './sheriff-data.js';
 import * as ages from './agegate.js';
 let soundMod = null, sounds = null;
@@ -171,7 +172,7 @@ export function createWatch(ctx) {
         <div class="vfail" hidden><p>This video couldn’t load. Try again later.</p></div>
         <div class="vgrad" aria-hidden="true"></div>
         <div class="vmeta">
-          <div class="vsh-tags"><span class="sh-orig">Lone Keem Studios Original</span> <span class="sh-badge">Everyone</span> <span class="vsh-epn">Episode 1 of ${SHERIFF_COUNT()}</span></div>
+          <div class="vsh-tags"><span class="sh-orig">Lone Keem Studios Original</span> <span class="sh-badge">13+</span> <span class="vsh-epn">Episode 1 of ${SHERIFF_COUNT()}</span></div>
           <div class="vcreator">
             ${avatar({ uid: p.authorId, displayName: p.authorName, username: p.authorUsername }, '', true)}
             <a class="vname" href="#/u/${esc(p.authorUsername)}">Lone Keem Studios</a>${badge(p.authorId)}
@@ -296,10 +297,10 @@ export function createWatch(ctx) {
   async function render(postId, token, tab = 'foryou') {
     if (!FEED_TABS.some(([t]) => t === tab)) tab = 'foryou';
     // Studio Original Ep 1 (4th item in For You) is the real posts/sheriff-ep1 doc, so stars / comments work.
-    const shDoc = tab === 'foryou' ? sheriffDoc() : null;
+    const shDoc = tab === 'foryou' && sheriffOk() ? sheriffDoc() : null; // 13+ (js/sheriff-age.js)
     const posts = (await buildTab(tab)).filter((p) => !(p.ytBlocked || isYtBlocked(p.ytId || (p.linkUrl && youTubeId(p.linkUrl)))));
     const shReal = shDoc ? await shDoc : null;
-    const shp = tab === 'foryou' ? sheriffFeedPost(STUDIO_UID, shReal) : null;
+    const shp = tab === 'foryou' && sheriffOk() ? sheriffFeedPost(STUDIO_UID, shReal) : null;
     if (shp && !window.kemyParental?.hidePost?.(shp)) posts.splice(Math.min(3, posts.length), 0, shp);
     if (stale(token)) return;
     const st = prefsStore();
@@ -341,9 +342,10 @@ export function createWatch(ctx) {
     // 4th item, so the card sits well after it (8 slides later) as a reminder, and is skipped in short feeds.
     const shAt = slides.findIndex((x) => x.dataset.id === 'sheriff-ep1');
     const promoAt = shAt < 0 ? Math.min(1, slides.length - 1) : shAt + 8;
-    if (tab === 'foryou' && slides[promoAt]) {
+    const promo = tab === 'foryou' && slides[promoAt] ? sheriffCard('slide') : ''; // '' = 13+ gate (js/sheriff-age.js)
+    if (promo) {
       const at = slides[promoAt];
-      at.insertAdjacentHTML('afterend', sheriffCard('slide'));
+      at.insertAdjacentHTML('afterend', promo);
       const sp = at.nextElementSibling;
       sp.querySelector('[data-vsh-skip]').onclick = () => sp.nextElementSibling?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       const spo = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) dispatchEvent(new Event('kemy:feed-break')); }), { threshold: 0.6 });

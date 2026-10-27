@@ -4,11 +4,12 @@
 // "metadata", never in the service worker cache). Watch progress stays on this device in localStorage.
 // Routes: #/series/sheriff (series page) and #/series/sheriff/<n> (full-screen player). Written by Lone Keem.
 import { claimAudio } from './autoplay.js';
+import { sheriffOk, sheriffAgeCard } from './sheriff-age.js';
 import { SHERIFF_EPISODES, SHERIFF_PROGRESS_KEY, isOut, sheriffPostId } from './sheriff-data.js';
 
 const DIR = 'assets/series/sheriff/';
 export const SERIES = {
-  id: 'sheriff', title: 'The Sheriff of Lone Keem', studio: 'Lone Keem Studios', creator: 'Keem', rating: 'Everyone',
+  id: 'sheriff', title: 'The Sheriff of Lone Keem', studio: 'Lone Keem Studios', creator: 'Keem', rating: '13+',
   tagline: 'A one-eyed lizard sheriff takes on the toughest outlaw in the little western town of Lone Keem.',
   hero: DIR + 'hero.webp',
   cast: ['Gecko', 'Big Mike', 'Mrs. Foster', 'Jimmy', 'Deputy John']
@@ -67,6 +68,8 @@ const BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 // ------------------------------------------------------------ series page
 export function page(main, { ep, toast, social } = {}) {
   loadCss();
+  // Rated 13+: under 13 / unknown age (trusted birthday, js/sheriff-age.js) get the friendly card, never the player
+  if (!sheriffOk()) { document.body.classList.remove('sh-playing'); restoreTitle(); main.innerHTML = sheriffAgeCard(); return; }
   if (ep) return player(main, Number(ep), { toast, social });
   document.body.classList.remove('sh-playing');
   restoreTitle();
@@ -82,7 +85,7 @@ export function page(main, { ep, toast, social } = {}) {
         <div class="sbanner-in">
           <span class="sb-series">LONE KEEM STUDIOS ORIGINAL</span>
           <h1 id="sh-title">${esc(SERIES.title)}</h1>
-          <p class="ssub"><span class="sh-rating" title="Made for all ages">${esc(SERIES.rating)}</span> Western · ${EPISODES.length} episodes${soon ? ` · ${out === 1 ? 'Episode 1' : out + ' episodes'} out now` : ` · ${mins(total)}`} · No ads</p>
+          <p class="ssub"><span class="sh-rating" title="Rated 13+">${esc(SERIES.rating)}</span> Western · ${EPISODES.length} episodes${soon ? ` · ${out === 1 ? 'Episode 1' : out + ' episodes'} out now` : ` · ${mins(total)}`} · No ads</p>
           <p class="sh-tagline">${esc(SERIES.tagline)}</p>${soon ? '' : '<p class="sh-more-badge"><span>🤠 More episodes coming soon</span></p>'}
           <div class="sacts"><a class="btn sh-play" id="sh-play" href="#/series/sheriff/${up.ep.n}">${PLAY}<span>${esc(label)}</span></a></div>
         </div>
@@ -97,7 +100,7 @@ export function page(main, { ep, toast, social } = {}) {
       <section class="sh-about">
         <h2 class="sseason-h">About the series</h2>
         <p>A western set in the dusty town of Lone Keem (pop. 42). Starring Gecko, a lizard sheriff with an eyepatch, with Big Mike, Mrs. Foster, Jimmy and Deputy John.</p>
-        <p class="small muted">Created by ${esc(SERIES.creator)} · A ${esc(SERIES.studio)} production · Rated ${esc(SERIES.rating)} · Edited to be clean for all ages · No ads</p>
+        <p class="small muted">Created by ${esc(SERIES.creator)} · A ${esc(SERIES.studio)} production · Rated ${esc(SERIES.rating)} · No ads</p>
       </section>
     </div>`;
   if (social) cardCounts(main, social);

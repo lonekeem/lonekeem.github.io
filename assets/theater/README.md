@@ -1,23 +1,62 @@
 # Lone Keem Studio movie + songs
 
-## The movie (default)
+## Showtimes (default)
 
-By default the big screen shows **The Sheriff of Lone Keem** (the series videos in
-`assets/series/sheriff/`, used in place, never copied). Logic: `js/world/theater-movie.js`.
+The big screen runs a fixed program every hour (local clock). Logic: `js/world/theater-movie.js`
+(`PROGRAM`, `showAt`, `listings`). Every show gets a 5:00 "Next showing in m:ss" countdown, and
+every show **starts on a quarter hour**:
 
-- Every 15 minutes: a 5:00 "Next showing in m:ss" countdown (screen, outside marquee, lobby
-  Now Showing stand), then all episodes back to back, then a short end card.
-  Countdowns start at :00 :15 :30 :45 and shows at :05 :20 :35 :50 (local clock).
+| Starts | Film | Runtime | Ends |
+|---|---|---|---|
+| :00 | **The Sheriff of Lone Keem** (13+, ep 1–3) | 9:43 | :09:43 |
+| :15 | **Big Buck Bunny** | 9:56 | :24:56 |
+| :30 | **Spring** | 7:44 | :37:44 |
+| :45 | **Triple feature:** Caminandes 2 (:45:00), Caminandes 3 (:47:34), Wing It! (:50:12) | 2:26 + 2:30 + 3:58 | :54:10 |
+
+Countdowns run :55–:00, :10–:15, :25–:30, :40–:45. Each Blender film is preceded by an 8 s title
+card that shows its credit.
+
+- **13+ gate:** The Sheriff needs age 13+ from the trusted age source (`viewerAge()` in `js/safety.js`,
+  wrapped by `js/sheriff-age.js`). Under-13 or unknown-age viewers see the friendly card on the
+  Sheriff page, and in the theater the :00 slot becomes a **Caminandes Double Feature**
+  (Caminandes 2 then 3, same clock) on the screen, board, 2D list, lobby poster and marquee. This is
+  local only: no writes and no rules change.
+- **Lobby:** the showtimes board (poster thumbs, titles, runtimes, the next 3 times, NOW PLAYING /
+  UP NEXT, live) is on the lobby wall. Tap it, or the 🎟 Showtimes button, to open the 2D list.
+  There are 6 gold-framed posters with title plates and the next showtime. Poster textures load
+  lazily and are about 20–40 KB webp each.
+- **Fit:** wide films cover-fit the screen. The portrait Sheriff is shown sharp in the centre with
+  blurred sides.
 - Sync needs **no writes and no rules change**: every client works out the same spot from the
   clock, so late joiners seek straight to the right second.
-- The owner's 🎬 Screen tab can start a show now, start a 5:00 countdown now, go back to the
-  clock schedule, or turn showings off (saved as `pl.ma` / `pl.mo` in the theater doc).
-- The `<video>` is created only while you are inside and is unloaded when you leave. Sound plays
-  only in the auditorium (muted in the lobby). If the browser blocks sound (iPhone), a
-  "Tap for sound" button shows. House lights dim to 12% during the movie and come back up after.
+- The owner's 🎬 Screen tab can start any slot now, start a 5:00 countdown now, go back to the
+  clock schedule, or turn showings off (saved as `pl.ma` / `pl.mo` / `pl` slot in the theater doc).
+- There is only ONE `<video>`. It is created only while you are inside and unloaded when you leave.
+  Sound plays only in the auditorium (muted in the lobby). If the browser blocks sound (iPhone), a
+  "Tap for sound" button shows. House lights dim to 12% during a film.
 - A song started from the editor plays instead of the movie until it ends or is stopped.
-- New episodes join automatically once they are released in `js/sheriff-data.js` (with their `dur`).
-  If the movie grows past ~9:50, the cycle grows in whole minutes.
+- Tests: `node tests/world/theater-schedule.test.mjs` (unit) and `tests/world/theater-films-e2e.mjs` (emulator).
+
+## Film files and credits (`assets/theater/films/`)
+
+All of these open movies are by the **Blender Foundation** (studio.blender.org). They were downloaded from
+official Blender sources and re-encoded to H.264 + AAC, faststart, 720p, under 50 MB, with webp posters
+under 100 KB. No other changes were made. The required credit, shown on each title card, on the board
+and on `#/sounds`, is:
+
+> *Title* © Blender Foundation | studio.blender.org, CC BY
+
+| File | Film | Year | License | Size |
+|---|---|---|---|---|
+| big-buck-bunny.mp4 | Big Buck Bunny | 2008 | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | 46.9 MB |
+| spring.mp4 | Spring | 2019 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 46.9 MB |
+| caminandes-2.mp4 | Caminandes 2: Gran Dillama | 2013 | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | 27.5 MB |
+| caminandes-3.mp4 | Caminandes 3: Llamigos | 2016 | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | 28.3 MB |
+| wing-it.mp4 | Wing It! | 2023 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 47.3 MB |
+
+To add a film, put `<key>.mp4` and `<key>.webp` here, add it to `FILMS` and `PROGRAM` in
+`theater-movie.js` (the slot must fit inside 15 minutes, including the 5:00 countdown), update the
+schedule test, and bump `sw.js`.
 
 # Songs
 

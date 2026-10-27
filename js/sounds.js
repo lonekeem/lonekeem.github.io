@@ -325,5 +325,9 @@ export async function creditsPage(root) {
       <p class="muted small">Only licenses that allow an app to keep and share the music: public domain / CC0, CC BY, and CC BY-SA. CC BY and CC BY-SA need the credit line on the post. CC BY-SA also means a remix of that track stays under the same license. Non-commercial and no-derivatives tracks are not included. Trending is the most-played music that fits a video.</p>
       <h3>Trending</h3><ul class="ks-credits">${free.filter((t) => Number(t.trending) > 0).sort((a, b) => Number(a.trending) - Number(b.trending)).map(row).join('')}</ul>
       ${MOODS.map(([id, name]) => `<h3>${name}</h3><ul class="ks-credits">${free.filter((t) => t.mood === id).map(row).join('')}</ul>`).join('')}
-    </section>`;
+    </section>
+    <section class="card pad ks-page" data-film-credits><h2>🎬 Lone Keem Studio films</h2><p class="muted small">Short films shown on the theater's big screen on Kemy Street.</p><ul class="ks-credits"></ul></section>`;
+  // the theater's open-movie credits (small module, loaded only here)
+  import('./world/theater-movie.js').then(({ FILMS }) => { const ul = root.querySelector('[data-film-credits] ul'); if (!ul) return;
+    ul.innerHTML = Object.values(FILMS).filter((f) => f.credit).map((f) => `<li><b>${esc(f.title)}</b> (${f.year}) — Blender Foundation · ${licLink({ license: f.lic })} · <a href="https://studio.blender.org" target="_blank" rel="noopener noreferrer">Source</a><br><span class="muted">${esc(f.credit)}. Re-encoded to 720p for the app; otherwise unchanged.</span></li>`).join(''); }).catch(() => {});
 }

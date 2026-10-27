@@ -1,5 +1,6 @@
 // Tiny entry cards for "The Sheriff of Lone Keem" (the series page + player live in js/sheriff.js, loaded on demand).
 import { SHERIFF_EPISODES, SHERIFF_PROGRESS_KEY as KEY, isOut } from './sheriff-data.js';
+import { sheriffOk } from './sheriff-age.js';
 const ART = 'assets/series/sheriff/';
 
 function cta() {
@@ -19,19 +20,20 @@ function newLine() {
 /** kind: 'explore' (wide featured card), 'slide' (For You feed slide), 'tile' (Movies Originals row). */
 export function sheriffCard(kind = 'explore') {
   if (kind === 'tile') {
-    return `<a class="wtile movie stile sh-tile" href="#/series/sheriff" title="The Sheriff of Lone Keem"><span class="wart"><img src="${ART}ep1.webp" alt="" loading="lazy" decoding="async"><span class="sb-series">Series</span><span class="wb-pick">Original</span></span><span class="wmeta"><b>The Sheriff of Lone Keem</b><small>Lone Keem Studios · Everyone</small></span></a>`;
+    return `<a class="wtile movie stile sh-tile" href="#/series/sheriff" title="The Sheriff of Lone Keem"><span class="wart"><img src="${ART}ep1.webp" alt="" loading="lazy" decoding="async"><span class="sb-series">Series</span><span class="wb-pick">Original</span></span><span class="wmeta"><b>The Sheriff of Lone Keem</b><small>Lone Keem Studios · 13+</small></span></a>`;
   }
   if (kind === 'slide') {
+    if (!sheriffOk()) return ''; // 13+: no For You promo for under 13 / unknown age
     return `<section class="vslide vend vdon vsh-promo" aria-label="The Sheriff of Lone Keem, a Lone Keem Studios Original"><div class="vend-inner vsh-in">
       <img class="vsh-art" src="${ART}ep1.webp" alt="" loading="lazy" decoding="async">
       <span class="sh-orig">Lone Keem Studios Original</span>
       <b class="vsh-t">The Sheriff of Lone Keem</b>
-      <small><span class="sh-badge">Everyone</span> ${newLine()}</small>
+      <small><span class="sh-badge">13+</span> ${newLine()}</small>
       <a class="btn" href="#/series/sheriff">▶ ${cta()}</a>
       <button type="button" class="btn btn-ghost btn-sm vsh-skip" data-vsh-skip>Keep scrolling ↓</button>
     </div></section>`;
   }
-  return `<a class="sh-feat" href="#/series/sheriff" style="--bg:url('${new URL(ART + 'hero.webp', document.baseURI).href}')"><span class="sh-feat-in"><span class="sh-orig">Lone Keem Studios Original</span><b>The Sheriff of Lone Keem</b><small><span class="sh-badge">Everyone</span> ${newLine()}</small><span class="sh-feat-cta">▶ ${cta()}</span></span></a>`;
+  return `<a class="sh-feat" href="#/series/sheriff" style="--bg:url('${new URL(ART + 'hero.webp', document.baseURI).href}')"><span class="sh-feat-in"><span class="sh-orig">Lone Keem Studios Original</span><b>The Sheriff of Lone Keem</b><small><span class="sh-badge">13+</span> ${newLine()}</small><span class="sh-feat-cta">▶ ${cta()}</span></span></a>`;
 }
 
 const prog = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; } };
@@ -63,7 +65,7 @@ export function sheriffGridTiles() {
 // just without the social buttons' counts (external).
 export function sheriffFeedPost(studioUid = 'studio', real = null) {
   const e = SHERIFF_EPISODES.find((x) => x.n === 1 && isOut(x));
-  if (!e) return null;
+  if (!e || !sheriffOk()) return null; // 13+: never in For You for under 13 / unknown age
   const base = {
     id: 'sheriff-ep1', external: true, sheriff: true, kind: 'sheriff', mediaType: 'video',
     mediaUrl: ART + 'ep1.mp4', poster: ART + 'ep1.webp', authorId: studioUid, authorName: 'Lone Keem Studios',
