@@ -524,7 +524,19 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
   function onMiniResize() { if (radioBox.classList.contains('dock')) placeNote(); else if (radioBox.classList.contains('min')) settleMini(); }
   noteBtn.addEventListener('click', (e) => { e.stopPropagation(); restoreCard(); });
   function onHouseMusic(ev) { const d = ev.detail || {}; if (!rad || d.source !== 'house-radio' || d.service !== 'spotify') return; markPaused(d.state !== 'play'); }
-  addEventListener('resize', onMiniResize); addEventListener('kemy:music', onHouseMusic);
+  // 🎬 theater hush (js/world/theater-hush.js, this player only): Spotify pauses itself on the theater's kemy:media-play, so resume it on the
+  // way out; Apple's embed cannot pause, so its iframe is blanked inside and reloaded after (that restarts its song). <audio> + YouTube: theater-hush.js.
+  let hushEmb = null;
+  function onTheaterHush(ev) {
+    const on = !!(ev.detail && ev.detail.on);
+    if (on) { hushEmb = null; if (!rad || !rad.emb || rad.paused) return;
+      if (rad.emb.service === 'spotify') hushEmb = { me: rad, k: 'sp' };
+      else if (rad.emb.service === 'apple') { const f = radioBox.querySelector('.mx-embed.apple iframe'); if (f) { hushEmb = { me: rad, k: 'ap', f, src: f.src }; f.src = 'about:blank'; markPaused(true); } }
+      return; }
+    const h = hushEmb; hushEmb = null; if (!h || rad !== h.me || !rad.emb) return;
+    if (h.k === 'sp') { if (rad.paused) rad.emb.toggle(); } else if (h.f.isConnected) { h.f.src = h.src; markPaused(false); }
+  }
+  addEventListener('resize', onMiniResize); addEventListener('kemy:music', onHouseMusic); addEventListener('kemy:theater-hush', onTheaterHush);
   async function startRadio() {
     if (!inside || radioOff === inside.id) return;
     const plot = inside.id, o = owners.get(plot), Rd = o && o.radio;
@@ -551,7 +563,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
       body.innerHTML = `<div class="kh-now">${t.cover ? `<img src="${esc(t.cover)}" alt="" width="44" height="44">` : ''}<div><b>🎵 ${esc(t.title)}</b><small>${esc(t.artist)}${t.credit ? ` · ${esc(t.credit)}` : ''}</small><small class="kh-note">Everyone inside hears the same spot.</small></div></div><button type="button" data-p hidden>Tap to listen 🎵</button>`;
       const tb = body.querySelector('[data-p]');
       const go = () => { if (!au.getAttribute('src')) { au.preload = 'none'; au.src = t.src; } sync(); au.play().then(() => { tb.hidden = true; markPaused(false); dispatchEvent(new CustomEvent('kemy:media-play', { detail: { source: 'house-radio' } })); }).catch(() => { tb.hidden = false; markPaused(true); }); };
-      tb.onclick = go; au.addEventListener('loadedmetadata', sync, { once: true }); go(); setRadioTitle(t.title); me0.tvArtist = t.artist || '';
+      tb.onclick = go; au.__resync = sync; au.addEventListener('loadedmetadata', sync, { once: true }); go(); setRadioTitle(t.title); me0.tvArtist = t.artist || '';
       // the Pals dance to this TV's beat (js/pals/musicbeat.js reads the shared set)
       (window.__kemyAud || (window.__kemyAud = new Set())).add(au); au.addEventListener('playing', () => { au.__kbAt = performance.now(); });
       // karaoke lyrics on every TV in the house for every Kemy song (module + one small JSON loaded only now)
@@ -1045,7 +1057,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
     sitAt: (o) => { P.sit = { x: o.x, z: o.z, y: o.y, yaw: o.yaw, seat: o.seat || null, back: o.back, off: () => (o.dn === 'sleep' ? life.act('wake') : null) }; P.x = o.x; P.z = o.z; P.yaw = o.yaw; api.markDirty && api.markDirty(); },
     unsit: () => { const st = P.sit; if (!st) return; P.sit = null; P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; api.markDirty && api.markDirty(); } });
   window.__khApi = { ringDoor, considerRing, doorWatch, visitorsHere, askLeave, waiting: () => (waitRing ? { ...waitRing } : null), tvAudio: () => (rad && rad.au) || null, tvCanvas: () => tvC, life, lookOnly, myPanel, sellPanel, drive: D, sitDown, standUp, seats: () => seatsHere().map((q) => ({ c: q.c, x: q.x, z: q.z, y: q.y })), screens: () => (inside && rooms.get(inside.id)?.I.screens()) || [], tvShow, tvAct, fakeOwn, startDeco, endDeco, unstick, deco: () => deco, decoratePad, decoState, screenOf, guestPanel, radioPanel, rooms: () => rooms, ring: () => ring, goIn: (id) => goIn(HOUSE_BY_ID[id]), goOut, floor: () => changeFloor(), sale: (id) => salePanel(HOUSE_BY_ID[id]), home: () => homeB.click(), buy: (id) => buyHome(HOUSE_BY_ID[id], document.createElement('button')), garage: (t) => buyGarage(t, document.createElement('button')), parkHome, takeNear: () => takeCar(nearMyCar()), persist, shown: (id) => ((garages.get(id || myPlot) || {}).shown || []).map(({ car, s }) => ({ m: car.m, x: s.x, z: s.z, lv: s.lv || 0 })), garageInfo: (id) => { const g = garages.get(id || myPlot); return g ? { cars: g.carMs.length, shown: (g.shown || []).length } : null; }, syncCars, owners: () => owners, teleport };
-  function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('kemy:media-play', onEmbPlay); removeEventListener('kemy:media-stop', onEmbStop); embAud.paused = true; if (window.__kemyAud) window.__kemyAud.delete(embAud); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); clearInterval(doorT); clearTimeout(arrT); waitEl.remove(); arrEl.remove(); css.remove(); css2.remove(); }
+  function destroy() { try { life.destroy(); } catch { /* */ } stopParty(); watchDecor(null); document.body.classList.remove('kh-decorating'); persist(true); removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); removeEventListener('resize', onMiniResize); removeEventListener('kemy:music', onHouseMusic); removeEventListener('kemy:theater-hush', onTheaterHush); removeEventListener('kemy:media-play', onEmbPlay); removeEventListener('kemy:media-stop', onEmbStop); embAud.paused = true; if (window.__kemyAud) window.__kemyAud.delete(embAud); removeEventListener('keydown', onDecoKey, true); view.removeEventListener('pointerdown', onDecoDown, true); view.removeEventListener('pointermove', onDecoMove, true); view.removeEventListener('pointerup', onDecoUp, true); view.removeEventListener('pointercancel', onDecoUp, true); if (unsub) unsub(); roomState.box = null; roomState.inId = null; stopRadio(); if (roomLight) scene.remove(roomLight); if (roomLight2) scene.remove(roomLight2); radioBox.remove(); noteBtn.remove(); decB.remove(); yardB.remove(); stuckB.remove(); dbar.remove(); scene.remove(root); homeB.remove(); inB.remove(); flB.remove(); pan.remove(); clearInterval(doorT); clearTimeout(arrT); waitEl.remove(); arrEl.remove(); css.remove(); css2.remove(); }
   void Q; void K;
   return { update, destroy };
 }

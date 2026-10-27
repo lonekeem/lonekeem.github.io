@@ -11,7 +11,7 @@ import { SHERIFF_EPISODES, isOut } from '../sheriff-data.js';
 const DIR = new URL('../../assets/series/sheriff/', import.meta.url).href;
 export const MOVIE = { title: 'The Sheriff of Lone Keem', poster: DIR + 'ep1.webp', hero: DIR + 'hero.webp' };
 const EPS = SHERIFF_EPISODES.filter(isOut).map((e) => ({ n: e.n, title: e.title, dur: e.dur, src: `${DIR}ep${e.n}.mp4` }));
-export const MOVIE_LEN = EPS.reduce((a, e) => a + e.dur, 0); // ~588.7 s
+export const MOVIE_LEN = EPS.reduce((a, e) => a + e.dur, 0); // ~583.4 s
 export const COUNTDOWN = 300; // "starts in five minutes"
 export const CYCLE = Math.max(900, Math.ceil((MOVIE_LEN + COUNTDOWN + 8) / 60) * 60); // 900 s = 15 min while the movie is under ~9:52
 const mod = (a, n) => ((a % n) + n) % n;
@@ -30,20 +30,40 @@ export const clockStr = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'num
 export const mmss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 export const episodes = () => EPS;
 
-// The player: one <video> (never duplicated: it streams the same files as the series page), a curved video panel in front
-// of the screen (the episodes are portrait 720x1156, so they sit centred like a tall film with dark curtains either side).
+// The player: one <video> (never duplicated: it streams the same files as the series page) on ONE full-width curved panel
+// in front of the screen. The episodes are portrait 720x1156 and the screen is ~2.4:1, so a cover-crop would cut faces:
+// instead a tiny shader draws the sharp film full-height in the centre and fills both sides edge to edge with a zoomed,
+// blurred, darkened copy of the same frame (same texture, no second decode, no stretching).
+const VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+const FS = `uniform sampler2D map; uniform float cw, zy, dim; varying vec2 vUv;
+vec3 tap(vec2 p) { return texture2D(map, clamp(p, vec2(0.002), vec2(0.998))).rgb; }
+void main() {
+  float x = 1.0 - vUv.x, y = vUv.y, d = abs(x - 0.5) - cw * 0.5; vec3 c;
+  if (d <= 0.0) c = tap(vec2((x - 0.5) / cw + 0.5, y));
+  else { // side fill: the frame scaled to cover the full width (so it is magnified, never squashed), soft 13-tap blur
+    vec2 p = vec2(x, 0.5 + (y - 0.5) * zy), r = vec2(0.022, 0.022 * zy * 2.4);
+    c = tap(p) * 0.2;
+    c += (tap(p + vec2(r.x, 0.0)) + tap(p - vec2(r.x, 0.0)) + tap(p + vec2(0.0, r.y)) + tap(p - vec2(0.0, r.y))) * 0.1;
+    c += (tap(p + r) + tap(p - r) + tap(p + vec2(r.x, -r.y)) + tap(p + vec2(-r.x, r.y))) * 0.075;
+    c += (tap(p + vec2(2.0 * r.x, 0.0)) + tap(p - vec2(2.0 * r.x, 0.0)) + tap(p + vec2(0.0, 2.0 * r.y)) + tap(p - vec2(0.0, 2.0 * r.y))) * 0.025;
+    c *= dim * (0.55 + 0.45 * smoothstep(0.0, 0.035, d)); // a soft shadow where the sharp film begins
+  }
+  gl_FragColor = vec4(c, 1.0);
+  #include <colorspace_fragment>
+}`;
 export function createMoviePlayer(THREE, ib, { IN, LOW, onBlocked }) {
-  const S = IN.SCR, ar = 720 / 1156, vh = S.h, vw = vh * ar, th = vw / S.R;
-  const geo = new THREE.CylinderGeometry(S.R - 0.03, S.R - 0.03, vh, 16, 1, true, Math.PI - th / 2, th);
+  const S = IN.SCR, ar = 720 / 1156, th = S.w / S.R; // full screen width, same arc as the screen itself
+  const geo = new THREE.CylinderGeometry(S.R - 0.03, S.R - 0.03, S.h, 40, 1, true, Math.PI - th / 2, th);
   let video = null, tex = null, cur = -1, blocked = false, upT = 0, lastSeek = 0, wantSound = false;
-  const mat = new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.BackSide, toneMapped: false });
+  const uni = { map: { value: null }, cw: { value: (S.h * ar) / S.w }, zy: { value: (S.h * ar) / S.w }, dim: { value: 0.42 } };
+  const mat = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS, fragmentShader: FS, side: THREE.BackSide, toneMapped: false });
   const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(ib.screen.position); mesh.visible = false; ib.screen.parent.add(mesh);
   function ensure() {
     if (video) return video; video = document.createElement('video');
     video.playsInline = true; video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', ''); video.preload = 'auto'; video.crossOrigin = 'anonymous'; video.muted = true; video.disablePictureInPicture = true;
     video.width = 720; video.height = 1156; // three r170 sizes the texture from .width/.height (0 on a <video> by default -> black)
-    tex = new THREE.Texture(video); tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = -1;
-    mat.map = tex; mat.needsUpdate = true; return video;
+    tex = new THREE.Texture(video); tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+    uni.map.value = tex; return video;
   }
   function tryPlay() { const v = video; if (!v || !v.paused) return; v.play().catch(() => { if (!v.muted) { v.muted = true; setBlocked(true); v.play().catch(() => {}); } }); }
   function setBlocked(b) { if (b !== blocked) { blocked = b; onBlocked && onBlocked(b); } }

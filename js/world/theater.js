@@ -13,6 +13,7 @@ import { isUnlimited } from '../inf-pass.js';
 import { doc, onSnapshot, setDoc, serverTimestamp } from '../fsq.js';
 import { startHouseParty } from './housemates.js';
 import { attachTheaterNpcs } from './theater-npcs.js';
+import { createTheaterHush } from './theater-hush.js';
 import { MOVIE, MOVIE_LEN, CYCLE, COUNTDOWN, showAt, createMoviePlayer, drawMovieScreen, drawNowShowing, clockStr, mmss } from './theater-movie.js';
 
 const TID = 'lone-keem-studio', LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -173,7 +174,8 @@ export function attachTheater(api, W, K, { far }) {
     ib.menuTex.needsUpdate = true; }
   let SN_LIST = []; import('./theater-snacks.js').then((m) => { SN_LIST = m.THEATER_SNACKS; if (ib) drawMenu(); });
   // ---------------------------------------------------------------- screen
-  let scrT = 0, idleT = -1, scrKey = ''; const off = document.createElement('canvas'); off.width = 512; off.height = 224; const og = off.getContext('2d');
+  const OH = Math.round(512 * IN.SCR.h / IN.SCR.w); // lyric card at the screen's own ~2.4:1 so it fills edge to edge (no black bars)
+  let scrT = 0, idleT = -1, scrKey = ''; const off = document.createElement('canvas'); off.width = 512; off.height = OH; const og = off.getContext('2d');
   function drawScreen(now) {
     const cv = ib.scrCv, g = cv.getContext('2d'), w = cv.width, h = cv.height, s = songAt(st.pl.i), on = playing();
     if (!on) { const sh = show(); if (sh.phase !== 'off') { // the movie is the default showing: countdown, film, thanks card
@@ -193,12 +195,14 @@ export function attachTheater(api, W, K, { far }) {
     }
     idleT = -1; if (now - scrT < (LOW ? 1 / 20 : 1 / 30)) return; scrT = now;
     const t = audio && !audio.paused && audioKey === s.key ? audio.currentTime : pos(); const L = lyricsFor(s);
-    og.setTransform(1, 0, 0, 1, 0, 0); const gr = og.createLinearGradient(0, 0, 512, 224); const hue = (now * 8) % 360; gr.addColorStop(0, `hsl(${hue},55%,9%)`); gr.addColorStop(1, `hsl(${(hue + 60) % 360},55%,6%)`); og.fillStyle = gr; og.fillRect(0, 0, 512, 224);
-    drawLyrics(og, 512, 224, L || [], t, { main: '#d4af37', alt: '#ff5a7a' }, s.title || s.key, s.artist || 'Lone Keem');
-    if (!on) { og.fillStyle = 'rgba(0,0,0,.45)'; og.fillRect(0, 0, 512, 224); og.fillStyle = '#fff'; og.font = '900 30px Inter, Arial, sans-serif'; og.textAlign = 'center'; og.fillText('⏸ Paused', 256, 200); }
-    g.fillStyle = '#000'; g.fillRect(0, 0, w, h); const sc = Math.min(w / 512, h / 224); g.drawImage(off, (w - 512 * sc) / 2, (h - 224 * sc) / 2, 512 * sc, 224 * sc); ib.scrTex.needsUpdate = true;
+    og.setTransform(1, 0, 0, 1, 0, 0); const gr = og.createLinearGradient(0, 0, 512, OH); const hue = (now * 8) % 360; gr.addColorStop(0, `hsl(${hue},55%,9%)`); gr.addColorStop(1, `hsl(${(hue + 60) % 360},55%,6%)`); og.fillStyle = gr; og.fillRect(0, 0, 512, OH);
+    drawLyrics(og, 512, OH, L || [], t, { main: '#d4af37', alt: '#ff5a7a' }, s.title || s.key, s.artist || 'Lone Keem');
+    if (!on) { og.fillStyle = 'rgba(0,0,0,.45)'; og.fillRect(0, 0, 512, OH); og.fillStyle = '#fff'; og.font = '900 30px Inter, Arial, sans-serif'; og.textAlign = 'center'; og.fillText('⏸ Paused', 256, 200); }
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h); const sc = Math.min(w / 512, h / OH); g.drawImage(off, (w - 512 * sc) / 2, (h - OH * sc) / 2, 512 * sc, OH * sc); ib.scrTex.needsUpdate = true;
   }
   // ---------------------------------------------------------------- enter / leave
+  // only the movie (or an owner-started theater song) is heard inside: everything else pauses locally, resumes on the way out
+  const hush = createTheaterHush({ ours: () => [audio, movie && movie.video], say: (m) => K.say(m) });
   const driving = () => { try { const m = W.drive && W.drive.mine && W.drive.mine(); return !!(m && m.state && m.state !== 'parked'); } catch { return false; } };
   function enter() {
     { const rt = document.getElementById('p3-rotip'); if (rt) rt.hidden = true; }
@@ -210,7 +214,7 @@ export function attachTheater(api, W, K, { far }) {
     roomState.box = { x0: RX - IN.X + 0.4, x1: RX + IN.X - 0.4, z0: RZ + IN.Z0 + 0.4, z1: RZ + IN.Z1 - 0.4 }; roomState.inId = T.plot; roomState.outSpot = { x: T.door[0] + 1.6, z: T.door[1], yaw: Math.PI / 2 }; roomState.leave = (q) => leave(q);
     roomState.camOv = camOv; { const f = api.scene && api.scene.fog; fogWas = f ? { f, near: f.near, far: f.far, density: f.density } : null; if (f) { if (f.density != null) f.density = 0; else { f.near = 1e4; f.far = 2e4; } } } // world fog off inside (keep the object: day/night tints it)
     if (uid) try { party = startHouseParty({ db, uid, plot: T.plot, cx: RX, cz: RZ, P, S, others: api.others, say: K.say, quietPark: api.quietPark, dropPal: api.dropPal, onFull: () => K.say('🎬 The theater is packed! Some guests are hidden.'), k: 50, cap: 40 }); } catch (e) { console.warn('theater party', e); }
-    ensureAudio(); soundBlocked = false; syncAudio(); paintHud(); api.markDirty && api.markDirty(); api.send && api.send(true);
+    hush.enter(); ensureAudio(); soundBlocked = false; syncAudio(); paintHud(); api.markDirty && api.markDirty(); api.send && api.send(true);
     K.say('🎬 Welcome to Lone Keem Studio! Free entry, grab a seat 🍿');
   }
   function leave(quiet) {
@@ -218,7 +222,7 @@ export function attachTheater(api, W, K, { far }) {
     for (const b of inBoxes) { const i = api.box.indexOf(b); if (i >= 0) api.box.splice(i, 1); } if (inG) inG.visible = false;
     if (roomState.inId === T.plot) { roomState.box = null; roomState.inId = null; roomState.outSpot = null; roomState.leave = null; }
     if (roomState.camOv === camOv) roomState.camOv = null; if (fogWas) { const f = fogWas.f; if (fogWas.density != null) f.density = fogWas.density; else { f.near = fogWas.near; f.far = fogWas.far; } fogWas = null; }
-    if (audio) audio.pause(); if (movie) movie.unload(); movieBlocked = false; closePanels();
+    if (audio) audio.pause(); if (movie) movie.unload(); movieBlocked = false; closePanels(); hush.leave(); // resume only what was playing before you walked in
     if (!quiet) { P.x = T.door[0] + 1.6; P.z = T.door[1]; P.y = FLAT; P.yaw = Math.PI / 2; P.vy = 0; P.onGround = true; try { window.__p3 && window.__p3.setYaw && window.__p3.setYaw(-Math.PI / 2); } catch { /* */ } }
     paintHud(); api.markDirty && api.markDirty(); api.send && api.send(true);
   }
@@ -310,7 +314,7 @@ export function attachTheater(api, W, K, { far }) {
     const s = songAt(st.pl.i); if ((marqT -= dt) <= 0) { marqT = 0.5; const [a, b] = marqText(); drawMarq(a, b); }
     if (inside && ib) {
       if (Math.abs(lvl - lvlT) > 0.002 || lvlT !== targetLevel()) { lvlT = targetLevel(); const tw = performance.now(), fdt = Math.min(0.5, Math.max(dt, (tw - (fadeAt || tw)) / 1000)); fadeAt = tw; lvl += (lvlT - lvl) * Math.min(1, fdt / 0.8); if (Math.abs(lvl - lvlT) < 0.003) lvl = lvlT; applyLights(); } else fadeAt = 0;
-      drawScreen(now); if ((autoT -= dt) <= 0) { autoT = 0.5; syncAudio(); }
+      drawScreen(now); if ((autoT -= dt) <= 0) { autoT = 0.5; syncAudio(); hush.tick(); }
       const sh = show(), aud = P.z - RZ <= 4.2; if (movie) movie.update(playing() ? null : sh, aud, dt);
       if (!aud && (nsT -= dt) <= 0) { nsT = 1; drawNowShowing(ib.nsCv.getContext('2d'), ib.nsCv.width, ib.nsCv.height, sh); ib.nsTex.needsUpdate = true; } // lobby stand, once a second
       if ((seatChk -= dt) <= 0) { seatChk = 0.2; const nb = P.sit ? null : findSeat(); if (nb !== seatNear) seatNear = nb; }
@@ -342,13 +346,13 @@ export function attachTheater(api, W, K, { far }) {
     else if (a === 'th-snack') snackMenu(); else if (a === 'th-ticket') { emote('🎟️'); K.say('🎟️ Here is your ticket! Entry is free today. Enjoy the show!'); }
     else if (a === 'th-npc') { const n = npc.nearest(); if (n) npc.talk(n); } else if (a === 'th-edit') openEdit();
   }
-  window.__theaterDbg = { get st() { return st; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, movieCmd, show, get movie() { return movie; }, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
+  window.__theaterDbg = { get st() { return st; }, get hush() { return hush; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, movieCmd, show, get movie() { return movie; }, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
     standUp: () => standUp(), seats: () => allSeats().map((q) => ({ x: q.x - RX, z: q.z - RZ, y: q.y })),
     tp(lx, lz, cy) { if (!LOCAL || !inside) return; P.x = RX + lx; P.z = RZ + lz; P.y = FLAT + yIn(lx, lz); P.vy = 0; P.onGround = true; if (cy != null) try { window.__p3.setYaw(cy); } catch { /* */ } } };
   return {
     prompt, action, update,
     destroy() { try { leave(true); } catch { /* */ } if (unsub) unsub(); clearTimeout(saveT); for (const f of cleanup) try { f(); } catch { /* */ }
       for (const c of ex.cols) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } for (const b of odBoxes) { const i = api.box.indexOf(b); if (i >= 0) api.box.splice(i, 1); }
-      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
+      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); hush.leave(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
   };
 }
