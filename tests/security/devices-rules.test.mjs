@@ -8,7 +8,8 @@ let pass = 0, fail = 0; const ok = async (n, p) => { try { await p; pass++; cons
 const now = Math.floor(Date.now() / 1000);
 const db = (u, at = now) => env.authenticatedContext(u, { email: u + '@example.com', email_verified: true, auth_time: at }).firestore();
 const A = db('ann'), B = db('bob');
-const prof = (n) => ({ displayName: n, username: n, bio: '', color: '#8a2be2', createdAt: Timestamp.now(), welcomed: true });
+// 13+ birthday: the under-13 rule blocks free-text bio edits for accounts with no known age.
+const prof = (n) => ({ displayName: n, username: n, bio: '', color: '#8a2be2', createdAt: Timestamp.now(), welcomed: true, birthY: 2000, birthM: 1 });
 await env.withSecurityRulesDisabled(async (c) => { for (const n of ['ann', 'bob']) await setDoc(doc(c.firestore(), 'users', n), prof(n)); });
 const dev = () => ({ label: 'iPhone · Safari', firstSeen: serverTimestamp(), lastSeen: serverTimestamp(), ack: false });
 const D = 'AbCdEfGhIjKlMnOpQrSt';

@@ -9,6 +9,11 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
+    function Dp(c, i) { return /databases/$(database)/documents/$(c)/$(i); }
+    function Dp2(c, i, c2, j) { return /databases/$(database)/documents/$(c)/$(i)/$(c2)/$(j); }
+    function Nd() { return request.resource.data; }
+    function Od() { return resource.data; }
+    function Tn() { return request.time; }
     function isAdmin() {
       return signedIn()
         && request.auth.token.email == 'lillykemoy1@gmail.com'
@@ -17,15 +22,16 @@ service cloud.firestore {
     // Unlimited Star Coins + Diamonds: the admin, or a player the admin gave an ∞ Pass (infPass/{uid}).
     // Only for your own wallet (callers already require uid == me()). One lookup, only reached for paid-0 buys.
     function unlimitedFor(uid) {
-      return isAdmin() || (signedIn() && uid == me() && exists(/databases/$(database)/documents/infPass/$(uid))
-        && get(/databases/$(database)/documents/infPass/$(uid)).data.unlimitedPass == true);
+      return isAdmin() || (signedIn() && uid == me() && exists(Dp('infPass', uid))
+        && get(Dp('infPass', uid)).data.unlimitedPass == true);
     }
     // Acting as yourself, or the admin acting as the studio account.
     function actingAs(uid) { return signedIn() && (uid == me() || (uid == 'studio' && isAdmin())); }
-    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function userPath(uid) { return Dp('users', uid); }
     function isStr(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
     // Modded-keyboard tricks: zero-width / bidi / invisible fillers, or zalgo (3+ stacked combining marks). ZWJ (U+200D) stays for emoji.
-    function cleanStr(v, min, max) { return isStr(v, min, max) && !v.matches('(?s).*([\\x{200B}\\x{200C}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{FEFF}\\x{3164}\\x{115F}\\x{1160}\\x{FFA0}\\x{00AD}]|[\\x{0300}-\\x{036F}]{3,}).*'); }
+    function plainStr(v) { return !v.matches('(?s).*([\\x{200B}\\x{200C}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{FEFF}\\x{3164}\\x{115F}\\x{1160}\\x{FFA0}\\x{00AD}]|[\\x{0300}-\\x{036F}]{3,}).*'); }
+    function cleanStr(v, min, max) { return isStr(v, min, max) && plainStr(v); }
     // Kid-safe chat and names. The Cloud Function does the full check (leet, repeats, strikes).
     // This stops a raw message or name from being stored in the first place.
     function kidSafe(t) {
@@ -44,10 +50,19 @@ service cloud.firestore {
     function reservedKemy(n) {
       return n is string && n.lower().matches('^[^a-z]*k[^a-z]*[e3][^a-z]*m[^a-z]*y[^a-z]*$');
     }
+    // Display name + username: well-formed, clean, kid-safe, not reserved. Text checks run once over the
+    // fields joined by a newline: no plainStr / kidSafe / contactFree pattern can match across a newline,
+    // so this is the same as checking each field on its own.
+    function nameShape(d) {
+      return isStr(d.displayName, 1, 50) && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$');
+    }
+    function nameOk(d) {
+      return nameShape(d) && plainStr(d.displayName) && kidSafe(d.displayName + '\n' + d.username) && namesOpen(d);
+    }
     function namesOpen(d) {
-      return isAdmin()
-        || ((!('displayName' in d) || !reservedKemy(d.displayName))
-            && (!('username' in d) || !reservedKemy(d.username)));
+      return ((!('displayName' in d) || !reservedKemy(d.displayName))
+            && (!('username' in d) || !reservedKemy(d.username)))
+        || isAdmin();
     }
     // Under-13 display names are picked from this list. Same words as js/safe-names.js.
     function safeDisplay(t) {
@@ -58,7 +73,7 @@ service cloud.firestore {
       let y = d.get('birthY', 0);
       let m = d.get('birthM', 0);
       return y is int && m is int && y >= 1900 && y <= 2100 && m >= 1 && m <= 12
-        && (request.time.year() - y) * 12 + (request.time.month() - m) >= 156;
+        && (Tn().year() - y) * 12 + (Tn().month() - m) >= 156;
     }
     // Free-text public chat: 13+ and not flagged under 13. Everyone else uses preset phrases.
     function chatFree(u) {
@@ -67,24 +82,24 @@ service cloud.firestore {
     function presetSay(t) {
       return t.matches('^(Good game!|Want to race\\?|Nice car!|Follow me!|Thanks!|Hi!|Bye!|Wanna play\\?|Hello!|Nice shot!|Lets go!|Wait for me!|GG!|Nice one!|Well played!|😂|😍|😮|🥳|👍|💜|🔥|⭐|😎|🤩|🙌|👏|👋|🎉)$');
     }
-    function blockedBy(owner) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(me())); }
-    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function blockedBy(owner) { return exists(Dp2('users', owner, 'blocks', me())); }
+    function changed() { return Nd().diff(Od()).affectedKeys(); }
     // "Sign out everywhere" (js/devices.js): sessions that signed in before users/{uid}.sessionsValidAfter are refused
     // here (auth_time is whole seconds, hence the +1 s). Checked on profile, device and security writes.
     function sessionOk(uid) {
-      let d = get(/databases/$(database)/documents/users/$(uid)).data;
+      let d = get(Dp('users', uid)).data;
       return !('sessionsValidAfter' in d) || (request.auth.token.auth_time + 1) * 1000 > d.sessionsValidAfter.toMillis();
     }
     // ---------- Moderators + bans ----------
     // roles/{uid} {mod: true} is written only by the admin. bans/{uid} {until, ...} by moderators.
-    function rolePath(u) { return /databases/$(database)/documents/roles/$(u); }
-    function banPath(u) { return /databases/$(database)/documents/bans/$(u); }
+    function rolePath(u) { return Dp('roles', u); }
+    function banPath(u) { return Dp('bans', u); }
     // Watchlist (warned / suspended / restricted by a moderator): their pictures and videos must go
     // through heldPosts first, and stories are paused. A ban doc (even an expired one) also counts.
-    function watchPath(u) { return /databases/$(database)/documents/watchlist/$(u); }
+    function watchPath(u) { return Dp('watchlist', u); }
     function watched(u) {
       return u != 'studio' && !isAdmin()
-        && (exists(banPath(u)) || (exists(watchPath(u)) && get(watchPath(u)).data.until > request.time));
+        && (exists(banPath(u)) || (exists(watchPath(u)) && get(watchPath(u)).data.until > Tn()));
     }
     function hasMedia(d) { return d.get('mediaUrl', '') != '' || d.get('work', {}).get('cover', '') != ''; }
     // The AI helper moderator ('Kemy Helper'): a moderator whose role has ai == true (admin-set).
@@ -96,7 +111,7 @@ service cloud.firestore {
     // change it), Community Rules agreement (rulesAt), and an under-13 flag (underage/{uid}).
     // A player whose birthday is under 13 can save that flag. They cannot remove it.
     // Posting, uploads, comments and lives need a known 13+ birthday, the rules agreement, and no flag.
-    function u13Path(u) { return /databases/$(database)/documents/underage/$(u); }
+    function u13Path(u) { return Dp('underage', u); }
     function canCreate(u) {
       let d = get(userPath(u)).data;
       // knownTeen fails closed when the birthday is missing, under 13, or not a real month/year.
@@ -106,7 +121,7 @@ service cloud.firestore {
     // doc so these checks add no extra lookups. pcOff(d, k): that feature was switched off by a parent.
     function validPc(m) {
       return m is map && m.keys().hasOnly(['chat', 'dm', 'live', 'cmt', 'buy', 'time', 'vis', 'safe'])
-        && m.get('chat', true) is bool && m.get('live', true) is bool && m.get('cmt', true) is bool && m.get('safe', true) is bool
+        && [m.get('chat', true), m.get('live', true), m.get('cmt', true), m.get('safe', true)].hasOnly([true, false])
         && m.get('dm', 'friends') in ['off', 'friends', 'everyone'] && m.get('buy', 'pin') in ['block', 'pin', 'open']
         && m.get('time', 0) in [0, 30, 60, 120] && m.get('vis', 'public') in ['private', 'friends', 'public'];
     }
@@ -114,46 +129,57 @@ service cloud.firestore {
     function validBirth(d) {
       return !('birthY' in d) || (d.birthY is int && d.get('birthM', 0) is int && d.birthY >= 1900 && d.birthY <= 2100 && d.birthM >= 1 && d.birthM <= 12);
     }
-    function notBanned() { return !signedIn() || isAdmin() || !exists(banPath(me())) || get(banPath(me())).data.until <= request.time; }
+    function notBanned() { return !signedIn() || isAdmin() || !exists(banPath(me())) || get(banPath(me())).data.until <= Tn(); }
 
     // ---------- Usernames (uniqueness) ----------
     match /usernames/{name} {
       allow read: if true;
-      function z75() { let qq = request.resource.data; return signedIn()
+      function z75() { let qq = Nd(); return signedIn()
         && name.matches('^[a-z0-9_.]{3,20}$')
         && (isAdmin() || !reservedKemy(name))
         && qq.keys().hasOnly(['uid'])
         && actingAs(qq.uid)
         && getAfter(userPath(qq.uid)).data.username == name; }
       allow create: if z75();
-      allow delete: if isAdmin() || (signedIn() && actingAs(resource.data.uid)
-        && (!existsAfter(userPath(resource.data.uid))
-            || getAfter(userPath(resource.data.uid)).data.username != name));
+      allow delete: if isAdmin() || (signedIn() && actingAs(Od().uid)
+        && (!existsAfter(userPath(Od().uid))
+            || getAfter(userPath(Od().uid)).data.username != name));
     }
 
     // ---------- Profiles ----------
+    // Helpers (validPc, validBirth, validUserSearch, nameShape, namesOpen, isStr) are written out
+    // inline here: every helper call costs extra expressions, and this runs on every profile write.
     function validProfile(d) {
+      let pc = d.get('pc', null);
       return d.keys().hasOnly(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed',
                                'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'isStudio',
                                'usernameLower', 'displayNameLower', 'photoURL', 'storyUntil',
                                'pronouns', 'website', 'activePet', 'birthY', 'birthM', 'rulesAt', 'ageHonestAt',
                                'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter', 'pc'])
-        && (!('pc' in d) || validPc(d.pc))
-        && validBirth(d)
-        && validUserSearch(d)
+        // = (!('pc' in d) || validPc(d.pc))
+        && (!('pc' in d) || (pc is map && pc.keys().hasOnly(['chat', 'dm', 'live', 'cmt', 'buy', 'time', 'vis', 'safe'])
+          && [pc.get('chat', true), pc.get('live', true), pc.get('cmt', true), pc.get('safe', true)].hasOnly([true, false])
+          && pc.get('dm', 'friends') in ['off', 'friends', 'everyone'] && pc.get('buy', 'pin') in ['block', 'pin', 'open']
+          && pc.get('time', 0) in [0, 30, 60, 120] && pc.get('vis', 'public') in ['private', 'friends', 'public']))
+        // = validBirth(d)
+        && (!('birthY' in d) || (d.birthY is int && d.get('birthM', 0) is int && d.birthY >= 1900 && d.birthY <= 2100 && d.birthM >= 1 && d.birthM <= 12))
+        // = validUserSearch(d)
+        && d.get('usernameLower', d.username) == d.username
+        && d.get('displayNameLower', '') is string && d.get('displayNameLower', '').size() <= 100
         && d.keys().hasAll(['displayName', 'username', 'bio', 'color', 'createdAt', 'welcomed'])
-        && namesOpen(d)
-        && cleanStr(d.displayName, 1, 50)
-        && kidSafe(d.displayName)
+        // = nameShape(d)
+        && d.displayName is string && d.displayName.size() >= 1 && d.displayName.size() <= 50
         && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
-        && kidSafe(d.username)
-        && cleanStr(d.bio, 0, 160)
-        && kidSafe(d.bio)
+        && d.bio is string && d.bio.size() <= 160
+        && plainStr(d.displayName + '\n' + d.bio)
+        && kidSafe(d.displayName + '\n' + d.username + '\n' + d.bio)
         && contactFree(d.bio)
-        && (!('pronouns' in d) || isStr(d.pronouns, 0, 20))
+        // = namesOpen(d) (both names are strings here; same pattern as reservedKemy)
+        && ((!d.displayName.lower().matches('^[^a-z]*k[^a-z]*[e3][^a-z]*m[^a-z]*y[^a-z]*$') && !d.username.lower().matches('^[^a-z]*k[^a-z]*[e3][^a-z]*m[^a-z]*y[^a-z]*$')) || isAdmin())
+        && (!('pronouns' in d) || (d.pronouns is string && d.pronouns.size() <= 20))
         && (!('website' in d) || d.website == ''
-            || (isStr(d.website, 12, 100) && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
-        && isStr(d.color, 1, 20)
+            || (d.website is string && d.website.size() >= 12 && d.website.size() <= 100 && d.website.matches('https://[A-Za-z0-9-]+([.][A-Za-z0-9-]+)+(:[0-9]+)?(/[^\\s\"<>]*)?')))
+        && d.color is string && d.color.size() >= 1 && d.color.size() <= 20
         && (!('activePet' in d) || (d.activePet is string && d.activePet.matches('^(p[1-6])?$')))
         && d.welcomed is bool
         && d.createdAt is timestamp
@@ -161,35 +187,32 @@ service cloud.firestore {
     }
     // Search fields (lowercase copies used for prefix search). Optional for older profiles.
     function validUserSearch(d) {
-      return (!('usernameLower' in d) || d.usernameLower == d.username)
-        && (!('displayNameLower' in d) || isStr(d.displayNameLower, 0, 100));
+      return d.get('usernameLower', d.username) == d.username && isStr(d.get('displayNameLower', ''), 0, 100);
     }
     // Rate limit: a "last action" timestamp may only be set to now, and only after `secs` seconds.
-    function rateOk(field, secs) {
-      return !(field in changed())
-        || (request.resource.data[field] == request.time
-            && (isAdmin() || !(field in resource.data)
-                || resource.data[field] + duration.value(secs, 's') < request.time));
+    // Only called for a field that changed (the caller checks `field in ch` first).
+    function rateOk(n, o, t, field, secs) {
+      return (n[field] == t
+            && (isAdmin() || !(field in o)
+                || o[field] + duration.value(secs, 's') < t));
     }
 
     // ---------- Anti-spam (js/spam.js does the friendly client-side checks) ----------
-    function isNewAcct(d) { return d.get('createdAt', request.time) > request.time - duration.value(3, 'd'); }
+    function isNewAcct(d) { return d.get('createdAt', Tn()) > Tn() - duration.value(3, 'd'); }
     // Links in free text (our own Cloudinary media links don't count).
     function linkText(t) { return t.replace('https://res[.]cloudinary[.]com/[^\\s]*', ''); }
     function hasLink(t) { return linkText(t).matches('(?is).*(https?://|www[.]).*'); }
     function tooManyLinks(t) { return linkText(t).matches('(?is)(.*(https?://|www[.])){3,}.*'); }
     // New accounts: no links; everyone else: at most 2 links per post / comment / message.
     function linksOk(t, u) { return !tooManyLinks(t) && (!isNewAcct(u) || !hasLink(t)); }
-    function dayNo() { return math.floor(request.time.toMillis() / 86400000); }
     // Daily post cap: accounts under 3 days old get 5 posts (and lives / stories) per UTC day.
     // postDay / postsToday only change together with lastPostAt.
-    function postCapOk() {
-      let n = request.resource.data;
-      let o = resource.data;
-      return (!changed().hasAny(['postDay', 'postsToday']) || 'lastPostAt' in changed())
-        && (!('lastPostAt' in changed()) || isAdmin()
-          || (!isNewAcct(o) && (!('postDay' in n) || (n.postDay is int && n.get('postsToday', 0) is int)))
-          || (n.get('postDay', null) is int && n.postDay >= dayNo() - 1 && n.postDay <= dayNo()
+    function postCapOk(ch, n, o, t) {
+      let day = math.floor(t.toMillis() / 86400000);
+      return (!ch.hasAny(['postDay', 'postsToday']) || 'lastPostAt' in ch)
+        && (!('lastPostAt' in ch) || isAdmin()
+          || (!(o.get('createdAt', t) > t - duration.value(3, 'd')) && (!('postDay' in n) || (n.postDay is int && n.get('postsToday', 0) is int)))
+          || (n.get('postDay', null) is int && n.postDay >= day - 1 && n.postDay <= day
               && n.postDay >= o.get('postDay', 0)
               && n.get('postsToday', 0) == (n.postDay == o.get('postDay', -1) ? o.get('postsToday', 0) + 1 : 1)
               && n.postsToday <= 5));
@@ -199,49 +222,49 @@ service cloud.firestore {
     match /users/{uid}/prefs/{docId} {
       function scoreMap(m, n) { return m is map && m.size() <= n; }
       allow read, delete: if signedIn() && uid == me();
-      function z74() { let qq = request.resource.data; return signedIn() && uid == me() && docId == 'feed'
+      function z74() { let qq = Nd(); return signedIn() && uid == me() && docId == 'feed'
         && qq.keys().hasOnly(['cats', 'creators', 'updatedAt'])
         && scoreMap(qq.cats, 20) && scoreMap(qq.creators, 60)
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z74();
       // Optional push switches (js/push.js). Owner only. Missing types stay on once they opt in.
-      function z73() { let qq = request.resource.data; return signedIn() && uid == me() && docId == 'push' && sessionOk(uid)
+      function z73() { let qq = Nd(); return signedIn() && uid == me() && docId == 'push' && sessionOk(uid)
         && qq.keys().hasOnly(['enabled', 'invite', 'turn', 'house', 'daily', 'announce', 'updatedAt'])
         && qq.enabled is bool
         && qq.invite is bool && qq.turn is bool
         && qq.house is bool && qq.daily is bool
         && qq.announce is bool
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z73();
       // Notification sound (js/chime.js). Owner only. Saved on the device too.
-      function z72() { let qq = request.resource.data; return signedIn() && uid == me() && docId == 'chime' && sessionOk(uid)
+      function z72() { let qq = Nd(); return signedIn() && uid == me() && docId == 'chime' && sessionOk(uid)
         && qq.keys().hasOnly(['sound', 'updatedAt'])
         && qq.sound is string
         && qq.sound.matches('^[a-z0-9-]{2,32}$')
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z72();
       // Which What's New entry this player has opened (js/updates.js). Owner only.
-      function z71() { let qq = request.resource.data; return signedIn() && uid == me() && docId == 'updates' && sessionOk(uid)
+      function z71() { let qq = Nd(); return signedIn() && uid == me() && docId == 'updates' && sessionOk(uid)
         && qq.keys().hasOnly(['seen', 'updatedAt'])
         && isStr(qq.seen, 1, 40)
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z71();
       // When the admin last opened New Members (js/members.js). Admin account only.
       allow create, update: if signedIn() && uid == me() && isAdmin() && docId == 'members' && sessionOk(uid)
-        && request.resource.data.keys().hasOnly(['seenAt'])
-        && request.resource.data.seenAt == request.time;
+        && Nd().keys().hasOnly(['seenAt'])
+        && Nd().seenAt == Tn();
       // Private search history (Search > Recent), max 20 short strings. Deleted by "Clear all" and with the account.
-      function z70() { let qq = request.resource.data; return signedIn() && uid == me() && docId == 'security'
+      function z70() { let qq = Nd(); return signedIn() && uid == me() && docId == 'security'
         && qq.keys().hasOnly(['alerts', 'updatedAt']) && qq.alerts is bool
-        && qq.updatedAt == request.time && sessionOk(uid); }
+        && qq.updatedAt == Tn() && sessionOk(uid); }
       allow create, update: if z70();
-      function z69() { let qq = request.resource.data; return signedIn() && uid == me() && docId == 'search'
+      function z69() { let qq = Nd(); return signedIn() && uid == me() && docId == 'search'
         && qq.keys().hasOnly(['recent', 'updatedAt'])
         && qq.recent is list && qq.recent.size() <= 20
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z69();
       // Device settings copy (js/settings-hub.js). Owner only. Games still read local storage.
-      function z68() { let qq = request.resource.data; return signedIn() && uid == me() && docId == 'hub' && sessionOk(uid)
+      function z68() { let qq = Nd(); return signedIn() && uid == me() && docId == 'hub' && sessionOk(uid)
         && qq.keys().hasOnly(['gfx', 'saver', 'fps', 'screen', 'size', 'sens', 'opacity', 'lefty', 'haptics', 'master', 'music', 'effects', 'radio', 'updatedAt'])
         && qq.gfx in ['auto', 'low', 'medium', 'high', 'ultra']
         && qq.saver is bool && qq.fps is bool && qq.screen is bool
@@ -253,7 +276,7 @@ service cloud.firestore {
         && qq.music is int && qq.music >= 0 && qq.music <= 100
         && qq.effects is int && qq.effects >= 0 && qq.effects <= 100
         && qq.radio is bool
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z68();
     }
 
@@ -273,11 +296,7 @@ service cloud.firestore {
       }
       function memberShape(d) {
         return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive'])
-          && namesOpen(d)
-          && cleanStr(d.displayName, 1, 50)
-          && kidSafe(d.displayName)
-          && d.username is string && d.username.matches('^[a-z0-9_.]{3,20}$')
-          && kidSafe(d.username)
+          && nameOk(d)
           && isStr(d.displayNameLower, 0, 100)
           && isStr(d.color, 1, 20)
           && (d.photoURL == '' || cloudinaryImageUrl(d.photoURL))
@@ -287,24 +306,24 @@ service cloud.firestore {
       }
       // A visit can set lastActive to now. It cannot be moved to some other time.
       function lastActiveOk() {
-        let next = request.resource.data;
-        let prev = resource.data;
+        let next = Nd();
+        let prev = Od();
         let hasNext = 'lastActive' in next;
         let hasPrev = 'lastActive' in prev;
         return (!hasNext && !hasPrev)
-          || (hasNext && next.lastActive == request.time)
+          || (hasNext && next.lastActive == Tn())
           || (hasNext && hasPrev && next.lastActive == prev.lastActive);
       }
       allow get: if isAdmin() || (signedIn() && uid == me());
       allow list: if isAdmin();
-      function z67() { let qq = request.resource.data; return signedIn() && uid == me() && memberShape(qq)
-        && qq.createdAt == request.time
-        && qq.lastActive == request.time
+      function z67() { let qq = Nd(); return signedIn() && uid == me() && memberShape(qq)
+        && qq.createdAt == Tn()
+        && qq.lastActive == Tn()
         && qq.signup == memberSignup(); }
       allow create: if z67();
-      function z66() { let qq = request.resource.data; return signedIn() && uid == me() && memberShape(qq)
-        && qq.createdAt == resource.data.createdAt
-        && qq.signup == resource.data.signup
+      function z66() { let qq = Nd(); return signedIn() && uid == me() && memberShape(qq)
+        && qq.createdAt == Od().createdAt
+        && qq.signup == Od().signup
         && lastActiveOk(); }
       allow update: if z66();
       allow delete: if isAdmin() || (signedIn() && uid == me());
@@ -312,8 +331,8 @@ service cloud.firestore {
       match /secret/{docId} {
         allow read: if isAdmin();
         allow create, update: if signedIn() && uid == me() && docId == 'email'
-          && request.resource.data.keys().hasOnly(['email'])
-          && memberEmailOk(request.resource.data);
+          && Nd().keys().hasOnly(['email'])
+          && memberEmailOk(Nd());
         allow delete: if isAdmin() || (signedIn() && uid == me());
       }
     }
@@ -330,12 +349,12 @@ service cloud.firestore {
           && d.deletedAt is timestamp;
       }
       function memberRow() {
-        return get(/databases/$(database)/documents/members/$(uid)).data;
+        return get(Dp('members', uid)).data;
       }
       allow get, list: if isAdmin();
-      function z65() { let qq = request.resource.data; return signedIn() && uid == me() && leftShape(qq)
-        && qq.deletedAt == request.time
-        && exists(/databases/$(database)/documents/members/$(uid))
+      function z65() { let qq = Nd(); return signedIn() && uid == me() && leftShape(qq)
+        && qq.deletedAt == Tn()
+        && exists(Dp('members', uid))
         && qq.displayName == memberRow().displayName
         && qq.username == memberRow().username
         && qq.createdAt == memberRow().createdAt; }
@@ -368,10 +387,10 @@ service cloud.firestore {
           && (!('link' in d) || (isStr(d.link, 2, 80) && (d.link.matches('^#/[A-Za-z0-9_./?=&%-]{1,78}$') || d.link.matches('^[a-z0-9][A-Za-z0-9./_-]{0,78}$'))));
       }
       allow read: if true;
-      allow create: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(request.resource.data)
-        && request.resource.data.createdAt == request.time;
-      allow update: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(request.resource.data)
-        && request.resource.data.createdAt == resource.data.createdAt;
+      allow create: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(Nd())
+        && Nd().createdAt == Tn();
+      allow update: if isAdmin() && id.matches('^[a-z0-9-]{3,40}$') && validUpdate(Nd())
+        && Nd().createdAt == Od().createdAt;
       allow delete: if isAdmin();
     }
 
@@ -379,77 +398,81 @@ service cloud.firestore {
     // doc with n == 1 or add exactly 1. The app only counts kid-safe queries, once per user per query per day.
     match /searchTrends/{id} {
       allow read: if true;
-      function z64() { let qq = request.resource.data; return signedIn() && qq.keys().hasOnly(['day', 'q', 'n'])
+      function z64() { let qq = Nd(); return signedIn() && qq.keys().hasOnly(['day', 'q', 'n'])
         && qq.n == 1 && qq.q is string
         && qq.q.matches('^[a-z0-9# ]{2,30}$')
         && qq.day is string && qq.day.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
         && id == qq.day + '_' + qq.q.replace('#', '~').replace(' ', '-'); }
       allow create: if z64();
-      allow update: if signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['n'])
-        && request.resource.data.n == resource.data.n + 1;
+      allow update: if signedIn() && Nd().diff(Od()).affectedKeys().hasOnly(['n'])
+        && Nd().n == Od().n + 1;
     }
 
     match /users/{uid} {
       allow read: if true;
-      function z63() { let qq = request.resource.data; return signedIn() && uid == me()
+      function z63() { let qq = Nd(); return signedIn() && uid == me()
         && validProfile(qq)
         && !qq.keys().hasAny(['isStudio', 'lastPostAt', 'lastCommentAt', 'lastMessageAt', 'photoURL', 'storyUntil', 'rulesAt', 'postDay', 'postsToday', 'lastFollowAt', 'lastNewChatAt', 'sessionsValidAfter'])
-        && qq.createdAt == request.time
-        && (!('ageHonestAt' in qq) || qq.ageHonestAt == request.time)
+        && qq.createdAt == Tn()
+        && (!('ageHonestAt' in qq) || qq.ageHonestAt == Tn())
         && (isAdmin() || knownTeen(qq) || (
           safeDisplay(qq.displayName)
           && qq.bio == ''
           && qq.get('pronouns', '') == ''
           && qq.get('website', '') == ''
           && qq.get('pc', {}).get('vis', '') == 'private'))
-        && getAfter(/databases/$(database)/documents/usernames/$(qq.username)).data.uid == uid; }
+        && getAfter(Dp('usernames', qq.username)).data.uid == uid; }
       allow create: if z63();
-      function z62() { let qq = request.resource.data; let oo = resource.data; let tt = request.time; return actingAs(uid)
+      function z62() { let qq = Nd(); let oo = Od(); let tt = Tn(); let ch = qq.diff(oo).affectedKeys(); return actingAs(uid)
         && (uid != me() || !('sessionsValidAfter' in oo) || (request.auth.token.auth_time + 1) * 1000 > oo.sessionsValidAfter.toMillis())
-        && (!('sessionsValidAfter' in changed()) || (uid == me() && qq.sessionsValidAfter == tt))
         && validProfile(qq)
         && (qq.createdAt == oo.createdAt
             || (!('createdAt' in oo) && uid == me() && qq.createdAt == tt))
         && qq.get('isStudio', false) == oo.get('isStudio', false)
         && (qq.username == oo.username
-            || getAfter(/databases/$(database)/documents/usernames/$(qq.username)).data.uid == uid)
-        && rateOk('lastPostAt', 20)
-        && rateOk('lastCommentAt', 5)
-        && rateOk('lastMessageAt', 1)
+            || getAfter(Dp('usernames', qq.username)).data.uid == uid)
+        // Rate limits + daily post cap, only looked at when one of those fields changes.
         // Anti-spam: follows at most one per 2 s, new DM conversations one per 8 s, daily post cap for new accounts.
-        && rateOk('lastFollowAt', 2)
-        && rateOk('lastNewChatAt', 8)
-        && postCapOk()
+        && (!ch.hasAny(['lastPostAt', 'lastCommentAt', 'lastMessageAt', 'lastFollowAt', 'lastNewChatAt', 'postDay', 'postsToday'])
+          || ((!('lastPostAt' in ch) || rateOk(qq, oo, tt, 'lastPostAt', 20))
+            && (!('lastCommentAt' in ch) || rateOk(qq, oo, tt, 'lastCommentAt', 5))
+            && (!('lastMessageAt' in ch) || rateOk(qq, oo, tt, 'lastMessageAt', 1))
+            && (!('lastFollowAt' in ch) || rateOk(qq, oo, tt, 'lastFollowAt', 2))
+            && (!('lastNewChatAt' in ch) || rateOk(qq, oo, tt, 'lastNewChatAt', 8))
+            && postCapOk(ch, qq, oo, tt)))
         // Birthday: set once, then locked (admin / human moderators fix mistakes below).
         && (!('birthY' in oo) || (qq.get('birthY', 0) == oo.birthY && qq.get('birthM', 0) == oo.birthM))
-        // Rules agreement: set to now, once.
-        && (!('rulesAt' in changed()) || (!('rulesAt' in oo) && qq.rulesAt == tt))
-        // Honest-age note: shown once, then kept.
-        && (!('ageHonestAt' in changed()) || (!('ageHonestAt' in oo) && qq.ageHonestAt == tt))
-        // Under 13, or flagged under 13: no free-text name, bio, photo, website, or public profile.
-        && (isAdmin() || (knownTeen(qq) && !exists(u13Path(uid))) || (
-          (!('displayName' in changed()) || safeDisplay(qq.displayName))
-          && (!('bio' in changed()) || qq.bio == '')
-          && (!('pronouns' in changed()) || qq.get('pronouns', '') == '')
-          && (!('website' in changed()) || qq.get('website', '') == '')
-          && (!('photoURL' in changed()) || qq.get('photoURL', '') == '')
-          && (!('pc' in changed()) || qq.get('pc', {}).get('vis', 'private') == 'private')))
-        // Profile photo: '' (removed) or an image on our Cloudinary cloud (blocked until the
-        // real cloud name is set, same placeholder as media posts). Checked only when it changes.
-        && (!('photoURL' in changed()) || qq.photoURL == ''
-            || cloudinaryImageUrl(qq.photoURL))
-        // "Has a live story until" hint, written together with a new story.
-        && (!('storyUntil' in changed()) || (qq.storyUntil is timestamp
+        // One-time / stamped fields, only looked at when one of them changes.
+        && (!ch.hasAny(['sessionsValidAfter', 'rulesAt', 'ageHonestAt', 'photoURL', 'storyUntil'])
+          || ((!('sessionsValidAfter' in ch) || (uid == me() && qq.sessionsValidAfter == tt))
+          // Rules agreement: set to now, once.
+          && (!('rulesAt' in ch) || (!('rulesAt' in oo) && qq.rulesAt == tt))
+          // Honest-age note: shown once, then kept.
+          && (!('ageHonestAt' in ch) || (!('ageHonestAt' in oo) && qq.ageHonestAt == tt))
+          // Profile photo: '' (removed) or an image on our Cloudinary cloud (blocked until the
+          // real cloud name is set, same placeholder as media posts).
+          && (!('photoURL' in ch) || qq.photoURL == '' || cloudinaryImageUrl(qq.photoURL))
+          // "Has a live story until" hint, written together with a new story.
+          && (!('storyUntil' in ch) || (qq.storyUntil is timestamp
             && qq.storyUntil > tt
-            && qq.storyUntil <= tt + duration.value(24, 'h'))); }
+            && qq.storyUntil <= tt + duration.value(24, 'h')))))
+        // Under 13, or flagged under 13: no free-text name, bio, photo, website, or public profile.
+        && (!ch.hasAny(['displayName', 'bio', 'pronouns', 'website', 'photoURL', 'pc'])
+          || (knownTeen(qq) && !exists(u13Path(uid))) || isAdmin() || (
+          (!('displayName' in ch) || safeDisplay(qq.displayName))
+          && (!('bio' in ch) || qq.bio == '')
+          && (!('pronouns' in ch) || qq.get('pronouns', '') == '')
+          && (!('website' in ch) || qq.get('website', '') == '')
+          && (!('photoURL' in ch) || qq.get('photoURL', '') == '')
+          && (!('pc' in ch) || qq.get('pc', {}).get('vis', 'private') == 'private'))); }
       allow update: if z62();
       // Admin or a human moderator corrects a birthday.
-      allow update: if isMod() && !isAI() && changed().hasOnly(['birthY', 'birthM']) && validBirth(request.resource.data)
-        && 'birthY' in request.resource.data;
+      allow update: if isMod() && !isAI() && changed().hasOnly(['birthY', 'birthM']) && validBirth(Nd())
+        && 'birthY' in Nd();
       // Admin search-index rebuild: only the search fields, on any profile.
       allow update: if isAdmin()
         && changed().hasOnly(['usernameLower', 'displayNameLower'])
-        && validUserSearch(request.resource.data);
+        && validUserSearch(Nd());
       // Account deletion: you can delete your own profile (the studio account and the admin's own
       // account can't be deleted this way); the admin can remove other accounts.
       allow delete: if uid != 'studio'
@@ -458,10 +481,10 @@ service cloud.firestore {
       // Private favourites
       match /saved/{postId} {
         allow read, delete: if signedIn() && uid == me();
-        function z61() { let qq = request.resource.data; return signedIn() && uid == me()
+        function z61() { let qq = Nd(); return signedIn() && uid == me()
           && qq.keys().hasOnly(['postId', 'createdAt'])
           && qq.postId == postId
-          && qq.createdAt == request.time; }
+          && qq.createdAt == Tn(); }
         allow create: if z61();
       }
 
@@ -469,8 +492,8 @@ service cloud.firestore {
       match /blocks/{other} {
         allow read, delete: if actingAs(uid);
         allow create: if actingAs(uid) && other != uid
-          && request.resource.data.keys().hasOnly(['createdAt'])
-          && request.resource.data.createdAt == request.time;
+          && Nd().keys().hasOnly(['createdAt'])
+          && Nd().createdAt == Tn();
       }
 
       // Sign-in devices (rough UA label + timestamps, no IP / location).
@@ -482,13 +505,13 @@ service cloud.firestore {
         }
         allow read: if signedIn() && (uid == me() || isAdmin());
         allow delete: if signedIn() && uid == me();
-        function z60() { let qq = request.resource.data; return signedIn() && uid == me() && dev.matches('^[A-Za-z0-9]{16,40}$') && exists(userPath(uid)) && sessionOk(uid)
+        function z60() { let qq = Nd(); return signedIn() && uid == me() && dev.matches('^[A-Za-z0-9]{16,40}$') && exists(userPath(uid)) && sessionOk(uid)
           && validDev(qq)
-          && qq.firstSeen == request.time && qq.lastSeen == request.time; }
+          && qq.firstSeen == Tn() && qq.lastSeen == Tn(); }
         allow create: if z60();
-        function z59() { let qq = request.resource.data; return signedIn() && uid == me() && sessionOk(uid) && validDev(qq)
-          && qq.firstSeen == resource.data.firstSeen
-          && (!('lastSeen' in changed()) || qq.lastSeen == request.time)
+        function z59() { let qq = Nd(); return signedIn() && uid == me() && sessionOk(uid) && validDev(qq)
+          && qq.firstSeen == Od().firstSeen
+          && (!('lastSeen' in changed()) || qq.lastSeen == Tn())
           && (!('ack' in changed()) || qq.ack == true); }
         allow update: if z59();
       }
@@ -499,11 +522,11 @@ service cloud.firestore {
           return d.keys().hasOnly(['token', 'label', 'tz', 'tzOffset', 'local', 'updatedAt'])
             && isStr(d.token, 10, 4096) && isStr(d.label, 1, 60) && isStr(d.tz, 0, 80)
             && d.tzOffset is int && d.tzOffset >= -840 && d.tzOffset <= 840
-            && d.local is bool && d.updatedAt == request.time;
+            && d.local is bool && d.updatedAt == Tn();
         }
         allow read, delete: if signedIn() && uid == me();
         allow create, update: if signedIn() && uid == me() && exists(userPath(uid)) && sessionOk(uid)
-          && id.matches('^[A-Za-z0-9]{16,40}$') && validToken(request.resource.data);
+          && id.matches('^[A-Za-z0-9]{16,40}$') && validToken(Nd());
       }
       // Daily send count. Cloud Functions (Admin SDK) write it. The owner may only read or delete it.
       match /pushQuota/{qid} {
@@ -514,9 +537,9 @@ service cloud.firestore {
       match /notifications/{nid} {
         allow read, delete: if actingAs(uid);
         // shared note shape (all four create paths below)
-        function nShape(qq) { return qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read']) && qq.createdAt == request.time && qq.read == false; }
+        function nShape(qq) { return qq.keys().hasOnly(['type', 'fromUid', 'fromName', 'fromUsername', 'postId', 'text', 'createdAt', 'read']) && qq.createdAt == Tn() && qq.read == false; }
         // "Kemy Security" new-device alert, written by the owner's own new device to their own inbox.
-        function z58() { let qq = request.resource.data; return signedIn() && uid == me() && sessionOk(uid)
+        function z58() { let qq = Nd(); return signedIn() && uid == me() && sessionOk(uid)
           && nShape(qq)
           && qq.type == 'security' && qq.fromUid == me()
           && qq.fromName == 'Kemy Security' && qq.fromUsername == ''
@@ -524,24 +547,24 @@ service cloud.firestore {
           && qq.text.matches('^New sign-in on .*'); }
         allow create: if z58();
         // The invited user tells the admin who invited them how they answered.
-        function z57() { let qq = request.resource.data; return signedIn() && qq.type == 'mod_invite' && qq.fromUid == me()
+        function z57() { let qq = Nd(); return signedIn() && qq.type == 'mod_invite' && qq.fromUid == me()
           && nShape(qq)
-          && exists(/databases/$(database)/documents/modInvites/$(me()))
-          && get(/databases/$(database)/documents/modInvites/$(me())).data.by == uid
+          && exists(Dp('modInvites', me()))
+          && get(Dp('modInvites', me())).data.by == uid
           && qq.fromName == get(userPath(me())).data.displayName
           && qq.fromUsername == get(userPath(me())).data.username
           && qq.postId == '' && cleanStr(qq.text, 0, 140); }
         allow create: if z57();
         // Moderator notices ("Thanks, we took action" / warnings / suspensions), shown as "Kemy Moderators".
-        function z56() { let qq = request.resource.data; return isMod() && exists(userPath(uid))
+        function z56() { let qq = Nd(); return isMod() && exists(userPath(uid))
           && nShape(qq)
           && qq.type == 'mod' && qq.fromUid == me()
           && qq.fromName == 'Kemy Moderators' && qq.fromUsername == ''
           && isStr(qq.postId, 0, 100) && cleanStr(qq.text, 1, 400); }
         allow create: if z56();
         allow update: if actingAs(uid)
-          && changed().hasOnly(['read']) && request.resource.data.read is bool;
-        function z55() { let qq = request.resource.data; return signedIn() && !isBlocked(uid, qq.fromUid)
+          && changed().hasOnly(['read']) && Nd().read is bool;
+        function z55() { let qq = Nd(); return signedIn() && !isBlocked(uid, qq.fromUid)
           && exists(userPath(uid))
           && nShape(qq)
           && qq.type in ['follow', 'like', 'comment', 'message', 'reply', 'comment_like', 'game', 'pal_pat', 'pal_play', 'episode', 'house', 'friend', 'friend_ok']
@@ -636,10 +659,10 @@ service cloud.firestore {
         && (d.mediaUrl == '' || d.mediaType in ['image', 'video', 'audio'])
         && validMediaExtras(d)
         && (d.text.size() > 0 || d.linkUrl != '' || d.mediaUrl != '')
-        && d.createdAt == request.time
+        && d.createdAt == Tn()
         && d.likeCount == 0 && d.commentCount == 0 && d.lastCommentId == ''
         && d.studio == (d.authorId == 'studio')
-        && getAfter(userPath(d.authorId)).data.lastPostAt == request.time;
+        && getAfter(userPath(d.authorId)).data.lastPostAt == Tn();
     }
 
     // Community movies + songs (type 'movie' / 'song'): a validated `work` map; either a YouTube id
@@ -671,21 +694,21 @@ service cloud.firestore {
       // fewer than config/mediaReview.minApproved posts; rules can't count, so that part is app-side).
       function newVideoOk(d) {
         return d.get('mediaType', '') != 'video' || isAdmin() || d.authorId == 'studio'
-          || get(userPath(d.authorId)).data.createdAt < request.time - duration.value(3, 'd');
+          || get(userPath(d.authorId)).data.createdAt < Tn() - duration.value(3, 'd');
       }
-      function postPath() { return /databases/$(database)/documents/posts/$(postId); }
+      function postPath() { return Dp('posts', postId); }
       function likeChange() {
-        let likeP = /databases/$(database)/documents/posts/$(postId)/likes/$(me());
-        let n = request.resource.data;
-        let o = resource.data;
+        let likeP = Dp2('posts', postId, 'likes', me());
+        let n = Nd();
+        let o = Od();
         return changed().hasOnly(['likeCount'])
           && ((n.likeCount == o.likeCount + 1 && !exists(likeP) && existsAfter(likeP))
               || (n.likeCount == o.likeCount - 1 && exists(likeP) && !existsAfter(likeP)));
       }
       function commentChange() {
-        let n = request.resource.data;
-        let o = resource.data;
-        let cP = /databases/$(database)/documents/posts/$(postId)/comments/$(n.lastCommentId);
+        let n = Nd();
+        let o = Od();
+        let cP = Dp2('posts', postId, 'comments', n.lastCommentId);
         return changed().hasOnly(['commentCount', 'lastCommentId'])
           && isStr(n.lastCommentId, 1, 100)
           && ((n.commentCount == o.commentCount + 1 && !exists(cP) && existsAfter(cP))
@@ -696,81 +719,81 @@ service cloud.firestore {
       }
 
       allow read: if true;
-      function z54() { let qq = request.resource.data; return signedIn() && notBanned() && actingAs(qq.authorId) && validNewPost(qq) && canCreate(qq.authorId)
+      function z54() { let qq = Nd(); return signedIn() && notBanned() && actingAs(qq.authorId) && validNewPost(qq) && canCreate(qq.authorId)
         && newVideoOk(qq)
         && !(hasMedia(qq) && watched(qq.authorId)); }
       allow create: if z54();
       // Moderator "Restore": an exact copy of the held post, moved out of heldPosts in the same batch.
-      allow create: if isMod() && exists(/databases/$(database)/documents/heldPosts/$(postId))
-        && request.resource.data == get(/databases/$(database)/documents/heldPosts/$(postId)).data.post
-        && !existsAfter(/databases/$(database)/documents/heldPosts/$(postId));
+      allow create: if isMod() && exists(Dp('heldPosts', postId))
+        && Nd() == get(Dp('heldPosts', postId)).data.post
+        && !existsAfter(Dp('heldPosts', postId));
       // Search-index backfill by the author (or admin): only keywords / hashtags.
       function searchChange() {
         return changed().hasOnly(['keywords', 'hashtags'])
-          && (actingAs(resource.data.authorId) || isAdmin())
-          && validPostSearch(request.resource.data);
+          && (actingAs(Od().authorId) || isAdmin())
+          && validPostSearch(Nd());
       }
       // Views: exactly +1 on viewCount and nothing else. Signed-in viewers must create their own
       // views/{uid} doc in the same batch (so it counts once per account); signed-out visitors can
       // only add 1 at a time (once per device, enforced in the app).
       function viewDocAdded() {
-        let viewP = /databases/$(database)/documents/posts/$(postId)/views/$(request.auth.uid);
+        let viewP = Dp2('posts', postId, 'views', me());
         return !exists(viewP) && existsAfter(viewP);
       }
       function viewChange() {
         return changed().hasOnly(['viewCount'])
-          && request.resource.data.viewCount is int
-          && request.resource.data.viewCount == resource.data.get('viewCount', 0) + 1
+          && Nd().viewCount is int
+          && Nd().viewCount == Od().get('viewCount', 0) + 1
           && (!signedIn() || viewDocAdded());
       }
       // Studio Picks: only the admin can feature / unfeature a community movie or song.
       function featureChange() {
-        return isAdmin() && changed().hasOnly(['featured']) && request.resource.data.featured is bool
-          && resource.data.type in ['movie', 'song'];
+        return isAdmin() && changed().hasOnly(['featured']) && Nd().featured is bool
+          && Od().type in ['movie', 'song'];
       }
       // Category: the author (or admin) can set / change it later.
       // Category and/or creator age limit (minAge 0 = all ages, 13+ or 17+).
       function catChange() {
-        return changed().hasOnly(['cat', 'minAge']) && (actingAs(resource.data.authorId) || isAdmin())
-          && (!changed().hasAny(['cat']) || request.resource.data.cat in postCats())
-          && request.resource.data.get('minAge', 0) in [0, 13, 17];
+        return changed().hasOnly(['cat', 'minAge']) && (actingAs(Od().authorId) || isAdmin())
+          && (!changed().hasAny(['cat']) || Nd().cat in postCats())
+          && Nd().get('minAge', 0) in [0, 13, 17];
       }
       // Shares: exactly +1, once per account (shares/{uid} created in the same batch).
       function shareChange() {
-        let shareP = /databases/$(database)/documents/posts/$(postId)/shares/$(request.auth.uid);
+        let shareP = Dp2('posts', postId, 'shares', me());
         return changed().hasOnly(['shareCount'])
-          && request.resource.data.shareCount is int
-          && request.resource.data.shareCount == resource.data.get('shareCount', 0) + 1
+          && Nd().shareCount is int
+          && Nd().shareCount == Od().get('shareCount', 0) + 1
           && !exists(shareP) && existsAfter(shareP);
       }
       // Reports: +1 per different person (flags/{uid} created in the same batch); 3+ => hidden in the
       // app until a moderator keeps it (reportOk = reportCount) or removes it.
       function reportChange() {
-        let fP = /databases/$(database)/documents/posts/$(postId)/flags/$(request.auth.uid);
+        let fP = Dp2('posts', postId, 'flags', me());
         return changed().hasOnly(['reportCount'])
-          && request.resource.data.reportCount == resource.data.get('reportCount', 0) + 1
-          && resource.data.authorId != me() && !exists(fP) && existsAfter(fP);
+          && Nd().reportCount == Od().get('reportCount', 0) + 1
+          && Od().authorId != me() && !exists(fP) && existsAfter(fP);
       }
       function reportOkChange() {
-        return isMod() && changed().hasOnly(['reportOk']) && request.resource.data.reportOk == resource.data.get('reportCount', 0);
+        return isMod() && changed().hasOnly(['reportOk']) && Nd().reportOk == Od().get('reportCount', 0);
       }
       allow update: if viewChange() || (signedIn() && (likeChange() || commentChange() || searchChange() || featureChange() || catChange() || shareChange() || reportChange() || reportOkChange()));
-      allow delete: if signedIn() && (resource.data.authorId == me() || isMod());
+      allow delete: if signedIn() && (Od().authorId == me() || isMod());
 
       match /flags/{flaggerId} {
         allow read: if signedIn() && (flaggerId == me() || isMod());
         allow create: if signedIn() && flaggerId == me()
-          && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
+          && Nd().keys().hasOnly(['at']) && Nd().at == Tn()
           && getAfter(postPath()).data.get('reportCount', 0) == get(postPath()).data.get('reportCount', 0) + 1;
         allow delete: if signedIn() && (isMod() || !existsAfter(postPath()));
       }
 
       match /likes/{likerId} {
         allow read: if true;
-        function z53() { let qq = request.resource.data; return signedIn() && likerId == me()
+        function z53() { let qq = Nd(); return signedIn() && likerId == me()
           && qq.keys().hasOnly(['createdAt', 'uid'])
           && qq.get('uid', me()) == me()
-          && qq.createdAt == request.time
+          && qq.createdAt == Tn()
           && getAfter(postPath()).data.likeCount == get(postPath()).data.likeCount + 1; }
         allow create: if z53();
         allow delete: if signedIn() && likerId == me()
@@ -783,8 +806,8 @@ service cloud.firestore {
         allow read: if signedIn() && sharerId == me();
         allow list: if signedIn() && actingAs(get(postPath()).data.authorId);
         allow create: if signedIn() && sharerId == me()
-          && request.resource.data.keys().hasOnly(['createdAt'])
-          && request.resource.data.createdAt == request.time
+          && Nd().keys().hasOnly(['createdAt'])
+          && Nd().createdAt == Tn()
           && getAfter(postPath()).data.get('shareCount', 0) == get(postPath()).data.get('shareCount', 0) + 1;
         allow delete: if signedIn() && (sharerId == me() || !existsAfter(postPath()));
       }
@@ -795,16 +818,16 @@ service cloud.firestore {
         allow list: if signedIn() && actingAs(get(postPath()).data.authorId);
         allow delete: if signedIn() && !existsAfter(postPath());
         allow create: if signedIn() && viewerId == me()
-          && request.resource.data.keys().hasOnly(['createdAt'])
-          && request.resource.data.createdAt == request.time
+          && Nd().keys().hasOnly(['createdAt'])
+          && Nd().createdAt == Tn()
           && getAfter(postPath()).data.get('viewCount', 0) == get(postPath()).data.get('viewCount', 0) + 1;
       }
 
       match /comments/{cid} {
-        function cPath(id) { return /databases/$(database)/documents/posts/$(postId)/comments/$(id); }
+        function cPath(id) { return Dp2('posts', postId, 'comments', id); }
         function me_() { return get(userPath(me())).data; }
         function canModerate() {
-          return resource.data.authorId == me() || isMod() || actingAs(get(postPath()).data.authorId);
+          return Od().authorId == me() || isMod() || actingAs(get(postPath()).data.authorId);
         }
         // A reply: one level deep, under a live (not deleted) top-level comment, which counts it.
         function validReplyTo(pid) {
@@ -818,16 +841,16 @@ service cloud.firestore {
         // Stars on a comment: exactly +/-1, tied to your own likes/{uid} doc.
         function cLikeChange() {
           let likeP = /databases/$(database)/documents/posts/$(postId)/comments/$(cid)/likes/$(me());
-          let n = request.resource.data;
-          let o = resource.data;
+          let n = Nd();
+          let o = Od();
           return changed().hasOnly(['likeCount']) && n.likeCount is int
             && ((n.likeCount == o.get('likeCount', 0) + 1 && !exists(likeP) && existsAfter(likeP))
                 || (n.likeCount == o.get('likeCount', 0) - 1 && exists(likeP) && !existsAfter(likeP)));
         }
         // Reply count on a top-level comment: +/-1, tied to the reply being added/removed.
         function replyChange() {
-          let n = request.resource.data;
-          let o = resource.data;
+          let n = Nd();
+          let o = Od();
           let rP = cPath(n.lastReplyId);
           return changed().hasOnly(['replyCount', 'lastReplyId']) && isStr(n.lastReplyId, 1, 100)
             && !('parentId' in o)
@@ -838,9 +861,9 @@ service cloud.firestore {
         }
         // Deleting a comment that has replies leaves a blank "Comment deleted" placeholder.
         function softDelete() {
-          let n = request.resource.data;
-          return canModerate() && !('parentId' in resource.data)
-            && resource.data.get('deleted', false) == false
+          let n = Nd();
+          return canModerate() && !('parentId' in Od())
+            && Od().get('deleted', false) == false
             && changed().hasOnly(['deleted', 'text', 'authorName', 'authorUsername', 'authorColor', 'media'])
             && !('media' in n) && n.deleted == true && n.text == '' && n.authorName == '' && n.authorUsername == '' && n.authorColor == ''
             && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount - 1
@@ -861,14 +884,14 @@ service cloud.firestore {
               && m.get('w', 1) is int && m.get('h', 1) is int)
             || (m.kind == 'sticker' && m.keys().hasOnly(['kind', 'petId', 'pose']) && m.keys().hasAll(['kind', 'petId', 'pose'])
               && isStr(m.petId, 1, 100) && m.pose in ['wave', 'love', 'laugh', 'cry', 'wow', 'dance', 'sleepy']
-              && exists(/databases/$(database)/documents/users/$(me())/pets/$(m.petId))));
+              && exists(Dp2('users', me(), 'pets', m.petId))));
         }
         function validBody(d) {
           return ('media' in d) ? (validMedia(d.media) && cleanStr(d.text, 0, 500)) : cleanStr(d.text, 1, 500);
         }
 
         allow read: if true;
-        function z52() { let qq = request.resource.data; return signedIn() && notBanned() && canCreate(qq.authorId)
+        function z52() { let qq = Nd(); return signedIn() && notBanned() && canCreate(qq.authorId)
           && !blockedBy(get(postPath()).data.authorId)
           && qq.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'text', 'createdAt',
                                                    'parentId', 'likeCount', 'replyCount', 'media'])
@@ -881,40 +904,40 @@ service cloud.firestore {
           && contactFree(qq.text)
           && groomFree(qq.text)
           && (isAdmin() || linksOk(qq.text, me_()))
-          && qq.createdAt == request.time
+          && qq.createdAt == Tn()
           && qq.get('likeCount', 0) == 0
           && qq.get('replyCount', 0) == 0
           && (!('parentId' in qq) || validReplyTo(qq.parentId))
           && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount + 1
           && getAfter(postPath()).data.lastCommentId == cid
-          && (isAdmin() || getAfter(userPath(me())).data.lastCommentAt == request.time)
+          && (isAdmin() || getAfter(userPath(me())).data.lastCommentAt == Tn())
           && !pcOff(getAfter(userPath(me())).data, 'cmt'); }
         allow create: if z52();
         allow update: if signedIn() && (cLikeChange() || replyChange() || softDelete());
         // Hard delete: the author, the admin or the post's owner. Replies update their parent's
         // count (unless the parent is gone); a comment with replies must be blanked instead.
         allow delete: if signedIn() && canModerate()
-          && resource.data.get('deleted', false) == false
-          && (('parentId' in resource.data)
-              ? (!existsAfter(cPath(resource.data.parentId))
-                 || (getAfter(cPath(resource.data.parentId)).data.get('replyCount', 0)
-                       == get(cPath(resource.data.parentId)).data.get('replyCount', 0) - 1
-                     && getAfter(cPath(resource.data.parentId)).data.lastReplyId == cid))
-              : resource.data.get('replyCount', 0) == 0)
+          && Od().get('deleted', false) == false
+          && (('parentId' in Od())
+              ? (!existsAfter(cPath(Od().parentId))
+                 || (getAfter(cPath(Od().parentId)).data.get('replyCount', 0)
+                       == get(cPath(Od().parentId)).data.get('replyCount', 0) - 1
+                     && getAfter(cPath(Od().parentId)).data.lastReplyId == cid))
+              : Od().get('replyCount', 0) == 0)
           && getAfter(postPath()).data.commentCount == get(postPath()).data.commentCount - 1;
         // Leftovers of a deleted post.
         allow delete: if signedIn() && !existsAfter(postPath());
         // A blank "Comment deleted" placeholder whose replies are all gone (it holds no content).
-        allow delete: if signedIn() && resource.data.get('deleted', false) == true
-          && resource.data.get('replyCount', 0) == 0;
+        allow delete: if signedIn() && Od().get('deleted', false) == true
+          && Od().get('replyCount', 0) == 0;
 
         match /likes/{likerId} {
-          function cmt() { return /databases/$(database)/documents/posts/$(postId)/comments/$(cid); }
+          function cmt() { return Dp2('posts', postId, 'comments', cid); }
           allow read: if true;
-          function z51() { let qq = request.resource.data; return signedIn() && likerId == me()
+          function z51() { let qq = Nd(); return signedIn() && likerId == me()
             && qq.keys().hasOnly(['createdAt', 'uid'])
             && qq.uid == me()
-            && qq.createdAt == request.time
+            && qq.createdAt == Tn()
             && get(cmt()).data.get('deleted', false) == false
             && getAfter(cmt()).data.likeCount == get(cmt()).data.get('likeCount', 0) + 1; }
           allow create: if z51();
@@ -935,7 +958,7 @@ service cloud.firestore {
       allow read: if true;
     }
     match /{path=**}/notifications/{nid} {
-      allow read, delete: if signedIn() && resource.data.fromUid == me();
+      allow read, delete: if signedIn() && Od().fromUid == me();
     }
 
     // ---------- Stories (24 h) ----------
@@ -943,7 +966,7 @@ service cloud.firestore {
     function canSeeStories(a) {
       return (a == 'studio' && (!signedIn() || !blockedBy(a)))
         || (signedIn() && (actingAs(a)
-            || (exists(/databases/$(database)/documents/follows/$(me() + '_' + a)) && !blockedBy(a))));
+            || (exists(Dp('follows', me() + '_' + a)) && !blockedBy(a))));
     }
     function validStory(d) {
       let u = get(userPath(d.authorId)).data;
@@ -966,28 +989,28 @@ service cloud.firestore {
         && cleanStr(d.caption, 0, 120)
         && isStr(d.cloudinaryPublicId, 1, 255)
         && d.cloudinaryPublicId.matches('^[A-Za-z0-9_./-]+$')
-        && d.createdAt == request.time
+        && d.createdAt == Tn()
         && d.expiresAt is timestamp
-        && d.expiresAt > request.time
-        && d.expiresAt <= request.time + duration.value(24, 'h')
-        && getAfter(userPath(d.authorId)).data.lastPostAt == request.time;
+        && d.expiresAt > Tn()
+        && d.expiresAt <= Tn() + duration.value(24, 'h')
+        && getAfter(userPath(d.authorId)).data.lastPostAt == Tn();
     }
     match /stories/{sid} {
-      allow read: if canSeeStories(resource.data.authorId);
-      function z50() { let qq = request.resource.data; return signedIn() && notBanned() && actingAs(qq.authorId) && validStory(qq) && canCreate(qq.authorId)
+      allow read: if canSeeStories(Od().authorId);
+      function z50() { let qq = Nd(); return signedIn() && notBanned() && actingAs(qq.authorId) && validStory(qq) && canCreate(qq.authorId)
         && !watched(qq.authorId); }
       allow create: if z50();
-      allow delete: if signedIn() && (actingAs(resource.data.authorId) || isAdmin());
+      allow delete: if signedIn() && (actingAs(Od().authorId) || isAdmin());
 
       // Who viewed a story: written by each viewer, read by the owner.
       match /viewers/{v} {
-        function story() { return get(/databases/$(database)/documents/stories/$(sid)).data; }
+        function story() { return get(Dp('stories', sid)).data; }
         allow read: if signedIn() && (v == me() || actingAs(story().authorId) || isAdmin());
-        function z49() { let qq = request.resource.data; return signedIn() && v == me()
+        function z49() { let qq = Nd(); return signedIn() && v == me()
           && story().authorId != me()
           && canSeeStories(story().authorId)
           && qq.keys().hasOnly(['viewedAt', 'name', 'username', 'color'])
-          && qq.viewedAt == request.time
+          && qq.viewedAt == Tn()
           && qq.name == get(userPath(me())).data.displayName
           && qq.username == get(userPath(me())).data.username
           && isStr(qq.color, 1, 20); }
@@ -1019,83 +1042,83 @@ service cloud.firestore {
         && d.hostColor == u.color
         && isStr(d.title, 0, 80)
         && d.status == 'live'
-        && d.startedAt == request.time
-        && d.heartbeatAt == request.time
+        && d.startedAt == Tn()
+        && d.heartbeatAt == Tn()
         && d.viewerCount == 0 && d.peakViewers == 0 && d.totalViewers == 0 && d.starCount == 0
-        && getAfter(userPath(d.hostId)).data.lastPostAt == request.time;
+        && getAfter(userPath(d.hostId)).data.lastPostAt == Tn();
     }
     function maxViewers(o) { return o.get('type', 'webrtc') == 'youtube' ? 10000000 : 50; }
     function hostLiveUpdate() {
-      let n = request.resource.data;
-      let o = resource.data;
+      let n = Nd();
+      let o = Od();
       return actingAs(o.hostId) && o.status == 'live'
         && changed().hasOnly(['heartbeatAt', 'viewerCount', 'peakViewers', 'totalViewers', 'starCount', 'status', 'endedAt', 'endedBy', 'palHidden'])
         && (!('palHidden' in n) || n.palHidden is bool)
-        && n.heartbeatAt == request.time
+        && n.heartbeatAt == Tn()
         && n.viewerCount is int && n.viewerCount >= 0 && n.viewerCount <= maxViewers(o)
         && n.peakViewers is int && n.peakViewers >= o.peakViewers && n.peakViewers <= maxViewers(o)
         && n.totalViewers is int && n.totalViewers >= o.totalViewers && n.totalViewers <= 10000000
         && n.starCount is int && n.starCount >= o.starCount && n.starCount <= 10000000
         && ((n.status == 'live' && !('endedAt' in n) && !('endedBy' in n))
-            || (n.status == 'ended' && n.endedAt == request.time && n.endedBy == 'host'));
+            || (n.status == 'ended' && n.endedAt == Tn() && n.endedBy == 'host'));
     }
     function adminEndsLive() {
-      return isAdmin() && resource.data.status == 'live'
+      return isAdmin() && Od().status == 'live'
         && changed().hasOnly(['status', 'endedAt', 'endedBy'])
-        && request.resource.data.status == 'ended'
-        && request.resource.data.endedAt == request.time
-        && request.resource.data.endedBy == 'admin';
+        && Nd().status == 'ended'
+        && Nd().endedAt == Tn()
+        && Nd().endedBy == 'admin';
     }
     match /lives/{lid} {
-      function live() { return get(/databases/$(database)/documents/lives/$(lid)).data; }
+      function live() { return get(Dp('lives', lid)).data; }
       function isHost() { return signedIn() && actingAs(live().hostId); }
       function liveOn() { return live().status == 'live'; }
 
       allow read: if true;
-      function z48() { let qq = request.resource.data; return signedIn() && actingAs(qq.hostId) && validNewLive(qq) && canCreate(qq.hostId)
+      function z48() { let qq = Nd(); return signedIn() && actingAs(qq.hostId) && validNewLive(qq) && canCreate(qq.hostId)
         && !pcOff(get(userPath(qq.hostId)).data, 'live'); }
       allow create: if z48();
       allow update: if signedIn() && (hostLiveUpdate() || adminEndsLive());
-      allow delete: if signedIn() && (actingAs(resource.data.hostId) || isAdmin());
+      allow delete: if signedIn() && (actingAs(Od().hostId) || isAdmin());
 
       // A viewer asks to join (their own doc only). The host caps the number of connections.
       match /viewers/{v} {
         allow read: if signedIn() && (v == me() || isHost() || isAdmin());
-        function z47() { let qq = request.resource.data; return signedIn() && v == me() && liveOn()
+        function z47() { let qq = Nd(); return signedIn() && v == me() && liveOn()
           && live().hostId != me() && !blockedBy(live().hostId)
           && qq.keys().hasOnly(['name', 'username', 'color', 'joinedAt'])
           && qq.name == get(userPath(me())).data.displayName
           && qq.username == get(userPath(me())).data.username
           && isStr(qq.color, 1, 20)
-          && qq.joinedAt == request.time; }
+          && qq.joinedAt == Tn(); }
         allow create: if z47();
         allow delete: if signedIn() && (v == me() || isHost() || isAdmin());
       }
       // The host's WebRTC offer for one viewer (or "full").
       match /conns/{v} {
         allow read: if signedIn() && (v == me() || isHost());
-        function z46() { let qq = request.resource.data; return isHost()
+        function z46() { let qq = Nd(); return isHost()
           && qq.keys().hasOnly(['offer', 'full', 'createdAt'])
           && isStr(qq.offer, 0, 30000)
           && qq.full is bool
-          && qq.createdAt == request.time; }
+          && qq.createdAt == Tn(); }
         allow create, update: if z46();
         allow delete: if isHost() || (signedIn() && v == me());
       }
       // The viewer's WebRTC answer (their own doc only).
       match /answers/{v} {
         allow read: if signedIn() && (v == me() || isHost());
-        function z45() { let qq = request.resource.data; return signedIn() && v == me() && liveOn()
+        function z45() { let qq = Nd(); return signedIn() && v == me() && liveOn()
           && qq.keys().hasOnly(['answer', 'createdAt'])
           && isStr(qq.answer, 1, 30000)
-          && qq.createdAt == request.time; }
+          && qq.createdAt == Tn(); }
         allow create, update: if z45();
         allow delete: if signedIn() && (v == me() || isHost());
       }
       // Live chat + stars, tied to the signed-in author, max ~1 per second (lastMessageAt).
       match /chat/{c} {
         allow read: if true;
-        function z44() { let qq = request.resource.data; return signedIn() && liveOn() && notBanned() && !blockedBy(live().hostId)
+        function z44() { let qq = Nd(); return signedIn() && liveOn() && notBanned() && !blockedBy(live().hostId)
           && live().get('chatOn', true) == true
           && qq.keys().hasOnly(['authorId', 'name', 'username', 'color', 'type', 'text', 'count', 'createdAt'])
           && qq.authorId == me()
@@ -1105,18 +1128,18 @@ service cloud.firestore {
           && ((qq.type == 'msg' && cleanStr(qq.text, 1, 150) && kidSafe(qq.text) && contactFree(qq.text) && groomFree(qq.text) && (chatFree(me()) || presetSay(qq.text)) && qq.count == 0)
               || (qq.type == 'star' && qq.text == ''
                   && qq.count is int && qq.count >= 1 && qq.count <= 20))
-          && qq.createdAt == request.time
-          && getAfter(userPath(me())).data.lastMessageAt == request.time
+          && qq.createdAt == Tn()
+          && getAfter(userPath(me())).data.lastMessageAt == Tn()
           && !pcOff(getAfter(userPath(me())).data, 'chat'); }
         allow create: if z44();
-        allow delete: if signedIn() && (isHost() || isMod() || resource.data.authorId == me());
+        allow delete: if signedIn() && (isHost() || isMod() || Od().authorId == me());
       }
     }
 
     // ---------- Follows (id = followerUid_followeeUid) ----------
     match /follows/{fid} {
       allow read: if true;
-      function z43() { let qq = request.resource.data; return signedIn()
+      function z43() { let qq = Nd(); return signedIn()
         && qq.keys().hasOnly(['follower', 'followee', 'createdAt'])
         && qq.follower == me()
         && qq.followee is string
@@ -1132,21 +1155,21 @@ service cloud.firestore {
                 && knownTeen(get(userPath(qq.followee)).data) && !exists(u13Path(qq.followee))))
         // Anti-spam: each follow stamps lastFollowAt (max one per 2 s); following the studio at signup is exempt.
         && (qq.followee == 'studio' || isAdmin()
-            || getAfter(userPath(me())).data.get('lastFollowAt', null) == request.time)
-        && qq.createdAt == request.time; }
+            || getAfter(userPath(me())).data.get('lastFollowAt', null) == Tn())
+        && qq.createdAt == Tn(); }
       allow create: if z43();
       // Friend request accepted (friendreq/{a}_{b} goes pending -> accepted in this same batch, written by b):
       // b writes both follows (a->b and b->a). Nobody else can make b follow anyone.
-      function frAccepted(a) { let r = /databases/$(database)/documents/friendreq/$(a + '_' + me());
+      function frAccepted(a) { let r = Dp('friendreq', a + '_' + me());
         return get(r).data.status == 'pending' && getAfter(r).data.status == 'accepted'; }
-      function z43f() { let qq = request.resource.data; return signedIn()
+      function z43f() { let qq = Nd(); return signedIn()
         && qq.keys().hasOnly(['follower', 'followee', 'createdAt'])
         && fid == qq.follower + '_' + qq.followee
-        && qq.createdAt == request.time
+        && qq.createdAt == Tn()
         && ((qq.followee == me() && frAccepted(qq.follower)) || (qq.follower == me() && frAccepted(qq.followee))); }
       allow create: if z43f();
       allow delete: if signedIn()
-        && (resource.data.follower == me() || resource.data.followee == me() || isAdmin());
+        && (Od().follower == me() || Od().followee == me() || isAdmin());
     }
 
     // ---------- Friend requests (js/friends.js; id = fromUid_toUid) ----------
@@ -1156,43 +1179,43 @@ service cloud.firestore {
     function frOn(u) { return knownTeen(get(userPath(u)).data) && !exists(u13Path(u)); }
     match /friendcap/{uid} {
       allow read: if signedIn() && uid == me();
-      allow create, update: if signedIn() && uid == me() && frCap(request.resource.data,
-        resource == null || request.time > resource.data.start + duration.value(1, 'd'));
-      function frCap(d, s) { return d.keys().hasOnly(['start', 'n', 'at']) && d.at == request.time && d.n <= 20
-        && d.n == (s ? 1 : resource.data.n + 1) && d.start == (s ? request.time : resource.data.start); }
+      allow create, update: if signedIn() && uid == me() && frCap(Nd(),
+        resource == null || Tn() > Od().start + duration.value(1, 'd'));
+      function frCap(d, s) { return d.keys().hasOnly(['start', 'n', 'at']) && d.at == Tn() && d.n <= 20
+        && d.n == (s ? 1 : Od().n + 1) && d.start == (s ? Tn() : Od().start); }
     }
     match /friendreq/{rid} {
-      allow read: if signedIn() && (resource == null ? me() in rid.split('_') : (resource.data.from == me() || resource.data.to == me()));
+      allow read: if signedIn() && (resource == null ? me() in rid.split('_') : (Od().from == me() || Od().to == me()));
       // both sides ok: not banned/paused, no block either way, 13+ known age
       function frOk(o) { return notBanned() && !isBlocked(o, me()) && !isBlocked(me(), o) && (isAdmin() || frOn(me())) && frOn(o); }
-      function frSend() { let qq = request.resource.data; let u = get(userPath(me())).data; return signedIn()
+      function frSend() { let qq = Nd(); let u = get(userPath(me())).data; return signedIn()
         && qq.keys().hasOnly(['from', 'to', 'name', 'uname', 'status', 'at'])
         && qq.from == me() && qq.to != me() && rid == me() + '_' + qq.to
-        && qq.status == 'pending' && qq.at == request.time
+        && qq.status == 'pending' && qq.at == Tn()
         && qq.name == u.displayName && qq.uname == u.username && frOk(qq.to)
-        && getAfter(/databases/$(database)/documents/friendcap/$(me())).data.at == request.time; }
+        && getAfter(Dp('friendcap', me())).data.at == Tn(); }
       allow create: if frSend();
       // the sender asks again: after an accept (they unfollowed since) or 3 days after a decline
-      allow update: if frSend() && (resource.data.status == 'accepted'
-            || (resource.data.status == 'declined' && request.time > resource.data.at + duration.value(3, 'd')));
+      allow update: if frSend() && (Od().status == 'accepted'
+            || (Od().status == 'declined' && Tn() > Od().at + duration.value(3, 'd')));
       // the receiver answers a pending request (a yes re-checks both sides)
-      allow update: if signedIn() && resource.data.to == me() && resource.data.status == 'pending' && frAns(request.resource.data);
-      function frAns(d) { return d.diff(resource.data).affectedKeys().hasOnly(['status', 'at']) && d.at == request.time
-        && (d.status == 'declined' || (d.status == 'accepted' && frOk(resource.data.from))); }
+      allow update: if signedIn() && Od().to == me() && Od().status == 'pending' && frAns(Nd());
+      function frAns(d) { return d.diff(Od()).affectedKeys().hasOnly(['status', 'at']) && d.at == Tn()
+        && (d.status == 'declined' || (d.status == 'accepted' && frOk(Od().from))); }
       // the receiver can clear it; the sender only once it was accepted (so a decline's cooldown can't be skipped)
-      allow delete: if signedIn() && (resource.data.to == me() || (resource.data.from == me() && resource.data.status == 'accepted') || isAdmin());
+      allow delete: if signedIn() && (Od().to == me() || (Od().from == me() && Od().status == 'accepted') || isAdmin());
     }
 
     // ---------- Direct messages (id = sortedUidA_sortedUidB) ----------
     // Player-to-player messages are turned off. Old threads can still be read. New writes are refused.
-    function isBlocked(owner, who) { return exists(/databases/$(database)/documents/users/$(owner)/blocks/$(who)); }
+    function isBlocked(owner, who) { return exists(Dp2('users', owner, 'blocks', who)); }
     match /chats/{chatId} {
       function parts() { return chatId.split('_'); }
       function inChat() { return signedIn() && (me() in parts() || ('studio' in parts() && isAdmin())); }
 
       allow get: if inChat();
-      allow list: if signedIn() && (me() in resource.data.participants
-        || ('studio' in resource.data.participants && isAdmin()));
+      allow list: if signedIn() && (me() in Od().participants
+        || ('studio' in Od().participants && isAdmin()));
       // Private messages between players are off. Old chats stay readable. Nothing new can be written.
       allow create, update: if false;
 
@@ -1220,13 +1243,13 @@ service cloud.firestore {
       return o.clk.size() == 0 ? n.clk == o.clk
         : (n.clk is list && n.clk.size() == 2 && n.clk[o.turn] is int && n.clk[o.turn] >= 0
            && (o.moveNo == 0 ? n.clk[o.turn] <= o.clk[o.turn]
-               : n.clk[o.turn] <= o.clk[o.turn] - (request.time.toMillis() - o.turnAt.toMillis()) + 3000)
+               : n.clk[o.turn] <= o.clk[o.turn] - (Tn().toMillis() - o.turnAt.toMillis()) + 3000)
            && n.clk[1 - o.turn] == o.clk[1 - o.turn]);
     }
     function gTurnUp(o) {
       return o.type == 'chess' && o.clk.size() == 2
-        ? request.time.toMillis() > o.turnAt.toMillis() + o.clk[o.turn] + 2000
-        : request.time > o.turnAt + duration.value(65, 's');
+        ? Tn().toMillis() > o.turnAt.toMillis() + o.clk[o.turn] + 2000
+        : Tn() > o.turnAt + duration.value(65, 's');
     }
     // Ludo: commit-reveal dice. rv[uid] holds each human's latest hash-chain link, rk[uid] its
     // roll index; die = 1 + first hex digit 0-5 of sha256(reveals in seat order + roll index).
@@ -1268,20 +1291,20 @@ service cloud.firestore {
     }
     function gSeatStep(o, n, i) { return i >= n.size() || i >= o.size() || (n[i] - o[i] <= 4 && o[i] - n[i] <= 1); }
     function gCountsOk(o, n) {
-      return n.counts is list && n.counts.size() == request.resource.data.players.size() && gCardsTotal(n) == 108
+      return n.counts is list && n.counts.size() == Nd().players.size() && gCardsTotal(n) == 108
         && (!('pv' in o) || o.pv.round != n.round
             || (gSeatStep(o.pv.counts, n.counts, 0) && gSeatStep(o.pv.counts, n.counts, 1) && gSeatStep(o.pv.counts, n.counts, 2)
                 && gSeatStep(o.pv.counts, n.counts, 3) && gSeatStep(o.pv.counts, n.counts, 4) && gSeatStep(o.pv.counts, n.counts, 5)));
     }
     match /games/{gid} {
-      function gPath() { return /databases/$(database)/documents/games/$(gid); }
-      function nd() { return request.resource.data; }
-      function od() { return resource.data; }
-      function member() { return signedIn() && me() in resource.data.players; }
+      function gPath() { return Dp('games', gid); }
+      function nd() { return Nd(); }
+      function od() { return Od(); }
+      function member() { return signedIn() && me() in Od().players; }
       function otherP() { return od().players[0] == me() ? od().players[1] : od().players[0]; }
       function hbOnly() {
         return changed().hasOnly(['hb']) && nd().hb.diff(od().hb).affectedKeys().hasOnly([me()])
-          && nd().hb[me()] == request.time;
+          && nd().hb[me()] == Tn();
       }
       function validNames(d) {
         return d.players is list && d.players.size() >= 1 && d.players.size() <= gMax(d.type)
@@ -1300,7 +1323,7 @@ service cloud.firestore {
         && nd().status == 'waiting' && nd().host == me() && nd().players[0] == me() && validNames(nd())
         && nd().names[0] == gProfile().displayName && nd().unames[0] == gProfile().username
         && isStr(nd().invitee, 0, 128) && nd().quick is bool
-        && nd().createdAt == request.time && nd().winnerUid == '' && nd().rematch == ''
+        && nd().createdAt == Tn() && nd().winnerUid == '' && nd().rematch == ''
         && (!gBoardType(nd().type) || (nd().players.size() == 1 && nd().board.matches('^[.]{9}$|^[.]{42}$|^[.]{81}$|^b{12}[.]{8}a{12}$')
                                         && nd().turn == 0 && nd().moveNo == 0))
         && (nd().type != 'pool' || (nd().players.size() == 1 && nd().pos is string && nd().pos.matches('^[0-9]{128}$')
@@ -1322,13 +1345,13 @@ service cloud.firestore {
                                         && (nd().status == 'waiting' || (nd().status == 'active' && gLStart(nd())))))
             && (od().type != 'starcards' || !('pv' in nd()) || gCountsOk(od(), nd().pv)));
       }
-      function z42() { let tt = request.time; return signedIn() && (
+      function z42() { let tt = Tn(); return signedIn() && (
         // Star Cards host first: with 5-6 seats the full chain below hits the 1000-expression cap
         (od().type == 'starcards' && hostRun())
         // Kemy Hill Rush host: stage pick, seats, start (roundAt + seed in round), finish
         || (od().type == 'rush' && hostRun() && nd().mode.matches('^[a-z]{3,12}-(sprint|classic)$')
             && (nd().get('winnerUid', '') == '' || (nd().winnerUid in od().players
-                && (nd().get('endReason', '') != 'finish' || get(/databases/$(database)/documents/games/$(gid)/car/$(nd().winnerUid)).data.fin == true))))
+                && (nd().get('endReason', '') != 'finish' || get(Dp2('games', gid, 'car', nd().winnerUid)).data.fin == true))))
         // heartbeat
         || (member() && hbOnly())
         // Chess move: only the side to move; shape checks on the board (one king each, the mover
@@ -1446,9 +1469,9 @@ service cloud.firestore {
       // Quick-chat emotes from players and signed-in spectators (preset ids only).
       match /chat/{cid} {
         allow read: if true;
-        function z41() { let qq = request.resource.data; return signedIn() && notBanned() && !pcOff(get(userPath(me())).data, 'chat') && qq.keys().hasOnly(['uid', 'e', 'at'])
+        function z41() { let qq = Nd(); return signedIn() && notBanned() && !pcOff(get(userPath(me())).data, 'chat') && qq.keys().hasOnly(['uid', 'e', 'at'])
           && qq.uid == me() && qq.e is int
-          && ((qq.e >= 0 && qq.e <= 9) || (qq.e >= 100 && qq.e <= 199)) && qq.at == request.time; }
+          && ((qq.e >= 0 && qq.e <= 9) || (qq.e >= 100 && qq.e <= 199)) && qq.at == Tn(); }
         allow create: if z41(); // 100+: Pal emote (game-emotes.js)
         allow delete: if isAdmin();
       }
@@ -1456,14 +1479,14 @@ service cloud.firestore {
       match /answers/{uid} {
         function room() { return get(gPath()).data; }
         allow read: if signedIn() && (me() == uid || me() == room().host);
-        function z40() { let qq = request.resource.data; return signedIn() && me() == uid && uid in room().players && room().status == 'active'
+        function z40() { let qq = Nd(); return signedIn() && me() == uid && uid in room().players && room().status == 'active'
           && room().type == 'trivia'
           && qq.keys().hasOnly(['round', 'choice', 'at'])
           && qq.round == room().round && qq.choice is int
           && qq.choice >= 0 && qq.choice <= 3
-          && qq.at == request.time
-          && request.time < room().roundAt + duration.value(room().roundLen + 3, 's')
-          && (resource == null || resource.data.round != qq.round); }
+          && qq.at == Tn()
+          && Tn() < room().roundAt + duration.value(room().roundLen + 3, 's')
+          && (resource == null || Od().round != qq.round); }
         allow create, update: if z40();
         allow delete: if isAdmin();
       }
@@ -1474,25 +1497,25 @@ service cloud.firestore {
         allow read: if signedIn() && (me() == hid || me() == get(gPath()).data.host);
         allow write: if signedIn() && me() == room().host && room().type == 'starcards'
           && (hid == '_dealer'
-              || (request.resource.data.keys().hasOnly(['hand', 'seat', 'drawn', 'dealt', 'round'])
-                  && request.resource.data.seat is int && room().players[request.resource.data.seat] == hid
-                  && request.resource.data.hand is list
-                  && request.resource.data.hand.size() == room().pv.counts[request.resource.data.seat]));
+              || (Nd().keys().hasOnly(['hand', 'seat', 'drawn', 'dealt', 'round'])
+                  && Nd().seat is int && room().players[Nd().seat] == hid
+                  && Nd().hand is list
+                  && Nd().hand.size() == room().pv.counts[Nd().seat]));
       }
       // Kemy Hill Rush: each racer posts their own car (position, distance, finish) a few times a second
       match /car/{uid} {
         function cg() { return get(gPath()).data; }
-        function cd() { return request.resource.data; }
+        function cd() { return Nd(); }
         allow read: if true;
         allow create, update: if signedIn() && uid == me() && cg().type == 'rush' && me() in cg().players
           && cg().status in ['waiting', 'active']
           && cd().keys().hasOnly(['x', 'y', 'a', 'v', 'd', 'fin', 'ft', 'st', 'pal', 'vid', 'at'])
           && (!('vid' in cd()) || (cd().vid is string && cd().vid.matches('^[a-z]{2,12}$')))
           && cd().x is number && cd().y is number && cd().a is number && cd().v is number && cd().d is number
-          && cd().fin is bool && cd().ft is number && cd().st is number && cd().at == request.time
-          && (resource == null || request.time > resource.data.at + duration.value(200, 'ms'))
-          && (resource == null || !resource.data.fin || (cd().fin && cd().ft == resource.data.ft))
-          && (!cd().fin || (cg().status == 'active' && request.time > cg().roundAt + duration.value(15, 's')))
+          && cd().fin is bool && cd().ft is number && cd().st is number && cd().at == Tn()
+          && (resource == null || Tn() > Od().at + duration.value(200, 'ms'))
+          && (resource == null || !Od().fin || (cd().fin && cd().ft == Od().ft))
+          && (!cd().fin || (cg().status == 'active' && Tn() > cg().roundAt + duration.value(15, 's')))
           && (!('pal' in cd()) || (cd().pal is map && cd().pal.size() <= 8));
       }
       // Result receipts: one per player per game, so a result is counted once.
@@ -1501,8 +1524,8 @@ service cloud.firestore {
         allow create: if signedIn() && (me() in getAfter(gPath()).data.players || me() in getAfter(gPath()).data.get('left', []))
           && (uid in getAfter(gPath()).data.players || uid in getAfter(gPath()).data.get('left', []))
           && getAfter(gPath()).data.status == 'done'
-          && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
-          && getAfter(/databases/$(database)/documents/gameStats/$(uid)).data.last == gid;
+          && Nd().keys().hasOnly(['at']) && Nd().at == Tn()
+          && getAfter(Dp('gameStats', uid)).data.last == gid;
       }
     }
 
@@ -1510,8 +1533,8 @@ service cloud.firestore {
     // Scores only go up, by at most one game's worth per write (win 3 / draw 1; Bubble Quest stars <= 300),
     // at most one write per doc every 10 s (3 s for Bubble Quest + Overall), with per-game bounds.
     match /leaderboard/{docId} {
-      function lb() { return request.resource.data; }
-      function lbOld() { return resource.data; }
+      function lb() { return Nd(); }
+      function lbOld() { return Od(); }
       function lbBig(g) { return g == 'quest' || g == 'all'; }
       function lbCap(g) { return lbBig(g) ? 300 : 3; }
       function lbMaxBest(g) { return g == 'quest' ? 500 : g == 'trivia' ? 50000 : g == 'pals' ? 10000 : 1000000; }
@@ -1531,7 +1554,7 @@ service cloud.firestore {
           && lb().wk is string && lb().wk.matches('^[0-9]{4}-W[0-9]{2}$') && lbN(lb().wkScore, 1000000) && lb().wkScore <= lb().score
           && (lb().game != 'quest' || lb().score <= lb().games * 300)
           && (lbBig(lb().game) || lb().score <= lb().games * 3)
-          && lb().updatedAt == request.time;
+          && lb().updatedAt == Tn();
       }
       allow read: if true;
       allow create: if signedIn() && lbShape()
@@ -1539,31 +1562,31 @@ service cloud.firestore {
       allow update: if signedIn() && lbOld().uid == me() && lbShape() && lb().game == lbOld().game
         && lbUp('score', lbCap(lb().game)) && lbUp('games', 1) && lbUp('wins', 1) && lbUp('losses', 1) && lbUp('draws', 1)
         && lb().best >= lbOld().best
-        && lbOld().updatedAt + duration.value(lbBig(lb().game) ? 3 : 10, 's') < request.time
+        && lbOld().updatedAt + duration.value(lbBig(lb().game) ? 3 : 10, 's') < Tn()
         && (lb().wk == lbOld().wk ? lbUp('wkScore', lbCap(lb().game)) : lb().wkScore <= lbCap(lb().game));
-      allow delete: if signedIn() && resource.data.uid == me();
+      allow delete: if signedIn() && Od().uid == me();
     }
 
     // ---------- Game records (wins / losses / draws per game) ----------
     match /gameStats/{uid} {
-      function gs() { return request.resource.data; }
-      function gG() { return getAfter(/databases/$(database)/documents/games/$(gs().last)).data; }
+      function gs() { return Nd(); }
+      function gG() { return getAfter(Dp('games', gs().last)).data; }
       function gKey() { return gG().type + '_' + (gG().winnerUid == uid ? 'w' : gG().winnerUid == 'draw' ? 'd' : 'l'); }
       function gFresh() {
-        return !exists(/databases/$(database)/documents/games/$(gs().last)/rec/$(uid))
-          && existsAfter(/databases/$(database)/documents/games/$(gs().last)/rec/$(uid));
+        return !exists(Dp2('games', gs().last, 'rec', uid))
+          && existsAfter(Dp2('games', gs().last, 'rec', uid));
       }
       function gOk() {
         return signedIn() && isStr(gs().last, 1, 40) && gG().status == 'done'
           && (uid in gG().players || uid in gG().get('left', [])) && (me() in gG().players || me() in gG().get('left', [])) && gFresh()
-          && gs().updatedAt == request.time
+          && gs().updatedAt == Tn()
           && gs().name == get(userPath(uid)).data.displayName && gs().uname == get(userPath(uid)).data.username
           && isStr(gs().color, 0, 20);
       }
       allow read: if true;
       allow create: if gOk() && gs().keys().hasOnly([gKey(), 'last', 'updatedAt', 'name', 'uname', 'color']) && gs()[gKey()] == 1;
       allow update: if gOk() && changed().hasOnly([gKey(), 'last', 'updatedAt', 'name', 'uname', 'color'])
-        && gs()[gKey()] == resource.data.get(gKey(), 0) + 1;
+        && gs()[gKey()] == Od().get(gKey(), 0) + 1;
       allow delete: if isAdmin() || (signedIn() && uid == me());
     }
 
@@ -1571,9 +1594,9 @@ service cloud.firestore {
     match /gameQueue/{qid} {
       allow read: if signedIn();
       allow write: if signedIn() && notBanned() && qid.matches('^[a-z-]{3,30}$')
-        && request.resource.data.keys().hasOnly(['gid', 'uid', 'at'])
-        && request.resource.data.uid in [me(), ''] && isStr(request.resource.data.gid, 0, 40)
-        && request.resource.data.at == request.time;
+        && Nd().keys().hasOnly(['gid', 'uid', 'at'])
+        && Nd().uid in [me(), ''] && isStr(Nd().gid, 0, 40)
+        && Nd().at == Tn();
     }
 
     // ---------- Series (Community Movies seasons + episodes) ----------
@@ -1582,7 +1605,7 @@ service cloud.firestore {
     // admin acting as 'studio' for Lone Keem Studios Originals) edits it; followers change only
     // followerCount, by exactly one, tied to their own followers/{uid} doc.
     match /series/{sid} {
-      function sd() { return request.resource.data; }
+      function sd() { return Nd(); }
       function validSeries(d) {
         return d.keys().hasOnly(['ownerId', 'ownerName', 'ownerUsername', 'ownerColor', 'title', 'desc', 'genre', 'aiTools',
                                  'rating', 'cover', 'seasons', 'episodes', 'postIds', 'followerCount', 'episodeCount',
@@ -1595,110 +1618,110 @@ service cloud.firestore {
           && d.postIds is list && d.postIds.size() == d.episodes.size()
           && d.episodeCount == d.episodes.size()
           && (!('ai' in d) || (d.ai is map && d.ai.keys().hasOnly(['style', 'seed', 'cast', 'look'])))
-          && d.updatedAt == request.time;
+          && d.updatedAt == Tn();
       }
       // The movie that was just added must be a movie post by the series owner.
       function addedOk(d) {
         return !('lastAddedId' in d) || d.lastAddedId == ''
-          || (resource != null && d.lastAddedId == resource.data.get('lastAddedId', ''))
+          || (resource != null && d.lastAddedId == Od().get('lastAddedId', ''))
           || (d.lastAddedId in d.postIds
-              && get(/databases/$(database)/documents/posts/$(d.lastAddedId)).data.authorId == d.ownerId
-              && get(/databases/$(database)/documents/posts/$(d.lastAddedId)).data.type == 'movie');
+              && get(Dp('posts', d.lastAddedId)).data.authorId == d.ownerId
+              && get(Dp('posts', d.lastAddedId)).data.type == 'movie');
       }
       allow read: if true;
       allow create: if actingAs(sd().ownerId) && validSeries(sd())
-        && sd().followerCount == 0 && sd().createdAt == request.time && addedOk(sd())
+        && sd().followerCount == 0 && sd().createdAt == Tn() && addedOk(sd())
         && (sd().ownerId == 'studio'
             || (sd().ownerName == get(userPath(me())).data.displayName && sd().ownerUsername == get(userPath(me())).data.username));
-      function z39() { let oo = resource.data; return (actingAs(oo.ownerId) && validSeries(sd())
+      function z39() { let oo = Od(); return (actingAs(oo.ownerId) && validSeries(sd())
                         && sd().ownerId == oo.ownerId && sd().createdAt == oo.createdAt
                         && sd().followerCount == oo.followerCount && addedOk(sd()))
         || (signedIn() && changed().hasOnly(['followerCount'])
             && ((sd().followerCount == oo.followerCount + 1
-                 && !exists(/databases/$(database)/documents/series/$(sid)/followers/$(me()))
-                 && existsAfter(/databases/$(database)/documents/series/$(sid)/followers/$(me())))
+                 && !exists(Dp2('series', sid, 'followers', me()))
+                 && existsAfter(Dp2('series', sid, 'followers', me())))
              || (sd().followerCount == oo.followerCount - 1
-                 && exists(/databases/$(database)/documents/series/$(sid)/followers/$(me()))
-                 && !existsAfter(/databases/$(database)/documents/series/$(sid)/followers/$(me()))))); }
+                 && exists(Dp2('series', sid, 'followers', me()))
+                 && !existsAfter(Dp2('series', sid, 'followers', me()))))); }
       allow update: if z39();
-      allow delete: if actingAs(resource.data.ownerId) || isAdmin();
+      allow delete: if actingAs(Od().ownerId) || isAdmin();
 
       match /followers/{fid} {
-        allow read: if signedIn() && (fid == me() || actingAs(get(/databases/$(database)/documents/series/$(sid)).data.ownerId) || isAdmin());
-        function z38() { let qq = request.resource.data; return signedIn() && fid == me()
+        allow read: if signedIn() && (fid == me() || actingAs(get(Dp('series', sid)).data.ownerId) || isAdmin());
+        function z38() { let qq = Nd(); return signedIn() && fid == me()
           && qq.keys().hasOnly(['uid', 'createdAt'])
-          && qq.uid == me() && qq.createdAt == request.time
-          && getAfter(/databases/$(database)/documents/series/$(sid)).data.followerCount
-               == get(/databases/$(database)/documents/series/$(sid)).data.followerCount + 1; }
+          && qq.uid == me() && qq.createdAt == Tn()
+          && getAfter(Dp('series', sid)).data.followerCount
+               == get(Dp('series', sid)).data.followerCount + 1; }
         allow create: if z38();
         allow delete: if signedIn() && (fid == me() || isAdmin()
-          || !existsAfter(/databases/$(database)/documents/series/$(sid))
-          || actingAs(get(/databases/$(database)/documents/series/$(sid)).data.ownerId));
+          || !existsAfter(Dp('series', sid))
+          || actingAs(get(Dp('series', sid)).data.ownerId));
       }
     }
     match /{path=**}/followers/{fid} {
-      allow read: if signedIn() && resource.data.uid == me();
+      allow read: if signedIn() && Od().uid == me();
     }
     // Private "continue watching" progress per user and episode.
     match /users/{uid}/watch/{postId} {
       allow read, delete: if signedIn() && uid == me();
-      function z37() { let qq = request.resource.data; return signedIn() && uid == me()
+      function z37() { let qq = Nd(); return signedIn() && uid == me()
         && qq.keys().hasOnly(['sid', 't', 'dur', 'at'])
         && isStr(qq.sid, 0, 100)
         && qq.t is number && qq.t >= 0 && qq.t <= 100000
         && qq.dur is number && qq.dur >= 0 && qq.dur <= 100000
-        && qq.at == request.time; }
+        && qq.at == Tn(); }
       allow create, update: if z37();
     }
 
     // Chat lines hidden after 3 different reporters. Lives and park presence stay owner-written.
     match /chatHides/{id} {
       allow read: if signedIn();
-      function z36() { let qq = request.resource.data; return signedIn() && id.matches('^[a-z]{2,8}_[a-z0-9]{1,12}$')
+      function z36() { let qq = Nd(); return signedIn() && id.matches('^[a-z]{2,8}_[a-z0-9]{1,12}$')
         && qq.keys().hasOnly(['n', 'area', 'at'])
         && qq.n == 1
         && qq.area in ['park', 'live', 'cmt', 'game', 'world']
-        && qq.at == request.time
-        && !exists(/databases/$(database)/documents/chatHides/$(id)/by/$(me())); }
+        && qq.at == Tn()
+        && !exists(Dp2('chatHides', id, 'by', me())); }
       allow create: if z36();
       allow update: if signedIn()
         && changed().hasOnly(['n'])
-        && request.resource.data.n == resource.data.n + 1
-        && request.resource.data.n <= 30
-        && !exists(/databases/$(database)/documents/chatHides/$(id)/by/$(me()));
+        && Nd().n == Od().n + 1
+        && Nd().n <= 30
+        && !exists(Dp2('chatHides', id, 'by', me()));
       match /by/{who} {
         allow read: if signedIn() && who == me();
         allow create: if signedIn() && who == me()
-          && request.resource.data.keys().hasOnly(['at'])
-          && request.resource.data.at == request.time;
+          && Nd().keys().hasOnly(['at'])
+          && Nd().at == Tn();
       }
     }
 
     // ---------- Reports (admin only can read) ----------
-    function strikePath(u) { return /databases/$(database)/documents/reportStrikes/$(u); }
-    function quotaPath(u) { return /databases/$(database)/documents/reportQuota/$(u); }
-    function reportsAllowed() { return !exists(strikePath(me())) || get(strikePath(me())).data.until <= request.time; }
+    function strikePath(u) { return Dp('reportStrikes', u); }
+    function quotaPath(u) { return Dp('reportQuota', u); }
+    function reportsAllowed() { return !exists(strikePath(me())) || get(strikePath(me())).data.until <= Tn(); }
     function quotaBumped() {
       let q = getAfter(quotaPath(me())).data;
-      return q.at == request.time && q.hN <= 10 && q.dN <= 30;
+      return q.at == Tn() && q.hN <= 10 && q.dN <= 30;
     }
     function helperQuotaOk() {
-      let q = getAfter(/databases/$(database)/documents/helperQuota/$(me())).data;
-      return q.at == request.time && q.hN >= 1 && q.hN <= 8;
+      let q = getAfter(Dp('helperQuota', me())).data;
+      return q.at == Tn() && q.hN >= 1 && q.hN <= 8;
     }
     // Report rate counter, bumped by the reporter together with each report.
     match /reportQuota/{uid} {
-      function q() { return request.resource.data; }
+      function q() { return Nd(); }
       function win(start, n, oldStart, oldN, secs) {
-        return (oldStart > request.time - duration.value(secs, 's') && start == oldStart && n == oldN + 1)
-          || (oldStart <= request.time - duration.value(secs, 's') && start == request.time && n == 1);
+        return (oldStart > Tn() - duration.value(secs, 's') && start == oldStart && n == oldN + 1)
+          || (oldStart <= Tn() - duration.value(secs, 's') && start == Tn() && n == 1);
       }
       allow read: if signedIn() && (uid == me() || isMod());
-      function z35() { let tt = request.time; return signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'dStart', 'dN', 'at'])
+      function z35() { let tt = Tn(); return signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'dStart', 'dN', 'at'])
         && q().at == tt && q().hStart == tt && q().dStart == tt && q().hN == 1 && q().dN == 1; }
       allow create: if z35();
-      function z34() { let oo = resource.data; return signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'dStart', 'dN', 'at'])
-        && q().at == request.time
+      function z34() { let oo = Od(); return signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'dStart', 'dN', 'at'])
+        && q().at == Tn()
         && win(q().hStart, q().hN, oo.hStart, oo.hN, 3600)
         && win(q().dStart, q().dN, oo.dStart, oo.dN, 86400); }
       allow update: if z34();
@@ -1708,23 +1731,23 @@ service cloud.firestore {
     // blocks = how many report blocks so far, flag = flagged for the admin.
     // Kemy Helper may only ADD one strike; only the admin / human moderators undo.
     match /reportStrikes/{uid} {
-      function sd() { return request.resource.data; }
+      function sd() { return Nd(); }
       function validStrikes() {
         return sd().keys().hasOnly(['n', 'times', 'until', 'blocks', 'flag', 'by', 'at'])
           && sd().n is int && sd().n >= 1 && sd().n <= 1000
           && sd().times is list && sd().times.size() <= 20
-          && sd().until is timestamp && sd().until <= request.time + duration.value(31, 'd')
+          && sd().until is timestamp && sd().until <= Tn() + duration.value(31, 'd')
           && sd().blocks is int && sd().blocks >= 0 && sd().flag is bool
-          && sd().by == me() && sd().at == request.time;
+          && sd().by == me() && sd().at == Tn();
       }
       allow read: if signedIn() && (uid == me() || isMod());
       allow create: if isMod() && uid != me() && validStrikes() && sd().n == 1;
-      allow update: if isMod() && uid != me() && validStrikes() && (!isAI() || sd().n == resource.data.n + 1);
+      allow update: if isMod() && uid != me() && validStrikes() && (!isAI() || sd().n == Od().n + 1);
       allow delete: if isMod() && !isAI();
     }
     match /reports/{rid} {
       allow read, delete: if isMod();
-      function z33() { let qq = request.resource.data; return signedIn()
+      function z33() { let qq = Nd(); return signedIn()
         // Reports about someone else: not while report-blocked (false-report strikes), and counted
         // in reportQuota/{me} in the same batch (10 per hour, 30 per day). Auto self-reports and
         // moderators skip both.
@@ -1738,44 +1761,44 @@ service cloud.firestore {
         && isStr(qq.excerpt, 0, 300)
         && isStr(qq.get('targetUid', ''), 0, 128)
         && qq.get('status', 'open') == 'open'
-        && qq.createdAt == request.time; }
+        && qq.createdAt == Tn(); }
       allow create: if z33();
       // Moderators move a report through open -> review -> resolved.
-      function z32() { let qq = request.resource.data; return isMod()
+      function z32() { let qq = Nd(); return isMod()
         && changed().hasOnly(['status', 'handledBy', 'handledAt', 'action'])
         && qq.status in ['open', 'review', 'resolved']
-        && qq.handledBy == me() && qq.handledAt == request.time
+        && qq.handledBy == me() && qq.handledAt == Tn()
         && isStr(qq.get('action', ''), 0, 40); }
       allow update: if z32();
     }
 
     // Kemy Helper notes. Players may create a scrubbed note. Only the admin can read or mark it fixed.
     function helperWin(start, n, oldStart, oldN) {
-      return (oldStart > request.time - duration.value(600, 's') && start == oldStart && n == oldN + 1 && n <= 8)
-        || ((oldStart <= request.time - duration.value(600, 's') || !exists(/databases/$(database)/documents/helperQuota/$(me()))) && start == request.time && n == 1);
+      return (oldStart > Tn() - duration.value(600, 's') && start == oldStart && n == oldN + 1 && n <= 8)
+        || ((oldStart <= Tn() - duration.value(600, 's') || !exists(Dp('helperQuota', me()))) && start == Tn() && n == 1);
     }
     match /helperQuota/{uid} {
-      function q() { return request.resource.data; }
+      function q() { return Nd(); }
       allow read: if signedIn() && uid == me();
       allow create: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'at'])
-        && q().at == request.time && q().hStart == request.time && q().hN == 1;
+        && q().at == Tn() && q().hStart == Tn() && q().hN == 1;
       allow update: if signedIn() && uid == me() && q().keys().hasOnly(['hStart', 'hN', 'at'])
-        && q().at == request.time
-        && helperWin(q().hStart, q().hN, resource.data.hStart, resource.data.hN);
+        && q().at == Tn()
+        && helperWin(q().hStart, q().hN, Od().hStart, Od().hN);
     }
     match /helperReports/{id} {
-      function hr() { return request.resource.data; }
+      function hr() { return Nd(); }
       function plain(v) { return isStr(v, 0, 180) && !v.matches('.*[@].*'); }
       allow read: if isAdmin();
       allow create: if signedIn() && helperQuotaOk()
         && hr().keys().hasOnly(['type', 'game', 'place', 'device', 'text', 'autoFixed', 'status', 'at'])
         && hr().type in ['error', 'reject', 'load', 'fps', 'stuck', 'bounds', 'under', 'wall', 'float', 'nan', 'desync', 'turn', 'note']
         && isStr(hr().game, 0, 24) && isStr(hr().place, 0, 48) && isStr(hr().device, 0, 24)
-        && plain(hr().text) && hr().autoFixed is bool && hr().status == 'open' && hr().at == request.time;
+        && plain(hr().text) && hr().autoFixed is bool && hr().status == 'open' && hr().at == Tn();
       allow update: if isAdmin()
         && changed().hasOnly(['status', 'fixedAt'])
-        && request.resource.data.status == 'fixed'
-        && request.resource.data.fixedAt == request.time;
+        && Nd().status == 'fixed'
+        && Nd().fixedAt == Tn();
       allow delete: if false;
     }
 
@@ -1783,30 +1806,30 @@ service cloud.firestore {
     // Keem can warn from the admin page. Nobody else writes this.
     match /helperStrikes/{uid} {
       allow read: if signedIn() && (uid == me() || isAdmin());
-      function z31() { let qq = request.resource.data; return isAdmin()
+      function z31() { let qq = Nd(); return isAdmin()
         && qq.keys().hasOnly(['n', 'warn', 'warnAt', 'ban'])
         && qq.n == 0
         && qq.warn == true
-        && qq.warnAt == request.time
+        && qq.warnAt == Tn()
         && qq.ban == false; }
       allow create: if z31();
       allow update: if isAdmin()
         && changed().hasOnly(['warn', 'warnAt'])
-        && request.resource.data.warn == true
-        && request.resource.data.warnAt == request.time;
+        && Nd().warn == true
+        && Nd().warnAt == Tn();
       allow delete: if false;
     }
     // A short note the helper sends to the moderation function (park chat, a bad
     // name attempt, or someone blocking a spawn). Not a public chat log.
     match /worldChat/{id} {
-      allow read: if signedIn() && (isAdmin() || resource.data.uid == me());
-      function z30() { let qq = request.resource.data; return signedIn() && notBanned()
+      allow read: if signedIn() && (isAdmin() || Od().uid == me());
+      function z30() { let qq = Nd(); return signedIn() && notBanned()
         && qq.keys().hasOnly(['uid', 'text', 'area', 'target', 'at', 'still'])
         && qq.uid == me()
         && isStr(qq.text, 0, 200)
         && qq.area in ['park', 'street', 'plains', 'towns', 'dm', 'live', 'comment', 'game', 'name', 'grief']
         && isStr(qq.get('target', ''), 0, 128)
-        && qq.at == request.time
+        && qq.at == Tn()
         && (!('still' in qq) || (qq.still is int && qq.still >= 0 && qq.still <= 600000)); }
       allow create: if z30();
       allow update, delete: if false;
@@ -1815,48 +1838,48 @@ service cloud.firestore {
     // ∞ Pass (unlimited Star Coins + Diamonds): public (profile badge), written ONLY by the admin.
     match /infPass/{uid} {
       allow read: if true;
-      function z29() { let qq = request.resource.data; return isAdmin() && qq.keys().hasOnly(['unlimitedPass', 'grantedBy', 'grantedAt'])
+      function z29() { let qq = Nd(); return isAdmin() && qq.keys().hasOnly(['unlimitedPass', 'grantedBy', 'grantedAt'])
         && qq.unlimitedPass == true && qq.grantedBy == me()
-        && qq.grantedAt == request.time; }
+        && qq.grantedAt == Tn(); }
       allow create, update: if z29();
       allow delete: if isAdmin();
     }
     // Moderator roles: public (so everyone sees the blue check), written ONLY by the admin.
     match /roles/{uid} {
       allow read: if true;
-      function z28() { let qq = request.resource.data; return isAdmin()
+      function z28() { let qq = Nd(); return isAdmin()
         && qq.keys().hasOnly(['mod', 'name', 'uname', 'by', 'at', 'ai'])
         && qq.get('ai', false) is bool
         && qq.mod == true
         && isStr(qq.name, 0, 60) && isStr(qq.uname, 0, 30)
-        && qq.by == me() && qq.at == request.time; }
+        && qq.by == me() && qq.at == Tn(); }
       allow create, update: if z28();
       // Accepting an invite: the invited user creates their own role in the same batch that flips
       // their pending invite to accepted.
-      function z27() { let qq = request.resource.data; return signedIn() && uid == me()
+      function z27() { let qq = Nd(); return signedIn() && uid == me()
         && qq.keys().hasOnly(['mod', 'name', 'uname', 'by', 'at'])
         && qq.mod == true
         && isStr(qq.name, 0, 60) && isStr(qq.uname, 0, 30)
-        && exists(/databases/$(database)/documents/modInvites/$(uid))
-        && get(/databases/$(database)/documents/modInvites/$(uid)).data.status == 'pending'
-        && getAfter(/databases/$(database)/documents/modInvites/$(uid)).data.status == 'accepted'
-        && qq.by == get(/databases/$(database)/documents/modInvites/$(uid)).data.by
-        && qq.at == request.time; }
+        && exists(Dp('modInvites', uid))
+        && get(Dp('modInvites', uid)).data.status == 'pending'
+        && getAfter(Dp('modInvites', uid)).data.status == 'accepted'
+        && qq.by == get(Dp('modInvites', uid)).data.by
+        && qq.at == Tn(); }
       allow create: if z27();
       allow delete: if isAdmin();
     }
     // Moderator invites: only the admin creates / cancels; the invited user can only answer their own
     // pending invite (accepted / declined).
     match /modInvites/{uid} {
-      function iv() { return request.resource.data; }
+      function iv() { return Nd(); }
       allow read: if signedIn() && (uid == me() || isAdmin());
       allow create, update: if isAdmin() && uid != me()
         && iv().keys().hasOnly(['status', 'by', 'at', 'name', 'uname', 'answeredAt'])
-        && iv().status in ['pending', 'cancelled'] && iv().by == me() && iv().at == request.time
+        && iv().status in ['pending', 'cancelled'] && iv().by == me() && iv().at == Tn()
         && isStr(iv().name, 0, 60) && isStr(iv().uname, 0, 30) && !('answeredAt' in iv());
-      allow update: if signedIn() && uid == me() && resource.data.status == 'pending'
+      allow update: if signedIn() && uid == me() && Od().status == 'pending'
         && changed().hasOnly(['status', 'answeredAt']) && iv().status in ['accepted', 'declined']
-        && iv().answeredAt == request.time;
+        && iv().answeredAt == Tn();
       allow delete: if isAdmin();
     }
     // Suspensions. Readable by the person themselves and moderators. Moderators can't suspend
@@ -1864,24 +1887,24 @@ service cloud.firestore {
     // Under-13 flag: moderators and the Kemy Helper mark; only the admin / human moderators undo.
     match /underage/{uid} {
       allow read: if signedIn() && (uid == me() || isMod());
-      function z26() { let qq = request.resource.data; return isMod() && uid != me() && !exists(rolePath(uid))
+      function z26() { let qq = Nd(); return isMod() && uid != me() && !exists(rolePath(uid))
         && qq.keys().hasOnly(['by', 'reason', 'at'])
         && qq.by == me() && isStr(qq.reason, 0, 200)
-        && qq.at == request.time; }
+        && qq.at == Tn(); }
       allow create: if z26();
       // The same flag markUnder13 writes, saved by the player when their birthday is under 13.
       // They cannot remove it. A human moderator still can.
-      function z25() { let qq = request.resource.data; return signedIn() && uid == me() && !isAdmin() && !knownTeen(get(userPath(uid)).data)
+      function z25() { let qq = Nd(); return signedIn() && uid == me() && !isAdmin() && !knownTeen(get(userPath(uid)).data)
         && qq.keys().hasOnly(['by', 'reason', 'at'])
         && qq.by == me()
         && qq.reason == 'Birthday is under 13'
-        && qq.at == request.time; }
+        && qq.at == Tn(); }
       allow create: if z25();
       allow delete: if isMod() && !isAI();
     }
     match /bans/{uid} {
       allow read: if signedIn() && (uid == me() || isMod());
-      function z24() { let qq = request.resource.data; let tt = request.time; return isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
+      function z24() { let qq = Nd(); let tt = Tn(); return isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
         // the AI helper: temporary suspensions of at most 7 days, never permanent / hidden
         && (!isAI() || (qq.permanent == false && qq.hide == false
                         && qq.until <= tt + duration.value(7 * 24 * 60 + 5, 'm')))
@@ -1894,7 +1917,7 @@ service cloud.firestore {
       allow create, update: if z24();
       // Kind-words filter: a 1-hour automatic timeout the app sets on your own account when you
       // try to get around it (only if you have no suspension yet; a moderator lifts or keeps it).
-      function z23() { let qq = request.resource.data; let tt = request.time; return signedIn() && uid == me() && !exists(banPath(uid))
+      function z23() { let qq = Nd(); let tt = Tn(); return signedIn() && uid == me() && !exists(banPath(uid))
         && qq.keys().hasOnly(['until', 'reason', 'permanent', 'hide', 'by', 'at', 'name', 'uname'])
         && qq.by == 'auto' && qq.permanent == false && qq.hide == false
         && qq.until is timestamp && qq.until > tt
@@ -1907,17 +1930,17 @@ service cloud.firestore {
     // Removed accounts whose content is hidden everywhere (public list, moderators write).
     match /watchlist/{uid} {
       allow read: if signedIn() && (uid == me() || isMod());
-      function z22() { let qq = request.resource.data; return isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
+      function z22() { let qq = Nd(); return isMod() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
         && qq.keys().hasOnly(['reason', 'by', 'at', 'until'])
         && isStr(qq.reason, 0, 200) && qq.until is timestamp
-        && qq.by == me() && qq.at == request.time; }
+        && qq.by == me() && qq.at == Tn(); }
       allow create, update: if z22();
       allow delete: if isMod() && !isAI();
     }
     match /hiddenUsers/{uid} {
       allow read: if true;
-      function z21() { let qq = request.resource.data; return isMod() && !isAI() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
-        && qq.keys().hasOnly(['by', 'at']) && qq.by == me() && qq.at == request.time; }
+      function z21() { let qq = Nd(); return isMod() && !isAI() && uid != me() && (isAdmin() || !exists(rolePath(uid)))
+        && qq.keys().hasOnly(['by', 'at']) && qq.by == me() && qq.at == Tn(); }
       allow create, update: if z21();
       allow delete: if isMod();
     }
@@ -1925,44 +1948,44 @@ service cloud.firestore {
     // Held posts: auto-flagged posts never go into posts/ until a moderator restores them, so nobody
     // else can read them. Readable by the author ("being reviewed") and moderators.
     match /heldPosts/{pid} {
-      function hp() { return request.resource.data; }
-      function livePost() { return /databases/$(database)/documents/posts/$(pid); }
-      allow read: if signedIn() && (resource.data.authorId == me() || isMod());
+      function hp() { return Nd(); }
+      function livePost() { return Dp('posts', pid); }
+      allow read: if signedIn() && (Od().authorId == me() || isMod());
       allow create: if signedIn() && notBanned()
         && hp().keys().hasOnly(['post', 'reason', 'level', 'authorId', 'createdAt', 'by'])
         && hp().post is map && hp().authorId == hp().post.authorId
         && isStr(hp().reason, 1, 200) && hp().level in ['bad', 'borderline', 'mod']
-        && hp().createdAt == request.time
+        && hp().createdAt == Tn()
         && ((hp().level != 'mod' && !('by' in hp()) && actingAs(hp().authorId) && validNewPost(hp().post) && canCreate(hp().authorId))
             // a moderator pulls a live post into review
             || (hp().level == 'mod' && isMod() && hp().by == me() && exists(livePost())
                 && hp().post == get(livePost()).data && !existsAfter(livePost())));
-      allow delete: if signedIn() && (isMod() || resource.data.authorId == me());
+      allow delete: if signedIn() && (isMod() || Od().authorId == me());
       // Poster appeals a song hold. Only the reason changes, and only from a song match.
-      allow update: if signedIn() && resource.data.authorId == me()
+      allow update: if signedIn() && Od().authorId == me()
         && changed().hasOnly(['reason'])
-        && resource.data.reason.matches('Song match:.*')
-        && request.resource.data.reason.matches('Own song:.+')
-        && isStr(request.resource.data.reason, 1, 200);
+        && Od().reason.matches('Song match:.*')
+        && Nd().reason.matches('Own song:.+')
+        && isStr(Nd().reason, 1, 200);
     }
     // One team note per minute. The player writes this stamp in the same batch as the note.
     match /feedbackQuota/{uid} {
       allow read: if signedIn() && (uid == me() || isAdmin());
       allow create: if signedIn() && uid == me()
-        && request.resource.data.keys().hasOnly(['at'])
-        && request.resource.data.at == request.time;
+        && Nd().keys().hasOnly(['at'])
+        && Nd().at == Tn();
       allow update: if signedIn() && uid == me()
         && changed().hasOnly(['at'])
-        && request.resource.data.at == request.time
-        && resource.data.at + duration.value(60, 's') < request.time;
+        && Nd().at == Tn()
+        && Od().at + duration.value(60, 's') < Tn();
       allow delete: if false;
     }
     // Bug reports and feedback. Only the admin (Keem) can read them. Players cannot see anyone's notes.
     match /feedback/{id} {
-      function fb() { return request.resource.data; }
-      function quotaPath() { return /databases/$(database)/documents/feedbackQuota/$(me()); }
+      function fb() { return Nd(); }
+      function quotaPath() { return Dp('feedbackQuota', me()); }
       allow read: if isAdmin();
-      function z20() { let tt = request.time; return signedIn() && fb().keys().hasOnly(['uid', 'name', 'kind', 'text', 'page', 'ua', 'status', 'note', 'createdAt'])
+      function z20() { let tt = Tn(); return signedIn() && fb().keys().hasOnly(['uid', 'name', 'kind', 'text', 'page', 'ua', 'status', 'note', 'createdAt'])
         && fb().uid == me() && isStr(fb().name, 0, 60) && fb().kind in ['bug', 'feedback', 'idea']
         && cleanStr(fb().text, 1, 1500) && isStr(fb().page, 0, 200) && isStr(fb().ua, 0, 300)
         && fb().status == 'new' && fb().note == '' && fb().createdAt == tt
@@ -1971,61 +1994,61 @@ service cloud.firestore {
       allow create: if z20();
       allow update: if isMod() && changed().hasOnly(['status', 'note', 'handledBy', 'handledAt'])
         && fb().status in ['new', 'progress', 'fixed', 'closed'] && isStr(fb().note, 0, 1000)
-        && fb().handledBy == me() && fb().handledAt == request.time;
+        && fb().handledBy == me() && fb().handledAt == Tn();
       allow delete: if isAdmin();
     }
     // Two-way "Kemy Moderators" thread per user: modThreads/{uid} + /m/{mid}. The user reads/writes
     // only their own (suspended users too, so they can appeal); moderators read and write all.
     match /modThreads/{uid} {
-      function th() { return request.resource.data; }
+      function th() { return Nd(); }
       function thShape() {
         return th().keys().hasOnly(['uid', 'name', 'uname', 'lastAt', 'lastText', 'lastFrom', 'unreadUser', 'unreadMod', 'ref'])
-          && th().uid == uid && isStr(th().name, 0, 60) && isStr(th().uname, 0, 30) && th().lastAt == request.time
+          && th().uid == uid && isStr(th().name, 0, 60) && isStr(th().uname, 0, 30) && th().lastAt == Tn()
           && isStr(th().lastText, 0, 200) && th().unreadUser is bool && th().unreadMod is bool && isStr(th().ref, 0, 120);
       }
       allow read: if signedIn() && (uid == me() || isMod());
       allow create, update: if signedIn() && thShape() && (
         (isMod() && th().lastFrom == 'mod')
-        || (uid == me() && th().lastFrom == 'user' && th().unreadMod == true && th().unreadUser == false && exists(/databases/$(database)/documents/modThreads/$(uid))));
+        || (uid == me() && th().lastFrom == 'user' && th().unreadMod == true && th().unreadUser == false && exists(Dp('modThreads', uid))));
       // marking read (no new message)
       allow update: if signedIn() && changed().hasOnly(['unreadUser', 'unreadMod'])
-        && ((uid == me() && th().unreadUser == false && th().unreadMod == resource.data.unreadMod)
-            || (isMod() && th().unreadMod == false && th().unreadUser == resource.data.unreadUser));
+        && ((uid == me() && th().unreadUser == false && th().unreadMod == Od().unreadMod)
+            || (isMod() && th().unreadMod == false && th().unreadUser == Od().unreadUser));
       match /m/{mid} {
-        function mm() { return request.resource.data; }
+        function mm() { return Nd(); }
         allow read: if signedIn() && (uid == me() || isMod());
         allow create: if signedIn() && mm().keys().hasOnly(['from', 'by', 'byName', 'text', 'createdAt', 'ref'])
           && mm().by == me() && isStr(mm().byName, 0, 60) && cleanStr(mm().text, 1, 1000) && isStr(mm().ref, 0, 120)
-          && mm().createdAt == request.time
+          && mm().createdAt == Tn()
           && ((mm().from == 'mod' && isMod()) || (mm().from == 'user' && uid == me()))
-          && getAfter(/databases/$(database)/documents/modThreads/$(uid)).data.lastAt == request.time;
+          && getAfter(Dp('modThreads', uid)).data.lastAt == Tn();
       }
     }
     // Mod team notes / handoff board.
     match /modNotes/{id} {
       allow read: if isMod();
-      function z19() { let qq = request.resource.data; return isMod() && qq.keys().hasOnly(['by', 'byName', 'text', 'done', 'createdAt'])
+      function z19() { let qq = Nd(); return isMod() && qq.keys().hasOnly(['by', 'byName', 'text', 'done', 'createdAt'])
         && qq.by == me() && isStr(qq.byName, 0, 60)
-        && cleanStr(qq.text, 1, 1000) && qq.done == false && qq.createdAt == request.time; }
+        && cleanStr(qq.text, 1, 1000) && qq.done == false && qq.createdAt == Tn(); }
       allow create: if z19();
-      allow update: if isMod() && changed().hasOnly(['done']) && request.resource.data.done is bool;
-      allow delete: if isAdmin() || (isMod() && resource.data.by == me());
+      allow update: if isMod() && changed().hasOnly(['done']) && Nd().done is bool;
+      allow delete: if isAdmin() || (isMod() && Od().by == me());
     }
     // Audit log of moderator actions: append-only. Moderators read it for user history; the full log tab is admin-only in the app.
     match /modLog/{id} {
       allow read: if isMod() && !isAI();
-      function z18() { let qq = request.resource.data; return isMod()
+      function z18() { let qq = Nd(); return isMod()
         && qq.keys().hasOnly(['by', 'byName', 'action', 'targetUid', 'targetName', 'reportId', 'detail', 'at'])
         && qq.by == me() && isStr(qq.byName, 0, 60)
         && isStr(qq.action, 1, 40) && isStr(qq.targetUid, 0, 128)
         && isStr(qq.targetName, 0, 60) && isStr(qq.reportId, 0, 100)
-        && isStr(qq.detail, 0, 400) && qq.at == request.time; }
+        && isStr(qq.detail, 0, 400) && qq.at == Tn(); }
       allow create: if z18();
       allow delete: if isAdmin();
     }
       // Kemy's Bubble Quest: one best-score doc per user per level (fastest time leaderboard).
     match /kqLevels/{lvl}/scores/{uid} {
-      function kq() { return request.resource.data; }
+      function kq() { return Nd(); }
       function kqValid() {
         return signedIn() && uid == me() && lvl.matches('^[1-3]-[1-2]$')
           && kq().keys().hasOnly(['uid', 'level', 'name', 'uname', 'time', 'stars', 'big', 'updatedAt'])
@@ -2033,11 +2056,11 @@ service cloud.firestore {
           && kq().time is int && kq().time >= 10000 && kq().time <= 3600000
           && kq().stars is int && kq().stars >= 0 && kq().stars <= 80
           && kq().big is int && kq().big >= 0 && kq().big <= 3
-          && kq().updatedAt == request.time;
+          && kq().updatedAt == Tn();
       }
       allow read: if true;
       allow create: if kqValid();
-      function z17() { let oo = resource.data; return kqValid() && kq().time <= oo.time && kq().stars >= oo.stars && kq().big >= oo.big; }
+      function z17() { let oo = Od(); return kqValid() && kq().time <= oo.time && kq().stars >= oo.stars && kq().big >= oo.big; }
       allow update: if z17();
       allow delete: if signedIn() && uid == me();
     }
@@ -2048,13 +2071,13 @@ service cloud.firestore {
       allow read: if true;
     }
     match /users/{uid}/pets/{pid} {
-      function pd() { return request.resource.data; }
+      function pd() { return Nd(); }
       function hex(v) { return v is string && v.matches('^#[0-9a-fA-F]{6}$'); }
       function stat(v) { return v is int && v >= 0 && v <= 100; }
       // Closet check for a paid id. Unchanged values are accepted above this and never call it:
       // each call counts the purchase rules, and more than a few in one write exceed 1000 expressions.
-      function held(id) { return exists(/databases/$(database)/documents/users/$(uid)/inv/$(id)); }
-      function same(k) { return resource != null && resource.data.keys().hasAny([k]) && pd().keys().hasAny([k]) && resource.data[k] == pd()[k]; }
+      function held(id) { return exists(Dp2('users', uid, 'inv', id)); }
+      function same(k) { return resource != null && Od().keys().hasAny([k]) && pd().keys().hasAny([k]) && Od()[k] == pd()[k]; }
       function palValid() {
         return pd().keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'xp', 'level', 'pats', 'stats', 'at', 'createdAt', 'updatedAt', 'outfit', 'voice', 'bg', 'variant'])
           && (!('variant' in pd()) || pd().variant == '' || same('variant') || (pd().variant is string && pd().variant.matches('^rare_[a-z]{2,11}$') && held(pd().variant)))
@@ -2064,7 +2087,7 @@ service cloud.firestore {
           && (!('outfit' in pd()) || outfitOk(pd().outfit))
           && pd().species is string && pd().species.matches('^[a-z]{2,16}$')
           && (pd().species != 'founder' || isAdmin())
-          && (!pd().species.matches('^rx[a-z]+$') || (resource != null && resource.data.species == pd().species) || held('sp_' + pd().species))
+          && (!pd().species.matches('^rx[a-z]+$') || (resource != null && Od().species == pd().species) || held('sp_' + pd().species))
           && isStr(pd().name, 1, 20)
           && pd().colors is map && pd().colors.keys().hasOnly(['body', 'accent', 'eye']) && hex(pd().colors.body) && hex(pd().colors.accent) && hex(pd().colors.eye)
           && (pd().pattern in ['none', 'spots', 'stripes', 'sparkle'] || same('pattern') || (pd().pattern is string && pd().pattern.matches('^pt_[a-z]{2,13}$') && held(pd().pattern)))
@@ -2074,7 +2097,7 @@ service cloud.firestore {
           && pd().pats is int
           && pd().stats is map && pd().stats.keys().hasOnly(['happy', 'hunger', 'energy', 'clean'])
           && stat(pd().stats.happy) && stat(pd().stats.hunger) && stat(pd().stats.energy) && stat(pd().stats.clean)
-          && pd().at == request.time && pd().updatedAt == request.time;
+          && pd().at == Tn() && pd().updatedAt == Tn();
       }
       function plain(id) { return id == '' || (id is string && id.matches('^f_[a-z0-9_]{1,13}$')); }
       // Empty or free ids skip the closet. A paid id is one exists() of inv/{id}.
@@ -2105,32 +2128,32 @@ service cloud.firestore {
       }
       function outfitOk(o) {
         return o is map && o.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand', 'nose'])
-          && (resource != null && 'outfit' in resource.data
-            ? changedPay(o, o.diff(resource.data.outfit).affectedKeys())
+          && (resource != null && 'outfit' in Od()
+            ? changedPay(o, o.diff(Od().outfit).affectedKeys())
             : eachPay(o));
       }
       function patPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid)/pats/$(me()); }
       allow create: if signedIn() && uid == me() && pid.matches('^p[1-6]$') && palValid()
-        && pd().xp == 0 && pd().pats == 0 && pd().createdAt == request.time;
-      function z16() { let oo = resource.data; return signedIn() && uid == me() && palValid()
+        && pd().xp == 0 && pd().pats == 0 && pd().createdAt == Tn();
+      function z16() { let oo = Od(); return signedIn() && uid == me() && palValid()
         && pd().createdAt == oo.createdAt && pd().pats == oo.pats
         && pd().xp >= oo.xp && pd().xp <= oo.xp + 60
-        && oo.updatedAt + duration.value(1, 's') < request.time; }
+        && oo.updatedAt + duration.value(1, 's') < Tn(); }
       allow update: if z16();
       // a visitor's pat: +1 on the counter, only together with a fresh pat doc (once per 20 hours)
       allow update: if signedIn() && uid != me()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pats'])
-        && pd().pats == resource.data.pats + 1
-        && getAfter(patPath()).data.at == request.time
-        && (!exists(patPath()) || get(patPath()).data.at + duration.value(20, 'h') < request.time);
+        && Nd().diff(Od()).affectedKeys().hasOnly(['pats'])
+        && pd().pats == Od().pats + 1
+        && getAfter(patPath()).data.at == Tn()
+        && (!exists(patPath()) || get(patPath()).data.at + duration.value(20, 'h') < Tn());
       allow delete: if signedIn() && uid == me();
       match /pats/{vid} {
-        function petPath() { return /databases/$(database)/documents/users/$(uid)/pets/$(pid); }
+        function petPath() { return Dp2('users', uid, 'pets', pid); }
         allow read: if true;
-        function z15() { let qq = request.resource.data; return signedIn() && vid == me() && uid != me()
+        function z15() { let qq = Nd(); return signedIn() && vid == me() && uid != me()
           && qq.keys().hasOnly(['uid', 'at']) && qq.uid == vid
-          && qq.at == request.time
-          && (resource == null || resource.data.at + duration.value(20, 'h') < request.time)
+          && qq.at == Tn()
+          && (resource == null || Od().at + duration.value(20, 'h') < Tn())
           && getAfter(petPath()).data.pats == get(petPath()).data.pats + 1; }
         allow create, update: if z15();
         allow delete: if signedIn() && (vid == me() || uid == me());
@@ -2138,12 +2161,12 @@ service cloud.firestore {
       // play dates: a visitor's Pal plays with this Pal, once per visitor per 20 hours
       match /playdates/{vid} {
         allow read: if true;
-        function z14() { let qq = request.resource.data; return signedIn() && vid == me() && uid != me()
+        function z14() { let qq = Nd(); return signedIn() && vid == me() && uid != me()
           && qq.keys().hasOnly(['uid', 'pet', 'at']) && qq.uid == vid
           && qq.pet is string && qq.pet.matches('^p[1-6]$')
-          && exists(/databases/$(database)/documents/users/$(vid)/pets/$(qq.pet))
-          && qq.at == request.time
-          && (resource == null || resource.data.at + duration.value(20, 'h') < request.time); }
+          && exists(Dp2('users', vid, 'pets', qq.pet))
+          && qq.at == Tn()
+          && (resource == null || Od().at + duration.value(20, 'h') < Tn()); }
         allow create, update: if z14();
         allow delete: if signedIn() && (vid == me() || uid == me());
       }
@@ -2154,8 +2177,8 @@ service cloud.firestore {
     // New-account video check: how many live posts before videos skip review (admin only).
     match /config/mediaReview {
       allow read: if true;
-      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['minApproved', 'updatedAt'])
-        && request.resource.data.minApproved is int && request.resource.data.minApproved >= 0 && request.resource.data.minApproved <= 50;
+      allow write: if isAdmin() && Nd().keys().hasOnly(['minApproved', 'updatedAt'])
+        && Nd().minApproved is int && Nd().minApproved >= 0 && Nd().minApproved <= 50;
     }
     match /config/palShop {
       allow read: if true;
@@ -2164,57 +2187,57 @@ service cloud.firestore {
     // Who receives the once-a-day Kemy Helper digest. The day stamp is written by the Cloud Function.
     match /config/helperDigest {
       allow read: if isAdmin();
-      function z13() { let qq = request.resource.data; return isAdmin() && qq.keys().hasOnly(['uid', 'updatedAt'])
-        && qq.uid == me() && qq.updatedAt == request.time; }
+      function z13() { let qq = Nd(); return isAdmin() && qq.keys().hasOnly(['uid', 'updatedAt'])
+        && qq.uid == me() && qq.updatedAt == Tn(); }
       allow create: if z13();
       allow update: if isAdmin() && changed().hasOnly(['uid', 'updatedAt'])
-        && request.resource.data.uid == me() && request.resource.data.updatedAt == request.time;
+        && Nd().uid == me() && Nd().updatedAt == Tn();
       allow delete: if isAdmin();
     }
     // Admin-only "ping me when someone joins" switch (js/members.js). The uid is the admin's own account.
     match /config/adminAlerts {
       allow read: if isAdmin();
-      function z12() { let qq = request.resource.data; return isAdmin()
+      function z12() { let qq = Nd(); return isAdmin()
         && qq.keys().hasOnly(['joinPush', 'uid', 'updatedAt'])
         && qq.joinPush is bool
         && qq.uid == me()
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z12();
       allow delete: if isAdmin();
     }
     match /users/{uid}/pal/wallet {
-      function w() { return request.resource.data; }
-      function ow() { return resource.data; }
-      function dayNow() { return int(request.time.toMillis() / 86400000); }
+      function w() { return Nd(); }
+      function ow() { return Od(); }
+      function dayNow() { return int(Tn().toMillis() / 86400000); }
       // Star Coin sources: max per write and max per day
       function emax() { return { 'daily': 50, 'care': 5, 'win': 25, 'quest': 10, 'stars': 5, 'park': 10, 'chat': 2 }; }
       function ecap() { return { 'daily': 50, 'care': 60, 'win': 150, 'quest': 60, 'stars': 50, 'park': 100, 'chat': 20 }; }
-      function invPath(i) { return /databases/$(database)/documents/users/$(uid)/inv/$(i); }
+      function invPath(i) { return Dp2('users', uid, 'inv', i); }
       function shop() { return get(/databases/$(database)/documents/config/palShop).data; }
       function walletShape() {
         return w().keys().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'lastBuy', 'paid', 'buyAt', 'room', 'updatedAt'])
           && w().coins is int && w().coins >= 0 && w().total is int && w().day is int && w().earned is map
-          && w().room is list && w().room.size() <= 3 && w().updatedAt == request.time;
+          && w().room is list && w().room.size() <= 3 && w().updatedAt == Tn();
       }
       function amt() { return w().coins - ow().coins; }
       function earnOk() {
         return w().src in emax() && amt() > 0 && amt() <= emax()[w().src]
-          && w().total == ow().total + amt() && w().day == dayNow() && w().last == request.time
-          && ow().last + duration.value(1, 's') < request.time
+          && w().total == ow().total + amt() && w().day == dayNow() && w().last == Tn()
+          && ow().last + duration.value(1, 's') < Tn()
           && ((ow().day == dayNow() && w().earned.diff(ow().earned).affectedKeys().hasOnly([w().src])
                && w().earned[w().src] == ow().earned.get(w().src, 0) + amt())
               || (ow().day != dayNow() && w().earned.keys().hasOnly([w().src]) && w().earned[w().src] == amt()))
           && w().earned[w().src] <= ecap()[w().src];
       }
       function buyOk() {
-        return w().paid == ow().coins - w().coins && w().paid > 0 && w().buyAt == request.time
+        return w().paid == ow().coins - w().coins && w().paid > 0 && w().buyAt == Tn()
           && w().lastBuy in shop().prices
           && (w().paid == shop().prices[w().lastBuy] || w().paid == shop().deals[dayNow() % shop().deals.size()].get(w().lastBuy, -1))
-          && getAfter(invPath(w().lastBuy)).data.at == request.time;
+          && getAfter(invPath(w().lastBuy)).data.at == Tn();
       }
       function adminBuyOk() {
-        return w().paid == 0 && w().buyAt == request.time && w().lastBuy in shop().prices
-          && getAfter(invPath(w().lastBuy)).data.at == request.time;
+        return w().paid == 0 && w().buyAt == Tn() && w().lastBuy in shop().prices
+          && getAfter(invPath(w().lastBuy)).data.at == Tn();
       }
       function roomOk() {
         return (w().room.size() < 1 || exists(invPath(w().room[0]))) && (w().room.size() < 2 || exists(invPath(w().room[1])))
@@ -2222,7 +2245,7 @@ service cloud.firestore {
       }
       allow read: if true;
       allow create: if signedIn() && uid == me() && walletShape() && w().coins == 0 && w().total == 0 && w().day == dayNow()
-        && w().earned.size() == 0 && w().room.size() == 0 && w().last == request.time && w().paid == 0 && w().lastBuy == '';
+        && w().earned.size() == 0 && w().room.size() == 0 && w().last == Tn() && w().paid == 0 && w().lastBuy == '';
       allow update: if signedIn() && uid == me() && walletShape() && (
         (changed().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'updatedAt']) && earnOk())
         || (changed().hasOnly(['coins', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && buyOk())
@@ -2234,69 +2257,69 @@ service cloud.firestore {
     // Diamonds (Pal Zombie Survival currency): earned once per finished run (max 250 per run, 1500 per day,
     // one run reward every 45 s), spent only on config/palShop.dprices items (inv doc written in the same batch).
     match /users/{uid}/pal/diamonds {
-      function d() { return request.resource.data; }
-      function od() { return resource.data; }
-      function dDay() { return int(request.time.toMillis() / 86400000); }
+      function d() { return Nd(); }
+      function od() { return Od(); }
+      function dDay() { return int(Tn().toMillis() / 86400000); }
       function dShop() { return get(/databases/$(database)/documents/config/palShop).data; }
       function dShape() {
         return d().keys().hasOnly(['d', 'total', 'day', 'today', 'last', 'lastBuy', 'paid', 'buyAt', 'updatedAt'])
           && d().d is int && d().d >= 0 && d().total is int && d().day is int && d().today is int && d().paid is int
-          && d().lastBuy is string && d().updatedAt == request.time;
+          && d().lastBuy is string && d().updatedAt == Tn();
       }
       function dAmt() { return d().d - od().d; }
       function dEarnOk() {
-        return dAmt() > 0 && dAmt() <= 250 && d().total == od().total + dAmt() && d().day == dDay() && d().last == request.time
-          && od().last + duration.value(45, 's') < request.time
+        return dAmt() > 0 && dAmt() <= 250 && d().total == od().total + dAmt() && d().day == dDay() && d().last == Tn()
+          && od().last + duration.value(45, 's') < Tn()
           && d().today == (od().day == dDay() ? od().today : 0) + dAmt() && d().today <= 1500;
       }
       function dBuyOk() {
-        return d().paid == od().d - d().d && d().paid > 0 && d().buyAt == request.time
+        return d().paid == od().d - d().d && d().paid > 0 && d().buyAt == Tn()
           && d().lastBuy in dShop().get('dprices', {}) && d().paid == dShop().dprices[d().lastBuy]
-          && getAfter(/databases/$(database)/documents/users/$(uid)/inv/$(d().lastBuy)).data.at == request.time;
+          && getAfter(Dp2('users', uid, 'inv', d().lastBuy)).data.at == Tn();
       }
       allow read: if true;
       allow create: if signedIn() && uid == me() && dShape() && d().d == 0 && d().total == 0 && d().today == 0 && d().paid == 0
-        && d().lastBuy == '' && d().last == request.time && d().day == dDay();
+        && d().lastBuy == '' && d().last == Tn() && d().day == dDay();
       allow update: if signedIn() && uid == me() && dShape() && (
         (changed().hasOnly(['d', 'total', 'day', 'today', 'last', 'updatedAt']) && dEarnOk())
         || (changed().hasOnly(['d', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && dBuyOk())
         // owner/admin or ∞ Pass: unlimited Diamonds - records a valid Diamond purchase (paid 0) without touching the balance
-        || (unlimitedFor(uid) && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && d().paid == 0 && d().buyAt == request.time
+        || (unlimitedFor(uid) && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && d().paid == 0 && d().buyAt == Tn()
             && d().lastBuy in dShop().get('dprices', {})
-            && getAfter(/databases/$(database)/documents/users/$(uid)/inv/$(d().lastBuy)).data.at == request.time));
+            && getAfter(Dp2('users', uid, 'inv', d().lastBuy)).data.at == Tn()));
       allow delete: if signedIn() && uid == me();
     }
     // ================= Pal Zombie Survival co-op lobbies (2-4 players)
     // Lobby doc: host only (plus a guarded take-over when the host has been quiet for 8 s or left).
     // Seats: one create-only doc per seat (max 4). Player docs: only their owner. Game state: only the host.
     match /zLobbies/{code} {
-      function zl() { return request.resource.data; }
-      function zlp(u) { return /databases/$(database)/documents/zLobbies/$(code)/p/$(u); }
-      function zlPath() { return /databases/$(database)/documents/zLobbies/$(code); }
+      function zl() { return Nd(); }
+      function zlp(u) { return Dp2('zLobbies', code, 'p', u); }
+      function zlPath() { return Dp('zLobbies', code); }
       function zlShape() {
         return zl().keys().hasOnly(['host', 'status', 'pub', 'n', 'wave', 'createdAt', 'updatedAt'])
           && zl().host is string && zl().host.size() <= 128 && zl().status in ['open', 'playing', 'done'] && zl().pub is bool
-          && zl().n is int && zl().n >= 0 && zl().n <= 4 && zl().wave is int && zl().wave >= 0 && zl().wave <= 1000 && zl().updatedAt == request.time;
+          && zl().n is int && zl().n >= 0 && zl().n <= 4 && zl().wave is int && zl().wave >= 0 && zl().wave <= 1000 && zl().updatedAt == Tn();
       }
       allow read: if signedIn();
-      allow create: if signedIn() && notBanned() && code.matches('^[A-Z2-9]{5}$') && zlShape() && zl().host == me() && zl().status == 'open' && zl().n == 1 && zl().createdAt == request.time;
-      function z11() { let oo = resource.data; return signedIn() && zlShape() && zl().createdAt == oo.createdAt && (
+      allow create: if signedIn() && notBanned() && code.matches('^[A-Z2-9]{5}$') && zlShape() && zl().host == me() && zl().status == 'open' && zl().n == 1 && zl().createdAt == Tn();
+      function z11() { let oo = Od(); return signedIn() && zlShape() && zl().createdAt == oo.createdAt && (
         (oo.host == me() && (zl().host == me() || exists(zlp(zl().host))))
         || (zl().host == me() && oo.host != me() && exists(zlp(me()))
-            && (!exists(zlp(oo.host)) || get(zlp(oo.host)).data.at < request.time - duration.value(8, 's'))
+            && (!exists(zlp(oo.host)) || get(zlp(oo.host)).data.at < Tn() - duration.value(8, 's'))
             && zl().diff(oo).affectedKeys().hasOnly(['host', 'updatedAt']))); }
       allow update: if z11();
-      allow delete: if signedIn() && (resource.data.host == me() || resource.data.updatedAt < request.time - duration.value(30, 'm'));
+      allow delete: if signedIn() && (Od().host == me() || Od().updatedAt < Tn() - duration.value(30, 'm'));
       match /slot/{s} {
         allow read: if signedIn();
-        function z10() { let qq = request.resource.data; return signedIn() && notBanned() && s in ['0', '1', '2', '3'] && exists(zlPath())
-          && qq.keys().hasOnly(['uid', 'at']) && qq.uid == me() && qq.at == request.time; }
+        function z10() { let qq = Nd(); return signedIn() && notBanned() && s in ['0', '1', '2', '3'] && exists(zlPath())
+          && qq.keys().hasOnly(['uid', 'at']) && qq.uid == me() && qq.at == Tn(); }
         allow create: if z10();
-        allow delete: if signedIn() && (resource.data.uid == me() || !exists(zlPath()) || get(zlPath()).data.host == me()
-          || resource.data.at < request.time - duration.value(30, 'm'));
+        allow delete: if signedIn() && (Od().uid == me() || !exists(zlPath()) || get(zlPath()).data.host == me()
+          || Od().at < Tn() - duration.value(30, 'm'));
       }
       match /p/{u} {
-        function zp() { return request.resource.data; }
+        function zp() { return Nd(); }
         function zpShape() {
           return zp().keys().hasOnly(['name', 'pal', 'slot', 'ready', 'x', 'y', 'z', 'f', 'a', 'fire', 'w', 'hp', 'down', 'rev', 'em', 'emAt', 'hits', 'hs', 'at'])
             && isStr(zp().name, 0, 40) && zp().pal is map && zp().pal.size() <= 8 && zp().pal.get('outfit', {}) is map && zp().pal.get('outfit', {}).size() <= 15
@@ -2306,55 +2329,55 @@ service cloud.firestore {
             && zp().x >= -60 && zp().x <= 60 && zp().z >= -60 && zp().z <= 60 && zp().y >= -5 && zp().y <= 20
             && zp().fire is bool && isStr(zp().w, 0, 10) && zp().hp is number && zp().hp >= 0 && zp().hp <= 200 && zp().down is bool
             && isStr(zp().rev, 0, 128) && zp().em is int && zp().em >= -1 && zp().em <= 999 && zp().emAt is int
-            && zp().hits is list && zp().hits.size() <= 45 && zp().hs is int && zp().at == request.time;
+            && zp().hits is list && zp().hits.size() <= 45 && zp().hs is int && zp().at == Tn();
         }
         allow read: if signedIn();
         allow create, update: if signedIn() && u == me() && zpShape()
-          && getAfter(/databases/$(database)/documents/zLobbies/$(code)/slot/$(string(zp().slot))).data.uid == me()
-          && (resource == null || resource.data.at + duration.value(60, 'ms') < request.time);
-        allow delete: if signedIn() && (u == me() || !exists(zlPath()) || get(zlPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+          && getAfter(Dp2('zLobbies', code, 'slot', string(zp().slot))).data.uid == me()
+          && (resource == null || Od().at + duration.value(60, 'ms') < Tn());
+        allow delete: if signedIn() && (u == me() || !exists(zlPath()) || get(zlPath()).data.host == me() || Od().at < Tn() - duration.value(30, 'm'));
       }
       match /s/{d} {
-        function zs() { return request.resource.data; }
+        function zs() { return Nd(); }
         allow read: if signedIn();
         allow create, update: if signedIn() && d == 'state' && get(zlPath()).data.host == me()
           && zs().keys().hasOnly(['wave', 'zs', 'score', 'kills', 'dia', 'over', 'slam', 'seq', 'n', 'ts', 'brk', 'bm', 'at'])
           && zs().wave is int && zs().wave >= 0 && zs().wave <= 1000 && zs().zs is list && zs().zs.size() <= 300
           && zs().score is int && zs().kills is map && zs().kills.size() <= 4 && zs().dia is map && zs().dia.size() <= 4
           && zs().over is bool && zs().slam is list && zs().slam.size() <= 4 && zs().seq is int && zs().n is int && zs().n >= 1 && zs().n <= 4
-          && zs().at == request.time;
-        allow delete: if signedIn() && (!exists(zlPath()) || get(zlPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+          && zs().at == Tn();
+        allow delete: if signedIn() && (!exists(zlPath()) || get(zlPath()).data.host == me() || Od().at < Tn() - duration.value(30, 'm'));
       }
     }
     // Kemy Challenge Show (js/pals/show-net.js): up to 30 players per room, host-authoritative show state
     match /shows/{code} {
-      function sl() { return request.resource.data; }
-      function shp(u) { return /databases/$(database)/documents/shows/$(code)/p/$(u); }
-      function shPath() { return /databases/$(database)/documents/shows/$(code); }
+      function sl() { return Nd(); }
+      function shp(u) { return Dp2('shows', code, 'p', u); }
+      function shPath() { return Dp('shows', code); }
       function slShape() {
         return sl().keys().hasOnly(['host', 'status', 'pub', 'n', 'createdAt', 'updatedAt'])
           && sl().host is string && sl().host.size() <= 128 && sl().status in ['open', 'playing', 'done'] && sl().pub is bool
-          && sl().n is int && sl().n >= 0 && sl().n <= 30 && sl().updatedAt == request.time;
+          && sl().n is int && sl().n >= 0 && sl().n <= 30 && sl().updatedAt == Tn();
       }
       allow read: if signedIn();
-      allow create: if signedIn() && notBanned() && code.matches('^[A-Z2-9]{5}$') && slShape() && sl().host == me() && sl().status == 'open' && sl().n == 1 && sl().createdAt == request.time;
-      function z9() { let oo = resource.data; return signedIn() && notBanned() && slShape() && sl().createdAt == oo.createdAt && (
+      allow create: if signedIn() && notBanned() && code.matches('^[A-Z2-9]{5}$') && slShape() && sl().host == me() && sl().status == 'open' && sl().n == 1 && sl().createdAt == Tn();
+      function z9() { let oo = Od(); return signedIn() && notBanned() && slShape() && sl().createdAt == oo.createdAt && (
         (oo.host == me() && (sl().host == me() || exists(shp(sl().host))))
         || (sl().host == me() && oo.host != me() && exists(shp(me()))
-            && (!exists(shp(oo.host)) || get(shp(oo.host)).data.at < request.time - duration.value(8, 's'))
+            && (!exists(shp(oo.host)) || get(shp(oo.host)).data.at < Tn() - duration.value(8, 's'))
             && sl().diff(oo).affectedKeys().hasOnly(['host', 'updatedAt']))); }
       allow update: if z9();
-      allow delete: if signedIn() && (resource.data.host == me() || resource.data.updatedAt < request.time - duration.value(30, 'm'));
+      allow delete: if signedIn() && (Od().host == me() || Od().updatedAt < Tn() - duration.value(30, 'm'));
       match /slot/{s} {
         allow read: if signedIn();
-        function z8() { let qq = request.resource.data; return signedIn() && notBanned() && s.matches('^([0-9]|[12][0-9])$') && exists(shPath())
-          && qq.keys().hasOnly(['uid', 'at']) && qq.uid == me() && qq.at == request.time; }
+        function z8() { let qq = Nd(); return signedIn() && notBanned() && s.matches('^([0-9]|[12][0-9])$') && exists(shPath())
+          && qq.keys().hasOnly(['uid', 'at']) && qq.uid == me() && qq.at == Tn(); }
         allow create: if z8();
-        allow delete: if signedIn() && (resource.data.uid == me() || !exists(shPath()) || get(shPath()).data.host == me()
-          || resource.data.at < request.time - duration.value(30, 'm'));
+        allow delete: if signedIn() && (Od().uid == me() || !exists(shPath()) || get(shPath()).data.host == me()
+          || Od().at < Tn() - duration.value(30, 'm'));
       }
       match /p/{u} {
-        function sp() { return request.resource.data; }
+        function sp() { return Nd(); }
         function spShape() {
           return sp().keys().hasOnly(['name', 'pal', 'slot', 'ready', 'x', 'y', 'z', 'f', 'v', 'st', 'r', 'sc', 'tp', 'bp', 'em', 'emAt', 'at'])
             && isStr(sp().name, 0, 40) && sp().pal is map && sp().pal.size() <= 8 && sp().pal.get('outfit', {}) is map && sp().pal.get('outfit', {}).size() <= 15
@@ -2364,16 +2387,16 @@ service cloud.firestore {
             && sp().x >= -120 && sp().x <= 120 && sp().z >= -120 && sp().z <= 120 && sp().y >= -20 && sp().y <= 40 && sp().v >= 0 && sp().v <= 50
             && sp().st is int && sp().st >= 0 && sp().st <= 2 && sp().r is int && sp().r >= -1 && sp().r <= 10
             && sp().sc is int && sp().sc >= -10 && sp().sc <= 10000 && sp().tp is int && sp().tp >= 0 && sp().tp <= 5000
-            && sp().bp is list && sp().bp.size() <= 24 && sp().em is int && sp().em >= -1 && sp().em <= 999 && sp().emAt is int && sp().at == request.time;
+            && sp().bp is list && sp().bp.size() <= 24 && sp().em is int && sp().em >= -1 && sp().em <= 999 && sp().emAt is int && sp().at == Tn();
         }
         allow read: if signedIn();
         allow create, update: if signedIn() && notBanned() && u == me() && spShape()
-          && getAfter(/databases/$(database)/documents/shows/$(code)/slot/$(string(sp().slot))).data.uid == me()
-          && (resource == null || resource.data.at + duration.value(250, 'ms') < request.time);
-        allow delete: if signedIn() && (u == me() || !exists(shPath()) || get(shPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+          && getAfter(Dp2('shows', code, 'slot', string(sp().slot))).data.uid == me()
+          && (resource == null || Od().at + duration.value(250, 'ms') < Tn());
+        allow delete: if signedIn() && (u == me() || !exists(shPath()) || get(shPath()).data.host == me() || Od().at < Tn() - duration.value(30, 'm'));
       }
       match /s/{d} {
-        function ss() { return request.resource.data; }
+        function ss() { return Nd(); }
         allow read: if signedIn();
         allow create, update: if signedIn() && d == 'state' && get(shPath()).data.host == me()
           && ss().keys().hasOnly(['ph', 'rd', 'nx', 'plan', 'left', 'light', 'lq', 'll', 'alive', 'out', 'elim', 'teams', 'pairs', 'rope', 'seed', 'rev', 'nb', 'bots', 'bb', 'bbq', 'champ', 'casual', 'seq', 'at'])
@@ -2383,35 +2406,35 @@ service cloud.firestore {
           && ss().get('teams', []) is list && ss().get('teams', []).size() <= 45 && ss().get('pairs', []) is list && ss().get('pairs', []).size() <= 45
           && ss().get('rev', []) is list && ss().get('rev', []).size() <= 16 && ss().get('bots', []) is list && ss().get('bots', []).size() <= 75
           && ss().get('bb', []) is list && ss().get('bb', []).size() <= 24 && ss().get('champ', []) is list && ss().get('champ', []).size() <= 45
-          && ss().get('nb', 0) is int && ss().get('nb', 0) <= 14 && ss().seq is int && ss().at == request.time;
-        allow delete: if signedIn() && (!exists(shPath()) || get(shPath()).data.host == me() || resource.data.at < request.time - duration.value(30, 'm'));
+          && ss().get('nb', 0) is int && ss().get('nb', 0) <= 14 && ss().seq is int && ss().at == Tn();
+        allow delete: if signedIn() && (!exists(shPath()) || get(shPath()).data.host == me() || Od().at < Tn() - duration.value(30, 'm'));
       }
     }
     // Talk to your Pal: short chat memory (last messages + a few facts), owner-only
     match /users/{uid}/pal/chat {
       allow read, delete: if signedIn() && uid == me();
-      function z7() { let qq = request.resource.data; return signedIn() && uid == me()
+      function z7() { let qq = Nd(); return signedIn() && uid == me()
         && qq.keys().hasOnly(['msgs', 'facts', 'updatedAt'])
         && qq.msgs is list && qq.msgs.size() <= 12
         && qq.facts is list && qq.facts.size() <= 6
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z7();
     }
     // owner's Pal settings that visitors may read (e.g. 'let visitors chat with my Pal')
     // Parental Controls PIN: only a salted SHA-256 hash, readable/writable by the account owner only.
     match /parental/{uid} {
       allow read, delete: if signedIn() && uid == me();
-      function z6() { let qq = request.resource.data; return signedIn() && uid == me()
+      function z6() { let qq = Nd(); return signedIn() && uid == me()
         && qq.keys().hasOnly(['salt', 'hash', 'updatedAt'])
         && qq.salt is string && qq.salt.matches('^[0-9a-f]{32}$')
         && qq.hash is string && qq.hash.matches('^[0-9a-f]{64}$')
-        && qq.updatedAt == request.time; }
+        && qq.updatedAt == Tn(); }
       allow create, update: if z6();
     }
     match /users/{uid}/pal/settings {
       allow read: if true;
-      allow write: if signedIn() && uid == me() && request.resource.data.keys().hasOnly(['visitorChat', 'updatedAt'])
-        && request.resource.data.visitorChat is bool && request.resource.data.updatedAt == request.time;
+      allow write: if signedIn() && uid == me() && Nd().keys().hasOnly(['visitorChat', 'updatedAt'])
+        && Nd().visitorChat is bool && Nd().updatedAt == Tn();
       allow delete: if signedIn() && uid == me();
     }
     // Read lives in its own match so a closet check does not also count every purchase rule below
@@ -2420,26 +2443,26 @@ service cloud.firestore {
       allow read: if true;
     }
     match /users/{uid}/inv/{item} {
-      function v() { return request.resource.data; }
+      function v() { return Nd(); }
       function walletPath() { return /databases/$(database)/documents/users/$(uid)/pal/wallet; }
-      function oldN() { return resource == null ? 0 : resource.data.n; }
+      function oldN() { return resource == null ? 0 : Od().n; }
       function kind() { return get(/databases/$(database)/documents/config/palShop).data.kinds[item]; }
-      function bought() { return getAfter(walletPath()).data.buyAt == request.time && getAfter(walletPath()).data.lastBuy == item; }
+      function bought() { return getAfter(walletPath()).data.buyAt == Tn() && getAfter(walletPath()).data.lastBuy == item; }
       function dPath() { return /databases/$(database)/documents/users/$(uid)/pal/diamonds; }
-      function dBought() { return getAfter(dPath()).data.buyAt == request.time && getAfter(dPath()).data.lastBuy == item; }
+      function dBought() { return getAfter(dPath()).data.buyAt == Tn() && getAfter(dPath()).data.lastBuy == item; }
       function achOk() {
         return oldN() == 0 && v().n == 1 && (
           (item == 'ach_glow' && v().proof is string && v().proof.matches('^p[1-6]$')
-             && get(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof)).data.level >= 12)
+             && get(Dp2('users', uid, 'pets', v().proof)).data.level >= 12)
           || (item == 'ach_coins' && get(walletPath()).data.total >= 1000)
           || (item == 'ach_family' && v().proof is list && v().proof.size() == 3 && v().proof[0] != v().proof[1] && v().proof[1] != v().proof[2] && v().proof[0] != v().proof[2]
-             && exists(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof[0]))
-             && exists(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof[1]))
-             && exists(/databases/$(database)/documents/users/$(uid)/pets/$(v().proof[2])))
-          || (item == 'ach_champ' && get(/databases/$(database)/documents/palStats/$(uid)).data.wins >= 5));
+             && exists(Dp2('users', uid, 'pets', v().proof[0]))
+             && exists(Dp2('users', uid, 'pets', v().proof[1]))
+             && exists(Dp2('users', uid, 'pets', v().proof[2])))
+          || (item == 'ach_champ' && get(Dp('palStats', uid)).data.wins >= 5));
       }
       allow create, update: if signedIn() && uid == me() && item.matches('^[a-z_]{2,16}$')
-        && v().keys().hasOnly(['n', 'at', 'proof']) && v().n is int && v().at == request.time && (
+        && v().keys().hasOnly(['n', 'at', 'proof']) && v().n is int && v().at == Tn() && (
           // bought: +1 together with the wallet purchase (wearables, decor and toys are one each)
           (v().n == oldN() + 1 && bought() && (kind() == 'snack' || v().n == 1))
           // bought with Diamonds (Zombie Armory, one each)
@@ -2453,27 +2476,27 @@ service cloud.firestore {
     match /users/{uid}/looks/{lid} {
       allow read: if true;
       allow write: if signedIn() && uid == me() && lid.matches('^l[1-6]$')
-        && request.resource.data.keys().hasOnly(['name', 'outfit', 'bg', 'variant', 'pattern', 'colors', 'at']) && isStr(request.resource.data.name, 1, 20)
-        && request.resource.data.outfit is map && request.resource.data.outfit.size() <= 15
-        && request.resource.data.outfit.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand', 'nose'])
-        && (!('bg' in request.resource.data) || isStr(request.resource.data.bg, 0, 16))
-        && (!('variant' in request.resource.data) || isStr(request.resource.data.variant, 0, 16))
-        && (!('pattern' in request.resource.data) || isStr(request.resource.data.pattern, 0, 16))
-        && (!('colors' in request.resource.data) || (request.resource.data.colors is map && request.resource.data.colors.size() <= 3));
+        && Nd().keys().hasOnly(['name', 'outfit', 'bg', 'variant', 'pattern', 'colors', 'at']) && isStr(Nd().name, 1, 20)
+        && Nd().outfit is map && Nd().outfit.size() <= 15
+        && Nd().outfit.keys().hasOnly(['head', 'face', 'neck', 'body', 'feet', 'back', 'hair', 'bottom', 'full', 'bag', 'held', 'ears', 'wrist', 'hand', 'nose'])
+        && (!('bg' in Nd()) || isStr(Nd().bg, 0, 16))
+        && (!('variant' in Nd()) || isStr(Nd().variant, 0, 16))
+        && (!('pattern' in Nd()) || isStr(Nd().pattern, 0, 16))
+        && (!('colors' in Nd()) || (Nd().colors is map && Nd().colors.size() <= 3));
       allow delete: if signedIn() && uid == me();
     }
 
     // ================= Pal Games (real-time Pal vs Pal mini-games)
     match /palGames/{gid} {
-      function g() { return request.resource.data; }
-      function og() { return resource.data; }
+      function g() { return Nd(); }
+      function og() { return Od(); }
       allow read: if true;
       allow create: if signedIn() && notBanned() && g().keys().hasOnly(['game', 'status', 'players', 'names', 'unames', 'pals', 'host', 'invitee', 'quick', 'seed', 'startAt', 'createdAt', 'updatedAt'])
         && g().game in ['race', 'bubbles', 'stars', 'dance'] && g().status == 'waiting' && g().host == me()
         && g().players == [me()] && g().names is list && g().names.size() == 1 && g().unames is list && g().unames.size() == 1
         && g().pals is list && g().pals.size() == 1 && isStr(g().invitee, 0, 128) && g().quick is bool && g().seed is int
-        && g().createdAt == request.time && g().updatedAt == request.time;
-      function z5() { let tt = request.time; return signedIn() && (
+        && g().createdAt == Tn() && g().updatedAt == Tn();
+      function z5() { let tt = Tn(); return signedIn() && (
         // join: second seat, starts the countdown
         (og().status == 'waiting' && !(me() in og().players) && og().invitee in ['', me()] && og().players.size() == 1
           && changed().hasOnly(['players', 'names', 'unames', 'pals', 'status', 'startAt', 'updatedAt'])
@@ -2487,46 +2510,46 @@ service cloud.firestore {
       // each player's live progress (throttled ~2/s) and final score
       match /live/{uid} {
         allow read: if true;
-        function z4() { let qq = request.resource.data; return signedIn() && uid == me() && me() in get(/databases/$(database)/documents/palGames/$(gid)).data.players
+        function z4() { let qq = Nd(); return signedIn() && uid == me() && me() in get(Dp('palGames', gid)).data.players
           && qq.keys().hasOnly(['p', 's', 'fin', 'at', 'em', 'emAt']) && (!('em' in qq) || (qq.em is int && qq.em >= -1 && qq.em <= 199 && qq.emAt is int)) && qq.p is int && qq.p >= 0 && qq.p <= 1000
           && qq.s is int && qq.s >= 0 && qq.s <= 999 && qq.fin is bool
-          && qq.at == request.time
-          && (resource == null || (!resource.data.fin && resource.data.at + duration.value(200, 'ms') < request.time && qq.s >= resource.data.s)); }
+          && qq.at == Tn()
+          && (resource == null || (!Od().fin && Od().at + duration.value(200, 'ms') < Tn() && qq.s >= Od().s)); }
         allow create, update: if z4();
         allow delete: if false;
       }
       match /rec/{uid} {
         allow read: if true;
-        allow create: if signedIn() && uid == me() && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
-          && getAfter(/databases/$(database)/documents/palStats/$(uid)).data.last == gid;
+        allow create: if signedIn() && uid == me() && Nd().keys().hasOnly(['at']) && Nd().at == Tn()
+          && getAfter(Dp('palStats', uid)).data.last == gid;
       }
     }
     // Pal Games leaderboard: wins only count for finished human matches where your score beat theirs.
     match /palStats/{uid} {
-      function ps() { return request.resource.data; }
-      function pg() { return get(/databases/$(database)/documents/palGames/$(ps().last)).data; }
+      function ps() { return Nd(); }
+      function pg() { return get(Dp('palGames', ps().last)).data; }
       function other() { return pg().players[0] == uid ? pg().players[1] : pg().players[0]; }
-      function lv(u) { return get(/databases/$(database)/documents/palGames/$(ps().last)/live/$(u)).data; }
+      function lv(u) { return get(Dp2('palGames', ps().last, 'live', u)).data; }
       function fresh() {
-        return !exists(/databases/$(database)/documents/palGames/$(ps().last)/rec/$(uid))
-          && existsAfter(/databases/$(database)/documents/palGames/$(ps().last)/rec/$(uid));
+        return !exists(Dp2('palGames', ps().last, 'rec', uid))
+          && existsAfter(Dp2('palGames', ps().last, 'rec', uid));
       }
       function base() {
         return signedIn() && uid == me() && ps().keys().hasOnly(['wins', 'games', 'last', 'name', 'uname', 'color', 'updatedAt'])
           && isStr(ps().last, 1, 40) && pg().players.size() == 2 && uid in pg().players && lv(uid).fin && lv(other()).fin && fresh()
-          && ps().updatedAt == request.time && ps().name == get(/databases/$(database)/documents/users/$(uid)).data.displayName
-          && ps().uname == get(/databases/$(database)/documents/users/$(uid)).data.username && isStr(ps().color, 0, 20);
+          && ps().updatedAt == Tn() && ps().name == get(Dp('users', uid)).data.displayName
+          && ps().uname == get(Dp('users', uid)).data.username && isStr(ps().color, 0, 20);
       }
       function won() { return lv(uid).s > lv(other()).s; }
       allow read: if true;
       allow create: if base() && ps().games == 1 && ps().wins == (won() ? 1 : 0);
-      allow update: if base() && ps().games == resource.data.games + 1 && ps().wins == resource.data.wins + (won() ? 1 : 0);
+      allow update: if base() && ps().games == Od().games + 1 && ps().wins == Od().wins + (won() ? 1 : 0);
       allow delete: if isAdmin() || (signedIn() && uid == me());
     }
 
     // ================= Kemy World property: one home per player (sale plots only), garage tier, private world save
     match /homes/{plot} {
-      function hd() { return request.resource.data; }
+      function hd() { return Nd(); }
       function plotNum() { return int(plot.replace('[hm]', '')); }
       // h01..h98: the original plots (fixed map); h99..h482: city plots (style = number % 4, only the For Sale half); h484..h488 estates; h483 is the palace pad (not for sale); h489 = admin palace
       function citySale(n) { return n % 8 in [0, 3, 5, 6]; } // = layout.js city plots: half for sale, every style
@@ -2534,11 +2557,11 @@ service cloud.firestore {
         : {'h484': 'estate', 'h485': 'mansion', 'h486': 'estate', 'h487': 'mansion', 'h488': 'estate'}[plot]; }
       function isEstate() { let n = plotNum(); return n >= 483 && n <= 489; } // hm1000..hm3591 = the far-south metro cities (all for sale, style = number % 4)
       function deed() { return {'cottage': 'hs_cottage', 'twostory': 'hs_twostory', 'ranch': 'hs_ranch', 'manor': 'z_hs_manor', 'mansion': 'z_hs_mansion', 'estate': 'z_hs_estate'}[plotStyle()]; }
-      function inv(it) { return exists(/databases/$(database)/documents/users/$(me())/inv/$(it)); }
+      function inv(it) { return exists(Dp2('users', me(), 'inv', it)); }
       // tier t needs that tier's item or any higher one (garage only changes when it differs, so plain saves cost no lookups)
       function gItem(t) { return ['gr_one', 'gr_two', 'z_gr_three', 'z_gr_four', 'z_gr_five', 'z_gr_six', 'z_gr_seven'][t - 1]; }
       function gHas(t) { return inv(gItem(t)) || (t < 7 && inv(gItem(t + 1))) || (t < 6 && inv(gItem(t + 2))); }
-      function garageOk() { return hd().garage == 0 || (resource != null && hd().garage == resource.data.get('garage', 0)) || (hd().garage <= (isEstate() ? 7 : 5) && gHas(hd().garage)); }
+      function garageOk() { return hd().garage == 0 || (resource != null && hd().garage == Od().get('garage', 0)) || (hd().garage <= (isEstate() ? 7 : 5) && gHas(hd().garage)); }
       // parked cars (display only): 'model.colour[.PLATE.bg.fg.border.frame]' joined by ';', max 50 entries / 1800 chars
       function carsOk(c) { return c is string && c.size() <= 1800 && c.matches('^[a-z]{2,8}[.][0-9][A-Z0-9.;a-z]*$|^$') && c.split(';').size() <= 50; } // clients parse + re-check each entry (and the plate word filter)
       function radioOk(r) { return r is map && r.keys().hasOnly(['k', 'url', 't', 's']) && r.k in ['link', 'kemy', 'off']
@@ -2555,77 +2578,77 @@ service cloud.firestore {
       // Gold palace sign. Only homes/h489, admin writes (update already requires isAdmin there). 24 letters on the client; 48 covers emoji.
       function signOk() { return !('sign' in hd()) || (plot == 'h489' && cleanStr(hd().sign, 1, 48) && kidSafe(hd().sign)); }
       function shape() { return hd().keys().hasOnly(['owner', 'name', 'style', 'garage', 'at', 'open', 'inv', 'invN', 'radio', 'decor', 'cars', 'sign', 'door']) && extrasOk() && signOk() && hd().owner == me() && hd().garage is int && hd().garage >= 0 && hd().garage <= 7
-        && hd().name == get(/databases/$(database)/documents/users/$(me())).data.displayName && hd().at == request.time; }
+        && hd().name == get(Dp('users', me())).data.displayName && hd().at == Tn(); }
       allow read: if signedIn();
       // 👑 h489 = the admin's palace: never for sale, only the admin account can create / change / remove it
       allow create: if signedIn() && notBanned() && (plot.matches('^h[0-9]{2,3}$') && plotNum() <= 488 || plot.matches('^hm[0-9]{4}$') && plotNum() >= 1000 && plotNum() <= 3591) && plotStyle() != null && shape() && hd().style == plotStyle() && inv(deed()) && garageOk()
         && getAfter(/databases/$(database)/documents/users/$(me())/pal/home).data.plot == plot
         || plot == 'h489' && isAdmin() && shape() && hd().style == 'estate';
-      allow update: if signedIn() && resource.data.owner == me() && shape() && hd().style == resource.data.style && (plot == 'h489' ? isAdmin() : garageOk());
+      allow update: if signedIn() && Od().owner == me() && shape() && hd().style == Od().style && (plot == 'h489' ? isAdmin() : garageOk());
       // owner moves out, or anyone may clear a home whose owner account no longer exists (it goes back on sale)
-      allow delete: if signedIn() && (resource.data.owner == me() && (plot != 'h489' || isAdmin()) || plot != 'h489' && !exists(/databases/$(database)/documents/users/$(resource.data.owner)));
+      allow delete: if signedIn() && (Od().owner == me() && (plot != 'h489' || isAdmin()) || plot != 'h489' && !exists(Dp('users', Od().owner)));
     }
     match /users/{uid}/pal/home {
       allow read: if signedIn() && uid == me();
-      function z3() { let qq = request.resource.data; return signedIn() && uid == me() && qq.keys().hasOnly(['plot', 'at']) && qq.plot is string
-        && qq.plot.matches('^h[0-9]{2,3}$|^hm[0-9]{4}$') && qq.at == request.time
-        && getAfter(/databases/$(database)/documents/homes/$(qq.plot)).data.owner == me(); }
+      function z3() { let qq = Nd(); return signedIn() && uid == me() && qq.keys().hasOnly(['plot', 'at']) && qq.plot is string
+        && qq.plot.matches('^h[0-9]{2,3}$|^hm[0-9]{4}$') && qq.at == Tn()
+        && getAfter(Dp('homes', qq.plot)).data.owner == me(); }
       allow create: if z3();
       allow delete: if signedIn() && uid == me();
     }
     match /users/{uid}/pal/drive {
       allow read, delete: if signedIn() && uid == me();
-      function z2() { let qq = request.resource.data; return signedIn() && uid == me() && qq.keys().hasOnly(['cfg', 'at']) && qq.cfg is string
-        && qq.cfg.size() <= 4000 && qq.at == request.time; }
+      function z2() { let qq = Nd(); return signedIn() && uid == me() && qq.keys().hasOnly(['cfg', 'at']) && qq.cfg is string
+        && qq.cfg.size() <= 4000 && qq.at == Tn(); }
       allow create, update: if z2();
     }
     match /users/{uid}/pal/world {
-      function wd() { return request.resource.data; }
+      function wd() { return Nd(); }
       function carOk(c) { return c is map && c.keys().hasOnly(['id', 'c', 'bay', 'x', 'z', 'yaw']) && c.id is string && c.id.size() <= 12; }
       allow read, delete: if signedIn() && uid == me();
       allow create, update: if signedIn() && uid == me() && wd().keys().hasOnly(['x', 'z', 'yaw', 'cars', 'street', 'at'])
         && wd().x is number && wd().x >= -1300 && wd().x <= 400 && wd().z is number && wd().z >= -80 && wd().z <= 3470 && wd().yaw is number
         && (!('cars' in wd()) || (wd().cars is list && wd().cars.size() <= 3 && (wd().cars.size() < 1 || carOk(wd().cars[0])) && (wd().cars.size() < 2 || carOk(wd().cars[1])) && (wd().cars.size() < 3 || carOk(wd().cars[2]))))
         && (!('street' in wd()) || wd().street == null || carOk(wd().street))
-        && wd().at == request.time && (resource == null || resource.data.at + duration.value(5, 's') < request.time);
+        && wd().at == Tn() && (resource == null || Od().at + duration.value(5, 's') < Tn());
     }
     // Pal Bingo. One write-once room doc (seed + start). Each player writes only their own seat.
     match /bingoRooms/{rid} {
       allow read: if true;
-      function z1() { let qq = request.resource.data; return signedIn() && notBanned()
+      function z1() { let qq = Nd(); return signedIn() && notBanned()
         && qq.keys().hasOnly(['host', 'code', 'pub', 'seed', 'start'])
         && qq.host == me() && qq.code == rid
         && qq.seed is int && qq.seed > 0 && qq.seed <= 2000000000
-        && qq.start == request.time
+        && qq.start == Tn()
         && qq.pub == (rid in ['hall', 'hall2', 'hall3']); }
       allow create: if z1();
       allow update, delete: if false;
       match /seats/{uid} {
         function bingoSeat() {
-          return request.resource.data.keys().hasOnly(['name', 'col', 'n', 'claim', 'emo', 'at'])
-            && request.resource.data.name == get(userPath(me())).data.displayName
-            && isStr(request.resource.data.col, 0, 20)
-            && request.resource.data.n is int && request.resource.data.n >= 1 && request.resource.data.n <= 4
-            && request.resource.data.claim is int && request.resource.data.claim >= 0 && request.resource.data.claim <= 75
-            && request.resource.data.emo is int && request.resource.data.emo >= 0 && request.resource.data.emo <= 400
-            && request.resource.data.at == request.time;
+          return Nd().keys().hasOnly(['name', 'col', 'n', 'claim', 'emo', 'at'])
+            && Nd().name == get(userPath(me())).data.displayName
+            && isStr(Nd().col, 0, 20)
+            && Nd().n is int && Nd().n >= 1 && Nd().n <= 4
+            && Nd().claim is int && Nd().claim >= 0 && Nd().claim <= 75
+            && Nd().emo is int && Nd().emo >= 0 && Nd().emo <= 400
+            && Nd().at == Tn();
         }
         allow read: if true;
         allow create, update: if signedIn() && uid == me() && bingoSeat()
-          && (resource == null ? notBanned() : resource.data.at + duration.value(2, 's') < request.time);
+          && (resource == null ? notBanned() : Od().at + duration.value(2, 's') < Tn());
         allow delete: if signedIn() && uid == me();
       }
     }
 
     // ================= Pal Park presence: rooms of ~20, ~14 writes/s while moving, stale docs removable by anyone
     match /parkRooms/{room}/p/{uid} {
-      function pp() { return request.resource.data; }
+      function pp() { return Nd(); }
       function cellNo() { return int(math.floor((float(pp().x - 1600) / 16.0 - 400.0) / 20.0)) + 6 * int(math.floor((float(pp().y - 1200) / 16.0 + 70.0) / 20.0)) + 1; } // js/world/layout.js ROOMS (20 m cells, 6 per row)
       function inNum() { return int(pp().in.replace('[hm]', '')); }
       // interior strip (house i -> cell i % 180, js/world/layout.js roomOf) or the mansion cells (40 m, 3 per row, y >= 10160)
       function mCell() { return int(math.floor((float(pp().x - 1600) / 16.0 - 400.0) / 40.0)) + 3 * int(math.floor((float(pp().y - 1200) / 16.0 - 560.0) / 40.0)); }
       function inCellOk() { return pp().y < 10160 ? cellNo() == (pp().in.size() == 6 ? inNum() : inNum() - 1) % 180 + 1 : (mCell() >= 0 && mCell() < 7 && pp().in == ['h483', 'h484', 'h485', 'h486', 'h487', 'h488', 'h489'][mCell()]); }
-      function hp(id) { return /databases/$(database)/documents/homes/$(id); }
+      function hp(id) { return Dp('homes', id); }
       function homeOk(id) { return id == 'h489' || !exists(hp(id)) || get(hp(id)).data.owner == me() || get(hp(id)).data.get('open', false) == true || me() in get(hp(id)).data.get('inv', []); }
       // Pose writes send say ''. The three scanners are only needed for real chat, and running
       // them on every heartbeat exceeds the 1000-expression cap (the write is denied, pals vanish).
@@ -2633,7 +2656,7 @@ service cloud.firestore {
       function profOk() {
         let d = get(userPath(uid)).data;
         return pp().name == d.displayName && pp().uname == d.username
-          && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || !pcOff(d, 'chat'));
+          && (pp().say == '' || (resource != null && pp().say == Od().get('say', '')) || !pcOff(d, 'chat'));
       }
       allow read: if signedIn();
       // vx/vz == 0 also takes a double -0.0 (older clients sent JS -0 when idle and were denied: they vanished)
@@ -2650,14 +2673,14 @@ service cloud.firestore {
         // live license plate (length digit + text + 4 hex nibbles). Same write as the pose, no extra rate.
         && (!('pl' in pp()) || (isStr(pp().pl, 0, 12) && pp().pl.matches('^$|^[1-7][A-Z0-9]{1,7}[0-9a-f]{4}$')))
         // chat: a new message needs a fresh sayAt at least 2 s after the previous one (rate limit), max 60 chars (below)
-        && (resource == null || !('say' in pp()) || pp().say == resource.data.get('say', '') || pp().sayAt is int && pp().sayAt >= resource.data.get('sayAt', 0) + 2000)
+        && (resource == null || !('say' in pp()) || pp().say == Od().get('say', '') || pp().sayAt is int && pp().sayAt >= Od().get('sayAt', 0) + 2000)
         && pp().x is int && pp().x >= -21000 && pp().x <= 10000 && pp().y is int && pp().y >= 0 && pp().y <= 60000
         && pp().d in [-1, 1] && isStr(pp().e, 0, 12) && isStr(pp().say, 0, 60) && sayClean() && isStr(pp().tgt, 0, 128)
-        && (pp().say == '' || (resource != null && pp().say == resource.data.get('say', '')) || chatFree(uid) || presetSay(pp().say))
+        && (pp().say == '' || (resource != null && pp().say == Od().get('say', '')) || chatFree(uid) || presetSay(pp().say))
         && profOk()
-        && pp().pal is map && pp().at == request.time
-        && (resource == null || resource.data.at + duration.value(70, 'ms') < request.time);
-      allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(2, 'm'));
+        && pp().pal is map && pp().at == Tn()
+        && (resource == null || Od().at + duration.value(70, 'ms') < Tn());
+      allow delete: if signedIn() && (uid == me() || Od().at < Tn() - duration.value(2, 'm'));
     }
 
     // 🎬 Lone Keem Studio movie theater (js/world/theater.js): one shared doc everyone signed in reads.
@@ -2665,19 +2688,19 @@ service cloud.firestore {
     match /theater/{tid} {
       allow read: if signedIn();
       allow create, update: if tid == 'lone-keem-studio' && unlimitedFor(me())
-        && request.resource.data.keys().hasOnly(['col', 'li', 'la', 'lo', 'lt', 'pl', 'at', 'by']) && request.resource.data.by == me();
+        && Nd().keys().hasOnly(['col', 'li', 'la', 'lo', 'lt', 'pl', 'at', 'by']) && Nd().by == me();
       allow delete: if isAdmin();
     }
     // People standing in one house. Tiny on purpose: the park presence rules are already near the size cap.
     // A missing home doc is a neighbor house (anyone who can open the door). h489 is the palace.
     // Closed sale houses stay owner / open-house / invite only, plus a doorbell let-in (homes.door[uid] = until ms; never a blocked visitor).
     match /houseHere/{plot}/who/{uid} {
-      function hp() { return /databases/$(database)/documents/homes/$(plot); }
+      function hp() { return Dp('homes', plot); }
       function hOk(h) { return h.owner == me() || h.get('open', false) == true || me() in h.get('inv', [])
-          || (h.get('door', {}).get(me(), 0) > request.time.toMillis() && !blockedBy(h.owner)); }
+          || (h.get('door', {}).get(me(), 0) > Tn().toMillis() && !blockedBy(h.owner)); }
       function houseOpen() { return !exists(hp()) || plot == 'h489' || hOk(get(hp()).data); }
       function hh() {
-        let d = request.resource.data;
+        let d = Nd();
         let meDoc = get(userPath(uid)).data;
         return signedIn() && notBanned() && uid == me() && houseOpen()
           && plot.matches('^h[0-9]{2,3}$|^hm[0-9]{4}$')
@@ -2691,19 +2714,19 @@ service cloud.firestore {
           && isStr(d.e, 0, 12) && isStr(d.s, 0, 60) && isStr(d.dn, 0, 20)
           && d.sa is int && d.sa >= 0
           && kidSafe(d.s) && contactFree(d.s) && groomFree(d.s)
-          && (d.s == '' || (resource != null && d.s == resource.data.get('s', '')) || chatFree(uid) || presetSay(d.s))
-          && (d.s == '' || (resource != null && d.s == resource.data.get('s', '')) || !pcOff(meDoc, 'chat'))
-          && (resource == null || d.s == resource.data.get('s', '') || d.sa >= resource.data.get('sa', 0) + 2000)
+          && (d.s == '' || (resource != null && d.s == Od().get('s', '')) || chatFree(uid) || presetSay(d.s))
+          && (d.s == '' || (resource != null && d.s == Od().get('s', '')) || !pcOff(meDoc, 'chat'))
+          && (resource == null || d.s == Od().get('s', '') || d.sa >= Od().get('sa', 0) + 2000)
           && d.p is map && d.p.size() <= 8
           && d.p.keys().hasOnly(['species', 'name', 'colors', 'pattern', 'acc', 'outfit', 'level', 'variant'])
           && isStr(d.p.species, 1, 16) && isStr(d.p.name, 0, 24)
           && d.p.level is int && d.p.colors is map && d.p.outfit is map
-          && d.at == request.time
-          && (resource == null || resource.data.at + duration.value(90, 'ms') < request.time);
+          && d.at == Tn()
+          && (resource == null || Od().at + duration.value(90, 'ms') < Tn());
       }
       allow read: if signedIn();
       allow create, update: if hh();
-      allow delete: if signedIn() && (uid == me() || resource.data.at < request.time - duration.value(8, 's'));
+      allow delete: if signedIn() && (uid == me() || Od().at < Tn() - duration.value(8, 's'));
     }
   }
 }
