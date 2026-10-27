@@ -427,13 +427,16 @@ export function createPals(ctx) {
     const k = 'kemy-pals-collected-' + (S.user ? S.user.uid : ''); const set = new Set(JSON.parse(localStorage.getItem(k) || '[]'));
     if (mine) mine.list.forEach((p) => set.add(SPEC[p.species] ? SPEC[p.species].id : p.species)); localStorage.setItem(k, JSON.stringify([...set])); return set;
   }
+  let galIO = null;
   async function gallery(main) {
     if (S.user && S.profile) await myPals(); const got = collected();
     main.innerHTML = `<section class="card pad pal-box"><div class="pal-box-head"><h1>Pal Gallery</h1><span class="pal-count">${got.size}/${SPECIES.length} collected</span></div>
       <p class="muted small">Every Pal has a baby, kid and grown-up glow-up form. Hatch one to add it to your collection.</p>
       <div class="pal-gal">${SPECIES.map((s) => `<div class="pal-gcard ${got.has(s.id) ? 'got' : ''}"><div class="pal-thumb" data-g="${s.id}"></div><b>${esc(s.name)}</b><small style="color:${VIBES[s.vibe].c}">${VIBES[s.vibe].name}</small><small>${esc(s.forms.join(' → '))}</small>${got.has(s.id) ? '<span class="pal-got">Collected</span>' : ''}</div>`).join('')}</div>
       <a class="btn btn-sm btn-ghost" href="#/pals">← Pal Box</a></section>`;
-    main.querySelectorAll('[data-g]').forEach((el) => { const sp = el.dataset.g; const q = stage(el, 96, 84); let lv = 1; const fn = (t) => { if (t % 180 === 0) lv = lv === 1 ? 5 : lv === 5 ? 12 : 1; q.c.clearRect(0, 0, 96, 84); drawPal(q.c, 48, 80, 64, { species: sp, level: lv }, { t, mode: t % 180 > 130 ? 'react' : 'idle' }); if (!got.has(sp)) { q.c.globalCompositeOperation = 'source-atop'; q.c.fillStyle = 'rgba(40,20,80,.55)'; q.c.fillRect(0, 0, 96, 84); q.c.globalCompositeOperation = 'source-over'; } }; fn.el = q.cv; if (RM()) fn(1); else loop(fn); });
+    // 129 animated thumbnails: only animate the ones on screen (each draws once first, then pauses while scrolled away)
+    if (galIO) galIO.disconnect(); galIO = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => { e.target._vis = e.isIntersecting; }), { rootMargin: '120px' }) : null;
+    main.querySelectorAll('[data-g]').forEach((el) => { const sp = el.dataset.g; const q = stage(el, 96, 84); let lv = 1; if (galIO) galIO.observe(el); const fn = (t) => { if (galIO && t > 1 && !el._vis) return; if (t % 180 === 0) lv = lv === 1 ? 5 : lv === 5 ? 12 : 1; q.c.clearRect(0, 0, 96, 84); drawPal(q.c, 48, 80, 64, { species: sp, level: lv }, { t, mode: t % 180 > 130 ? 'react' : 'idle' }); if (!got.has(sp)) { q.c.globalCompositeOperation = 'source-atop'; q.c.fillStyle = 'rgba(40,20,80,.55)'; q.c.fillRect(0, 0, 96, 84); q.c.globalCompositeOperation = 'source-over'; } }; fn.el = q.cv; if (RM()) fn(1); else loop(fn); });
   }
   addEventListener('kemy:coins', (e) => { const d = e.detail || {}; if (S.user && d.src) shop.earn(d.src, d.n || 1, d.why); });
   // XP from activity elsewhere in the app: dispatchEvent(new CustomEvent('kemy:xp', { detail: { n } }))

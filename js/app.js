@@ -725,7 +725,7 @@ const routes = [
   [/^#\/reset$/, pageReset, 'me'],
   [/^#\/onboard$/, pageOnboard, 'me']
 ];
-function gated(fn) { return async (...a) => { if (!requireAuth()) return; if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; } return fn(...a); }; }
+function gated(fn) { return async (...a) => { if (!requireAuth()) return; if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml((await safety.underageFlag(S.user.uid)) && safety.is13(S.profile)); return; } return fn(...a); }; }
 safety.initSafety({ S, db, esc, openModal, closeModal, toast, isAdmin: () => isAdmin(), friendlyError });
 ages.initAgeGate({ S, esc, openModal, closeModal, toast, friendlyError, isAdmin: () => isAdmin(), save: (p, minAge) => updateDoc(doc(db, 'posts', p.id), { minAge }) });
 initSpam({ S, toast, isAdmin: () => isAdmin(), autoPause: (o) => { if (window.kemyModWarn) window.kemyModWarn(); if (window.kemyModFlag) window.kemyModFlag(o.text || 'spam', 'park', ''); } });
@@ -956,7 +956,7 @@ const userRow = (u) => `<a class="list-item" href="#/u/${esc(u.username)}">${ava
 const composer = lazyMod(() => import('./create.js').then(({ createComposer }) => createComposer({ S, main, esc, $, toast, friendlyError, isAdmin, STUDIO_UID, saveMediaPost, saveStory, sendSnap, snapFriends })));
 async function pageCompose(sub, qs, token) {
   if (!requireAuth()) return;
-  if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml(await safety.underageFlag(S.user.uid)); return; }
+  if (!(await safety.gate())) { main.innerHTML = safety.blockedHtml((await safety.underageFlag(S.user.uid)) && safety.is13(S.profile)); return; }
   const pre = Object.fromEntries(new URLSearchParams(qs || ''));
   if (pre.series) { pre.sid = pre.series; }
   if (sub === 'movie' || sub === 'song') return getWorks().composePage(sub, token, pre);
