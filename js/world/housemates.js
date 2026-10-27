@@ -38,7 +38,7 @@ export function palBits(p) {
 }
 
 // Centimetres from the room centre, height above the floor, facing in degrees.
-export function packPose(P, cx, cz) {
+export function packPose(P, cx, cz, k = 100) {
   const yaw = Number.isFinite(P.yaw) ? P.yaw : 0;
   const dance = P.dance && Date.now() < (P.danceUntil || 0) ? String(P.dance).slice(0, 20) : '';
   const sitting = !!(P.sit || dance === 'sit');
@@ -47,9 +47,9 @@ export function packPose(P, cx, cz) {
   else if (P._sp > 2.6) a = 'r';
   else if (P._sp > 0.35) a = 'w';
   return {
-    x: clamp(Math.round((P.x - cx) * 100), -1200, 1200),
-    z: clamp(Math.round((P.z - cz) * 100), -1200, 1200),
-    y: clamp(Math.round(((Number.isFinite(P.y) ? P.y : FLAT) - FLAT) * 100), 0, 900),
+    x: clamp(Math.round((P.x - cx) * k), -1200, 1200),
+    z: clamp(Math.round((P.z - cz) * k), -1200, 1200),
+    y: clamp(Math.round(((Number.isFinite(P.y) ? P.y : FLAT) - FLAT) * k), 0, 900),
     f: ((Math.round(yaw * 180 / Math.PI) % 360) + 360) % 360,
     a,
     dn: sitting ? (dance || 'sit') : dance,
@@ -59,8 +59,9 @@ export function packPose(P, cx, cz) {
   };
 }
 
-function worldOf(d, cx, cz) {
-  return { x: cx + (d.x || 0) / 100, z: cz + (d.z || 0) / 100, y: FLAT + (d.y || 0) / 100, yaw: ((d.f || 0) * Math.PI) / 180 };
+// k = units per metre: 100 (cm) in houses; the big Lone Keem Studio theater packs 50 (2 cm) so it fits the same ±1200 rule.
+function worldOf(d, cx, cz, k = 100) {
+  return { x: cx + (d.x || 0) / k, z: cz + (d.z || 0) / k, y: FLAT + (d.y || 0) / k, yaw: ((d.f || 0) * Math.PI) / 180 };
 }
 
 function logLine(name, text) {
@@ -78,6 +79,7 @@ function logLine(name, text) {
 
 export function startHouseParty(opt) {
   const { db, uid, plot, cx, cz, P, S, others, say, onFull, quietPark, dropPal } = opt;
+  const K = opt.k || 100, CAP = opt.cap || HOUSE_CAP, GAP = Math.max(MOVE_GAP_MS, opt.gap || 0);
   const ref = doc(db, 'houseHere', plot, 'who', uid);
   const state = { plot, n: 0, writes: 0, err: '', full: false, stopped: false };
   let pal = null;
@@ -109,7 +111,7 @@ export function startHouseParty(opt) {
     return p && p.displayName && p.username ? p : null;
   }
   function body() {
-    const pose = packPose(P, cx, cz);
+    const pose = packPose(P, cx, cz, K);
     const me = profile();
     return {
       ...pose,
@@ -143,7 +145,7 @@ export function startHouseParty(opt) {
       state.err = '';
       lastSig = sig;
       dirty = false;
-      nextOk = Date.now() + MOVE_GAP_MS;
+      nextOk = Date.now() + GAP;
       if (!joinedAt) joinedAt = Date.now();
     } catch (e) {
       state.err = (e && e.code) || 'write';
@@ -164,7 +166,7 @@ export function startHouseParty(opt) {
   }
   function place(id, d, at) {
     if (blocked.has(id)) { forget(id); return; }
-    const w = worldOf(d, cx, cz);
+    const w = worldOf(d, cx, cz, K);
     let o = others.get(id);
     const fresh = !o;
     if (!o) {
@@ -210,7 +212,7 @@ export function startHouseParty(opt) {
     });
     fresh.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
     const mine = fresh.findIndex((x) => x.id === uid);
-    if (fresh.length > HOUSE_CAP && (mine < 0 || mine >= HOUSE_CAP)) {
+    if (fresh.length > CAP && (mine < 0 || mine >= CAP)) {
       state.full = true;
       state.stopped = true;
       removeDoc();
@@ -249,7 +251,7 @@ export function startHouseParty(opt) {
     P._sp = sp > 40 ? 0 : sp;
     lastX = P.x; lastZ = P.z; lastMoveAt = nowP;
     if (state.n > 0) {
-      const pose = packPose(P, cx, cz);
+      const pose = packPose(P, cx, cz, K);
       const key = [pose.x, pose.z, pose.y, pose.f, pose.a, pose.dn, pose.e, pose.s, pose.sa].join('|');
       if (key !== state.pose) { state.pose = key; dirty = true; }
       if (dirty || Date.now() - lastSend >= HEARTBEAT_MS) write(Date.now() - lastSend >= HEARTBEAT_MS);

@@ -863,7 +863,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
   addEventListener('keydown', onDecoKey, true);
   decB.onclick = () => startDeco('in');
   yardB.onclick = () => startDeco('out');
-  function unstick() { const own = myPlot && HOUSE_BY_ID[myPlot]; const h = own || inside; if (deco) endDeco(false); const spot = h ? doorSpot(h) : { x: 0, z: 82, yaw: Math.PI, cam: 0 }; if (inside) goOut(own ? spot : undefined); else placeAt(spot); document.body.classList.remove('kh-decorating'); if (!inside) { roomState.box = null; roomState.inId = null; } say('Back at the front door. You can look around and move.'); }
+  function unstick() { if (roomState.leave) try { roomState.leave(true); } catch { /* */ } const own = myPlot && HOUSE_BY_ID[myPlot]; const h = own || inside; if (deco) endDeco(false); const spot = h ? doorSpot(h) : { x: 0, z: 82, yaw: Math.PI, cam: 0 }; if (inside) goOut(own ? spot : undefined); else placeAt(spot); document.body.classList.remove('kh-decorating'); if (!inside) { roomState.box = null; roomState.inId = null; } say('Back at the front door. You can look around and move.'); }
   stuckB.onclick = () => unstick();
   // ---------------------------------------------------------------- owners (live) + buying
   // reads stay per-area: one listener for the classic world (ids < 'hm'), one for my own homes, and one per far-south metro city,
@@ -995,7 +995,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
 
   // ---------------------------------------------------------------- save / restore location (+ street car)
   let lastLS = 0, lastFS = 0, lastSent = null;
-  function snapshot() { let x = P.x, z = P.z, yaw = P.yaw || 0; if (inside) { const f = homeFront(inside); x = f.x; z = f.z; yaw = f.yaw; } else if (positionBad(x, z)) { const f = (deco && deco.out && deco.spot && !positionBad(deco.spot.x, deco.spot.z)) ? deco.spot : (myPlot && homeFront(HOUSE_BY_ID[myPlot])); if (f) { x = f.x; z = f.z; yaw = f.yaw || yaw; } } const m = D && D.mine && D.mine(); let street = null;
+  function snapshot() { let x = P.x, z = P.z, yaw = P.yaw || 0; if (inside) { const f = homeFront(inside); x = f.x; z = f.z; yaw = f.yaw; } else if (roomState.outSpot) { const f = roomState.outSpot; x = f.x; z = f.z; yaw = f.yaw || 0; } else if (positionBad(x, z)) { const f = (deco && deco.out && deco.spot && !positionBad(deco.spot.x, deco.spot.z)) ? deco.spot : (myPlot && homeFront(HOUSE_BY_ID[myPlot])); if (f) { x = f.x; z = f.z; yaw = f.yaw || yaw; } } const m = D && D.mine && D.mine(); let street = null;
     if (m) { street = { id: m.id, c: m.color, x: Math.round(m.x * 10) / 10, z: Math.round(m.z * 10) / 10, yaw: Math.round(m.yaw * 100) / 100 }; }
     return { x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10, yaw: Math.round(yaw * 100) / 100, cars: [], street }; }
   function persist(force) { const now = Date.now(); const s = snapshot(); Object.assign(save, s); if (force || now - lastLS > 3000) { lastLS = now; lss(LS, JSON.stringify(save)); }
@@ -1017,7 +1017,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
   if (!uid) setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 50); setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 6000);
 
   // ---------------------------------------------------------------- per-frame: prompts, garage doors, light
-  function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * (rad && rad.lyr ? 30 : 8)); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
+  function update(dt) { life.update(dt); if (tvMeshes.length) { const q = Math.floor((tvT += dt) * (rad && rad.lyr ? 30 : 8)); if (q !== tvDraw.q) { tvDraw.q = q; tvDraw(tvT); } } if (P.sit && !inside && !P.sit.ext) standUp(true); promptNow = null; let showIn = null; const m = D && D.mine && D.mine(); const driving = m && m.state !== 'parked';
     if (inside && (!Number.isFinite(P.y) || P.y < FLAT - 0.25)) { const r = rooms.get(inside.id); if (r) { P.x = r.cx; P.z = r.cz + 4.6 * SC; } P.y = FLAT; P.vy = 0; P.onGround = true; }
     if (deco && deco.out) { const y = standY(ground(P.x, P.z), P.x, P.z); if (inside || positionBad(P.x, P.z) || !Number.isFinite(P.y) || P.y < y - 0.45) placeAt(deco.spot); }
     if (driving && rad && !radioBox.hidden) { if (radioBox.classList.contains('dock')) placeNote(); else if (!radioBox.classList.contains('min')) dockRadio(); else { const rr = radioBox.getBoundingClientRect(); if (hitsPad({ l: rr.left, t: rr.top, r: rr.right, b: rr.bottom })) dockRadio(); } }

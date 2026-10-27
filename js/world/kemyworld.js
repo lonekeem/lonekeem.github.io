@@ -10,6 +10,7 @@ const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built house
 import { attachEast } from './east.js';
 import { currentSeason, SEASONS } from '../seasons.js';
 const SEASONS_T = Object.fromEntries(Object.values(SEASONS).filter((x) => x.treat).map((x) => [x.treat.id, x.treat]));
+import { attachTheaterGate } from './theater-gate.js';
 import { attachHomes } from './homes.js';
 import { isStyleDn, styleAt, danceBeat } from '../pals/dance-menu.js';
 import { attachRespawn } from './respawn.js';
@@ -425,12 +426,13 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const prevLm = W.landmarks; W.landmarks = () => (prevLm ? prevLm() : []).concat([{ name: '⭐ Bingo Hall', x: HALL.x, z: HALL.z, gx: HALL.x, gz: HALL.door[1] }]);
   const prevHallPrompt = api.prompt; api.prompt = () => { const p0 = prevHallPrompt && prevHallPrompt(); if (p0) return p0; if (Math.hypot(P.x - HALL.door[0], P.z - HALL.door[1]) < 3.2) return { id: 'bingo', label: '⭐ Enter Bingo Hall' }; return null; };
   const prevLab = W.mapLabels; W.mapLabels = (g, mx, mz) => { if (prevLab) prevLab(g, mx, mz); g.fillStyle = '#ffd34d'; g.font = 'bold 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('⭐ Bingo', mx(HALL.x), mz(HALL.z)); };
+  const Th = attachTheaterGate(api, W, { put, flush, G, std, rng, glowMat, say, hud, tag: (o, t, x, y, z) => tag(o, t, x, y, z), hideTag: (o) => hideTag(o) }); // 🎬 Lone Keem Studio (details lazy-load near it)
   const Rs = attachRespawn(api, W);
   const Kh = attachHelper(api, W);
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat, tag: (t) => { ptag = t; }, forget: (group) => { const meshes = []; group.traverse((o) => { if (o.isMesh) meshes.push(o); }); forgetTagged(tagged, meshes); } }); const Mp = attachMap(api, W);
   window.__kwApi.buildAround = (x, z) => W.buildAround && W.buildAround(x, z);
-  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
-  W.destroy = () => { for (const x of [D, E, Ci, Hm, Mp, Rs, Kh]) try { x.destroy(); } catch { /* */ } destroy(); };
+  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Th.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
+  W.destroy = () => { for (const x of [D, E, Ci, Hm, Th, Mp, Rs, Kh]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];
