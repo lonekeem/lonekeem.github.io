@@ -5,6 +5,7 @@
 // (the normal Pal Shop path). One shared doc theater/lone-keem-studio holds colors, decor, lights and the screen; only the
 // admin / ∞ Pass (isUnlimited, the same unlimitedFor() path in firestore.rules) can write it.
 import { THEATER, FLAT, roomState } from './layout.js';
+import { buildCar, poseCar, CARS } from './cars.js';
 import { SURF, DEF, hexOk, parseT, serT, makeKit, buildExterior, buildInterior, IN } from './theater-build.js';
 import { THEATER_SONGS } from './theater-songs.js';
 import { drawLyrics } from './tvlyrics.js';
@@ -37,6 +38,10 @@ export function attachTheater(api, W, K, { far }) {
   const extG = new THREE.Group(); extG.name = 'theater-ext'; W.root.add(extG);
   const ex = buildExterior(THREE, kit, extG, T, FLAT, LOW); if (far) far.visible = false;
   for (const c of ex.cols) api.cyl.push(c);
+  // a few guests' cars already parked in the painted stalls (lite models, 2 small colliders each, plenty of stalls left free)
+  const carG = new THREE.Group(); carG.name = 'theater-cars'; extG.add(carG);
+  try { const pick = ex.stalls.filter((_, i) => i % 3 === 1).slice(0, LOW ? 4 : 9); pick.forEach((st0, i) => { const d = CARS[(i * 5 + 1) % CARS.length]; const m = buildCar(d, (i * 7 + 3) % 12, { lite: true, noShadow: true }); poseCar(m, { x: st0.x, y: FLAT, z: st0.z, yaw: st0.yaw }, 0, 0); carG.add(m);
+    const ax = Math.sin(st0.yaw), az = Math.cos(st0.yaw); for (const f of [-0.27, 0.27]) { const c = { x: st0.x + ax * d.L * f, z: st0.z + az * d.L * f, r: d.Wd * 0.5, top: FLAT + d.H, parked: 1 }; api.cyl.push(c); ex.cols.push(c); } }); } catch (e) { console.warn('theater cars', e); }
   const odG = new THREE.Group(); odG.position.set(OX, FLAT, OZ); W.root.add(odG); let odBoxes = [];
   // ---------------------------------------------------------------- shared state (one doc, owner writes)
   const S0 = () => ({ col: {}, li: null, la: null, lo: null, lt: { h: 1, tint: '', sp: 0, spc: '', at: 0 }, pl: { i: 0, s: 0, p: 0, on: false, at: 0 } });
@@ -316,6 +321,7 @@ export function attachTheater(api, W, K, { far }) {
     else if (a === 'th-npc') { const n = npc.nearest(); if (n) npc.talk(n); } else if (a === 'th-edit') openEdit();
   }
   window.__theaterDbg = { get st() { return st; }, get inside() { return inside; }, get owner() { return owner; }, set owner(v) { if (LOCAL) { owner = !!v; paintHud(); } }, get ib() { return ib; }, transport, enter, leave, sitAt, findSeat, openEdit, snackMenu, closePanels, npc, get lvl() { return lvl; },
+    standUp: () => standUp(), seats: () => allSeats().map((q) => ({ x: q.x - RX, z: q.z - RZ, y: q.y })),
     tp(lx, lz, cy) { if (!LOCAL || !inside) return; P.x = RX + lx; P.z = RZ + lz; P.y = FLAT + yIn(lx, lz); P.vy = 0; P.onGround = true; if (cy != null) try { window.__p3.setYaw(cy); } catch { /* */ } } };
   return {
     prompt, action, update,
