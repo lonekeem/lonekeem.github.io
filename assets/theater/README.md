@@ -8,14 +8,15 @@ hour). Logic: `js/world/theater-movie.js` (`PROGRAM`, `showAt`, `listings`). Eve
 
 | Hour | Starts | Film | Runtime | Ends |
 |---|---|---|---|---|
-| A (even) | :00 | **Ada & Zangemann + Singularity:** Ada & Zangemann – A Tale of Software, Skateboards, and Raspberry Ice Cream (8 parts, :00:00), then Singularity (:31:41) | 31:33 + 6:31 | :38:12 |
+| A (even) | :00 | **Pepper&Carrot** motion comic, episodes 3, 4, 5, 6 back to back (5 parts) | 16:48 | :16:48 |
+| A (even) | :30 | **Singularity** | 6:31 | :36:31 |
 | A (even) | :45 | **Big Buck Bunny** | 9:56 | :54:56 |
 | B (odd) | :00 | **Pepper&Carrot** motion comic, episodes 3, 4, 5, 6 back to back (5 parts) | 16:48 | :16:48 |
 | B (odd) | :30 | **Spring** | 7:44 | :37:44 |
 | B (odd) | :45 | **Triple feature:** Caminandes 2 (:45:00), Caminandes 3 (:47:34), Wing It! (:50:12) | 2:26 + 2:30 + 3:58 | :54:10 |
 
-Countdowns run 5:00 before each start (A :55, A :40, B :55, B :25, B :40). Each film is preceded by an
-8 s title card (inside the countdown, or between Ada & Zangemann and Singularity / between the triple-feature shorts):
+Countdowns run 5:00 before each start (A :55, A :25, A :40, B :55, B :25, B :40). Each film is preceded by an
+8 s title card (inside the countdown, or between the triple-feature shorts):
 the first 4 s are the poster title card, the **last 4 s (`CARD`) a full-screen credit card** (black, gold frame, big
 white/gold type: title, makers, "Licensed under CC BY 4.0", the license deed address and the source page), so no
 start time moves. Multi-part films get it once, before part 1. The seat "Screen view" fills the phone with it.
@@ -24,8 +25,8 @@ truncated with …, license; under the Stuck button / minimap) shows for 8 s, th
 while the big card is up (your own name tag hides then too, so it never covers "Starting in"). Tap it, or **📜 Film credits & licenses** in the 🕒 Showtimes list, for the **credits panel** (every film, makers,
 license + deed, source page, the BY-SA "shown unmodified except split/re-encoded" note; the Stuck and top-right buttons hide while a theater panel is open). Web addresses there and on
 `#/sounds` are plain selectable text, never links (kid-directed app: no `<a href>` / `window.open` to outside sites).
-Singularity (6:31) joined after the 2-hour program was laid out: the 8 quarter-hour steps are all used
-(Ada 45 min, Pepper&Carrot 30, three 15-min slots), so it plays right after Ada in the same slot instead of on its own quarter hour.
+Pepper&Carrot (the longest all-ages show) opens **every** hour: the 7 films fill 90 minutes of quarter-hour slots
+(Pepper&Carrot 30 min, five 15-min slots), and its second showing fills the rest of the 2 hours.
 
 - **The Sheriff is not in the theater yet.** `SHERIFF_IN_THEATER = false` in `js/world/theater-movie.js`
   gives everyone the family lineup in the Sheriff slot (A :45, Big Buck Bunny), and no Sheriff poster, plate, board row, marquee or
@@ -38,9 +39,9 @@ Singularity (6:31) joined after the 2-hour program was laid out: the 8 quarter-h
   local only: no writes and no rules change.
 - **Lobby:** the showtimes board (poster thumbs, titles, runtimes, the next 3 times, NOW PLAYING /
   UP NEXT, live) is on the lobby wall. Tap it, or the 🎟 Showtimes button, to open the 2D list.
-  There are 8 gold-framed posters (Ada & Zangemann on the west wall, Pepper&Carrot and Singularity on the back wall either side of the auditorium doors) with title plates and the next showtime. Poster textures load
+  There are 8 gold-framed posters for the 7 films (Pepper&Carrot twice: west wall and back wall; Singularity on the back wall right of the auditorium doors) with title plates and the next showtime. Poster textures load
   lazily and are about 20–40 KB webp each.
-- **Outside:** the facade has 8 lit, gold-framed poster cases (Pepper&Carrot, Spring, Ada & Zangemann,
+- **Outside:** the facade has 8 lit, gold-framed poster cases for the 7 films (Pepper&Carrot, Spring, Pepper&Carrot again,
   Big Buck Bunny (Sheriff case) | doors | Caminandes 2, Caminandes 3, Wing It!, Singularity), each with a title plate and the next show. The textures load the first time a player
   comes near. Under-13 and unknown-age players see the Big Buck Bunny poster in the Sheriff case.
 - **Fit:** wide films cover-fit the screen. The portrait Sheriff is shown sharp in the centre with
@@ -83,14 +84,6 @@ Singularity's credit is Blender Studio's own line: *Singularity (CC) Blender Fou
 Source: [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:SINGULARITY_-_Blender_Open_Movie-full_movie.webm)
 (4K HDR AV1, CC BY 4.0, Blender Studio). Tone-mapped from HDR to SDR and re-encoded to 1280x536; the poster is a
 frame from the film (6:31 total, no dialogue).
-
-**Ada & Zangemann** (2024, English, 31:33, all ages), from the Wikimedia Commons webm
-(`File:Ada & Zangemann - A Tale of Software, Skateboards, and Raspberry Ice Cream.webm`), split into 8 parts
-(`ada-zangemann-0.mp4` … `-7.mp4`, 7 × 4:00 + 3:32.6, 23–29 MB each, 210 MB total), poster `ada-zangemann.webp`:
-
-> Ada & Zangemann by Free Software Foundation Europe (Matthias Kirschner, Sandra Brandstätter, Monströös), CC BY-SA 4.0
-
-License [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); source https://fsfe.org/activities/ada-zangemann/.
 
 **Pepper&Carrot Motion Comic** (Morevna Project, 2018–2022), every English episode, played back to back as one
 show, from the official Morevna PeerTube (peertube.touhoppai.moe) downloads, poster `pepper-carrot.webp`:
