@@ -8,41 +8,43 @@ hour). Logic: `js/world/theater-movie.js` (`PROGRAM`, `showAt`, `listings`). Eve
 
 | Hour | Starts | Film | Runtime | Ends |
 |---|---|---|---|---|
-| A (even) | :00 | **Pepper&Carrot** motion comic, episodes 3, 4, 5, 6 back to back (5 parts) | 16:48 | :16:48 |
-| A (even) | :30 | **Singularity** | 6:31 | :36:31 |
-| A (even) | :45 | **Big Buck Bunny** | 9:56 | :54:56 |
-| B (odd) | :00 | **Pepper&Carrot** motion comic, episodes 3, 4, 5, 6 back to back (5 parts) | 16:48 | :16:48 |
-| B (odd) | :30 | **Spring** | 7:44 | :37:44 |
-| B (odd) | :45 | **Triple feature:** Caminandes 2 (:45:00), Caminandes 3 (:47:34), Wing It! (:50:12) | 2:26 + 2:30 + 3:58 | :54:10 |
+| A (even) | :00 | **Spring** | 7:44 | :07:44 |
+| A (even) | :15 | **Double feature:** Singularity (:15:00), Caminandes 2 (:21:39) | 6:31 + 2:26 | :24:05 |
+| A (even) | :30 | **Big Buck Bunny** (the Sheriff slot) | 9:56 | :39:56 |
+| A (even) | :45 | **Double feature:** Caminandes 3 (:45:00), Wing It! (:47:38) | 2:30 + 3:58 | :51:36 |
+| B (odd) | :00 | **Big Buck Bunny** | 9:56 | :09:56 |
+| B (odd) | :15 | **Spring** | 7:44 | :22:44 |
+| B (odd) | :30 | **Double feature:** Singularity (:30:00), Caminandes 3 (:36:39) | 6:31 + 2:30 | :39:09 |
+| B (odd) | :45 | **Double feature:** Caminandes 2 (:45:00), Wing It! (:47:34) | 2:26 + 3:58 | :51:32 |
 
-Countdowns run 5:00 before each start (A :55, A :25, A :40, B :55, B :25, B :40). Each film is preceded by an
-8 s title card (inside the countdown, or between the triple-feature shorts):
+Countdowns run 5:00 before each start (:55, :10, :25, :40 every hour). Each film is preceded by an
+8 s title card (inside the countdown, or between the two films of a double feature):
 the first 4 s are the poster title card, the **last 4 s (`CARD`) a full-screen credit card** (black, gold frame, big
 white/gold type: title, makers, "Licensed under CC BY 4.0", the license deed address and the source page), so no
 start time moves. Multi-part films get it once, before part 1. The seat "Screen view" fills the phone with it.
 When a film (or each back-to-back short) starts, or you walk in mid-film, a one-line **credit line** (title, makers
 truncated with …, license; under the Stuck button / minimap) shows for 8 s, then fades to a small round 🎬 button. It is off
 while the big card is up (your own name tag hides then too, so it never covers "Starting in"). Tap it, or **📜 Film credits & licenses** in the 🕒 Showtimes list, for the **credits panel** (every film, makers,
-license + deed, source page, the BY-SA "shown unmodified except split/re-encoded" note; the Stuck and top-right buttons hide while a theater panel is open). Web addresses there and on
+license + deed, source page, the "shown unchanged except re-encoded" note; the Stuck and top-right buttons hide while a theater panel is open). Web addresses there and on
 `#/sounds` are plain selectable text, never links (kid-directed app: no `<a href>` / `window.open` to outside sites).
-Pepper&Carrot (the longest all-ages show) opens **every** hour: the 7 films fill 90 minutes of quarter-hour slots
-(Pepper&Carrot 30 min, five 15-min slots), and its second showing fills the rest of the 2 hours.
+The 6 films fill four 15-minute slots (the shorts paired up), so every film plays **twice** every 2 hours, in a
+different order each hour. Every slot fits in 15 minutes, so the longest end card before the next countdown is about 3.5 minutes.
 
 - **The Sheriff is not in the theater yet.** `SHERIFF_IN_THEATER = false` in `js/world/theater-movie.js`
-  gives everyone the family lineup in the Sheriff slot (A :45, Big Buck Bunny), and no Sheriff poster, plate, board row, marquee or
+  gives everyone the family lineup in the Sheriff slot (A :30, Big Buck Bunny), and no Sheriff poster, plate, board row, marquee or
   video appears anywhere in the theater. Set it to `true` to bring it back (13+ only, ep 1–3, 9:43 at :00).
   The Kemy series page `#/series/sheriff` and its 13+ gate are separate and unchanged.
 - **13+ gate (when the flag is on):** The Sheriff needs age 13+ from the trusted age source (`viewerAge()` in `js/safety.js`,
   wrapped by `js/sheriff-age.js`). Under-13 or unknown-age viewers see the friendly card on the
-  Sheriff page, and in the theater the Sheriff slot (A :45) becomes **Big Buck Bunny**
+  Sheriff page, and in the theater the Sheriff slot (A :30) becomes **Big Buck Bunny**
   (same clock) on the screen, board, 2D list, lobby poster and marquee. This is
   local only: no writes and no rules change.
 - **Lobby:** the showtimes board (poster thumbs, titles, runtimes, the next 3 times, NOW PLAYING /
   UP NEXT, live) is on the lobby wall. Tap it, or the 🎟 Showtimes button, to open the 2D list.
-  There are 8 gold-framed posters for the 7 films (Pepper&Carrot twice: west wall and back wall; Singularity on the back wall right of the auditorium doors) with title plates and the next showtime. Poster textures load
+  There are 6 gold-framed posters, one per film (east wall: Big Buck Bunny/Sheriff frame + Wing It!; west wall: Singularity + Spring; back wall: Caminandes 2 + 3 either side of the auditorium doors) with title plates and the next showtime. Poster textures load
   lazily and are about 20–40 KB webp each.
-- **Outside:** the facade has 8 lit, gold-framed poster cases for the 7 films (Pepper&Carrot, Spring, Pepper&Carrot again,
-  Big Buck Bunny (Sheriff case) | doors | Caminandes 2, Caminandes 3, Wing It!, Singularity), each with a title plate and the next show. The textures load the first time a player
+- **Outside:** the facade has 6 lit, gold-framed poster cases, one per film (Singularity, Spring,
+  Big Buck Bunny (Sheriff case) | doors | Caminandes 2, Caminandes 3, Wing It!), each with a title plate and the next show. The textures load the first time a player
   comes near. Under-13 and unknown-age players see the Big Buck Bunny poster in the Sheriff case.
 - **Fit:** wide films cover-fit the screen. The portrait Sheriff is shown sharp in the centre with
   blurred sides.
@@ -84,21 +86,6 @@ Singularity's credit is Blender Studio's own line: *Singularity (CC) Blender Fou
 Source: [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:SINGULARITY_-_Blender_Open_Movie-full_movie.webm)
 (4K HDR AV1, CC BY 4.0, Blender Studio). Tone-mapped from HDR to SDR and re-encoded to 1280x536; the poster is a
 frame from the film (6:31 total, no dialogue).
-
-**Pepper&Carrot Motion Comic** (Morevna Project, 2018–2022), every English episode, played back to back as one
-show, from the official Morevna PeerTube (peertube.touhoppai.moe) downloads, poster `pepper-carrot.webp`:
-
-> Pepper & Carrot Motion Comic by Morevna Project, based on Pepper&Carrot by David Revoy, CC BY-SA 4.0
-
-| File | Episode | Runtime | License | Size |
-|---|---|---|---|---|
-| pepper-carrot-ep3.mp4 | Ep. 3 The Secret Ingredients | 3:25 | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 27.9 MB |
-| pepper-carrot-ep4.mp4 | Ep. 4 Stroke of Genius | 3:35 | CC BY-SA 4.0 | 32.0 MB |
-| pepper-carrot-ep5.mp4 | Ep. 5 Holiday Special (wordless) | 2:13 | CC BY-SA 4.0 | 13.5 MB |
-| pepper-carrot-ep6-0.mp4 + ep6-1.mp4 | Ep. 6 The Potion Contest (2 parts) | 7:35 | CC BY-SA 4.0 | 37.1 + 29.9 MB |
-
-Episode pages: https://morevnaproject.org/pepper-and-carrot/episode-N/. The original comic is
-Pepper&Carrot by David Revoy (peppercarrot.com, CC BY 4.0).
 
 To add a film, put `<key>.mp4` and `<key>.webp` here, add it to `FILMS` and `PROGRAM` in
 `theater-movie.js` (slots are whole 15-minute steps, including the 5:00 countdown; split long films into `reels`), update the

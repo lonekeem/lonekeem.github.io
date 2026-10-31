@@ -14,7 +14,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from '../fsq.js';
 import { startHouseParty } from './housemates.js';
 import { attachTheaterNpcs } from './theater-npcs.js';
 import { createTheaterHush } from './theater-hush.js';
-import { FILMS, MOVIE, TC, familyOnly, creditFilms, CARD, licDeed, licName, bareUrl, PEPPER_EPISODES, SHERIFF_SLOT, SHERIFF_FAMILY, boardFooter, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
+import { FILMS, MOVIE, TC, familyOnly, creditFilms, CARD, licDeed, licName, bareUrl, SHERIFF_SLOT, SHERIFF_FAMILY, boardFooter, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
 import { sheriffOk } from '../sheriff-age.js';
 
 const TID = 'lone-keem-studio', LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -340,7 +340,7 @@ export function attachTheater(api, W, K, { far }) {
       return `<div class="th-cf" data-cf="${f.id}"><b>${esc(f.title)}</b>${f.sub ? ` <span>— ${esc(f.sub)}</span>` : ''} <span>(${esc(String(f.year))})</span>
 <p>${esc(f.credit)}</p><p><span class="th-k">Made by:</span> ${esc(f.makers)}</p>
 <p><span class="th-k">License:</span> ${esc(f.lic)} (${esc(licName(f.lic))}) · ${u(licDeed(f.lic))}</p>
-<p><span class="th-k">Source:</span> ${u(f.page || f.src)}</p>${f.id === 'pepper' ? `<p><span class="th-k">Episodes:</span> ${PEPPER_EPISODES.map((e) => `${e.n}. ${esc(e.title)} ${u(e.page)}`).join(' · ')}</p><p>Original comic: Pepper&amp;Carrot by David Revoy, ${u('www.peppercarrot.com')} (CC BY 4.0).</p>` : ''}
+<p><span class="th-k">Source:</span> ${u(f.page || f.src)}</p>
 <p class="th-sub">${sa ? `Kemy shows this film unmodified, except that it is ${parts}re-encoded to 720p for the app. It stays under ${esc(f.lic)}.` : `Shown unchanged, except ${parts}re-encoded to 720p for the app.`}</p></div>`; };
     d.innerHTML = `<div class="ks-card th-card th-times"><h3>📜 Film credits &amp; licenses</h3><p class="th-sub">Lone Keem Studio plays these open films under Creative Commons licenses. Web addresses are plain text: type one into a browser to read the license or visit the source.</p>${creditFilms().map(row).join('')}<button type="button" class="ghost" data-back style="width:100%">🕒 Back to showtimes</button><button type="button" class="ghost th-x" style="width:100%">Close</button></div>`;
     d.addEventListener('click', (e) => { if (e.target.closest('[data-back]')) timesPanel(); else if (e.target === d || e.target.closest('.th-x')) closePanels(); });

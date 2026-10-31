@@ -1,8 +1,7 @@
 // Theater films + showtimes e2e on the Firebase EMULATORS only (never the live DB). Every film in the program loads, fills the
 // screen (cover-fit) and plays (SHERIFF_IN_THEATER is off: its slot shows Big Buck Bunny for everyone, and no Sheriff
-// poster / plate / board row / marquee / video anywhere in the theater); Pepper&Carrot
-// (eps 3-6, 5 reels, every hour on the hour): seamless A/B reel handoff (next reel preloaded on the 2nd deck, no gap, never > 2 reels loaded) and
-// clock sync for a mid-movie join; the lobby board, 8 framed posters + 8 facade cases for the 7 films (Pepper&Carrot twice), 2D showtimes list (board tap + button),
+// poster / plate / board row / marquee / video anywhere in the theater); every film twice every 2 hours (shorts paired);
+// clock sync for a mid-movie join; the lobby board, 6 framed posters + 6 facade cases (one per film, unique names), 2D showtimes list (board tap + button),
 // title cards with credits, portrait + landscape iPhone 13 with no console
 // errors, and the Sheriff 13+ gate for a 13+ account and an under-13 account (family film swapped in locally, same clock).
 // Needs: emulators (auth+firestore; FS_PORT / AUTH_PORT, default 8199/9199, project lone-keem-studios) and a RANGE-capable
@@ -46,15 +45,15 @@ const view = (x, z, tx, tz) => p.evaluate(([x, z, y]) => window.__theaterDbg.tp(
 const vstate = () => p.evaluate(() => { const D = window.__theaterDbg, m = D.movie, v = m && m.video, s = D.show(); return { phase: s.phase, id: s.id, epT: s.epT != null ? +s.epT.toFixed(2) : null, epLeft: s.epLeft != null ? +s.epLeft.toFixed(2) : null, reel: s.reel ? s.reel.src.split('/').pop() : null, mode: m && m.mode, src: v && (v.currentSrc || '').split('/').pop(), rs: v && v.readyState, t: v && +v.currentTime.toFixed(2), paused: v && v.paused, vw: v && v.videoWidth, vh: v && v.videoHeight, vids: document.querySelectorAll('video').length, decks: m ? m.videos.length : 0, loaded: m ? m.loaded : 0, deck: m ? m.decks : null, swaps: m ? m.swaps : 0, gaps: m ? m.gaps : 0, vis: m ? m.mesh.visible : false, one: !!m && m.videos.length <= 2 && m.loaded <= 2 }; });
 const plates = () => p.evaluate(() => window.__theaterDbg.ib.lobbyPosters.map((q) => q.id + ' => ' + q.key));
 const posterShots = async (pre) => { await p.setViewportSize({ width: 844, height: 390 }); await W(p, 800);
-  for (const [n, q] of [['east-sheriff-wing', [3, 16, 16, 16]], ['west-pepper-spring', [-3, 16, -16, 16]], ['back-caminandes-pepper', [-3, 9.5, -3, 22]], ['back-c2-singularity', [4, 9.5, 9, 22]], ['board', [1.5, 8, 16, 8]]]) { await view(...q); await W(p, 2500); await p.screenshot({ path: shot + pre + n + '.png' }); } };
+  for (const [n, q] of [['east-sheriff-wing', [3, 16, 16, 16]], ['west-sing-spring', [-3, 16, -16, 16]], ['back-caminandes-3', [-3, 9.5, -3, 22]], ['back-caminandes-2', [4, 9.5, 9, 22]], ['board', [1.5, 8, 16, 8]]]) { await view(...q); await W(p, 2500); await p.screenshot({ path: shot + pre + n + '.png' }); } };
 const EXT = process.env.EXT_PRE || 'exterior-after-'; // facade poster cases ('exterior-before-' when shooting the old build)
 const extInfo = () => p.evaluate(() => { const ex = window.__theaterDbg && window.__theaterDbg.ex; return ex && ex.extPosters ? ex.extPosters.map((q) => ({ id: q.id, src: ((q.mesh.material.map && q.mesh.material.map.userData.src) || '').split('/').pop(), ok: !!(q.mesh.material.map && q.mesh.material.map.image && q.mesh.material.map.image.width), plate: q.key })) : null; });
 const extShots = async (who) => { await p.setViewportSize({ width: 844, height: 390 }); await W(p, 800);
   for (const [n, x, z] of [['facade', 90, 207], ['left-cases', 65.5, 216.5], ['right-cases', 65.5, 197.5]]) { await p.evaluate(([x, z]) => { window.__p3.teleport(x, z); window.__p3.setYaw(Math.PI / 2); }, [x, z]); await W(p, 3500); await p.screenshot({ path: shot + EXT + who + '-' + n + '.png' }); }
   await p.setViewportSize({ width: 390, height: 844 }); await p.evaluate(() => { window.__p3.teleport(80, 207); window.__p3.setYaw(Math.PI / 2); }); await W(p, 3000); await p.screenshot({ path: shot + EXT + who + '-portrait.png' }); return extInfo(); };
-const FILE = { sheriff: /ep[123]\.mp4/, bbb: 'big-buck-bunny.mp4', spring: 'spring.mp4', c2: 'caminandes-2.mp4', c3: 'caminandes-3.mp4', wing: 'wing-it.mp4', pepper: /^pepper-carrot-ep[3-6](-[01])?\.mp4$/, sing: 'singularity.mp4' };
-const CR = { pepper: 'Pepper & Carrot Motion Comic by Morevna Project, based on Pepper&Carrot by David Revoy, CC BY-SA 4.0' };
-const NF = 7; // films on the board / 2D list
+const FILE = { sheriff: /ep[123]\.mp4/, bbb: 'big-buck-bunny.mp4', spring: 'spring.mp4', c2: 'caminandes-2.mp4', c3: 'caminandes-3.mp4', wing: 'wing-it.mp4', sing: 'singularity.mp4' };
+const CR = { sing: 'Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0' };
+const NF = 6; // films on the board / 2D list
 const result = {};
 const check = (n, c, d) => { result[n] = c ? 'PASS' : 'FAIL ' + JSON.stringify(d).slice(0, 300); console.log(result[n].slice(0, 4), n); };
 
@@ -71,59 +70,45 @@ await step('world', async () => { await p.evaluate(() => { document.getElementBy
   await p.waitForFunction(() => window.__theater && window.__theater.M && window.__theaterDbg, null, { timeout: 10000 }); await W(p, 1500);
   const v0 = await p.evaluate(() => document.querySelectorAll('video').length); check('no video element outside the theater', v0 === 0, v0); return v0; });
 await step('marquee-outside', async () => { await p.evaluate(() => { window.__p3.teleport(75, 207); window.__p3.setYaw(-Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: shot + 'marquee-outside.png' }); const m = await p.evaluate(() => window.__theaterDbg.marq()); check('marquee names no Sheriff (13+ account)', noSheriffTxt(m), m); return m; });
-await step('exterior-adult', async () => { const e = await extShots('adult'); if (EXT === 'exterior-after-') { const want = { sheriff: 'big-buck-bunny.webp', spring: 'spring.webp', pepper: 'pepper-carrot.webp', c2: 'caminandes-2.webp', c3: 'caminandes-3.webp', wing: 'wing-it.webp', sing: 'singularity.webp' };
-  check('facade: 8 lit poster cases (Pepper&Carrot twice, Singularity; loaded lazily on approach)', e && e.length === 8 && e.filter((q) => q.id === 'pepper').length === 2 && e.every((q) => q.ok && q.src === want[q.id]), e); check('facade: plates show title + next show', e && e.every((q) => /\|(Next show|▶ Now playing)/.test(q.plate)), e);
+await step('exterior-adult', async () => { const e = await extShots('adult'); if (EXT === 'exterior-after-') { const want = { sheriff: 'big-buck-bunny.webp', spring: 'spring.webp', c2: 'caminandes-2.webp', c3: 'caminandes-3.webp', wing: 'wing-it.webp', sing: 'singularity.webp' };
+  check('facade: 6 lit poster cases, one per film, unique mesh names (loaded lazily on approach)', e && e.length === 6 && new Set(e.map((q) => q.id)).size === 6 && !e.some((q) => /pepper/.test(q.src)) && e.every((q) => q.ok && q.src === want[q.id]), e); check('facade: plates show title + next show', e && e.every((q) => /\|(Next show|▶ Now playing)/.test(q.plate)), e);
   check('facade: no Sheriff poster or plate for a 13+ player (family poster in its case)', e && noSheriffTxt(e.map((q) => q.plate).join(' ')) && e.find((q) => q.id === 'sheriff').plate.startsWith('Big Buck Bunny|'), e);
-  await p.setViewportSize({ width: 844, height: 390 }); for (const [n, z] of [['pepper2', 216.35], ['pepper', 222.4], ['singularity', 191.6]]) { await p.evaluate(([z]) => { window.__p3.teleport(64.5, z); window.__p3.setYaw(Math.PI / 2); }, [z]); await W(p, 2500); await p.screenshot({ path: `/workspace/theater/${n}-exterior-case.png` }); }
+  await p.setViewportSize({ width: 844, height: 390 }); for (const [n, z] of [['spring', 216.35], ['singularity', 218.7]]) { await p.evaluate(([z]) => { window.__p3.teleport(64.5, z); window.__p3.setYaw(Math.PI / 2); }, [z]); await W(p, 2500); await p.screenshot({ path: `/workspace/theater/${n}-exterior-case.png` }); }
   await p.evaluate(() => { window.__p3.teleport(75, 207); window.__p3.setYaw(-Math.PI / 2); }); await W(p, 1500);
   await p.setViewportSize({ width: 844, height: 390 }); await p.evaluate(() => { window.__p3.teleport(65.5, 216.5); window.__p3.setYaw(Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/no-sheriff-exterior-cases.png' });
   await p.evaluate(() => { window.__p3.teleport(90, 207); window.__p3.setYaw(Math.PI / 2); }); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/no-sheriff-exterior-facade.png' }); }
   await p.setViewportSize({ width: 390, height: 844 }); await p.evaluate(() => window.__p3.teleport(63, 207)); await W(p, 1500); return e; });
 await step('lobby', async () => { await p.evaluate(() => window.__theaterDbg.enter()); await W(p, 3000); await p.evaluate(() => window.__theaterDbg.drawPlates(window.__theaterDbg.list()));
   const L = await p.evaluate(() => window.__theaterDbg.list().map((e) => ({ id: e.id, n: e.times.length, now: e.now, next: e.next })));
-  check('board lists 7 films (incl. Pepper&Carrot + Singularity) with 3 times each, no Sheriff', L.length === NF && ['pepper', 'sing'].every((id) => L.some((e) => e.id === id)) && L.every((e) => e.n === 3) && !L.some((e) => e.id === 'sheriff'), L);
-  const pl = await plates(); check('8 framed lobby posters with title + next show (Pepper&Carrot twice + Singularity in gold frames)', pl.length === 8 && pl.some((s) => /^sing => Singularity\|/.test(s)) && pl.filter((s) => /^pepper => Pepper&Carrot\|/.test(s)).length === 2 && pl.every((s) => /\|(Next show \d|▶ Now playing)/.test(s)), pl);
+  check('board lists 6 films (no Pepper&Carrot) with 3 times each, no Sheriff', L.length === NF && !L.some((e) => e.id === 'pepper') && ['sing', 'bbb'].every((id) => L.some((e) => e.id === id)) && L.every((e) => e.n === 3) && !L.some((e) => e.id === 'sheriff'), L);
+  const pl = await plates(); check('6 framed lobby posters, one per film, with title + next show (no Pepper&Carrot)', pl.length === 6 && new Set(pl.map((s) => s.split(' => ')[0])).size === 6 && pl.some((s) => /^sing => Singularity\|/.test(s)) && !pl.some((s) => /pepper/i.test(s)) && pl.every((s) => /\|(Next show \d|▶ Now playing)/.test(s)), pl);
   check('lobby: the east-wall gold frame shows the family poster, no Sheriff on any plate (13+ account)', /^sheriff => Big Buck Bunny\|/.test(pl[0]) && noSheriffTxt(pl.join(' ').replace(/^sheriff => /, '').replace(/ sheriff => /g, ' ')), pl);
   const ns = await p.evaluate(() => ({ title: window.__theaterDbg.show().title, line: window.__theaterDbg.line(), kid: window.__theaterDbg.kid() })); check('Now Showing / show title name no Sheriff (13+ account)', noSheriffTxt(ns.title + ns.line), ns);
   await p.setViewportSize({ width: 844, height: 390 }); await W(p, 600); await view(1.5, 8, 16, 8); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/no-sheriff-lobby-board.png' }); await view(9, 13.5, 16, 13.5); await W(p, 6000); await p.screenshot({ path: '/workspace/theater/no-sheriff-lobby-east-wall.png' });
-    await view(-9, 13.5, -16, 13.5); await W(p, 4000); await p.screenshot({ path: '/workspace/theater/pepper-west-lobby-poster.png' });
-    await view(-12, 16.5, -12, 22); await W(p, 4000); await p.screenshot({ path: '/workspace/theater/pepper-lobby-poster.png' });
-    await view(9.5, 8, 16, 8); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/pepper-board.png' });
+    await view(-9, 13.5, -16, 13.5); await W(p, 4000); await p.screenshot({ path: '/workspace/theater/sing-west-lobby-poster.png' });
+    await view(9.5, 8, 16, 8); await W(p, 2500); await p.screenshot({ path: '/workspace/theater/board-6-films.png' });
     await posterShots('lobby-'); return { L, pl }; });
 await step('board-tap', async () => { await view(8.5, 8, 16, 8); await W(p, 1500); const xy = await p.evaluate(() => window.__theaterDbg.boardXY());
   await p.touchscreen.tap(xy.x, xy.y); await W(p, 1200); let open = await p.evaluate(() => !!document.querySelector('[data-th-times]'));
   check('tapping the board opens the 2D list', open, xy); await p.screenshot({ path: shot + 'showtimes-2d-list.png' });
   const rows = await p.evaluate(() => [...document.querySelectorAll('[data-th-times] .th-tr')].map((r) => r.innerText.replace(/\s+/g, ' ').slice(0, 160)));
   const rows2 = await p.evaluate(() => [...document.querySelectorAll('[data-th-times] .th-tr')].map((r) => ({ id: r.dataset.film, cr: r.querySelector('.th-cr').textContent }))), foot = await p.evaluate(() => document.querySelector('[data-th-times] .th-lic').textContent);
-  check('2D list: 7 rows with the right credit each, no Sheriff', rows.length === NF && rows2.every((r) => (CR[r.id] ? r.cr === CR[r.id] : /Blender Foundation \| studio\.blender\.org, CC BY/.test(r.cr))) && noSheriffTxt(rows.join(' ')), rows2);
-  check('2D list footer credits both rights holders', /Blender Foundation/.test(foot) && !/FSFE/.test(foot) && /Morevna Project/.test(foot) && /David Revoy/.test(foot), foot);
+  check('2D list: 6 rows with the right credit each, no Sheriff', rows.length === NF && rows2.every((r) => (CR[r.id] ? r.cr === CR[r.id] : /Blender Foundation \| studio\.blender\.org, CC BY/.test(r.cr))) && noSheriffTxt(rows.join(' ')), rows2);
+  check('2D list footer credits Blender only (no FSFE / Morevna)', /Blender Foundation/.test(foot) && !/FSFE|Morevna|Revoy/.test(foot), foot);
   await p.evaluate(() => window.__theaterDbg.closePanels()); await W(p, 300);
   const b = p.locator('button[data-h="times"]'); await b.first().click({ force: true }); await W(p, 800); open = await p.evaluate(() => !!document.querySelector('[data-th-times]')); check('Showtimes button opens the 2D list', open, ''); await p.evaluate(() => window.__theaterDbg.closePanels());
   return rows; });
 await step('films', async () => { const s = await p.evaluate(() => window.__theaterDbg.seats()); const m = s.filter((q) => Math.abs(q.x) < 2).sort((a, b) => a.z - b.z)[Math.floor(s.filter((q) => Math.abs(q.x) < 2).length * 0.5)] || s[0];
   await p.evaluate((m) => { const D = window.__theaterDbg; D.tp(m.x, m.z); const q = D.findSeat(); if (q) D.sitAt(q); }, m); await W(p, 1500);
-  const r = {}; for (const id of ['sing', 'pepper', 'bbb', 'spring', 'c2', 'c3', 'wing']) { await anchorTo(id, 40); await W(p, 8000); const a = await vstate(); await W(p, 2500); const b = await vstate(); r[id] = { a, b };
+  const r = {}; for (const id of ['sing', 'bbb', 'spring', 'c2', 'c3', 'wing']) { await anchorTo(id, 40); await W(p, 8000); const a = await vstate(); await W(p, 2500); const b = await vstate(); r[id] = { a, b };
     const fileOk = FILE[id] instanceof RegExp ? FILE[id].test(a.src || '') : a.src === FILE[id];
     check(`film ${id}: loads + plays + fills (${a.mode})`, a.phase === 'movie' && a.id === id && fileOk && b.rs >= 2 && !b.paused && b.t > a.t + 1 && a.mode === (id === 'sheriff' ? 'portrait' : 'cover') && a.one && b.one && a.vids === 0, { a, b }); // at most 2 decks (kept off the DOM)
     if (id === 'bbb') await p.screenshot({ path: shot + 'wide-film-seated.png' }); if (id === 'spring') await p.screenshot({ path: shot + 'wide-film-seated-spring.png' }); if (id === 'sing') await p.screenshot({ path: shot + 'wide-film-seated-singularity.png' }); if (id === 'sheriff') await p.screenshot({ path: shot + 'portrait-sheriff-seated.png' });
-    if (id === 'pepper') { const t1 = Date.now(); await p.screenshot({ path: `/workspace/theater/${id}-seated.png` }); await W(p, 14000); mark(id + '-preview', t1, Date.now()); } }
+  }
   return r; });
-// ---- seamless reel handoff (A/B decks): ~12 s before a reel ends the next one is buffered on the 2nd deck, then swapped in
-const reqs = []; p.on('request', (q) => { const m = q.url().match(/films\/(pepper-carrot[^/?]*\.mp4)/); if (m) reqs.push(m[1]); });
-const handoff = async (id, reelI) => { const pre = await p.evaluate(async ([id, i]) => { const M = await import('/js/world/theater-movie.js'); return M.FILMS[id].reels.slice(0, i + 1).reduce((a, r) => a + r.dur, 0); }, [id, reelI]);
-  await anchorTo(id, pre - 22); await W(p, 4500); const a = await vstate(); // 15.5 s left: only the current reel
-  await p.waitForFunction(() => { const s = window.__theaterDbg.show(); return s.phase === 'movie' && s.epLeft < 8; }, null, { timeout: 30000 }); await W(p, 1500); const b = await vstate(); // preloaded, paused, on the other deck
-  const sw0 = b.swaps, g0 = b.gaps; let worst = 0, min = 9; const watch = Date.now(); const samples = [];
-  while (Date.now() - watch < 16000) { const x = await vstate(); samples.push([x.reel, x.src, x.vis, x.loaded]); if (!x.vis) worst++; min = Math.min(min, x.rs || 0); if (x.swaps > sw0 && x.epT > 3) break; await W(p, 120); }
-  const c = await vstate(); const h = await p.evaluate(() => window.__theaterDbg.movie.handoffs.slice(-1)[0]);
-  const ok = !a.deck.some((d) => !d.active && d.src) && b.loaded === 2 && b.deck.some((d) => !d.active && d.paused && d.ready >= 2 && FILE[id].test(d.src)) && c.swaps === sw0 + 1 && c.gaps === g0 && worst === 0 && h && h.preloaded && h.ready >= 2 && c.src === h.to && !c.paused && c.loaded <= 2 && Math.abs(c.t - c.epT) < 1.5;
-  return { ok, a: { reel: a.reel, loaded: a.loaded, deck: a.deck }, b: { reel: b.reel, loaded: b.loaded, deck: b.deck }, c: { reel: c.reel, src: c.src, t: c.t, epT: c.epT, loaded: c.loaded, paused: c.paused }, h, worst, n: samples.length }; };
-await step('handoff', async () => { const r = {}; for (const [id, i] of [['pepper', 0], ['pepper', 2], ['pepper', 3]]) { const x = await handoff(id, i); r[id + i] = x;
-    check(`seamless handoff ${id} reel ${i} -> ${i + 1}: preloaded on deck 2, swapped with no gap, <= 2 reels loaded, in sync`, x.ok, x); }
-  const files = [...new Set(reqs)]; return { ...r, files }; });
 // ---- a player who walks in mid-movie lands on the right reel at the clock position (and only that reel + maybe the next)
 await step('mid-join', async () => { const r = {};
-  for (const [id, into, want] of [['pepper', 300, 'pepper-carrot-ep4.mp4'], ['pepper', 700, 'pepper-carrot-ep6-0.mp4']]) {
+  for (const [id, into, want] of [['bbb', 300, 'big-buck-bunny.mp4'], ['spring', 200, 'spring.mp4']]) {
     await p.evaluate(() => window.__theaterDbg.leave()); await W(p, 1200); const gone = await p.evaluate(() => window.__theaterDbg.movie ? window.__theaterDbg.movie.loaded : 0);
     await anchorTo(id, into); await W(p, 500); await p.evaluate(() => window.__theaterDbg.enter()); await W(p, 1500);
     const s = await p.evaluate(() => window.__theaterDbg.seats()); await p.evaluate((m) => { const D = window.__theaterDbg; D.tp(m.x, m.z); const q = D.findSeat(); if (q) D.sitAt(q); }, s[Math.floor(s.length * 0.5)]); await W(p, 7000);
@@ -132,12 +117,12 @@ await step('mid-join', async () => { const r = {};
     r[id + '@' + into] = { ok, gone, a: { src: a.src, t: a.t, epT: a.epT, loaded: a.loaded }, b: { src: b.src, t: b.t, epT: b.epT, loaded: b.loaded, paused: b.paused } };
     check(`mid-movie join ${id} at ${into} s: ${want} in sync with the clock (|video - clock| < 1.5 s)`, ok, r[id + '@' + into]); }
   return r; });
-await step('credit-cards', async () => { const r = {}; for (const id of ['pepper']) { const a = await setFilm(id, -4); await setAnchor(a); await W(p, 1800);
+await step('credit-cards', async () => { const r = {}; for (const id of ['sing']) { const a = await setFilm(id, -4); await setAnchor(a); await W(p, 1800);
     const s = await p.evaluate(() => { const x = window.__theaterDbg.show(); return { phase: x.phase, id: x.id, credit: x.film && x.film.credit }; }); await p.screenshot({ path: `/workspace/theater/${id}-credit.png` }); r[id] = s;
     check(`${id}: credit card before the film (${CR[id].slice(0, 30)}...)`, s.phase === 'title' && s.id === id && s.credit === CR[id], s); }
-  const c = await p.evaluate(async () => (await import('/js/world/theater-movie.js')).anchorFor(3, Date.now() - 1000, true)); await setAnchor(c); await W(p, 2500);
-  const cd = await p.evaluate(() => { const x = window.__theaterDbg.show(); return { phase: x.phase, id: x.id, left: Math.round(x.left) }; }); await p.screenshot({ path: '/workspace/theater/pepper-countdown.png' });
-  check('Pepper&Carrot has its own 5:00 countdown', cd.phase === 'count' && cd.id === 'pepper' && cd.left > 290 && cd.left <= 300, cd); r.cd = cd; return r; });
+  const c = await p.evaluate(async () => (await import('/js/world/theater-movie.js')).anchorFor(1, Date.now() - 1000, true)); await setAnchor(c); await W(p, 2500);
+  const cd = await p.evaluate(() => { const x = window.__theaterDbg.show(); return { phase: x.phase, id: x.id, left: Math.round(x.left) }; }); await p.screenshot({ path: '/workspace/theater/sing-countdown.png' });
+  check('Singularity + Caminandes 2 slot has its own 5:00 countdown', cd.phase === 'count' && cd.id === 'sing' && cd.left > 290 && cd.left <= 300, cd); r.cd = cd; return r; });
 await step('title-card', async () => { const a = await setFilm('c3', -7); await setAnchor(a); await W(p, 1500); const s = await p.evaluate(() => { const x = window.__theaterDbg.show(); return { phase: x.phase, id: x.id }; }); await p.screenshot({ path: shot + 'title-card-credit.png' });
   check('title card with credit between films', s.phase === 'title' && s.id === 'c3', s); return s; });
 // no projector beam / screen-facing light cone in the theater-in group (auditorium + lobby; street car headlights excluded); auto-dim + owner spotlight still work

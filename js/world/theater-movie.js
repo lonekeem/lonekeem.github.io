@@ -1,6 +1,5 @@
 // 🎬 Lone Keem Studio showings: a clock-based rotating program on the big curved screen.
-//   "The Sheriff of Lone Keem" (13+, only when SHERIFF_IN_THEATER is on; off for now), six Blender Foundation open movies (CC BY),
-//   and the "Pepper & Carrot" motion comics (Morevna Project, CC BY-SA 4.0).
+//   "The Sheriff of Lone Keem" (13+, only when SHERIFF_IN_THEATER is on; off for now), six Blender Foundation open movies (CC BY).
 //   Files in assets/theater/films/, credits in assets/theater/README.md. Long films are split into keyframe-cut reels < 50 MB.
 // Lazy: theater.js imports this only near the theater, and the <video> is created only while you are INSIDE (unloaded on leave).
 // Sync needs no writes and no rules change: every client computes the same timeline from the clock.
@@ -25,18 +24,6 @@ const FD = new URL('../../assets/theater/films/', import.meta.url).href;
 export const CREDIT = '© Blender Foundation | studio.blender.org, CC BY';
 const EPS = SHERIFF_EPISODES.filter(isOut).map((e) => ({ n: e.n, title: e.title, dur: e.dur, src: `${DIR}ep${e.n}.mp4`, w: 720, h: 1156 }));
 const blender = (id, title, file, dur, w, h, lic, year) => ({ id, title, short: title, poster: FD + file + '.webp', reels: [{ src: FD + file + '.mp4', dur, w, h }], dur, credit: `${title} ${CREDIT}${lic.slice(5)}`, by: CREDIT, org: 'Blender Foundation', makers: 'Blender Studio / Blender Foundation', src: 'https://studio.blender.org', page: `https://studio.blender.org/films/${file}/`, lic, year, rating: 'All ages' });
-// a film in consecutive keyframe-cut reels (each < 50 MB): played back to back, the next reel preloaded so the handoff has no gap
-const reels = (file, durs, w = 1280, h = 720) => durs.map((dur, i) => ({ src: FD + file(i) + '.mp4', dur, w, h, i }));
-const sum = (L) => +L.reduce((a, r) => a + r.dur, 0).toFixed(3);
-export const PEPPER_CREDIT = 'Pepper & Carrot Motion Comic by Morevna Project, based on Pepper&Carrot by David Revoy, CC BY-SA 4.0';
-// Pepper & Carrot: every released English episode (3, 4, 5, 6; ep 5 is wordless), back to back as one show. ep = which episode a reel is.
-export const PEPPER_EPISODES = [
-  { n: 3, title: 'The Secret Ingredients', files: ['pepper-carrot-ep3'], durs: [205.077], page: 'https://morevnaproject.org/pepper-and-carrot/episode-3/' },
-  { n: 4, title: 'Stroke of Genius', files: ['pepper-carrot-ep4'], durs: [215.063], page: 'https://morevnaproject.org/pepper-and-carrot/episode-4/' },
-  { n: 5, title: 'Holiday Special', files: ['pepper-carrot-ep5'], durs: [133.104], page: 'https://morevnaproject.org/pepper-and-carrot/episode-5/' },
-  { n: 6, title: 'The Potion Contest', files: ['pepper-carrot-ep6-0', 'pepper-carrot-ep6-1'], durs: [240, 214.971], page: 'https://morevnaproject.org/pepper-and-carrot/episode-6/' }
-];
-const PEPPER_REELS = PEPPER_EPISODES.flatMap((e) => e.files.map((f, j) => ({ src: FD + f + '.mp4', dur: e.durs[j], w: 1280, h: 720, epN: e.n, epTitle: e.title }))).map((r, i) => ({ ...r, i }));
 export const FILMS = {
   sheriff: { id: 'sheriff', title: 'The Sheriff of Lone Keem', short: 'The Sheriff', poster: DIR + 'ep1.webp', hero: DIR + 'hero.webp', reels: EPS, dur: EPS.reduce((a, e) => a + e.dur, 0), credit: '', rating: '13+', min: 13 },
   bbb: blender('bbb', 'Big Buck Bunny', 'big-buck-bunny', 596.48, 1280, 720, 'CC BY 3.0', 2008),
@@ -44,7 +31,6 @@ export const FILMS = {
   c2: blender('c2', 'Caminandes 2: Gran Dillama', 'caminandes-2', 146.048, 1280, 720, 'CC BY 3.0', 2013),
   c3: blender('c3', 'Caminandes 3: Llamigos', 'caminandes-3', 150.14, 1280, 720, 'CC BY 3.0', 2016),
   wing: blender('wing', 'Wing It!', 'wing-it', 237.917, 1280, 720, 'CC BY 4.0', 2023),
-  pepper: { id: 'pepper', title: 'Pepper&Carrot', short: 'Pepper&Carrot', sub: 'Motion Comic · Episodes 3, 4, 5 and 6', poster: FD + 'pepper-carrot.webp', reels: PEPPER_REELS, dur: sum(PEPPER_REELS), credit: PEPPER_CREDIT, by: 'Morevna Project, after David Revoy, CC BY-SA 4.0', org: 'Morevna Project', makers: 'Morevna Project, based on Pepper&Carrot by David Revoy', src: 'https://morevnaproject.org/pepper-and-carrot/', page: 'https://morevnaproject.org/pepper-and-carrot/', lic: 'CC BY-SA 4.0', year: '2018–2022', rating: 'All ages' },
   sing: blender('sing', 'Singularity', 'singularity', 391.008, 1280, 536, 'CC BY 4.0', 2026)
 };
 FILMS.sing.credit = 'Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0'; // Blender Studio's own credit line
@@ -64,13 +50,13 @@ export const bareUrl = (u) => String(u || '').replace(/^https?:\/\//, '');
 export const licDeed = (lic) => { const m = /^CC (BY(?:-SA)?) (\d\.\d)$/.exec(lic || ''); return m ? `creativecommons.org/licenses/${m[1].toLowerCase()}/${m[2]}/` : ''; };
 export const licName = (lic) => (/-SA/.test(lic) ? `Creative Commons Attribution-ShareAlike ${lic.slice(-3)}` : `Creative Commons Attribution ${lic.slice(-3)}`);
 // the films with a credit, in program order (credits panel)
-export const creditFilms = () => [...new Set(['pepper', 'sing', 'bbb', 'spring', 'c2', 'c3', 'wing'])].map((id) => FILMS[id]).filter((f) => f && f.credit);
+export const creditFilms = () => [...new Set(['spring', 'sing', 'c2', 'bbb', 'c3', 'wing'])].map((id) => FILMS[id]).filter((f) => f && f.credit);
 const STEP = 900; // slots are whole 15-minute steps so shows start on :00 :15 :30 :45 (+5:00)
 // the 2-hour program (by the clock, same for everyone). kid = what under-13 / unknown-age players see in that slot (same clock)
-//   hour A  :00 Pepper&Carrot (eps 3-6, 16:48, 30 min)   :30 Singularity   :45 Big Buck Bunny (the Sheriff slot when SHERIFF_IN_THEATER is on)
-//   hour B  :00 Pepper&Carrot (again)                      :30 Spring        :45 Caminandes 2 + 3 + Wing It!
-//   (Pepper&Carrot, the longest all-ages show, opens every hour; every film still plays at least once every 2 hours)
-const PROGRAM = [{ films: ['pepper'] }, { films: ['sing'] }, { films: ['sheriff'], kid: SHERIFF_FAMILY }, { films: ['pepper'] }, { films: ['spring'] }, { films: ['c2', 'c3', 'wing'] }]
+//   hour A  :00 Spring   :15 Singularity + Caminandes 2   :30 Big Buck Bunny (the Sheriff slot when SHERIFF_IN_THEATER is on)   :45 Caminandes 3 + Wing It!
+//   hour B  :00 Big Buck Bunny   :15 Spring   :30 Singularity + Caminandes 3   :45 Caminandes 2 + Wing It!
+//   (every film plays twice every 2 hours; every slot fits in 15 min, so the longest idle end card is ~3.5 min)
+const PROGRAM = [{ films: ['spring'] }, { films: ['sing', 'c2'] }, { films: ['sheriff'], kid: SHERIFF_FAMILY }, { films: ['c3', 'wing'] }, { films: ['bbb'] }, { films: ['spring'] }, { films: ['sing', 'c3'] }, { films: ['c2', 'wing'] }]
   .map((p) => (SHERIFF_IN_THEATER || !p.kid ? p : { films: p.kid })); // flag off: the family lineup for everyone
 // true when this viewer must not see the Sheriff in the theater (under 13 / unknown age, or the flag is off)
 export const familyOnly = (kid) => !!kid || !SHERIFF_IN_THEATER;
@@ -91,7 +77,7 @@ const filmStart = (sl, id) => sl.segs.find((g) => g.k === 'reel' && g.id === id)
 export function program(kid = false) { return SLOTS.map((s, i) => { const v = kid ? s.kids : s.adult; return { i, o: s.o, len: s.len, ids: v.ids, starts: v.ids.map((id) => filmStart(v, id)), end: v.end }; }); }
 const isPair = (ids) => ids.length > 1 && ids.every((id) => id[0] === 'c');
 export const slotTitle = (ids) => (isPair(ids) ? 'Caminandes Double Feature' : ids.length > 2 ? 'Cartoon Shorts Triple Feature' : ids.map((id) => FILMS[id].title).join(' + '));
-export const slotPoster = (ids) => (ids.length > 1 && ids[0] === 'c2' ? DOUBLE_POSTER : FILMS[ids[0]].poster);
+export const slotPoster = (ids) => (ids[0] === 'c2' && ids[1] === 'c3' ? DOUBLE_POSTER : FILMS[ids[0]].poster);
 // owner "start" helpers: anchor values that put slot k's title card (or 5:00 countdown) at `now`
 export function anchorFor(k, nowMs, countdown = false) { const s = SLOTS[mod(k, SLOTS.length)]; return nowMs - (s.o + (countdown ? 0 : COUNTDOWN - TC)) * 1000; }
 
@@ -246,7 +232,7 @@ const bg = (g, w, h, now) => { const gr = g.createLinearGradient(0, 0, w, h); gr
   g.globalAlpha = 0.25; for (let i = 0; i < 30; i++) { const x = (i * 97.3 + now * 7 * (1 + (i % 3))) % w, y = (i * 53.7) % h; g.fillStyle = '#d4af37'; g.fillRect(x, y, 3, 3); } g.globalAlpha = 1; };
 // the attribution line for a slot (one per rights holder: the Blender shorts share one line)
 export const creditOf = (ids) => [...new Set(ids.map((id) => FILMS[id]).filter((f) => f.credit).map((f) => (f.by === CREDIT ? CREDIT : f.credit)))].join(' · ');
-const ORG = { 'Blender Foundation': 'Blender Foundation (CC BY)', 'Morevna Project': 'Pepper&Carrot © Morevna Project, after David Revoy (CC BY-SA 4.0)' };
+const ORG = { 'Blender Foundation': 'Blender Foundation (CC BY)' };
 export const boardFooter = (list) => 'Open films: ' + [...new Set(list.map((e) => e.film.org).filter(Boolean))].map((o) => ORG[o] || o).join(' · ');
 // word-wrap for canvas text (max n lines; the last one is squeezed by fillText's maxWidth)
 function wrap(g, text, maxW, n = 2) { const out = []; let cur = '';
@@ -303,7 +289,7 @@ export function drawMovieScreen(g, w, h, sh, now) {
   g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.085); g.fillText(sh.title, cx, h * 0.28, tw);
   g.fillStyle = '#ffffff'; g.shadowColor = '#d4af37'; g.shadowBlur = 20; g.font = F(900, h * 0.26); g.fillText(mmss(sh.left), cx, h * 0.52, tw); g.shadowBlur = 0;
   const f = sh.film, mins = Math.round(ids.reduce((a, id) => a + FILMS[id].dur, 0) / 60);
-  g.fillStyle = 'rgba(243,227,195,.85)'; g.font = F(700, h * 0.05); g.fillText(`Starts ${clockStr(sh.start)} · ${f.id === 'sheriff' ? `${EPS.length} episodes · ` : f.id === 'pepper' ? `${PEPPER_EPISODES.length} episodes · ` : ''}${mins} min · ${f.rating}`, cx, h * 0.73, tw);
+  g.fillStyle = 'rgba(243,227,195,.85)'; g.font = F(700, h * 0.05); g.fillText(`Starts ${clockStr(sh.start)} · ${f.id === 'sheriff' ? `${EPS.length} episodes · ` : ''}${mins} min · ${f.rating}`, cx, h * 0.73, tw);
   g.fillStyle = 'rgba(243,227,195,.65)'; g.font = F(600, h * 0.04); g.fillText(f.credit ? creditOf(ids) : 'A Lone Keem original', cx, h * 0.83, tw);
   return true;
 }
@@ -312,7 +298,7 @@ export function drawNowShowing(g, w, h, sh) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = 10; g.strokeRect(5, 5, w - 10, h - 10);
   const playing = sh.phase === 'movie' || sh.phase === 'title', ids = sh.phase === 'end' ? sh.nextIds : sh.ids;
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd36b'; g.font = F(900, w * 0.11); g.fillText(playing ? 'NOW SHOWING' : 'UP NEXT', w / 2, h * 0.06, w - 30);
-  const pw = w * 0.74, ph = pw * 868 / 540, px = (w - pw) / 2, py = h * 0.105; const src = sh.phase === 'off' ? (SHERIFF_IN_THEATER ? FILMS.sheriff.poster : FILMS.pepper.poster) : playing ? sh.film.poster : slotPoster(ids);
+  const pw = w * 0.74, ph = pw * 868 / 540, px = (w - pw) / 2, py = h * 0.105; const src = sh.phase === 'off' ? (SHERIFF_IN_THEATER ? FILMS.sheriff.poster : FILMS.bbb.poster) : playing ? sh.film.poster : slotPoster(ids);
   const im = img(src); if (ok(im)) cover(g, im, px, py, pw, ph); else { g.fillStyle = '#3b1d0e'; g.fillRect(px, py, pw, ph); }
   const y = py + ph + (h - py - ph) / 2; let a = '', b = '';
   if (sh.phase === 'off') { a = 'Showtimes paused'; b = 'Check back soon'; }
