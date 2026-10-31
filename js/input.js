@@ -64,6 +64,18 @@ let capture = null;
 const sampleFns = new Set();
 const deviceFns = new Set();
 let prevDown = new Set();
+let synth = false;
+let loopOn = false;
+let stickRep = { dir: '', at: 0 };
+const BRIDGE_SEL = '.rush-run, .pl-stage';
+
+// Label family the player picked in Settings (auto follows the controller).
+export function labelKind(kind) {
+  let o = 'auto';
+  try { o = (mem() && mem().getItem('kemy-pad-labels')) || 'auto'; } catch { /* */ }
+  if (o === 'ps' || o === 'xbox') return o;
+  return kind === 'ps' ? 'ps' : kind === 'xbox' ? 'xbox' : 'generic';
+}
 
 function emptyFrame() {
   return {
@@ -178,12 +190,12 @@ export function invertY() { return !!loadPrefs().invertY; }
 
 const PAD_FACE = {
   xbox: { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'View', 9: 'Menu' },
-  ps: { 0: 'Cross', 1: 'Circle', 2: 'Square', 3: 'Triangle', 4: 'L1', 5: 'R1', 6: 'L2', 7: 'R2', 8: 'Share', 9: 'Options' },
+  ps: { 0: '✕', 1: '○', 2: '□', 3: '△', 4: 'L1', 5: 'R1', 6: 'L2', 7: 'R2', 8: 'Share', 9: 'Options' },
   generic: { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Select', 9: 'Start' }
 };
 
 export function padLabel(index, kind) {
-  const map = PAD_FACE[kind] || PAD_FACE.generic;
+  const map = PAD_FACE[labelKind(kind)] || PAD_FACE.generic;
   if (map[index]) return map[index];
   if (index === 12) return 'Up';
   if (index === 13) return 'Down';
@@ -247,7 +259,7 @@ function isShown(el) {
 }
 function overlayEl() {
   if (typeof document === 'undefined') return null;
-  const sel = '#modal-root .modal-backdrop, .kc-set, .kc-tut, .ks-panel, .zw-ov, .ew-ov, .kd-plate, .zg-pause, .set-remap.capturing';
+  const sel = '.kg-ov, #modal-root .modal-backdrop, .kc-set, .kc-tut, .ks-panel, .zw-ov, .ew-ov, .kd-plate, .zg-pause, .set-remap.capturing';
   const hit = [...document.querySelectorAll(sel)].find(isShown);
   if (hit) return hit;
   const house = document.querySelector('.kh-radio.min:not(.dock)');
@@ -327,7 +339,7 @@ function activateFocus() {
 }
 
 function closeTop() {
-  const done = document.querySelector('.kc-set [data-done], .kc-tut button, .ks-panel [data-close], .ew-ov [data-close], .zw-ov [data-x], .zw-ov [data-close], .kd-plate [data-x]');
+  const done = document.querySelector('.kg-ov [data-close], .kc-set [data-done], .kc-tut button, .ks-panel [data-close], .ew-ov [data-close], .zw-ov [data-x], .zw-ov [data-close], .kd-plate [data-x]');
   if (done) { done.click(); return true; }
   const modal = document.querySelector('#modal-root [data-close]');
   if (modal) { modal.click(); return true; }
@@ -381,7 +393,12 @@ function onKeyDown(e) {
     done && done();
     return;
   }
+  if (synth) return;
   if (typing(e.target)) return;
+  if (!e.repeat && (e.key === '?' || (e.key === '/' && e.shiftKey))) {
+    import('./input/gamepad-ui.js').then((m) => m.openGuide()).catch(() => {});
+    e.preventDefault(); return;
+  }
   if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.closest && e.target.closest('.kh-note-btn, .kh-radio')) return;
   const k = normKey(e);
   if (!k) return;
@@ -449,6 +466,7 @@ function buttonValue(p, i) {
 
 export function simulatePad(state) {
   sim = state;
+  if (state) startLoop();
   if (state && state.id) noteDevice(kindFromId(state.id));
   else if (state) noteDevice('generic');
 }
@@ -464,7 +482,7 @@ export function tick() {
     if (!sim && !seenPad.has(id)) {
       seenPad.add(id);
       noteDevice(kindFromId(g.id || ''));
-      try { toastFn('Controller connected'); } catch { /* */ }
+      announce(g.id || '');
     } else noteDevice(kindFromId(g.id || (sim ? 'generic' : '')));
     break;
   }
@@ -522,6 +540,9 @@ export function tick() {
     sampleFns.forEach((f) => { try { f(frame); } catch { /* */ } });
     return frame;
   }
+  const bridge = !play && typeof document !== 'undefined' && document.querySelector(BRIDGE_SEL);
+  if (bridge) { bridgeKeys(bridge, down, pressed, left, frame.gas, frame.brake); sampleFns.forEach((f) => { try { f(frame); } catch { /* */ } }); return frame; }
+  if (pad && menuMode() && !play) stickNav(left, look);
   if (decorating && world.decorate) world.decorate(pressed);
   else {
   if (pressed.confirm) {
@@ -538,6 +559,7 @@ export function tick() {
       else {
         const b = document.querySelector('.gm-bar a[aria-label="Back"], a[aria-label="Leave Pal Park"]');
         if (b) b.click();
+        else if (location.hash && location.hash !== '#/' && location.hash !== '#/home') history.back();
       }
     }
   }
@@ -568,6 +590,69 @@ export function tick() {
   }
   sampleFns.forEach((f) => { try { f(frame); } catch { /* */ } });
   return frame;
+}
+
+function keyEv(type, key, code) {
+  synth = true;
+  try { document.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true })); } catch { /* */ }
+  synth = false;
+}
+const held = new Map();
+function hold(name, on, key, code) {
+  if (on && !held.get(name)) { held.set(name, true); keyEv('keydown', key, code); }
+  else if (!on && held.get(name)) { held.set(name, false); keyEv('keyup', key, code); }
+}
+// Games that only listen for keys (Kemy Rush, Pool) get key presses from the pad.
+function bridgeKeys(root, down, pressed, left, gas, brake) {
+  if (root.classList.contains('rush-run')) {
+    hold('gas', gas > 0.3 || down.confirm || left.x > 0.4 || down.right, 'ArrowRight', 'ArrowRight');
+    hold('brake', brake > 0.3 || down.back || left.x < -0.4 || down.left, 'ArrowLeft', 'ArrowLeft');
+    if (pressed.pause || pressed.menu) keyEv('keydown', 'Escape', 'Escape');
+    return;
+  }
+  // Pool: d-pad/stick aim and power, A shoots, B goes back.
+  const tapKey = (k) => { keyEv('keydown', k, k); keyEv('keyup', k, k); };
+  const now = performance.now();
+  const dir = down.left || left.x < -0.5 ? 'ArrowLeft' : down.right || left.x > 0.5 ? 'ArrowRight' : down.up || left.y < -0.5 ? 'ArrowUp' : down.down || left.y > 0.5 ? 'ArrowDown' : '';
+  if (dir && (dir !== stickRep.dir || now - stickRep.at > 90)) { stickRep = { dir, at: now }; tapKey(dir); }
+  if (!dir) stickRep.dir = '';
+  if (pressed.confirm) tapKey('Enter');
+  if (pressed.back && !closeTop()) { const b = document.querySelector('.gm-bar a[aria-label="Back"]'); if (b) b.click(); }
+}
+// Left stick moves the focus ring like the d-pad; right stick scrolls.
+function stickNav(left, look) {
+  const now = performance.now();
+  let dir = '';
+  if (Math.abs(left.x) > 0.55 || Math.abs(left.y) > 0.55) dir = Math.abs(left.x) > Math.abs(left.y) ? (left.x > 0 ? 'ArrowRight' : 'ArrowLeft') : (left.y > 0 ? 'ArrowDown' : 'ArrowUp');
+  if (dir) {
+    const first = dir !== stickRep.dir;
+    if (first || now - stickRep.at > (stickRep.n > 1 ? 120 : 380)) { stickRep = { dir, at: now, n: first ? 1 : (stickRep.n || 1) + 1 }; moveFocus(dir); }
+  } else stickRep = { dir: '', at: 0 };
+  if (look.mag) {
+    const ov = overlayEl();
+    const t = (ov && [ov, ...ov.querySelectorAll('*')].find((el) => el.scrollHeight > el.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(el).overflowY))) || document.scrollingElement;
+    if (t) t.scrollBy(look.x * 14, look.y * 18);
+  }
+}
+function announce(id) {
+  import('./input/gamepad-ui.js').then((m) => m.padConnected(kindFromId(id))).catch(() => { try { toastFn('🎮 Controller connected'); } catch { /* */ } });
+}
+function anyPad() {
+  try { return [...((navigator.getGamepads && navigator.getGamepads()) || [])].some(Boolean); } catch { return false; }
+}
+// Polls only while a controller is plugged in; nothing runs when none is.
+function startLoop() {
+  if (loopOn || typeof requestAnimationFrame !== 'function') return;
+  loopOn = true;
+  const loop = () => {
+    if (!sim && !anyPad()) {
+      loopOn = false; seenPad.clear(); prevDown = new Set(); frame = emptyFrame();
+      held.forEach((on, k) => { if (on) hold(k, false, k === 'gas' ? 'ArrowRight' : 'ArrowLeft', k === 'gas' ? 'ArrowRight' : 'ArrowLeft'); });
+      return;
+    }
+    tick(); requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
 }
 
 function loadHaptics() {
@@ -690,8 +775,10 @@ export function startInput(opts = {}) {
       const t = e.target;
       if (t && t.closest && t.closest('.kc, .p3-view, .zg, .pl-stage, [data-kemy-game]')) e.preventDefault();
     }, true);
-    const loop = () => { tick(); requestAnimationFrame(loop); };
-    requestAnimationFrame(loop);
+    addEventListener('gamepadconnected', startLoop);
+    if (anyPad()) startLoop();
+    // Lazy: only loads on desktop (keyboard hint) or once a pad connects.
+    if (deviceName === 'keyboard') setTimeout(() => import('./input/gamepad-ui.js').then((m) => m.startKeyboardHint()).catch(() => {}), 1500);
   }
   if (typeof window !== 'undefined') window.__kemyInput = api;
   return api;

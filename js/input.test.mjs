@@ -30,7 +30,7 @@ assert.equal(keyboardLook(new Set(['ArrowUp']), lookArrows).y, -1);
 
 assert.equal(hintFor('jump', 'keyboard', prefs), 'Space');
 assert.equal(hintFor('emote', 'xbox', prefs), 'X');
-assert.equal(hintFor('jump', 'ps', prefs), 'Cross');
+assert.equal(hintFor('jump', 'ps', prefs), '✕');
 assert.equal(keyLabel('Escape'), 'Esc');
 assert.match(glyph('confirm', 'ps'), /<svg/);
 assert.match(glyph('confirm', 'xbox'), /A/);

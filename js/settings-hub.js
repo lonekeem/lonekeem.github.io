@@ -212,6 +212,8 @@ function html(ctx) {
         <div class="set-slider"><label for="set-op">Button opacity <span class="muted" id="set-op-n">${Math.round(joy.opacity * 100)}%</span></label><input id="set-op" type="range" min="0.3" max="1" step="0.05" value="${joy.opacity}"></div>
         <label class="set-row" for="set-left"><span>Left-handed<small>Swaps the walk stick and the look side.</small></span><input id="set-left" type="checkbox" ${joy.left ? 'checked' : ''}></label>
         <label class="set-row" for="set-hap"><span>Vibration</span><input id="set-hap" type="checkbox" ${joy.haptics ? 'checked' : ''}></label>
+        <p><b>Controller &amp; keyboard guide</b></p>
+        <div id="set-padguide"></div>
         <div id="set-remap"></div>
         <p>Driving, camera and drive buttons</p>
         <div id="set-drive" class="set-drive"></div>
@@ -422,6 +424,7 @@ export async function page(main, ctx) {
     document.getElementById(id).onchange = saveJoy;
   });
   mountRemap(document.getElementById('set-remap'));
+  import('./input/gamepad-ui.js').then((m) => m.mountGuide(document.getElementById('set-padguide'))).catch(() => {});
   renderDriveSettings(document.getElementById('set-drive'));
 
   paintWallet(S);

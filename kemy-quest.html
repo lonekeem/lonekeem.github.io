@@ -78,6 +78,7 @@
 <p>Loading the game… <noscript>The game needs JavaScript. Please turn it on.</noscript></p>
 <p><a href="app.html#/games" style="color:#e2d0ff">More free games in Kemy</a>: Star Pool, Chess, Ludo, Checkers and more.</p>
 </section></main>
+<script type="module">addEventListener("gamepadconnected",(e)=>import("./js/input/gamepad-ui.js").then((m)=>import("./js/input.js").then((i)=>m.padConnected(i.kindFromId(e.gamepad&&e.gamepad.id)))).catch(()=>{}));</script>
 <script type="module">
 import { mountGameMusic } from './js/gamemusic.js'; mountGameMusic({ corner: 'top-right' }).catch(() => {});
 import { watchGameRotate } from './js/rotate.js'; watchGameRotate();

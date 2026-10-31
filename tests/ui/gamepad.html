@@ -1,0 +1,16 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%}#v{position:fixed;inset:0;background:#8fd3ff}</style>
+<div id=v class="p3-view"></div><div id="modal-root"></div><div id="guide"></div>
+<script type=module>
+import { startInput, registerWorld, moveStick } from '/js/input.js';
+import { createControls } from '/js/controls.js';
+window.log = [];
+startInput({ toast: (m) => log.push('toast:' + m) });
+const v = document.getElementById('v');
+createControls(v, { settings: false, buttons: [{ id: 'jump', icon: '⤒', label: 'Jump', big: true }, { id: 'emote', icon: '😊', label: 'Emote' }] });
+document.querySelectorAll('.kc-tut,.kc-tip').forEach((e) => e.remove());
+window.playing = true;
+registerWorld({ active: () => window.playing, jump: () => log.push('jump'), interact: () => false, use: () => log.push('use'), menu: () => log.push('menu'), back: () => log.push('back'), map: () => log.push('map') });
+window.moveStick = moveStick;
+window.ready = true;
+</script>
