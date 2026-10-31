@@ -2,7 +2,7 @@
 // (PlayStation / Xbox / Keyboard tabs), a first-play keyboard hint on computers, and
 // small "what to press" badges beside on-screen buttons. Original art only.
 // Loaded lazily by js/input.js. Written by Lone Keem.
-import { device, labelKind, loadPrefs, keyLabel, onDevice, onSample } from '../input.js';
+import { device, labelKind, loadPrefs, keyLabel, onDevice } from '../input.js';
 
 const LS_LABELS = 'kemy-pad-labels';
 const LS_HINT = 'kemy-kb-hint-seen';
@@ -89,8 +89,11 @@ const CSS = `.kg-b{display:inline-flex;align-items:center;justify-content:center
 .kg-list li{display:flex;align-items:center;gap:10px;min-height:32px}
 .kg-keys{display:inline-flex;gap:4px;flex-wrap:wrap;min-width:96px}
 .kg-ctx h3{font-size:15px;margin:12px 0 6px}
-.kg-toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:99999;max-width:min(420px,92vw);padding:12px 16px;border-radius:18px;background:rgba(32,18,64,.94);color:#fff8e8;box-shadow:0 8px 30px rgba(0,0,0,.4);transition:opacity .5s;pointer-events:auto}
+.kg-toast{position:fixed;left:calc(10px + env(safe-area-inset-left));top:calc(64px + env(safe-area-inset-top));z-index:99999;max-width:min(330px,80vw);max-height:60vh;overflow:auto;padding:10px 12px;font-size:13px;border-radius:18px;background:rgba(32,18,64,.94);color:#fff8e8;box-shadow:0 8px 30px rgba(0,0,0,.4);transition:opacity .5s;pointer-events:auto}
 .kg-toast.out{opacity:0}
+.kg-toast .kg-list li{min-height:26px;gap:8px}.kg-toast .kg-keys{min-width:78px}
+.kg-toast .kg-x{position:static;float:right;display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:2px 6px;margin:-4px -4px 4px 8px;border-radius:12px;background:rgba(255,255,255,.12);font-size:16px}
+.kg-toast .kg-x:focus{outline:3px solid #ffd34d}
 .kg-toast b{display:block;margin-bottom:8px}
 .kg-toast small{display:block;margin-top:8px;opacity:.75}
 .kg-x{position:absolute;top:6px;right:8px;background:none;border:0;color:#fff8e8;font-size:18px;min-width:32px;min-height:32px}
@@ -115,7 +118,8 @@ function closeToast() {
   if (!toastEl) return;
   const el = toastEl; toastEl = null; clearTimeout(toastT);
   if (offToast) { offToast(); offToast = null; }
-  el.classList.add('out'); setTimeout(() => el.remove(), 500);
+  removeEventListener('keydown', onEsc, true);
+  el.classList.add('out'); setTimeout(() => el.remove(), 300);
 }
 export function padConnected(kind) {
   css(); badges();
@@ -124,14 +128,32 @@ export function padConnected(kind) {
   closeToast();
   const el = document.createElement('div');
   el.className = 'kg-toast'; el.setAttribute('role', 'status'); el.dataset.fam = fam;
-  el.innerHTML = `<button class="kg-x" type="button" aria-label="Close" tabindex="-1">×</button><b>🎮 ${name} controller connected</b>${guideHTML(fam, true)}<small>Full guide: Settings › Controls</small>`;
+  el.innerHTML = `${closeBtn(fam)}<b>🎮 ${name} controller connected</b>${guideHTML(fam, true)}<small>Full guide: Settings › Controls</small>`;
   el.querySelector('.kg-x').onclick = closeToast;
   document.body.appendChild(el);
   toastEl = el;
-  toastT = setTimeout(closeToast, 6000);
-  // Any button press after a short beat hides it.
-  const t0 = performance.now();
-  offToast = onSample((f) => { if (performance.now() - t0 > 400 && Object.keys(f.pressed).length) closeToast(); });
+  watchClose();
+}
+// The guide stays until the player closes it: the × button, Esc, or ○/B.
+function closeBtn(fam) {
+  return `<button class="kg-x" type="button" aria-label="Close controls guide">× ${badge('b', fam)} ${kbd('Esc')}</button>`;
+}
+function onEsc(e) {
+  if (toastEl && e.key === 'Escape' && !ov) { e.preventDefault(); e.stopImmediatePropagation(); closeToast(); }
+}
+function watchClose() {
+  addEventListener('keydown', onEsc, true);
+  // Pages without the shared input loop (Kemy Quest) watch ○/B themselves, only while the guide is up.
+  if (window.__kemyInput) return;
+  let was = true;
+  const poll = () => {
+    if (!toastEl) return;
+    let b = false;
+    try { for (const g of navigator.getGamepads() || []) if (g && g.buttons[1] && g.buttons[1].pressed) b = true; } catch { /* */ }
+    if (b && !was) { closeToast(); return; }
+    was = b; requestAnimationFrame(poll);
+  };
+  requestAnimationFrame(poll);
 }
 
 let ov = null;
@@ -172,7 +194,7 @@ export function mountGuide(host, tab) {
 
 // Small badges beside common on-screen buttons (Back, Close) when not on touch.
 const BADGE_SEL = [
-  ['.gm-bar a[aria-label="Back"], a[aria-label="Leave Pal Park"], #modal-root [data-close], .kg-x', 'b', 'Esc']
+  ['.gm-bar a[aria-label="Back"], a[aria-label="Leave Pal Park"], #modal-root [data-close], .kg-card .kg-x', 'b', 'Esc']
 ];
 let badgeQ = 0;
 function paintBadges() {
@@ -226,9 +248,9 @@ function showKbHint() {
   closeToast();
   const el = document.createElement('div');
   el.className = 'kg-toast kg-kbhint'; el.setAttribute('role', 'status');
-  el.innerHTML = `<button class="kg-x" type="button" aria-label="Close">×</button><b>⌨️ Controls</b>${guideHTML('kb', true)}<small>Press ${kbd('?')} any time for the full guide.</small>`;
+  el.innerHTML = `${closeBtn(famNow())}<b>⌨️ Controls</b>${guideHTML('kb', true)}<small>Press ${kbd('?')} any time for the full guide.</small>`;
   el.querySelector('.kg-x').onclick = closeToast;
   document.body.appendChild(el);
-  toastEl = el; toastT = setTimeout(closeToast, 9000);
+  toastEl = el; watchClose();
 }
 hookDevice();

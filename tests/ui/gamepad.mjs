@@ -43,7 +43,13 @@ for (const [fam, id, a, b] of [['ps', 'Wireless Controller (STANDARD GAMEPAD Ven
   const log = await p.evaluate(() => log);
   ok(`${fam}: confirm=jump, X=use, Start=menu`, log.includes('jump') && log.includes('use') && log.includes('menu'), log.join(','));
   const td = await p.evaluate(() => new Promise((r) => setTimeout(() => r([...document.querySelectorAll('.kg-toast')].map((e) => e.className).join()), 700)));
-  ok(`${fam}: toast dismissed by button`, dbg && !/kg-toast(?! out)/.test(td), td);
+  ok(`${fam}: toast stays after gameplay buttons`, dbg && /kg-toast/.test(td) && !/ out/.test(td), td);
+  const xb = await p.textContent('.kg-toast .kg-x'); ok(`${fam}: close button has ${b} + Esc badge`, xb.includes(b) && xb.includes('Esc'), xb);
+  const box = await p.evaluate(() => { const r = document.querySelector('.kg-toast').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+  ok(`${fam}: toast compact in a corner`, box[0] < 40 && box[2] < 360, JSON.stringify(box));
+  await p.waitForTimeout(6500); ok(`${fam}: toast still up after 7 s`, !!(await p.$('.kg-toast:not(.out)')));
+  await p.screenshot({ path: `/workspace/gp-toast-stays-${fam}.png` });
+  await press(p, 1); await p.waitForTimeout(400); ok(`${fam}: ${b} closes toast`, !(await p.$('.kg-toast')));
   const hint = await p.evaluate(() => [...document.querySelectorAll('.kc-b small')].map((s) => s.textContent).join(' '));
   ok(`${fam}: on-screen button badges`, hint.includes(a), hint);
   // Guide overlay + tabs + B closes, focus nav
@@ -65,6 +71,10 @@ for (const [fam, id, a, b] of [['ps', 'Wireless Controller (STANDARD GAMEPAD Ven
   await q.evaluate(() => __connect());
   await q.waitForSelector('.kg-toast', { timeout: 4000 });
   ok(`${fam}: Kemy Quest toast`, (await q.textContent('.kg-toast')).includes(a));
+  await press(q, 0); await q.waitForTimeout(6500); ok(`${fam}: KQ toast stays`, !!(await q.$('.kg-toast:not(.out)')));
+  await press(q, 1); await q.waitForTimeout(400); ok(`${fam}: KQ ${b} closes toast`, !(await q.$('.kg-toast')));
+  await q.evaluate(() => __connect()); await q.waitForSelector('.kg-toast'); await q.keyboard.press('Escape'); await q.waitForTimeout(400);
+  ok(`${fam}: KQ Esc closes toast`, !(await q.$('.kg-toast')));
   await q.context().close();
 }
 // Settings page guide in the real app (signed-out route rendering via module)
@@ -87,6 +97,9 @@ for (const [fam, id, a, b] of [['ps', 'Wireless Controller (STANDARD GAMEPAD Ven
   ok('desktop first-play hint', !!(await p.$('.kg-kbhint')));
   ok('hint remembered', await p.evaluate(() => localStorage.getItem('kemy-kb-hint-seen') === '1'));
   ok('? button present', !!(await p.$('.kg-help')));
+  await p.keyboard.press('w'); await p.waitForTimeout(9500); ok('kb hint stays after keys and 9 s', !!(await p.$('.kg-kbhint:not(.out)')));
+  await p.screenshot({ path: '/workspace/gp-kbhint-stays.png' });
+  await p.click('.kg-kbhint .kg-x'); await p.waitForTimeout(400); ok('kb hint closes with ×', !(await p.$('.kg-kbhint')));
   await p.keyboard.press('?'); await p.waitForTimeout(300);
   ok('? opens guide on keyboard tab', (await p.getAttribute('.kg-tabs [aria-selected=true]', 'data-tab')) === 'kb');
   await p.screenshot({ path: '/workspace/gp-kb.png' });

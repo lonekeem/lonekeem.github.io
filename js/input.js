@@ -553,6 +553,8 @@ export function tick() {
       if (!(world.interact && world.interact())) world.jump && world.jump();
     }
   }
+  const kgx = pressed.back && document.querySelector('.kg-toast:not(.out) .kg-x');
+  if (kgx) { kgx.click(); pressed.back = false; }
   if (pressed.back) {
     if (!closeTop()) {
       if (play) world.back && world.back();
@@ -604,6 +606,8 @@ function hold(name, on, key, code) {
 }
 // Games that only listen for keys (Kemy Rush, Pool) get key presses from the pad.
 function bridgeKeys(root, down, pressed, left, gas, brake) {
+  const kgx = pressed.back && document.querySelector('.kg-toast:not(.out) .kg-x');
+  if (kgx) { kgx.click(); return; }
   if (root.classList.contains('rush-run')) {
     hold('gas', gas > 0.3 || down.confirm || left.x > 0.4 || down.right, 'ArrowRight', 'ArrowRight');
     hold('brake', brake > 0.3 || down.back || left.x < -0.4 || down.left, 'ArrowLeft', 'ArrowLeft');
