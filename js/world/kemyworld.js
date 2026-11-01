@@ -158,7 +158,8 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const capIM = new THREE.InstancedMesh(new THREE.ConeGeometry(0.4, 0.3, 12), std('#2b2840', { r: 0.4, m: 0.6 }), lamps.length);
   lamps.forEach((l, i) => { tmpM.compose(tv.set(l.x, FLAT + 2.2, l.z), tq.identity(), ts.set(1, 1, 1)); postIM.setMatrixAt(i, tmpM); tmpM.compose(tv.set(l.x, FLAT + 4.45, l.z), tq.identity(), ts.set(1, 1, 1)); headIM.setMatrixAt(i, tmpM); tmpM.compose(tv.set(l.x, FLAT + 4.75, l.z), tq.identity(), ts.set(1, 1, 1)); capIM.setMatrixAt(i, tmpM); });
   postIM.castShadow = !LOW; root.add(postIM, headIM, capIM);
-  const NPL = LOW ? 0 : Q.tier === 'medium' ? 6 : ULTRA ? 14 : 10; const pls = []; for (let i = 0; i < NPL; i++) { const l = new THREE.PointLight('#ffd58a', 0, 18, 1.6); l.castShadow = false; scene.add(l); pls.push(l); }
+  // Pooled lights only shine on night seasons (inS is 0 otherwise); unlit ones still cost every pixel, so none by day. Phones get fewer.
+  const NPL = LOW || !SEA.night ? 0 : Q.phone ? 3 : Q.tier === 'medium' ? 6 : ULTRA ? 14 : 10; const pls = []; for (let i = 0; i < NPL; i++) { const l = new THREE.PointLight('#ffd58a', 0, 18, 1.6); l.castShadow = false; scene.add(l); pls.push(l); }
   const lightSpots = [...lamps.map((l) => ({ x: l.x, y: FLAT + 4.2, z: l.z, c: '#ffd58a', i: 26 })), ...doors.map((d) => ({ x: d.x, y: FLAT + 2.6, z: d.z + 0, c: '#ffb050', i: 10 }))];
 
   // ---------------------------------------------------------------- autumn trees (instanced), leaf piles, park corner

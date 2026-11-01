@@ -755,6 +755,9 @@ export function createPark3D(ctx) {
     });
     if (/^#\/street/.test(location.hash)) W3.spawnStreet();
     // ---------------------------------------------------------------- main loop
+    // Low-power steps never flip shadowMap.enabled / castShadow at runtime: that recompiles every shader (a multi-second freeze
+    // on phones). Shadows instead refresh every 6th frame; pixel ratio climbs back at most twice, 30 s after a drop (no resize ping-pong).
+    let shThin = false, dropAt = 0, climbs = 0;
     let fast = 0, qStep = 0, drvCls = false, cullAt = 0; const applyDraw = () => { scene.fog.near = Q.draw * 0.6; scene.fog.far = Q.draw * 1.15; waterM.uniforms.fogNear.value = scene.fog.near; waterM.uniforms.fogFar.value = scene.fog.far; cam.far = Math.min(farCap, Q.draw * 1.15 + 24); cam.updateProjectionMatrix(); fitSky(); };
     R.shadowMap.autoUpdate = !(Q.phone || LOW); let shN = 0; // phones: shadow map re-rendered every third frame (the sun follows the player slowly)
     let alive = true, last = performance.now(), frames = 0, fpsT = last, fps = 0, slow = 0, lodT = 0, portalCd = 0; lodTrees(P.x, P.z);
@@ -786,12 +789,12 @@ export function createPark3D(ctx) {
     function frame(now) {
       if (!alive) return; if (!document.body.contains(cv)) { cleanup(); return; }
       requestAnimationFrame(frame); if (lost || document.hidden) { last = now; return; }
-      const dt = Math.min(0.05, (now - last) / 1000); last = now; frames++; window.__p3.frame++; const c0 = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000); last = now; frames++; window.__p3.frame++; if (shThin && window.__p3.frame % 6 === 0) R.shadowMap.needsUpdate = true; const c0 = performance.now();
       if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; fpsEl.textContent = fps.toFixed(0) + ' fps'; window.__p3.fps = fps;
         // auto quality from measured FPS: 1) pixel ratio down to 1.0, 2) shadows off, 3) shorter draw distance; climbs back when smooth
-        if (fps < 40 && now > 6000) { if (++slow >= 3) { slow = 0; fast = 0; if (DPR * dprK > 1.01) { dprK = Math.max(1 / DPR, dprK - 0.15); applySize(); } else if (sun.castShadow) { sun.castShadow = false; R.shadowMap.enabled = false; qStep = 2; } else if (Q.draw > 110) { Q.draw = Math.round(Q.draw * 0.8); applyDraw(); qStep = 3; } } }
-        else { slow = Math.max(0, slow - 1); if (fps > 56 && ++fast >= 8 && dprK < 1) { fast = 0; dprK = Math.min(1, dprK + 0.1); applySize(); } }
-        window.__p3.q = { dpr: +(DPR * dprK).toFixed(2), shadows: sun.castShadow, draw: Q.draw, step: qStep, tier: Q.tier, phone: !!Q.phone }; }
+        if (fps < 40 && now > 6000) { if (++slow >= 3) { slow = 0; fast = 0; if (DPR * dprK > 1.01) { dprK = Math.max(1 / DPR, dprK - 0.15); dropAt = now; applySize(); } else if (sun.castShadow && !shThin) { shThin = true; R.shadowMap.autoUpdate = false; R.shadowMap.needsUpdate = true; qStep = 2; } else if (Q.draw > 110) { Q.draw = Math.round(Q.draw * 0.8); applyDraw(); qStep = 3; } } }
+        else { slow = Math.max(0, slow - 1); if (fps > 56 && ++fast >= 8 && dprK < 1 && climbs < 2 && now - dropAt > 30000) { fast = 0; climbs++; dprK = Math.min(1, dprK + 0.1); applySize(); } }
+        window.__p3.q = { dpr: +(DPR * dprK).toFixed(2), shadows: sun.castShadow, shThin, draw: Q.draw, step: qStep, tier: Q.tier, phone: !!Q.phone }; }
       // input -> move relative to the camera
       const mv = W3.move(jv.test ? { x: jv.x, y: jv.y, run: false } : tc.move); if (W3.driving()) jumpQ = false; let ix = mv.x, iz = mv.y; const lk = tc.takeLook(); if (lk.dx || lk.dy) { C.yaw -= lk.dx * 0.008; C.pitch = Math.max(pov ? -0.6 : -0.15, Math.min(pov ? 1.2 : 1.25, C.pitch + lk.dy * 0.006)); }
       if (P.sit && (Math.hypot(ix, iz) > 0.3 || jumpQ)) { const f = P.sit.off; if (f) f(); else P.sit = null; jumpQ = false; ix = iz = 0; } // move/jump = stand up
