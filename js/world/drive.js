@@ -11,7 +11,7 @@ import { createCarFx } from './carfx.js';
 import { onSample } from '../input.js';
 import { plateCode, parsePlate, carWorldVel } from '../pals/presence-sync.js';
 import { carMats } from './cars.js';
-import { applyKustom, parseLook, lookCode, dnLook, playHorn, registerKustomItems } from './kustom-look.js';
+import { applyKustom, parseLook, lookCode, lookDn, dnLook, playHorn, registerKustomItems } from './kustom-look.js';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)); const lsg = (k) => { try { return localStorage.getItem(k); } catch { return null; } }, lss = (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } };
 export const CAMS = ['chase', 'far', 'pov']; const CAM_NAME = { chase: 'Chase', far: 'Far chase', pov: 'Cockpit view' };
 export const carCode = (id, color, door) => '~c' + CAR_IDX.indexOf(id).toString(36) + (color | 0).toString(36) + (door ? '1' : '0');
@@ -218,7 +218,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   // passenger asks '~q'+driver8 -> driver accepts (auto for mutual follows, else a popup) by adding 'o'+passenger8 to its car code -> passenger shows '~r'+driver8
   // The passenger mesh is parented to the driver's car. That car is drawn from poses buffered ~130 ms back.
   const U8 = (u) => String(u || '').slice(0, 8); const me8 = U8(uid); let rider = null, riderSeen = 0; let ride = null; const asked = new Map(); const sp = new THREE.Vector3();
-  const myCode = () => carCode(my.id, my.color, my.door > 0.5) + (rider ? 'o' + rider : '') + (lookCode(lookOf(my.id)) ? 'k' + lookCode(lookOf(my.id)) : '');
+  const myCode = () => { const c = carCode(my.id, my.color, my.door > 0.5) + (rider ? 'o' + rider : ''); return c + lookDn(lookOf(my.id), 20 - c.length); }; // presence dn max 20 chars
   const riderOf = (dn) => (dn && dn.slice(0, 2) === '~c' && dn[5] === 'o' ? dn.slice(6, 14) : null);
   const seatP = (car, out) => { car.updateMatrixWorld(true); out.copy(car.userData.seat); out.x = -out.x; out.y -= 0.1; return out.applyMatrix4(car.userData.chassis.matrixWorld); };
   function mountDriver(mesh, car) { const ch = car && car.userData && car.userData.chassis, s = car && car.userData && car.userData.seat; if (!mesh || !ch || !s) return false; if (mesh.parent !== ch) ch.attach(mesh); mesh.position.set(s.x, s.y - 0.1, s.z); mesh.rotation.set(0, 0, 0); mesh.scale.setScalar(0.6); mesh.visible = true; return true; }

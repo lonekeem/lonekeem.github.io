@@ -18,6 +18,7 @@ export function createCarFx(api) { const { THREE, scene, Q, LOW, ULTRA } = api; 
   let ac = null, sq = null; function squeal(k) { try { if (!ac) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; ac = new AC(); const n = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const src = ac.createBufferSource(); src.buffer = n; src.loop = true; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 6; const g = ac.createGain(); g.gain.value = 0; src.connect(bp).connect(g).connect(ac.destination); src.start(); sq = { g, bp }; }
       sq.g.gain.setTargetAtTime(Math.min(0.12, k * 0.12), ac.currentTime, 0.05); sq.bp.frequency.setTargetAtTime(1500 + k * 900, ac.currentTime, 0.1); } catch { /* */ } }
   let em = 0;
+  let headHex = '#fff3c4';
   function update(dt, car, V, rs, night, offRoad, braking) { for (const p of parts) if (p.sp.visible) { p.life += dt; const k = p.life / p.max; if (k >= 1) { p.sp.visible = false; continue; } p.sp.position.x += p.vx * dt; p.sp.position.y += p.vy * dt; p.sp.position.z += p.vz * dt; p.sp.scale.setScalar(p.s0 * (1 + k * 2.2)); p.sp.material.opacity = (1 - k) * 0.5; }
     if (!car) { beams.forEach((b) => (b.visible = false)); spots.forEach((l) => (l.intensity = 0)); squeal(0); return; }
     const def = car.userData.def; const sy = Math.sin(rs.yaw), cy = Math.cos(rs.yaw); const spd = Math.abs(V.vf);
@@ -28,6 +29,7 @@ export function createCarFx(api) { const { THREE, scene, Q, LOW, ULTRA } = api; 
     if (em > rate) { em = 0; if (sliding && !offRoad && tier) rear.forEach(([x, z]) => puff(x, y + 0.3, z, '#e5e7eb', 0.9, 0.6)); else if (offRoad && spd > 3) rear.forEach(([x, z]) => puff(x, y + 0.2, z, '#c8a26b', 0.7 + spd * 0.04, 0.4)); }
     squeal(sliding && !offRoad ? Math.min(1, V.slip - 0.4) : 0);
     // lights: beams follow the front of the car
+    { const hh = (car && car.userData && car.userData.headHex) || '#fff3c4'; if (hh !== headHex) { headHex = hh; beamM.color.set(hh); for (const sp of spots) sp.color.set(hh); } } // Kustoms headlight colour: colour only, no recompile
     const on = night > 0.3; beamM.opacity = on ? 0.07 + night * 0.06 : 0; [-1, 1].forEach((sd, i) => { const fx = rs.x + sy * def.L * 0.48 + cy * sd * def.Wd * 0.33, fz = rs.z + cy * def.L * 0.48 - sy * sd * def.Wd * 0.33, fy = y + def.H * 0.42;
       beams[i].visible = on; beams[i].position.set(fx, fy, fz); beams[i].rotation.set(0.12, rs.yaw, 0); if (spots[i]) { spots[i].intensity = on ? 40 * night : 0; spots[i].position.set(fx, fy, fz); spots[i].target.position.set(fx + sy * 12, fy - 1.6, fz + cy * 12); } }); void ULTRA; }
   return { update, destroy() { scene.remove(root); try { ac && ac.close(); } catch { /* */ } } };

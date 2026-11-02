@@ -3,7 +3,7 @@
 // garage (the roll-up door opens for the owner and closes after), "Park here" saves the car in that bay, your last
 // spot + a car left on the street are remembered (localStorage + a throttled private Firestore doc).
 // Purchases use the existing validated coin / diamond shop paths; firestore.rules check deed + owner. Written by Lone Keem.
-import { applyKustom, parseLook } from './kustom-look.js';
+import { applyKustom, parseLook, lookV1 } from './kustom-look.js';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, documentId, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, addDoc } from '../fsq.js';
 import { HOUSES, HOUSE_BY_ID, HOME_STYLES, GARAGES, FLAT, roomState, worldClamp, roomOf, garageCap, maxTier, ADMIN_CAP, ADMIN_PLOT, CITIES, CITY_BY_ID, METROS, housesNear, palaceBays, PALACE_SIGN, PALACE_SIGN_AT, saleSignAt } from './layout.js';
 import { CAR, CARS, PAINTS, buildCar, poseCar, addPlate, carMats } from './cars.js';
@@ -102,8 +102,10 @@ export function attachHomes(api, W, K) {
     for (let lv = 0; lv < (L.cols[0] ? L.cols[0].lv : 0); lv++) for (const c of L.cols) { if (out.length >= cap) break; const [x, z] = Lw(h, c.lx, c.lz); const [fx, fz] = Lw(h, c.lx, c.lz + c.dep / 2 + 2.6); out.push({ x, z, y: FLAT + lv * L.LV + (lv ? 0.16 : 0), yaw: ry0(h) + Math.PI, front: [fx, fz], kind: lv ? 'lift' : 'bay', lv }); }
     for (const e of L.extra) { const [x, z] = Lw(h, e.lx, e.lz); out.push({ x, z, y: FLAT, yaw: ry0(h) + e.yaw, front: [x, z], kind: e.kind, lv: 0 }); } return { slots: out, L, lvUsed }; }
   function parseCars(str) { const out = []; for (const t of String(str || '').split(';').slice(0, ADMIN_CAP)) { const q = t.split('.'); if (!CAR[q[0]]) continue; const c = Math.max(0, Math.min(PAINTS.length - 1, q[1] | 0)); const it = { m: q[0], c };
-      if (q.length >= 7 && /^[A-Z0-9]{1,7}$/.test(q[2]) && !plateBad(q[2])) it.p = { t: q[2], b: q[3] | 0, f: q[4] | 0, r: q[5] | 0, fr: q[6] | 0 }; { const k = q.slice(2).find((x) => /^k[0-9a-z]{4}$/.test(x)); if (k) it.k = k.slice(1); } out.push(it); } return out; }
-  const serCars = (L) => L.map((i) => i.m + '.' + (i.c | 0) + (i.p ? `.${i.p.t}.${i.p.b | 0}.${i.p.f | 0}.${i.p.r | 0}.${i.p.fr | 0}` : '') + (i.k && /^[0-9a-z]{4}$/.test(i.k) ? '.k' + i.k : '')).join(';');
+      if (q.length >= 7 && /^[A-Z0-9]{1,7}$/.test(q[2]) && !plateBad(q[2])) it.p = { t: q[2], b: q[3] | 0, f: q[4] | 0, r: q[5] | 0, fr: q[6] | 0 }; { const k = q.slice(2).find((x) => /^q[0-9a-z]{4,16}$/.test(x)) || q.slice(2).find((x) => /^k[0-9a-z]{4}$/.test(x)); if (k) it.k = k[0] === 'q' ? k : k.slice(1); } out.push(it); } return out; }
+  const serCars = (L) => L.map((i) => i.m + '.' + (i.c | 0) + (i.p ? `.${i.p.t}.${i.p.b | 0}.${i.p.f | 0}.${i.p.r | 0}.${i.p.fr | 0}` : '') + kSer(i.k)).join(';');
+  // looks: '.k'+v1 (old app versions read this) and '.q'+v2 when the look uses newer parts
+  const kSer = (k) => { if (!k) return ''; if (/^[0-9a-z]{4}$/.test(k)) return '.k' + k; if (!/^q[0-9a-z]{4,16}$/.test(k)) return ''; const v = lookV1(parseLook(k)); return (v ? '.k' + v : '') + '.' + k; };
   const signOf = (o) => { const t = o && typeof o.sign === 'string' ? o.sign.trim() : ''; return t || PALACE_SIGN; };
   function buildGarage(h) { dropGarage(h.id); const o = owners.get(h.id); if (!o) return; const cars = parseCars(o.cars); const cap = capOf(h, o); if (!cap && !cars.length) return;
     if (h.admin) { try { buildPalaceYard(h, o, cars); } catch (err) { console.error('palace yard', err); } return; }
@@ -139,7 +141,7 @@ export function attachHomes(api, W, K) {
     if (api.others) for (const p of api.others.values()) if (p.uid === o.owner || p.id === o.owner) { const c = parseCar(p.dn); if (c) return c.id; } return ''; }
   function placeCars(G0) { for (const m of G0.carMs) { root.remove(m); m.traverse((q) => { if (q.userData && q.userData.plateTex) q.userData.plateTex.dispose(); }); } for (const c of G0.carCols || []) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } G0.carMs = []; G0.carCols = [];
     const hide = hiddenModel(G0.h); G0.hide = hide; let si = 0, skipped = false; G0.shown = [];
-    for (const car of G0.cars) { if (!skipped && car.m === hide) { skipped = true; continue; } const s = G0.slots[si++]; if (!s) break; const m = buildCar(CAR[car.m], car.c, { lite: true, noShadow: LOW || G0.cars.length > 6 }); if (car.p) addPlate(m, car.p); if (car.k) applyKustom(m, parseLook(car.k), carMats); poseCar(m, { x: s.x, y: s.y, z: s.z, yaw: s.yaw }, 0, 0); m.userData.slot = s; m.userData.car = car; root.add(m); G0.carMs.push(m); G0.shown.push({ car, s });
+    for (const car of G0.cars) { if (!skipped && car.m === hide) { skipped = true; continue; } const s = G0.slots[si++]; if (!s) break; const m = buildCar(CAR[car.m], car.c, { lite: true, noShadow: LOW || G0.cars.length > 6 }); if (car.p) addPlate(m, car.p); if (car.k) applyKustom(m, parseLook(car.k), carMats); { const d = CAR[car.m]; const lift = s.kind === 'bay' || s.kind === 'lift'; const sc = Math.min(1, 5.3 / d.L, 3.4 / d.Wd, lift ? 2.3 / (d.H + (m.userData.lift || 0)) : 9); if (sc < 1) m.scale.setScalar(sc); } poseCar(m, { x: s.x, y: s.y, z: s.z, yaw: s.yaw }, 0, 0); m.userData.slot = s; m.userData.car = car; root.add(m); G0.carMs.push(m); G0.shown.push({ car, s });
       if (!s.lv) { const cy = { x: s.x, z: s.z, r: CAR[car.m].Wd * 0.55, top: FLAT + CAR[car.m].H, parked: 1 }; api.cyl.push(cy); G0.carCols.push(cy); } }
     G0.overflow = Math.max(0, G0.cars.length - (skipped ? 1 : 0) - G0.slots.length); }
   function dropGarage(id) { const G0 = garages.get(id); if (!G0) return; for (const m of G0.carMs) root.remove(m); for (const c of G0.carCols || []) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } root.remove(G0.g); G0.g.traverse((q) => { if (q.userData.tex) q.userData.tex.dispose(); }); for (const c of G0.cols) { const i = box.indexOf(c); if (i >= 0) box.splice(i, 1); } garages.delete(id); }

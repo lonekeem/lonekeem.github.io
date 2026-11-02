@@ -10,13 +10,13 @@ const looks = (new URLSearchParams(location.search).get('looks') || '').split(',
 if (looks.length) { const R = new THREE.WebGLRenderer({ canvas: v, antialias: true }); R.setSize(innerWidth, innerHeight); R.outputColorSpace = THREE.SRGBColorSpace; R.toneMapping = THREE.ACESFilmicToneMapping;
   const S = new THREE.Scene(); S.background = new THREE.Color('#1a1236'); S.add(new THREE.HemisphereLight('#fff', '#334', 1.4)); const dl = new THREE.DirectionalLight('#fff', 2.5); dl.position.set(3, 6, 5); S.add(dl);
   const C = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 200); const side = new URLSearchParams(location.search).get('side'); if (side) C.position.set(0, 2.2, 9); else C.position.set(0, 7, 15); C.lookAt(0, 0.6, 0);
-  looks.forEach((k, i) => { const c = buildCar(CARS[i % CARS.length], i % 12); c.position.x = (i - (looks.length - 1) / 2) * 4.2; c.rotation.y = side ? -Math.PI / 2 : 0.9; applyKustom(c, parseLook(k), carMats); S.add(c); });
+  looks.forEach((k, i) => { const ids = (new URLSearchParams(location.search).get('cars') || '').split(',').filter(Boolean); const c = buildCar(ids.length ? CARS.find((x) => x.id === ids[i % ids.length]) : CARS[i % CARS.length], i % 12); c.position.x = (i - (looks.length - 1) / 2) * 4.2; c.rotation.y = side ? -Math.PI / 2 : 0.9; applyKustom(c, parseLook(k), carMats); S.add(c); });
   const loop = (t) => { tickKustoms(t); R.render(S, C); requestAnimationFrame(loop); }; requestAnimationFrame(loop); window.__ready = 1; }
 else { const inv = {}; let coins = 2000, gems = 300; const { KK_ITEMS } = await import('../../js/world/kustom-look.js');
   const econ = { wallet: async () => ({ coins }), inventory: async () => ({ ...inv }), buy: async (id) => { const o = KK_ITEMS.find((x) => x.id === id); if (inv[id]) throw Object.assign(new Error('Already yours'), { code: 'kemy/owned' }); if (coins < o.p) throw Object.assign(new Error('Not enough Star Coins'), { code: 'kemy/coins' }); coins -= o.p; inv[id] = 1; } };
   const dia = { get: async () => ({ d: gems }), buy: async (id) => { const o = KK_ITEMS.find((x) => x.id === id); gems -= o.d; inv[id] = 1; } };
   const saved = {}; window.__saved = saved;
   const { openKustoms } = await import('../../js/world/kustoms.js');
-  openKustoms({ cars: [{ id: 'pip', color: 6 }, { id: CARS[1].id, color: 2 }, { id: CARS[3].id, color: 0 }], startId: 'pip', getLook: (id) => saved[id] || null, saveLook: (id, l, c) => { saved[id] = { ...l, color: c }; }, loadShop: async () => ({ inv: { ...inv }, econ, dia }), say: console.log });
+  openKustoms({ cars: [{ id: new URLSearchParams(location.search).get('start') || 'pip', color: 6 }, { id: CARS[1].id, color: 2 }, { id: CARS[3].id, color: 0 }, { id: 'rocky', color: 4 }, { id: 'zapper', color: 0 }, { id: 'stomp', color: 1 }], startId: 'pip', getLook: (id) => saved[id] || null, saveLook: (id, l, c) => { saved[id] = { ...l, color: c }; }, loadShop: async () => ({ inv: { ...inv }, econ, dia }), say: console.log });
   window.__ready = 1; }
 </script>

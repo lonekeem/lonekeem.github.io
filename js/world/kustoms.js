@@ -4,12 +4,15 @@
 // moves the highlight, A/✕ selects, B/○ goes back, LB/RB switch tabs) and keyboard. Original art only.
 // The preview has its own small renderer that only exists while the garage is open. Written by Lone Keem.
 import * as THREE from '../vendor/three-0.170.0.module.min.js';
-import { CAR, PAINTS, buildCar, carMats } from './cars.js';
-import { KK, normLook, lookNeeds, applyKustom, playHorn, registerKustomItems, tickKustoms } from './kustom-look.js';
+import { CAR, PAINTS, buildCar, carMats, isTruck } from './cars.js';
+import { KK, fits, normLook, lookNeeds, applyKustom, playHorn, registerKustomItems, tickKustoms } from './kustom-look.js';
 import { makeSky, envFromSky } from '../gfx.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const TABS = [['paint', '🎨 Paint'], ['rim', '🛞 Wheels'], ['spoiler', '🪽 Spoiler'], ['decal', '⚡ Decals'], ['glow', '💡 Underglow'], ['tint', '🕶️ Tint'], ['horn', '📯 Horn']];
+const TABS = [['paint', '🎨 Paint', ['metal', 'two']], ['wheels', '🛞 Wheels', ['rim', 'tires']], ['body', '🏁 Body', ['kit', 'hood', 'spoiler', 'exhaust', 'rack']], ['truck', '🛻 Truck', ['lift', 'bull', 'roof'], 1],
+  ['lights', '🔦 Lights', ['head', 'hcol', 'tail', 'fog', 'show']], ['glow', '💡 Neon', ['glow', 'gmode']], ['style', '⚡ Style', ['decal', 'wrap']], ['inside', '🪑 Inside', ['tint', 'inter']], ['horn', '📯 Horn', ['horn']]];
+const SEC = { metal: 'Finish', two: 'Two-tone roof', rim: 'Rims', tires: 'Tires', kit: 'Body kit', hood: 'Hood', spoiler: 'Spoiler', exhaust: 'Exhaust', rack: 'Roof rack', lift: 'Lift kit', bull: 'Front bar', roof: 'Roof lights',
+  head: 'Headlight style', hcol: 'Headlight color', tail: 'Taillights', fog: 'Fog lights', show: 'Light show', glow: 'Underglow color', gmode: 'Underglow mode', decal: 'Decals', wrap: 'Wraps', tint: 'Window tint', inter: 'Interior', horn: 'Horn' };
 const PAINT_NAMES = ['Cherry', 'Grape', 'Ocean', 'Teal', 'Amber', 'Lime Green', 'Bubblegum', 'Snow', 'Charcoal', 'Sunshine', 'Sky', 'Kiwi'];
 let cssDone = false;
 function css() { if (cssDone) return; cssDone = true; const s = document.createElement('style'); s.textContent = `
@@ -22,7 +25,7 @@ function css() { if (cssDone) return; cssDone = true; const s = document.createE
 .kk-ov button:focus-visible,.kk-ov button:focus{outline:3px solid #ffd23f;outline-offset:2px}.kk-ov button.on{border-color:#ffd23f;background:#5b3fb0}.kk-ov button.ghost{background:transparent}
 .kk-cars,.kk-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px}.kk-cars button,.kk-tabs button{flex:0 0 auto}
 .kk-opts{max-height:34vh;overflow:auto;padding:2px;display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px;align-content:start}.kk-opts button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
-.kk-opts small{font-weight:700;opacity:.85}.kk-opts .sw{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.6);display:inline-block}
+.kk-opts h4{grid-column:1/-1;margin:6px 0 0;font-size:13px;color:#ffd23f}.kk-opts small{font-weight:700;opacity:.85}.kk-opts .sw{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.6);display:inline-block}
 .kk-msg{min-height:18px;color:#ffd23f}.kk-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}.kk-act .grow{flex:1;min-width:120px}
 .kk-hint{opacity:.8;font-size:12px}.kk-hint .kg-b{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;margin:0 2px;color:#fff;text-align:center}`; document.head.appendChild(s); }
 
@@ -71,33 +74,36 @@ export async function openKustoms(ctx) { css(); registerKustomItems().catch(() =
     let opts = '';
     if (tab === 'paint') { opts = PAINTS.map((hx, i) => { const sel = !look.paint && color === i; return `<button type="button" data-preset="${i}" class="${sel ? 'on' : ''}" aria-pressed="${sel}"><span class="sw" style="background:${hx}"></span><b>${PAINT_NAMES[i]}</b><small>Free</small></button>`; }).join('')
         + KK.paint.slice(1).map((o, j) => { const i = j + 1; const sel = look.paint === i; return optHTML('paint', o, i).replace(/class="[^"]*"/, `class="${sel ? 'on' : ''}"`); }).join('')
-        + KK.metal.map((o, i) => optHTML('metal', o, i).replace('<b>', '<b>✨ ')).join(''); }
-    else opts = KK[tab].map((o, i) => optHTML(tab, o, i)).join('');
-    const need = lookNeeds(look).filter((o) => !owns(o)); const cur = need[0];
+; }
+    const T = tabs().find((t) => t[0] === tab) || TABS[0]; const tr = isTruck(CAR[carId]);
+    for (const k of T[2]) { const list = KK[k].map((o, i) => (fits(o, tr) ? optHTML(k, o, i) : '')).join(''); if (list) opts += (T[2].length > 1 || tab === 'paint' ? `<h4>${SEC[k]}</h4>` : '') + list; }
+    if (tab === 'paint') opts = `<h4>Colors</h4>` + opts;
+    const need = lookNeeds(look, tr).filter((o) => !owns(o)); const cur = need[0];
     const act = cur ? `<span class="grow">🔒 ${esc(cur.n)} isn’t yours yet.</span><button type="button" data-buy="${cur.id}">${confirmId === cur.id ? 'Tap again to buy · ' : 'Buy · '}${price(cur)}</button>` : '<span class="grow">✓ Everything here is yours.</span>';
     side.innerHTML = `<div class="kk-cars" aria-label="Your cars">${cars.map((c) => `<button type="button" data-car="${c.id}" class="${c.id === carId ? 'on' : ''}">${CAR[c.id].emoji} ${esc(CAR[c.id].name)}</button>`).join('')}</div>
-      <div class="kk-tabs" role="tablist">${TABS.map(([k, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div class="kk-tabs" role="tablist">${tabs().map(([k, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${n}</button>`).join('')}</div>
       <div class="kk-opts">${opts}</div><div class="kk-msg" role="status">${esc(msg)}</div>
       <div class="kk-act">${act}</div><div class="kk-act"><button type="button" class="ghost" data-reset>↺ Stock look</button><button type="button" class="ghost" data-close>Close</button><button type="button" data-save>💾 Save look</button></div>
       <div class="kk-hint">${padHint}</div>`;
     if (focusKey) { const n = [...side.querySelectorAll('button')].find((b) => keyOf(b) === focusKey); if (n) n.focus(); } }
+  function tabs() { return TABS.filter((t) => !t[3] || isTruck(CAR[carId])); }
   const keyOf = (b) => ['car', 'tab', 'part', 'i', 'preset', 'buy', 'rot'].map((k) => b.dataset[k] ?? '').join('|') + (b.dataset.save !== undefined ? 's' : '') + (b.dataset.reset !== undefined ? 'r' : '') + (b.dataset.close !== undefined ? 'c' : '');
   paintTop(); paintSide(); shop(false);
   function close() { if (!alive) return; alive = false; cancelAnimationFrame(raf); if (ro) ro.disconnect(); try { R.dispose(); R.forceContextLoss(); } catch { /* */ } el.remove(); if (ctx.onClose) ctx.onClose(); }
   el.addEventListener('click', async (e) => { const b = e.target.closest('button'); if (e.target === el) { close(); return; } if (!b || busy) return;
     if (b.dataset.close !== undefined) { close(); return; }
     if (b.dataset.rot) { yaw += +b.dataset.rot * 0.6; spinV = 0; return; }
-    if (b.dataset.car) { if (b.dataset.car !== carId) { load(b.dataset.car); rebuild(); } paintSide(); return; }
+    if (b.dataset.car) { if (b.dataset.car !== carId) { load(b.dataset.car); if (!tabs().some((t) => t[0] === tab)) tab = 'paint'; rebuild(); } paintSide(); return; }
     if (b.dataset.tab) { tab = b.dataset.tab; confirmId = ''; paintSide(); const t = el.querySelector(`[data-tab="${tab}"]`); if (t) t.focus(); return; }
     if (b.dataset.preset) { color = +b.dataset.preset; look.paint = 0; rebuild(); msg = ''; paintSide(); return; }
     if (b.dataset.part) { const part = b.dataset.part, i = +b.dataset.i; look[part] = i; confirmId = ''; msg = ''; refreshLook(); if (part === 'horn') playHorn(i, () => playHorn(1)); paintSide(); return; }
     if (b.dataset.reset !== undefined) { look = normLook(null); refreshLook(); msg = 'Stock look (press Save to keep it).'; paintSide(); return; }
-    if (b.dataset.buy) { const id = b.dataset.buy; const o = lookNeeds(look).find((x) => x.id === id); if (!o) return; if (confirmId !== id) { confirmId = id; paintSide(); return; }
+    if (b.dataset.buy) { const id = b.dataset.buy; const o = lookNeeds(look, isTruck(CAR[carId])).find((x) => x.id === id); if (!o) return; if (confirmId !== id) { confirmId = id; paintSide(); return; }
       busy = true; b.disabled = true; b.textContent = 'Buying…';
       try { if (!econ || !dia) await shop(true); if (o.p) await econ.buy(id); else await dia.buy(id); inv[id] = 1; msg = `🎉 ${o.n} is yours! It works on all your cars.`; confirmId = ''; await shop(true); inv[id] = 1; }
       catch (er) { msg = er && er.code === 'permission-denied' ? 'The Kustoms shop isn’t open yet (prices not published). Try again soon!' : (er && er.message) || 'Could not buy right now.'; confirmId = ''; }
       busy = false; paintSide(); return; }
-    if (b.dataset.save !== undefined) { const need = lookNeeds(look).filter((o) => !owns(o)); if (need.length) { msg = `Buy ${need.map((o) => o.n).join(', ')} first, or pick a free one.`; paintSide(); return; }
+    if (b.dataset.save !== undefined) { const need = lookNeeds(look, isTruck(CAR[carId])).filter((o) => !owns(o)); if (need.length) { msg = `Buy ${need.map((o) => o.n).join(', ')} first, or pick a free one.`; paintSide(); return; }
       ctx.saveLook(carId, look, color); const c = cars.find((x) => x.id === carId); if (c) c.color = color; msg = '💾 Saved! Everyone in Pal Park will see it.'; paintSide(); return; } });
   window.__kkApi = { el, close, state: () => ({ carId, color, look: { ...look }, tab, inv: { ...inv } }), pick: (part, i) => { look[part] = i; refreshLook(); paintSide(); }, tab: (t) => { tab = t; paintSide(); } };
   return { close, el };
