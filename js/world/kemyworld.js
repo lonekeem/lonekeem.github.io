@@ -18,6 +18,7 @@ import { attachRespawn } from './respawn.js';
 import { attachHelper } from '../helper/pal.js';
 import { buildCar, poseCar, CAR_IDX, CARS } from './cars.js';
 import { attachDrive } from './drive.js';
+import { attachTraffic } from './traffic.js';
 export { worldGround, worldClamp } from './layout.js';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v)), sstep = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -272,7 +273,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     scene.environmentIntensity = DAY.env + (NIGHT.env - DAY.env) * k; R.toneMappingExposure = DAY.exp + (NIGHT.exp - DAY.exp) * k; stars.material.opacity = k * 0.9; moon.material.opacity = k; api.nightU.value = k; pumpMat.emissiveIntensity = 0.6 + k * 1.6; headIM.material.emissiveIntensity = 0.6 + k * 2.4; }
 
   // ---------------------------------------------------------------- NPC cars: parked along the curbs + a few slowly driving the loop
-  const cars = []; const PH = !!Q.phone; const NDRIVE = LOW ? 3 : PH || Q.tier === 'medium' ? 4 : 7, NPARK = LOW ? 8 : PH ? 10 : Q.tier === 'medium' ? 14 : 20; // phones: fewer NPC cars
+  const cars = []; const PH = !!Q.phone; const NDRIVE = 0 /* driving now handled by traffic.js (lanes + stoplights) */, NPARK = LOW ? 8 : PH ? 10 : Q.tier === 'medium' ? 14 : 20; // phones: fewer NPC cars
   const LOOP = [[-64, 100], [64, 100], [64, 145], [-64, 145]]; // driven counter-clockwise on the right-hand lane
   const loopLen = LOOP.reduce((s, p, i) => s + Math.hypot(LOOP[(i + 1) % 4][0] - p[0], LOOP[(i + 1) % 4][1] - p[1]), 0);
   const LOOP0 = { pts: LOOP, len: loopLen };
@@ -449,9 +450,10 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const Rs = attachRespawn(api, W);
   const Kh = attachHelper(api, W);
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat, tag: (t) => { ptag = t; }, forget: (group) => { const meshes = []; group.traverse((o) => { if (o.isMesh) meshes.push(o); }); forgetTagged(tagged, meshes); } }); const Mp = attachMap(api, W);
+  W.peds = () => bots.map((b) => ({ x: b.x, z: b.z })); const Tf = attachTraffic(api, W); W.traffic = Tf;
   window.__kwApi.buildAround = (x, z) => W.buildAround && W.buildAround(x, z);
-  W.update = (dt, now) => { tickKustoms(now); D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Th.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
-  W.destroy = () => { for (const x of [D, E, Ci, Hm, Th, Mp, Rs, Kh]) try { x.destroy(); } catch { /* */ } destroy(); };
+  W.update = (dt, now) => { tickKustoms(now); D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Th.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); Tf.update(dt, now); update(dt, now); };
+  W.destroy = () => { for (const x of [D, E, Ci, Hm, Th, Mp, Rs, Kh, Tf]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];

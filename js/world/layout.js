@@ -44,7 +44,7 @@ export const PLAINS = { x0: -97, x1: 118, z0: 174, z1: 540 };
 export const THEATER = { x0: 22, x1: 58, z0: 186, z1: 228, h: 13, door: [59.6, 207], lot: { x0: 62, x1: 86.4, z0: 182, z1: 232 }, flat: { x0: 16, x1: 86.5, z0: 178, z1: 238 }, room: { x: 460, z: 760 }, plot: 'h990' };
 export const ROADS3 = [
   { id: 'pa', a: [91, 145], b: [91, 440], w: 8, cr: 1 }, { id: 'pb', a: [-86, 270], b: [122, 270], w: 8, cr: 1 },
-  { id: 'pc', a: [-86, 440], b: [122, 440], w: 8, cr: 1 }, { id: 'pd', a: [-40, 270], b: [-40, 440], w: 8, cr: 1 },
+  { id: 'pc', a: [-86, 440], b: [122, 440], w: 14, cr: 1, bv: 1 }, { id: 'pd', a: [-40, 270], b: [-40, 440], w: 14, cr: 1, bv: 1 },
 ];
 export const ALL_ROADS = () => ROADS.concat(ROADS2, ROADS3, ROADS4);
 export const SIDEWALK = 2.6;
@@ -148,6 +148,14 @@ const SOUTH = 3450;
 ROADS4.push(HWy('SW', [-1240, 1400], [-1240, SOUTH]), HWy('SE', [372, 1400], [372, SOUTH]), HWy('SB', [-1240, SOUTH], [372, SOUTH]), HWy('SM', [-720, 1400], [-720, SOUTH]), HWy('SN', [-150, 1400], [-150, SOUTH]));
 for (const c of METROS) { for (let j = 0; j < 6; j++) ROADS4.push(St(c.id + 's' + j, [c.x - 132, c.z - 110 + 44 * j], [c.x + 132, c.z - 110 + 44 * j]));
   for (const s of [-1, 1]) ROADS4.push(St(c.id + 'v' + (s > 0 ? 'e' : 'w'), [c.x + s * 132, c.z - 150], [c.x + s * 132, c.z + 110])); }
+// 🚦 stage 6 (traffic.js): wider main roads + new long roads. Highways with room get 2 lanes each way + a median (w 18);
+// boulevards are w 14. Every width/route here clears house plots, buildings and estates (tools/road-clear.mjs, tests/world/traffic.test.mjs).
+export const WIDE_HW = ['S1650', 'S2150', 'S2650', 'S3150', 'SB', 'SE', 'SM', 'SN', 'SW', 'W2', 'W3', 'W4', 'W5'];
+for (const r of ROADS4) if (WIDE_HW.includes(r.id)) { r.w = 18; r.med = 1; }
+const Bv = (id, a, b, name) => ({ id, a, b, w: 14, big: 1, bv: 1, name }), Ln = (id, a, b, name) => ({ id, a, b, w: 8, big: 1, name });
+export const NEW_ROADS = [Bv('n1', [-86, 440], [-520, 440], 'Sunset Drive'), Ln('n2', [-200, 100], [-200, 440], 'Orchard Road'), Ln('n3', [-40, 355], [91, 355], 'Meadow Lane'),
+  Bv('n4', [-1240, 1300], [91, 1300], 'Pine Valley Parkway')];
+ROADS4.push(...NEW_ROADS);
 { let num = METRO0; for (const c of METROS) for (let j = 0; j < 6; j++) for (const s of [-1, 1]) for (let k = 0; k < 18; k++) { const z = c.z - 110 + 44 * j + s * 16, x = c.x - 119 + 14 * k, face = -s;
   HOUSES.push({ id: 'hm' + num, num, x, z, face, style: num % 4, seed: (num * 13 + k * 7) % 997, town: c.id, city: c.id, door: { x, z: z + face * 4.02 }, w: 9, d: 8, cs: true }); num++; } }
 // property: every third plot is for sale (one owner each); the rest are open "neighbor" houses you can visit + knock at
