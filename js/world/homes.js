@@ -1027,7 +1027,7 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
     else if (loc && loc.x != null && !positionBad(+loc.x, +loc.z)) teleport({ x: +loc.x, z: +loc.z, yaw: +loc.yaw || 0, cam: (+loc.yaw || 0) + Math.PI });
     else teleport({ x: 0, z: 82, yaw: Math.PI, cam: 0 });
     if (savedBad) persist(true); // rewrite a broken saved spot so the next visit does not restore it
-    if (save.street && CAR[save.street.id] && D && D.place && !D.mine() && !positionBad(+save.street.x, +save.street.z)) D.place(save.street.id, save.street.c || 0, { x: save.street.x, z: save.street.z, yaw: save.street.yaw }, false);
+    if (save.street && CAR[save.street.id] && D && D.place && !D.mine() && !positionBad(+save.street.x, +save.street.z)) { const st = save.street; Promise.resolve(D.ownedCars ? D.ownedCars() : null).then((list) => { const o = list && list.find((c) => c.id === st.id); if ((list && !o) || D.mine()) return; D.place(st.id, o ? o.color : st.c || 0, { x: st.x, z: st.z, yaw: st.yaw }, false); }).catch(() => {}); }
     showParked(); window.__kh && (window.__kh.spawned = home ? 'home' : loc && !savedBad ? 'saved' : 'default'); }
   if (!uid) setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 50); setTimeout(() => { if (!snapOk) { snapOk = true; firstSpawn(); } }, 6000);
 

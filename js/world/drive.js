@@ -6,7 +6,7 @@ import { CARS, CAR, CAR_IDX, PAINTS, carItem, buildCar, poseCar, setDoors, setBr
 import { checkInput } from '../pals/talk.js';
 import { ALL_ROADS, FLAT, roadD } from './layout.js';
 import { createDriveHud } from './drivehud.js';
-import { getCfg, onCfg, buzz, linkAccount } from './drivecfg.js';
+import { getCfg, setCfg, onCfg, buzz, linkAccount } from './drivecfg.js';
 import { createCarFx } from './carfx.js';
 import { onSample } from '../input.js';
 import { plateCode, parsePlate, carWorldVel } from '../pals/presence-sync.js';
@@ -28,6 +28,15 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   let econ = null, dia = null; async function loadInv() { try { const [{ createEconomy }, { createDiamonds }] = await Promise.all([import('../pals/economy.js'), import('../pals/armory.js')]); await registerCarItems(); await registerKustomItems(); econ = econ || createEconomy(db, uid); dia = dia || createDiamonds(db, uid);
     const inv = await econ.inventory(true); for (const c of CARS) if (inv[carItem(c)]) owned.add(c.id); invLoaded = true; } catch (e) { console.warn('cars inv', e); } }
   const invP = loadInv(); const carsChanged = () => dispatchEvent(new CustomEvent('kemy:cars-changed'));
+  // Car looks, paint and plates follow the account, not just this device: a copy rides in users/{uid}/pal/drive (cfg.kk,
+  // already allowed by the rules). Before this they lived only in this browser's localStorage, so a car customized in the
+  // phone browser came out stock in the Play app / another phone / after storage was cleared (and others never saw it).
+  function savePrefNow() { pref.t = Date.now(); lss(MK, JSON.stringify(pref)); if (uid === 'anon') return;
+    try { let kk = { t: pref.t, kustom: pref.kustom, colors: pref.colors, plates: pref.plates || {} }; if (JSON.stringify({ ...getCfg(), kk }).length > 3900) kk = { t: pref.t, kustom: pref.kustom, colors: pref.colors }; setCfg({ kk }); } catch { /* device copy still saved */ } }
+  function respawnMine(id) { if (!my || my.id !== id) return; const pos = { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; const wasIn = my.state === 'drive'; if (my.state !== 'parked' && !wasIn) return; removeCar(); spawnCar(id, pref.colors[id] ?? CAR[id].color, pos); if (wasIn) { my.state = 'drive'; enterSync(); } }
+  (async () => { if (uid === 'anon' || !db) return; try { const { doc, getDoc } = await import('../fsq.js'); const s = await getDoc(doc(db, 'users', uid, 'pal', 'drive')); let kk = null; try { kk = s.exists() ? JSON.parse(s.data().cfg || '{}').kk : null; } catch { kk = null; }
+    if (kk && kk.kustom && (kk.t || 0) > (pref.t || 0)) { pref.kustom = { ...kk.kustom }; pref.colors = { ...pref.colors, ...(kk.colors || {}) }; if (kk.plates) pref.plates = { ...kk.plates }; pref.t = kk.t; lss(MK, JSON.stringify(pref)); carsChanged(); if (my) { const id = my.id; if (pref.plates && pref.plates[id]) addPlate(my.m, pref.plates[id]); respawnMine(id); } }
+    else if ((!kk || (kk.t || 0) < (pref.t || 0)) && (Object.keys(pref.kustom).length || Object.keys(pref.colors).length)) savePrefNow(); } catch { /* offline: device copy */ } })();
   // every car I own (+ my paint pick + plate) for homes.js (parked at my house for everyone)
   async function ownedCars() { await invP; if (lsg('kemy-pals-debug') === '1' && pref.fakeAll) CARS.forEach((c) => owned.add(c.id)); return CARS.filter((c) => owned.has(c.id)).map((c) => ({ id: c.id, color: pref.colors[c.id] ?? c.color, plate: (pref.plates || {})[c.id] || null, kustom: pref.kustom[c.id] || '' })); }
   // ---------------------------------------------------------------- my car (one active car at a time)
@@ -90,16 +99,19 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     const more = document.createElement('div'); more.className = 'kd-set gfx-set'; more.innerHTML = '<b>🚗 Driving controls</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><button type="button" data-dc>🎮 Driving settings</button><button type="button" data-de>✏️ Edit layout</button><button type="button" data-rs>↩️ Respawn</button></div>'; blk.after(more);
     more.querySelector('[data-dc]').onclick = () => { d.querySelector('[data-done]')?.click(); H.openSettings(); }; more.querySelector('[data-de]').onclick = () => { d.querySelector('[data-done]')?.click(); H.editLayout(); }; more.querySelector('[data-rs]').onclick = () => { d.querySelector('[data-done]')?.click(); world.respawn && world.respawn.open(); }; });
   // My Cars panel (garage list): spawn, paint, buy with Star Coins or Diamonds (existing validated shop paths)
-  function openMyCars() { const d = document.createElement('div'); d.className = 'ks-panel'; hud.appendChild(d); const paint = () => {
+  function openMyCars() { let sellArm = '', sellT = 0; const d = document.createElement('div'); d.className = 'ks-panel'; hud.appendChild(d); const paint = () => {
       d.innerHTML = `<div class="ks-card"><h3>🚗 My Cars</h3><button type="button" data-kk="" style="margin:0 0 8px">🔧 Kemy Kustoms garage</button><p style="margin:0 0 10px;opacity:.85;font-size:13px">Original Kemy designs. Pocket Pip is free. Others: ⭐ Star Coins or 💎 Diamonds (no real money).${invLoaded ? '' : ' Loading your garage…'}</p><div class="kd-list">${CARS.map((c) => { const own = owned.has(c.id); const col = pref.colors[c.id] ?? c.color;
         return `<div class="kd-car"><span class="e">${c.emoji}</span><div><b>${c.name}</b>${c.prem ? ' <small style="display:inline;color:#ffd23f">PREMIUM</small>' : ''}<small>${c.blurb}</small></div><div class="row">${PAINTS.map((p, i) => `<button type="button" class="kd-sw${i === col ? ' on' : ''}" style="background:${p}" data-col="${c.id}:${i}" aria-label="Paint ${i + 1}"></button>`).join('')}</div>
-          <div class="row">${own ? `<button type="button" data-spawn="${c.id}">▶ Drive it</button><button type="button" class="ghost" data-kk="${c.id}">🔧 Kustomize</button><button type="button" class="ghost" data-plate="${c.id}">🔖 Plate${(pref.plates || {})[c.id] ? ' · ' + pref.plates[c.id].t : ''}</button>` : c.p ? `<button type="button" data-buy="${c.id}">Buy · ⭐ ${c.p}</button>` : `<button type="button" data-buy="${c.id}">Buy · 💎 ${c.d}</button>`}${my && my.id === c.id ? '<button type="button" class="ghost" data-park>Put away</button>' : ''}</div></div>`; }).join('')}</div><button type="button" class="ghost" data-close style="width:100%">Close</button></div>`; };
+          <div class="row">${own ? `<button type="button" data-spawn="${c.id}">▶ Drive it</button><button type="button" class="ghost" data-kk="${c.id}">🔧 Kustomize</button><button type="button" class="ghost" data-plate="${c.id}">🔖 Plate${(pref.plates || {})[c.id] ? ' · ' + pref.plates[c.id].t : ''}</button>${(!c.free && (c.p || c.d)) ? `<button type="button" class="ghost" data-sell="${c.id}"${sellArm === c.id ? ' style="background:#c0392b;color:#fff"' : ''}>${sellArm === c.id ? 'Tap again to sell' : `💰 Sell · ${c.p ? '⭐ ' + Math.floor(c.p / 2) : '💎 ' + Math.floor(c.d / 2)} back`}</button>` : ''}` : c.p ? `<button type="button" data-buy="${c.id}">Buy · ⭐ ${c.p}</button>` : `<button type="button" data-buy="${c.id}">Buy · 💎 ${c.d}</button>`}${my && my.id === c.id ? '<button type="button" class="ghost" data-park>Put away</button>' : ''}</div></div>`; }).join('')}</div><button type="button" class="ghost" data-close style="width:100%">Close</button></div>`; };
     paint(); d.onclick = async (e) => { const b = e.target.closest('button'); if (e.target === d || (b && b.dataset.close !== undefined)) { d.remove(); return; } if (!b) return;
-      if (b.dataset.col) { const [id, i] = b.dataset.col.split(':'); pref.colors[id] = +i; lss(MK, JSON.stringify(pref)); carsChanged(); if (my && my.id === id) { const st = my.state; const pos = { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; const wasIn = st === 'drive'; removeCar(); spawnCar(id, +i, pos); if (wasIn) { my.state = 'drive'; enterSync(); } } paint(); return; }
+      if (b.dataset.col) { const [id, i] = b.dataset.col.split(':'); pref.colors[id] = +i; savePrefNow(); carsChanged(); if (my && my.id === id) { const st = my.state; const pos = { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; const wasIn = st === 'drive'; removeCar(); spawnCar(id, +i, pos); if (wasIn) { my.state = 'drive'; enterSync(); } } paint(); return; }
       if (b.dataset.spawn) { const id = b.dataset.spawn; spawnCar(id, pref.colors[id] ?? CAR[id].color); d.remove(); say(`🚗 ${CAR[id].name} is parked nearby. Walk up and tap Enter car!`); return; }
       if (b.dataset.plate) { d.remove(); plateEditor(b.dataset.plate, openMyCars); return; }
       if (b.dataset.kk !== undefined) { d.remove(); openKustoms(b.dataset.kk || (my && my.id)); return; }
       if (b.dataset.park !== undefined) { removeCar(); paint(); return; }
+      if (b.dataset.sell) { const id = b.dataset.sell; clearTimeout(sellT); const refocus = () => d.querySelector(`[data-sell="${id}"]`)?.focus();
+        if (sellArm !== id) { sellArm = id; paint(); refocus(); sellT = setTimeout(() => { sellArm = ''; if (d.isConnected) { paint(); refocus(); } }, 4000); return; }
+        sellArm = ''; b.disabled = true; b.textContent = 'Selling…'; const r = await sellCar(id); paint(); (r === false ? refocus() : d.querySelector('[data-spawn]')?.focus()); return; }
       if (b.dataset.buy) { const c = CAR[b.dataset.buy]; if (!confirm(`Buy ${c.name} for ${c.p ? '⭐ ' + c.p + ' Star Coins' : '💎 ' + c.d + ' Diamonds'}?`)) return; b.disabled = true; b.textContent = 'Buying…';
         try { await loadInv(); if (c.p) await econ.buy(carItem(c)); else await dia.buy(carItem(c)); owned.add(c.id); carsChanged(); say(`🎉 ${c.name} is yours! Make its license plate 🔖`); d.remove(); plateEditor(c.id, openMyCars); return; } catch (er) { say(er && er.code === 'permission-denied' ? 'The shop isn’t ready for cars yet (prices not published). Try again soon!' : (er && er.message) || 'Could not buy right now'); } paint(); } }; }
   myB.onclick = openMyCars;
@@ -116,7 +128,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     paintE(); d.onclick = (e) => { const b = e.target.closest('button'); if (!b) { if (e.target === d) { d.remove(); } return; }
       if (b.dataset.k) { cur[b.dataset.k] = +b.dataset.i; paintE(); return; } if (b.dataset.fr) { cur.fr = +b.dataset.fr; paintE(); return; } if (b.dataset.x !== undefined) { d.remove(); if (back) back(); return; }
       if (b.dataset.save !== undefined) { if (!cur.t) { cur.t = plateText(''); const inp = d.querySelector('input'); if (inp) inp.value = cur.t; } if (!/^[A-Z0-9]{1,7}$/.test(cur.t)) { showPlateError(d, 'Type 1 to 7 letters or numbers.'); return; } if (plateBad(cur.t)) { showPlateError(d, '🙈 Let’s pick a kinder word.'); return; }
-        pref.plates = pref.plates || {}; pref.plates[id] = { t: cur.t, b: cur.b, f: cur.f, r: cur.r, fr: cur.fr }; lss(MK, JSON.stringify(pref)); if (my && my.id === id) addPlate(my.m, pref.plates[id]); carsChanged(); d.remove(); say('🔖 Plate saved: ' + cur.t); } };
+        pref.plates = pref.plates || {}; pref.plates[id] = { t: cur.t, b: cur.b, f: cur.f, r: cur.r, fr: cur.fr }; savePrefNow(); if (my && my.id === id) addPlate(my.m, pref.plates[id]); carsChanged(); d.remove(); say('🔖 Plate saved: ' + cur.t); } };
     document.body.appendChild(d); window.__kdPlate = { id, cur }; }
   W_EXTRA.plateEditor = plateEditor;
   // 🔧 Kemy Kustoms garage (lazy: the module + its preview renderer load only when opened)
@@ -124,7 +136,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   async function openKustoms(startId) { if (kkOpen) return kkOpen; await invP; const list = await ownedCars(); const mod = await import('./kustoms.js');
     kkOpen = mod.openKustoms({ host: hud, LOW, say, startId: startId || (my && my.id) || (list[0] && list[0].id), cars: list.map((c) => ({ id: c.id, color: c.color })),
       getLook: (id) => lookOf(id), loadShop: async (force) => { if (force || !econ) await loadInv(); return { inv: econ ? await econ.inventory(!!force) : {}, econ, dia }; },
-      saveLook: (id, look, color) => { const code = lookCode(look); if (code) pref.kustom[id] = code; else delete pref.kustom[id]; pref.colors[id] = color; lss(MK, JSON.stringify(pref)); carsChanged();
+      saveLook: (id, look, color) => { const code = lookCode(look); if (code) pref.kustom[id] = code; else delete pref.kustom[id]; pref.colors[id] = color; savePrefNow(); carsChanged();
         if (my && my.id === id) { const pos = { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; const wasIn = my.state === 'drive'; if (my.state === 'parked' || wasIn) { removeCar(); spawnCar(id, color, pos); if (wasIn) { my.state = 'drive'; enterSync(); } } } },
       onClose: () => { kkOpen = null; } }); return kkOpen; }
   W_EXTRA.openKustoms = openKustoms;
@@ -272,12 +284,26 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     if (s.pressed.use) { kHonk(); api.markDirty(); }
     if (s.pressed.back) getOut();
   });
-  window.__kdApi = { remotes: () => [...remote.keys()], askRide, leaveRide, accept: (u) => { const o = api.others.get(u); if (o) accept(o); }, rider: () => rider, ride: () => ride, spawn: (id, c, at) => { id = id || 'pip'; if (!owned.has(id) && lsg('kemy-pals-debug') !== '1') return false; spawnCar(id, c ?? 0, at); return true; }, enter: () => getIn(), out: () => getOut(), cam: () => cycleCam(), reset: (r) => resetCar(r !== false), stuckProbe: () => ({ stuckT: my && my.stuckT, nudges: my && my.nudges, ownCy: !!my && api.cyl.includes(my.cy) }), doors: () => toggleDoors(), test: (o) => { window.__kdTest = o; }, showroom: (x, z) => { CARS.forEach((c, i) => { const m = buildCar(c, c.color); scene.add(m); poseCar(m, { x: x + i * 5.2, y: ground(x + i * 5.2, z), z, yaw: 0.5 }, 0.3, 0); setDoors(m, i % 2 ? 0.8 : 0); }); }, owned: () => [...owned], myCars: () => openMyCars() };
+  window.__kdApi = { remotes: () => [...remote.keys()], askRide, leaveRide, accept: (u) => { const o = api.others.get(u); if (o) accept(o); }, rider: () => rider, ride: () => ride, spawn: (id, c, at) => { id = id || 'pip'; if (!owned.has(id) && lsg('kemy-pals-debug') !== '1') return false; spawnCar(id, c ?? 0, at); return true; }, enter: () => getIn(), out: () => getOut(), cam: () => cycleCam(), reset: (r) => resetCar(r !== false), stuckProbe: () => ({ stuckT: my && my.stuckT, nudges: my && my.nudges, ownCy: !!my && api.cyl.includes(my.cy) }), doors: () => toggleDoors(), test: (o) => { window.__kdTest = o; }, showroom: (x, z) => { CARS.forEach((c, i) => { const m = buildCar(c, c.color); scene.add(m); poseCar(m, { x: x + i * 5.2, y: ground(x + i * 5.2, z), z, yaw: 0.5 }, 0.3, 0); setDoors(m, i % 2 ? 0.8 : 0); }); }, owned: () => [...owned], myCars: () => openMyCars(), kk: (id) => openKustoms(id), sell: (id) => sellCar(id), remoteLooks: () => [...remote.values()].map((R) => ({ id: R.id, kk: R.kc || '' })), prefT: () => pref.t || 0, carInfo: () => my && { id: my.id, state: my.state, kk: my.m.userData.kkKey || '', saved: pref.kustom[my.id] || '', paint: (my.m.userData.kkPaint || []).map((m) => m.material.color && m.material.color.getHexString()).slice(0, 1)[0] || '', parts: my.m.userData.chassis.children.length, x: my.V.x, z: my.V.z } };
   const mine = () => (my ? { id: my.id, color: my.color, x: my.V.x, z: my.V.z, yaw: my.V.yaw, state: my.state, speed: my.V.speed() } : null);
   function stash() { if (!my) return; exitNow(); removeCar(); } // park in a garage bay: hop out and the car stays in the bay
   function place(id, color, at, enter) { if (!CAR[id]) return null; spawnCar(id, color, at); if (enter) getIn(); return my; }
   function isOwned(id) { return owned.has(id); }
-  W_EXTRA.ownedCars = ownedCars; W_EXTRA.pref = pref; W_EXTRA.savePref = () => { lss(MK, JSON.stringify(pref)); carsChanged(); }; W_EXTRA.owned = owned;
+// Sell an owned car back for half its price, same currency. Refund + removing the car are ONE batch, so a refused write
+// (offline, or the rules not allowing it) changes nothing: you never lose a car without the coins. Kustoms parts stay owned.
+async function sellCar(id) { const c = CAR[id]; if (!c || c.free || !owned.has(id) || !(c.p || c.d)) { say('That car cannot be sold.'); return false; }
+  if (my && my.id === id && my.state === 'drive') { say('Hop out of the car before selling it.'); return false; }
+  if (owned.size <= 1) { say('Keep at least one car!'); return false; }
+  const half = Math.floor((c.p || c.d) / 2); const item = carItem(c); const db = S.db, uid = S.user && S.user.uid; if (!db || !uid) { say('Sign in to sell cars.'); return false; }
+  try { const F = await import('../fsq.js'); let unl = false; try { unl = await (await import('../inf-pass.js')).isUnlimited(uid); } catch { /* */ }
+    const b = F.writeBatch(db); if (!unl) { const wref = F.doc(db, 'users', uid, 'pal', c.p ? 'wallet' : 'diamonds'); const w = (await F.getDoc(wref)).data() || {}; const k = c.p ? 'coins' : 'd';
+      b.update(wref, { [k]: (+w[k] || 0) + half, lastSell: item, sold: half, sellAt: F.serverTimestamp(), updatedAt: F.serverTimestamp() }); }
+    b.delete(F.doc(db, 'users', uid, 'inv', item)); await b.commit();
+  } catch (e) { console.warn('sell', e); say(String(e && e.code || e).includes('permission') ? '💰 Selling cars opens soon. Your car is safe.' : 'Could not sell right now. Your car is safe.'); return false; }
+  owned.delete(id); if (my && my.id === id) removeCar(); delete pref.kustom[id]; delete pref.colors[id]; if (pref.plates) delete pref.plates[id];
+  W_EXTRA.savePref(); try { econ && econ.wallet && econ.wallet(true); econ && econ.inventory && econ.inventory(true); } catch { /* */ }
+  dispatchEvent(new CustomEvent('kemy:wallet-changed')); say(`💰 Sold ${c.name} for ${c.p ? '⭐ ' + half : '💎 ' + half}.`); return half; }
+  W_EXTRA.ownedCars = ownedCars; W_EXTRA.pref = pref; W_EXTRA.savePref = () => { savePrefNow(); carsChanged(); }; W_EXTRA.owned = owned;
   return { ...W_EXTRA, update, destroy() { offPad(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); rcss.remove(); rbar.remove(); rpop.remove(); H.destroy(); FX.destroy(); }, spawnCar, mine, stash, place, removeCar, isOwned, resetCar, resetAt: (p) => { if (!my) return; my.V.place(p.x, p.z, p.yaw || 0); my.V.rev = false; my.V.gear = 1; my.stuckT = 0; api.markDirty(); } };
 }
 void FLAT;
