@@ -18,7 +18,7 @@ const CSS = `.wchip{position:relative;display:inline-flex;align-items:center;gap
 #wallet-fab{position:fixed;z-index:94;top:calc(env(safe-area-inset-top) + 8px);left:calc(env(safe-area-inset-left) + 8px);right:auto;transform:none;max-width:min(168px,calc(100vw - 88px));overflow:hidden}
 body.wc-video .wchip:not(.bs-ov .wchip),body.feed-mode #wallet-fab,body.live-mode #wallet-fab{display:none!important}
 body.p3-on:has(#wallet-fab) .p3-top{padding-left:calc(max(8px, env(safe-area-inset-left)) + 136px)}
-body.pool-mode:has(#wallet-fab) .gm-bar{padding-left:136px}
+body:has(#wallet-fab) .gm-bar{padding-left:calc(env(safe-area-inset-left) + 136px)}
 .app-header .inner{min-width:0}
 .header-actions{min-width:0;flex:1 1 auto;justify-content:flex-end;flex-wrap:nowrap}
 .header-actions>*{flex:none}
