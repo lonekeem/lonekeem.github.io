@@ -2,7 +2,7 @@
 // ground / bounds hooks Pal Park uses. Pure data + math (no three.js) so tests and other modules can import it.
 // Written by Lone Keem.
 export const PARK = { W: 100, H: 75 };                     // Pal Park half-size (x -100..100, z -75..75)
-export const BOUNDS = { x0: -1300, x1: 385, z0: -75, z1: 3460 };  // whole walkable world (presence 1 m = 16 units, rules allow x -40000..10000, y 0..60000)
+export const BOUNDS = { x0: -1300, x1: 385, z0: -75, z1: 3510 };  // whole walkable world (presence 1 m = 16 units, rules allow x -40000..10000, y 0..60000; z 3510 stays under that)
 export const OLD = { x0: -100, z1: 540 };                  // the original hand-made world (x >= -100, z <= 540); everything else streams in chunks (cities.js)
 // the east side (stage 3): a highway loop around Kemy Downtown, Clover Fields countryside and Sunny Shore beach
 export const EAST = { x0: 100, x1: 385, z0: -75, z1: 522 };
@@ -141,7 +141,11 @@ for (let i = 0; i < 12; i++) { const [id, name] = MNAMES[i]; const pal = MPAL[i 
 export const METROS = CITIES.filter((c) => c.metro);
 for (const c of METROS) { TOWNS.push({ id: c.id, name: c.name, x: c.x, z: c.z, city: 1 }); CITY_BY_ID[c.id] = c; }
 for (const z of [1650, 2150, 2650, 3150]) ROADS4.push(HWy('S' + z, [-1240, z], [372, z]));
-ROADS4.push(HWy('SW', [-1240, 1400], [-1240, 3400]), HWy('SE', [372, 1400], [372, 3400]), HWy('SB', [-1240, 3400], [372, 3400]), HWy('SM', [-720, 1400], [-720, 3400]), HWy('SN', [-150, 1400], [-150, 3400]));
+// South beltway. Cupcake Corners, Starfall and Melonville's last house row reaches ~z 3431.
+// The old line at z 3400 ran straight through those plots. 3450 clears the yards; the rim hills
+// start at BOUNDS.z1 - 40, so the asphalt stays on flat ground.
+const SOUTH = 3450;
+ROADS4.push(HWy('SW', [-1240, 1400], [-1240, SOUTH]), HWy('SE', [372, 1400], [372, SOUTH]), HWy('SB', [-1240, SOUTH], [372, SOUTH]), HWy('SM', [-720, 1400], [-720, SOUTH]), HWy('SN', [-150, 1400], [-150, SOUTH]));
 for (const c of METROS) { for (let j = 0; j < 6; j++) ROADS4.push(St(c.id + 's' + j, [c.x - 132, c.z - 110 + 44 * j], [c.x + 132, c.z - 110 + 44 * j]));
   for (const s of [-1, 1]) ROADS4.push(St(c.id + 'v' + (s > 0 ? 'e' : 'w'), [c.x + s * 132, c.z - 150], [c.x + s * 132, c.z + 110])); }
 { let num = METRO0; for (const c of METROS) for (let j = 0; j < 6; j++) for (const s of [-1, 1]) for (let k = 0; k < 18; k++) { const z = c.z - 110 + 44 * j + s * 16, x = c.x - 119 + 14 * k, face = -s;

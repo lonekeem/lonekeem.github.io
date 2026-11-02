@@ -14,9 +14,10 @@ check('LOOP HIGHWAY sign', LOOP_SIGN.x, LOOP_SIGN.z, LOOP_SIGN.foot);
 assert.equal(footClear(110, -6, LOOP_SIGN.foot, 0), false, 'the old Loop Highway sign spot (post in e0) is caught');
 for (const t of TOWNS) if (t.gate) { const p = bannerAt(t); assert.ok(p, t.name + ' banner has a spot'); check('banner ' + t.name, p[0], p[1], BANNER_FOOT); }
 for (const c of CITIES) check('welcome sign ' + c.name, c.x - c.hx - 4, c.z - c.hz + 12, signFoot(6, Math.PI / 4, [-2.1, 2.1], 0.1));
-// For Sale signs + mailboxes. Plots whose own house footprint sits on a road are a layout problem (reported separately), skipped here.
+// For Sale signs + mailboxes. A house whose footprint sits on a road is a layout bug (Highway SB used to cut the south row).
 const Lw = (h, lx, lz) => [h.x + (h.face > 0 ? lx : -lx), h.z + (h.face > 0 ? lz : -lz)];
 const onRoad = (h) => roadD(h.x, h.z) < Math.max(h.w, h.d) / 2; const skipped = HOUSES.filter((h) => !h.admin && onRoad(h));
+assert.deepEqual(skipped.map((h) => h.id), [], 'no house plot sits on a road');
 let sale = 0; for (const h of HOUSES) { if (h.admin || onRoad(h)) continue;
   if (h.sale) { const [x, z] = saleSignAt(h); check('sale sign ' + h.id, x, z, SALE_FOOT); sale++; }
   if (!h.estate && !h.sale && !h.city) { const [x, z] = Lw(h, 2.1, h.d / 2 + 4.8); check('mailbox ' + h.id, x, z, [[0, 0, 0.3]]); }
