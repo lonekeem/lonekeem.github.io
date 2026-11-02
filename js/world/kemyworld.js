@@ -139,7 +139,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     // the face sits around u = 0.25 (front of the sphere): happy eyes + a big smile
     const cx = 64, cy = 60; x.beginPath(); x.moveTo(cx - 22, cy - 6); x.lineTo(cx - 12, cy - 22); x.lineTo(cx - 3, cy - 6); x.fill(); x.beginPath(); x.moveTo(cx + 3, cy - 6); x.lineTo(cx + 12, cy - 22); x.lineTo(cx + 22, cy - 6); x.fill();
     x.beginPath(); x.moveTo(cx - 26, cy + 4); x.quadraticCurveTo(cx, cy + 34, cx + 26, cy + 4); x.quadraticCurveTo(cx, cy + 16, cx - 26, cy + 4); x.fill(); const t = new THREE.CanvasTexture(cv); return t; })();
-  const pumpG = (() => { const pts = []; for (let i = 0; i <= 16; i++) { const a = -Math.PI / 2 + Math.PI * i / 16; pts.push(new THREE.Vector2(Math.cos(a) * 0.5, Math.sin(a) * 0.42 + 0.42)); } const g = new THREE.LatheGeometry(pts, 32); const p = g.attributes.position;
+  const pumpG = (() => { const pts = []; for (let i = 0; i <= 10; i++) { const a = -Math.PI / 2 + Math.PI * i / 10; pts.push(new THREE.Vector2(Math.cos(a) * 0.5, Math.sin(a) * 0.42 + 0.42)); } const g = new THREE.LatheGeometry(pts, 20); const p = g.attributes.position;
     for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); const a = Math.atan2(z, x); const k = 1 - 0.07 * Math.pow(Math.abs(Math.cos(a * 4)), 0.5); p.setX(i, x * k); p.setZ(i, z * k); } g.computeVertexNormals(); return g; })();
   const pumpMat = new THREE.MeshStandardMaterial({ color: '#ff8a1f', roughness: 0.55, emissive: '#ffb020', emissiveMap: faceTex, emissiveIntensity: 1.5 });
   const pumpIM = new THREE.InstancedMesh(pumpG, pumpMat, pumpkins.length + 40); const stemIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.04, 0.06, 0.16, 6), std('#4d7c0f'), pumpkins.length + 40);
