@@ -289,7 +289,7 @@ export function attachHomes(api, W, K) {
 .kh-note-btn:focus-visible,.kh-radio button:focus-visible{outline:3px solid #ffd34d;outline-offset:3px}
 .kh-now,.kh-pick{display:flex;gap:8px;align-items:center}.kh-now img,.kh-pick img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none}.kh-pick small{display:block;opacity:.75;font-size:11px;font-weight:600}
 .kh-dec,.kh-yard{position:absolute;left:calc(max(8px,env(safe-area-inset-left)) + 76px);top:calc(max(8px,env(safe-area-inset-top)) + 226px);pointer-events:auto;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(15,118,110,.85);color:#fff;font:800 14px Inter,sans-serif;padding:0 12px}
-.kh-stuck{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 108px);z-index:28;pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;background:#c2410c;color:#fff;font:800 14px Inter,sans-serif;padding:0 12px;box-shadow:0 4px 12px rgba(0,0,0,.35)}
+.kh-stuck{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 160px);z-index:28;pointer-events:auto;height:44px;border-radius:999px;border:2px solid #fff;background:#c2410c;color:#fff;font:800 14px Inter,sans-serif;padding:0 12px;box-shadow:0 4px 12px rgba(0,0,0,.35)}
 .kh-yard[hidden],.kh-dec[hidden]{display:none}
 .kh-dbar{position:absolute;inset:0;pointer-events:none;z-index:40;color:#1f1147;font:600 13px Inter,sans-serif}
 .kh-dbar[hidden]{display:none}
