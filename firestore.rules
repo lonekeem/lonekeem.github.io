@@ -2215,7 +2215,7 @@ service cloud.firestore {
       function invPath(i) { return Dp2('users', uid, 'inv', i); }
       function shop() { return get(/databases/$(database)/documents/config/palShop).data; }
       function walletShape() {
-        return w().keys().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'lastBuy', 'paid', 'buyAt', 'room', 'updatedAt'])
+        return w().keys().hasOnly(['coins', 'total', 'day', 'earned', 'src', 'last', 'lastBuy', 'paid', 'buyAt', 'room', 'lastSell', 'sold', 'sellAt', 'updatedAt'])
           && w().coins is int && w().coins >= 0 && w().total is int && w().day is int && w().earned is map
           && w().room is list && w().room.size() <= 3 && w().updatedAt == Tn();
       }
@@ -2239,6 +2239,10 @@ service cloud.firestore {
         return w().paid == 0 && w().buyAt == Tn() && w().lastBuy in shop().prices
           && getAfter(invPath(w().lastBuy)).data.at == Tn();
       }
+      // sell a car back: +floor(price/2) (±1), inv doc deleted in the same batch
+      function sellOk() { let i = w().lastSell; let h = math.floor(shop().prices[i] / 2);
+        return w().sold == amt() && w().sold > 0 && w().sellAt == Tn() && i.matches('(z_)?car_.+') && i in shop().prices && w().sold >= h - 1 && w().sold <= h + 1
+          && exists(invPath(i)) && !existsAfter(invPath(i)); }
       function roomOk() {
         return (w().room.size() < 1 || exists(invPath(w().room[0]))) && (w().room.size() < 2 || exists(invPath(w().room[1])))
           && (w().room.size() < 3 || exists(invPath(w().room[2])));
@@ -2251,6 +2255,7 @@ service cloud.firestore {
         || (changed().hasOnly(['coins', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && buyOk())
         // owner/admin or ∞ Pass: unlimited Star Coins - records a valid shop purchase (paid 0) without touching the balance
         || (unlimitedFor(uid) && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && adminBuyOk())
+        || (changed().hasOnly(['coins', 'lastSell', 'sold', 'sellAt', 'updatedAt']) && sellOk())
         || (changed().hasOnly(['room', 'updatedAt']) && roomOk()));
       allow delete: if signedIn() && uid == me();
     }
@@ -2262,7 +2267,7 @@ service cloud.firestore {
       function dDay() { return int(Tn().toMillis() / 86400000); }
       function dShop() { return get(/databases/$(database)/documents/config/palShop).data; }
       function dShape() {
-        return d().keys().hasOnly(['d', 'total', 'day', 'today', 'last', 'lastBuy', 'paid', 'buyAt', 'updatedAt'])
+        return d().keys().hasOnly(['d', 'total', 'day', 'today', 'last', 'lastBuy', 'paid', 'buyAt', 'lastSell', 'sold', 'sellAt', 'updatedAt'])
           && d().d is int && d().d >= 0 && d().total is int && d().day is int && d().today is int && d().paid is int
           && d().lastBuy is string && d().updatedAt == Tn();
       }
@@ -2277,12 +2282,16 @@ service cloud.firestore {
           && d().lastBuy in dShop().get('dprices', {}) && d().paid == dShop().dprices[d().lastBuy]
           && getAfter(Dp2('users', uid, 'inv', d().lastBuy)).data.at == Tn();
       }
+      function dSellOk() { let i = d().lastSell; let ip = Dp2('users', uid, 'inv', i); let h = math.floor(dShop().get('dprices', {}).get(i, 0) / 2);
+        return d().sold == dAmt() && d().sold > 0 && d().sellAt == Tn() && i.matches('(z_)?car_.+') && i in dShop().get('dprices', {}) && d().sold >= h - 1 && d().sold <= h + 1
+          && exists(ip) && !existsAfter(ip); }
       allow read: if true;
       allow create: if signedIn() && uid == me() && dShape() && d().d == 0 && d().total == 0 && d().today == 0 && d().paid == 0
         && d().lastBuy == '' && d().last == Tn() && d().day == dDay();
       allow update: if signedIn() && uid == me() && dShape() && (
         (changed().hasOnly(['d', 'total', 'day', 'today', 'last', 'updatedAt']) && dEarnOk())
         || (changed().hasOnly(['d', 'lastBuy', 'paid', 'buyAt', 'updatedAt']) && dBuyOk())
+        || (changed().hasOnly(['d', 'lastSell', 'sold', 'sellAt', 'updatedAt']) && dSellOk())
         // owner/admin or ∞ Pass: unlimited Diamonds - records a valid Diamond purchase (paid 0) without touching the balance
         || (unlimitedFor(uid) && changed().hasOnly(['lastBuy', 'paid', 'buyAt', 'updatedAt']) && d().paid == 0 && d().buyAt == Tn()
             && d().lastBuy in dShop().get('dprices', {})

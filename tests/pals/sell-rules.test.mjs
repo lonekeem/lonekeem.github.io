@@ -1,0 +1,33 @@
+// Rules tests: selling a car back (wallet ⭐ and diamonds 💎): +floor(price/2) (±1) only with the inv doc deleted in the same batch.
+// Run: firebase emulators:exec --config firebase.emu.json --only firestore "node tests/pals/sell-rules.test.mjs"
+import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
+import { doc, setDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+const env = await initializeTestEnvironment({ projectId: 'demo-sell', firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8') } });
+let pass = 0, fail = 0;
+const ok = async (n, p) => { try { await p; pass++; console.log('PASS', n); } catch (e) { fail++; console.log('FAIL', n, String(e.message).slice(0, 200)); } };
+const no = async (n, p) => { try { await p; fail++; console.log('FAIL (allowed)', n); } catch { pass++; console.log('PASS', n); } };
+const T0 = Timestamp.fromMillis(Date.now() - 3600e3);
+await env.withSecurityRulesDisabled(async (c) => { const d = c.firestore();
+  await setDoc(doc(d, 'config/palShop'), { prices: { car_comet: 301, car_zip: 200, hat_x: 10 }, dprices: { z_car_star: 500 }, deals: [{}] });
+  await setDoc(doc(d, 'users/kid'), { displayName: 'Kid', username: 'kid' });
+  await setDoc(doc(d, 'users/kid/pal/wallet'), { coins: 100, total: 500, day: 0, earned: {}, src: 'daily', last: T0, lastBuy: '', paid: 0, buyAt: T0, room: [], updatedAt: T0 });
+  await setDoc(doc(d, 'users/kid/pal/diamonds'), { d: 10, total: 10, day: 0, today: 0, last: T0, lastBuy: '', paid: 0, buyAt: T0, updatedAt: T0 });
+  for (const i of ['car_comet', 'z_car_star', 'hat_x']) await setDoc(doc(d, `users/kid/inv/${i}`), { n: 1, at: T0 }); });
+const K = env.authenticatedContext('kid').firestore();
+const sellW = (item, coins, sold, del = true, extra = {}) => { const b = writeBatch(K); b.update(doc(K, 'users/kid/pal/wallet'), { coins, lastSell: item, sold, sellAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra }); if (del) b.delete(doc(K, `users/kid/inv/${item}`)); return b.commit(); };
+const sellD = (item, d, sold, del = true) => { const b = writeBatch(K); b.update(doc(K, 'users/kid/pal/diamonds'), { d, lastSell: item, sold, sellAt: serverTimestamp(), updatedAt: serverTimestamp() }); if (del) b.delete(doc(K, `users/kid/inv/${item}`)); return b.commit(); };
+await no('wrong amount (too much)', sellW('car_comet', 100 + 160, 160));
+await no('sold != coins change', sellW('car_comet', 100 + 200, 150));
+await no('keeps the car (no inv delete)', sellW('car_comet', 250, 150, false));
+await no('unowned car', sellW('car_zip', 200, 100));
+await no('extra field sneaks in', sellW('car_comet', 250, 150, true, { total: 9999 }));
+await no('client sellAt', (() => { const b = writeBatch(K); b.update(doc(K, 'users/kid/pal/wallet'), { coins: 250, lastSell: 'car_comet', sold: 150, sellAt: T0, updatedAt: serverTimestamp() }); b.delete(doc(K, 'users/kid/inv/car_comet')); return b.commit(); })());
+await ok('sell comet ⭐ floor(301/2)=150', sellW('car_comet', 250, 150));
+await no('sell it again (already gone)', sellW('car_comet', 400, 150));
+await no('diamonds wrong amount', sellD('z_car_star', 10 + 400, 400));
+await no('diamonds unowned', sellD('z_car_none', 10 + 250, 250));
+await ok('sell star 💎 250', sellD('z_car_star', 260, 250));
+await no('non-car item (hat) refused', sellW('hat_x', 256, 6));
+await ok('±1 rounding allowed (comet 301 → 151)', (async () => { await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), 'users/kid/inv/car_comet'), { n: 1, at: T0 })); return sellW('car_comet', 401, 151); })());
+console.log(`\n${pass} passed, ${fail} failed`); await env.cleanup(); process.exit(fail ? 1 : 0);

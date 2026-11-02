@@ -294,7 +294,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
 async function sellCar(id) { const c = CAR[id]; if (!c || c.free || !owned.has(id) || !(c.p || c.d)) { say('That car cannot be sold.'); return false; }
   if (my && my.id === id && my.state === 'drive') { say('Hop out of the car before selling it.'); return false; }
   if (owned.size <= 1) { say('Keep at least one car!'); return false; }
-  const half = Math.floor((c.p || c.d) / 2); const item = carItem(c); const db = S.db, uid = S.user && S.user.uid; if (!db || !uid) { say('Sign in to sell cars.'); return false; }
+  const half = Math.floor((c.p || c.d) / 2); const item = carItem(c); const uid = S.user && S.user.uid; if (!db || !uid) { say('Sign in to sell cars.'); return false; }
   try { const F = await import('../fsq.js'); let unl = false; try { unl = await (await import('../inf-pass.js')).isUnlimited(uid); } catch { /* */ }
     const b = F.writeBatch(db); if (!unl) { const wref = F.doc(db, 'users', uid, 'pal', c.p ? 'wallet' : 'diamonds'); const w = (await F.getDoc(wref)).data() || {}; const k = c.p ? 'coins' : 'd';
       b.update(wref, { [k]: (+w[k] || 0) + half, lastSell: item, sold: half, sellAt: F.serverTimestamp(), updatedAt: F.serverTimestamp() }); }
