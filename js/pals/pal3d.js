@@ -38,6 +38,7 @@ function init() {
   // rebuild (restored event, or a fresh renderer if it never comes back). Cached models are rebuilt on the new context.
   cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; lostAt = performance.now(); });
   cv.addEventListener('webglcontextrestored', () => { dropCache(); lost = false; });
+  R.debug.checkShaderErrors = false; // the error-log readback blocks on every shader compile
   R.setPixelRatio(1); R.setSize(RES, RES, false); R.setClearColor(0, 0);
   R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
   R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.9; R.outputColorSpace = THREE.SRGBColorSpace;
@@ -568,12 +569,24 @@ function wear3D(of, { J, H, headR, fz, legs, kind, B, sp, ex, legacyNeck }) {
 const C_RED = '#e8434f';
 // Store thumbnails: the REAL 3D item rendered on the user's own Pal (only that item worn), framed on the slot.
 const FOCUS = { head: [0, -0.06, 1, 0.6], hair: [0, -0.06, 1, 0.6], face: [0.15, 0.1, 0.7, 0.45], ears: [0.1, 0.1, 0.8, 0.5], nose: [0.2, 0.12, 0.6, 0.4], neck: [0.15, 0.25, 0.7, 0.45], feet: [0.15, 0.72, 0.7, 0.3], hand: [0.6, 0.45, 0.5, 0.32], wrist: [0.6, 0.42, 0.5, 0.32] };
+let thumbMats = [], thumbFree = 0;
+// Same thumb, but the new shaders compile in the background first (KHR_parallel_shader_compile) so the page never stalls.
+export async function renderItemThumbAsync(pal, slot, id, px = 96, opt = {}) {
+  if (!R) init(); if (lost || !R) return null;
+  const p2 = { ...pal, outfit: id ? { [slot]: id } : {}, variant: opt.variant != null ? opt.variant : '', pattern: opt.pattern || 'none' };
+  const m = build(p2); apply(m, modePose('idle', 30), 30, 'idle'); m.rotation.y = slot === 'back' || slot === 'bag' ? 2.6 : 0.35;
+  if (R.compileAsync) { scene.add(m); try { await R.compileAsync(scene, cam); } catch { /* render compiles it */ } scene.remove(m); }
+  if (lost || !R) return null; return renderItemThumb(pal, slot, id, px, { ...opt, model: m });
+}
 export function renderItemThumb(pal, slot, id, px = 96, opt = {}) {
   if (!R) init(); if (lost || !R) return null;
   const p2 = { ...pal, outfit: id ? { [slot]: id } : {}, variant: opt.variant != null ? opt.variant : '', pattern: opt.pattern || 'none' };
-  const m = build(p2); apply(m, modePose('idle', 30), 30, 'idle');
-  m.rotation.y = slot === 'back' || slot === 'bag' ? 2.6 : 0.35; scene.add(m); R.render(scene, cam); scene.remove(m);
-  m.traverse((o) => { if (o.isMesh && o.material && !o.material.userData.shared) o.material.dispose(); });
+  const m = opt.model || build(p2); if (!opt.model) { apply(m, modePose('idle', 30), 30, 'idle'); m.rotation.y = slot === 'back' || slot === 'bag' ? 2.6 : 0.35; }
+  scene.add(m); R.render(scene, cam); scene.remove(m);
+  // Keep this thumb's materials alive until the next thumb has rendered: disposing them right away freed their
+  // shader programs, so every following thumb recompiled the same shaders (~1.5 s stalls on the Pal store).
+  const mats = []; m.traverse((o) => { if (o.isMesh && o.material && !o.material.userData.shared) (Array.isArray(o.material) ? o.material : [o.material]).forEach((x) => mats.push(x)); });
+  for (const x of thumbMats) if (!mats.includes(x)) x.dispose(); thumbMats = mats; clearTimeout(thumbFree); thumbFree = setTimeout(() => { for (const x of thumbMats) x.dispose(); thumbMats = []; }, 8000);
   const cv = document.createElement('canvas'); cv.width = cv.height = px; const c = cv.getContext('2d'); const S0 = R.domElement.width;
   // the Pal fills the lower ~87% of the render; focus boxes are fractions of that area
   const [fx, fy, fw, fh] = FOCUS[slot] || [-0.05, -0.04, 1.1, 1.08]; const bx = S0 * 0.31, bw = S0 * 0.38, by = S0 * 0.06, bh = S0 * 0.8; // Pal's box in the render

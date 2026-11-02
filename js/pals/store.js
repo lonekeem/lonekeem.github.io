@@ -67,11 +67,11 @@ export function createPalStore(ctx) {
     // tile pictures = the real 3D item rendered on this Pal (cached per Pal look + item); emoji only if 3D is off
     const TH = new Map(); let P3 = null, q = []; import('./pal3d.js').then((m) => { P3 = m; pump(); }).catch(() => {});
     function thumbs(g) { q = [...g.querySelectorAll('[data-th]')]; pump(); }
-    function pump() { if (!P3 || !q.length) return; let n = 0; while (q.length && n < 3) { const el = q.shift(); if (!document.body.contains(el)) continue; const id = el.dataset.th;
+    let pumping = false;
+    async function pump() { if (!P3 || pumping) return; pumping = true; try { while (q.length) { const el = q.shift(); if (!document.body.contains(el)) continue; const id = el.dataset.th;
         const w = WEAR_BY[id]; const k = JSON.stringify([p.species, p.colors, p.level >= 12 ? 2 : p.level >= 5 ? 1 : 0, id]); let cv = TH.get(k);
-        if (!cv) { n++; try { cv = w ? P3.renderItemThumb(p, w.slot, id, 96) : RARE[id] ? P3.renderItemThumb(p, null, '', 96, { variant: id }) : PATTERNS.find((x) => x.id === id) ? P3.renderItemThumb(p, null, '', 96, { pattern: id }) : null; } catch { cv = null; } if (cv) TH.set(k, cv); }
-        if (cv) { const c2 = document.createElement('canvas'); c2.width = c2.height = 96; c2.className = 'ps-th'; c2.getContext('2d').drawImage(cv, 0, 0); el.replaceWith(c2); } }
-      if (q.length) requestAnimationFrame(pump); }
+        if (!cv) { const T = P3.renderItemThumbAsync || (async (...a) => P3.renderItemThumb(...a)); try { cv = w ? await T(p, w.slot, id, 96) : RARE[id] ? await T(p, null, '', 96, { variant: id }) : PATTERNS.find((x) => x.id === id) ? await T(p, null, '', 96, { pattern: id }) : null; } catch { cv = null; } if (cv) TH.set(k, cv); await new Promise((r) => requestAnimationFrame(r)); }
+        if (cv && document.body.contains(el)) { const c2 = document.createElement('canvas'); c2.width = c2.height = 96; c2.className = 'ps-th'; c2.getContext('2d').drawImage(cv, 0, 0); el.replaceWith(c2); } } } finally { pumping = false; } }
     function grid() {
       const g = $('#ps-grid'); let h = '';
       if (tab === 'outfits' || tab === 'jewelry' || tab === 'hand') { const sl = tab === 'hand' ? ['held'] : tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s) && s !== 'held');

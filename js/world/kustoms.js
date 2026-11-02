@@ -81,7 +81,7 @@ export async function openKustoms(ctx) { css(); registerKustomItems().catch(() =
     const need = lookNeeds(look, tr).filter((o) => !owns(o)); const cur = need[0];
     const act = cur ? `<span class="grow">🔒 ${esc(cur.n)} isn’t yours yet.</span><button type="button" data-buy="${cur.id}">${confirmId === cur.id ? 'Tap again to buy · ' : 'Buy · '}${price(cur)}</button>` : '<span class="grow">✓ Everything here is yours.</span>';
     side.innerHTML = `<div class="kk-cars" aria-label="Your cars">${cars.map((c) => `<button type="button" data-car="${c.id}" class="${c.id === carId ? 'on' : ''}">${CAR[c.id].emoji} ${esc(CAR[c.id].name)}</button>`).join('')}</div>
-      <div class="kk-tabs" role="tablist">${tabs().map(([k, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div class="kk-tabs" role="tablist">${tabs().map(([k, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${n}</button>`).join('')}${ctx.editPlate ? '<button type="button" data-plate>🔖 Plate</button>' : ''}</div>
       <div class="kk-opts">${opts}</div><div class="kk-msg" role="status">${esc(msg)}</div>
       <div class="kk-act">${act}</div><div class="kk-act"><button type="button" class="ghost" data-reset>↺ Stock look</button><button type="button" class="ghost" data-close>Close</button><button type="button" data-save>💾 Save look</button></div>
       <div class="kk-hint">${padHint}</div>`;
@@ -94,6 +94,7 @@ export async function openKustoms(ctx) { css(); registerKustomItems().catch(() =
     if (b.dataset.close !== undefined) { close(); return; }
     if (b.dataset.rot) { yaw += +b.dataset.rot * 0.6; spinV = 0; return; }
     if (b.dataset.car) { if (b.dataset.car !== carId) { load(b.dataset.car); if (!tabs().some((t) => t[0] === tab)) tab = 'paint'; rebuild(); } paintSide(); return; }
+    if (b.dataset.plate !== undefined && ctx.editPlate) { ctx.editPlate(carId); return; } // plate text, colours, frame and the ♿ accessible badge (free)
     if (b.dataset.tab) { tab = b.dataset.tab; confirmId = ''; paintSide(); const t = el.querySelector(`[data-tab="${tab}"]`); if (t) t.focus(); return; }
     if (b.dataset.preset) { color = +b.dataset.preset; look.paint = 0; rebuild(); msg = ''; paintSide(); return; }
     if (b.dataset.part) { const part = b.dataset.part, i = +b.dataset.i; look[part] = i; confirmId = ''; msg = ''; refreshLook(); if (part === 'horn') playHorn(i, () => playHorn(1)); paintSide(); return; }

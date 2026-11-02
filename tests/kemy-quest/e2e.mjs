@@ -1,12 +1,13 @@
 // Headless browser test. Usage: NODE_PATH=<dir with playwright> node tests/kemy-quest/e2e.mjs <baseUrl> [shotPrefix] [newShotPrefix]
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { chromium, devices } = require('playwright');
+import { playwright, exe, GL, emuContext, signup, assertLocal } from '../helpers/emu.mjs';
+const { chromium, devices } = playwright();
 const base = (process.argv[2] || 'http://localhost:8799/').replace(/\/?$/, '/');
 const shot = process.argv[3] || '/workspace/kemygame-';
 const shot2 = process.argv[4] || '/workspace/kemyquest2-';
 const results = []; const ok = (name, cond, info = '') => { results.push([cond ? 'PASS' : 'FAIL', name, info]); console.log(cond ? 'PASS' : 'FAIL', name, info); };
-const browser = await chromium.launch();
+const browser = await chromium.launch({ executablePath: exe() });
 const errors = [];
 async function page(ctxOpts, init) {
   const ctx = await browser.newContext(ctxOpts); const p = await ctx.newPage();

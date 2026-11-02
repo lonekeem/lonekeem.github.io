@@ -1,11 +1,14 @@
 // Deletes the throwaway accounts from the last e2e run (credentials in /tmp/pals-test-cred.json), via the app's own delete flow.
 import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
 import { readFileSync } from 'node:fs';
-const { chromium } = require('playwright'); const { stamp, pass } = JSON.parse(readFileSync('/tmp/pals-test-cred.json'));
-const base = (process.argv[2] || 'https://lonekeem.github.io/').replace(/\/?$/, '/');
-const b = await chromium.launch();
+import { playwright, exe, emuContext, assertLocal } from '../helpers/emu.mjs';
+const { chromium } = playwright(); const { stamp, pass } = JSON.parse(readFileSync('/tmp/pals-test-cred.json'));
+const base = (process.argv[2] || 'http://localhost:8947/').replace(/\/?$/, '/'); assertLocal(base);
+// Local emulator accounts are throwaway (wiped when the emulator stops), so there is nothing to clean up there.
+if (/localhost|127\.0\.0\.1/.test(base) && !process.env.CLEANUP_EMU) { console.log('emulator run: nothing to clean up'); process.exit(0); }
+const b = await chromium.launch({ executablePath: exe() });
 for (const tag of ['a', 'b']) {
-  const p = await (await b.newContext()).newPage();
+  const p = await (await emuContext(b)).newPage();
   await p.goto(base + 'app.html#/login'); await p.waitForSelector('#login-form');
   const ins = await p.$$('#login-form input'); await ins[0].fill(`kemy.pals.test+${tag}${stamp}@example.com`); await ins[1].fill(pass); await p.evaluate(() => document.getElementById('kw-ov')?.remove()); await p.click('#login-form [type=submit]');
   await p.waitForTimeout(4000); const uid = await p.evaluate(async () => { const u = (await import('/js/firebase-init.js')).auth.currentUser; return u && u.uid; });

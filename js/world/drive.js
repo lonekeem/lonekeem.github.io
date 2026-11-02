@@ -2,7 +2,7 @@
 // chase / far / driver-seat cameras (saved per device), speedometer, procedural engine + horn, multiplayer sync through
 // Pal Park's existing presence doc (the dance-name field carries a tiny "~c" car code; x/z/yaw are the normal fields),
 // remote cars interpolated + predicted. Cars never hurt anyone: people are only nudged aside. Written by Lone Keem.
-import { CARS, CAR, CAR_IDX, PAINTS, carItem, buildCar, poseCar, setDoors, setBrakeLights, createVehicle, createEngineSound, honk, registerCarItems, addPlate, drawPlate, PLATE_COLS, PLATE_FRAMES, PLATE_PREVIEW, plateText, showPlateError } from './cars.js';
+import { CARS, CAR, CAR_IDX, PAINTS, carItem, buildCar, poseCar, setDoors, setBrakeLights, createVehicle, createEngineSound, honk, registerCarItems, addPlate, drawPlate, PLATE_COLS, PLATE_FRAMES, PLATE_PREVIEW, plateText, showPlateError, PLATE_HC } from './cars.js';
 import { checkInput } from '../pals/talk.js';
 import { ALL_ROADS, FLAT, roadD } from './layout.js';
 import { createDriveHud } from './drivehud.js';
@@ -121,12 +121,13 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     const paintE = () => { d.innerHTML = `<div class="kp-card"><h3>🔖 License plate · ${c.name}</h3><canvas width="512" height="128"></canvas>
       <input maxlength="7" value="${cur.t}" placeholder="${PLATE_PREVIEW}" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="Plate text"><small class="kp-msg">Up to 7 letters or numbers. Changing it later is free.</small>
       <b>Background</b><div class="row">${sw('b')}</div><b>Letters</b><div class="row">${sw('f')}</div><b>Border</b><div class="row">${sw('r')}</div>
-      <b>Frame</b><div class="row">${PLATE_FRAMES.map((n, i) => `<button type="button" class="fr${cur.fr === i ? ' on' : ''}" data-fr="${i}">${n}</button>`).join('')}</div>
+      <b>Frame</b><div class="row">${PLATE_FRAMES.map((n, i) => `<button type="button" class="fr${(cur.fr & 7) === i ? ' on' : ''}" data-fr="${i}">${n}</button>`).join('')}</div>
+      <b>Badge</b><div class="row"><button type="button" class="fr${cur.fr & PLATE_HC ? ' on' : ''}" data-hc aria-pressed="${!!(cur.fr & PLATE_HC)}">♿ Accessible plate</button></div>
       <div class="row end"><small class="kp-by" role="alert"></small><button type="button" class="ghost" data-x>Cancel</button><button type="button" data-save>Save plate</button></div></div>`;
       const cv = d.querySelector('canvas'), inp = d.querySelector('input'), msg = d.querySelector('.kp-msg'); const draw = () => drawPlate(cv, { ...cur, t: plateText(cur.t) }); draw();
       inp.oninput = () => { cur.t = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7); if (inp.value !== cur.t) inp.value = cur.t; draw(); const bad = cur.t && plateBad(cur.t); msg.textContent = bad ? '🙈 Let’s pick a kinder word.' : 'Up to 7 letters or numbers. Changing it later is free.'; const by = d.querySelector('.kp-by'); if (by) by.textContent = bad ? msg.textContent : ''; }; }
     paintE(); d.onclick = (e) => { const b = e.target.closest('button'); if (!b) { if (e.target === d) { d.remove(); } return; }
-      if (b.dataset.k) { cur[b.dataset.k] = +b.dataset.i; paintE(); return; } if (b.dataset.fr) { cur.fr = +b.dataset.fr; paintE(); return; } if (b.dataset.x !== undefined) { d.remove(); if (back) back(); return; }
+      if (b.dataset.k) { cur[b.dataset.k] = +b.dataset.i; paintE(); return; } if (b.dataset.fr) { cur.fr = (cur.fr & PLATE_HC) | +b.dataset.fr; paintE(); return; } if (b.dataset.hc !== undefined) { cur.fr ^= PLATE_HC; paintE(); return; } if (b.dataset.x !== undefined) { d.remove(); if (back) back(); return; }
       if (b.dataset.save !== undefined) { if (!cur.t) { cur.t = plateText(''); const inp = d.querySelector('input'); if (inp) inp.value = cur.t; } if (!/^[A-Z0-9]{1,7}$/.test(cur.t)) { showPlateError(d, 'Type 1 to 7 letters or numbers.'); return; } if (plateBad(cur.t)) { showPlateError(d, '🙈 Let’s pick a kinder word.'); return; }
         pref.plates = pref.plates || {}; pref.plates[id] = { t: cur.t, b: cur.b, f: cur.f, r: cur.r, fr: cur.fr }; savePrefNow(); if (my && my.id === id) addPlate(my.m, pref.plates[id]); carsChanged(); d.remove(); say('🔖 Plate saved: ' + cur.t); } };
     document.body.appendChild(d); window.__kdPlate = { id, cur }; }
@@ -134,7 +135,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   // 🔧 Kemy Kustoms garage (lazy: the module + its preview renderer load only when opened)
   let kkOpen = null;
   async function openKustoms(startId) { if (kkOpen) return kkOpen; await invP; const list = await ownedCars(); const mod = await import('./kustoms.js');
-    kkOpen = mod.openKustoms({ host: hud, LOW, say, startId: startId || (my && my.id) || (list[0] && list[0].id), cars: list.map((c) => ({ id: c.id, color: c.color })),
+    kkOpen = mod.openKustoms({ host: hud, LOW, say, startId: startId || (my && my.id) || (list[0] && list[0].id), cars: list.map((c) => ({ id: c.id, color: c.color })), editPlate: (id) => plateEditor(id),
       getLook: (id) => lookOf(id), loadShop: async (force) => { if (force || !econ) await loadInv(); return { inv: econ ? await econ.inventory(!!force) : {}, econ, dia }; },
       saveLook: (id, look, color) => { const code = lookCode(look); if (code) pref.kustom[id] = code; else delete pref.kustom[id]; pref.colors[id] = color; savePrefNow(); carsChanged();
         if (my && my.id === id) { const pos = { x: my.V.x, z: my.V.z, yaw: my.V.yaw }; const wasIn = my.state === 'drive'; if (my.state === 'parked' || wasIn) { removeCar(); spawnCar(id, color, pos); if (wasIn) { my.state = 'drive'; enterSync(); } } } },

@@ -3,26 +3,27 @@
 // usage: node park3d-e2e.mjs <base> <shotPrefix> <device> [engine]
 import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
-const pw = require('playwright'); const { devices } = pw;
-const base = (process.argv[2] || 'https://lonekeem.github.io/').replace(/\/?$/, '/'); const shot = process.argv[3] || '/workspace/park3d-'; const dev = process.argv[4] || 'iPhone 13'; const engine = process.argv[5] || 'chromium';
-const args = engine === 'chromium' ? { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] } : {};
+import { playwright, exe, GL, emuContext, signup, assertLocal } from '../helpers/emu.mjs';
+const pw = playwright(); const { devices } = pw;
+const base = (process.argv[2] || 'http://localhost:8947/').replace(/\/?$/, '/'); assertLocal(base); const shot = process.argv[3] || '/workspace/park3d-'; const dev = process.argv[4] || 'iPhone 13'; const engine = process.argv[5] || 'chromium';
+const args = engine === 'chromium' ? { executablePath: exe(), args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] } : {};
 const browser = await pw[engine].launch(args); const errors = [];
 const stamp = Date.now().toString(36).slice(-6); const pass = 'Test-' + Math.random().toString(36).slice(2, 12) + '!9';
 if (existsSync('/tmp/pals-test-cred.json')) writeFileSync('/tmp/pals-cred-prev-' + Date.now() + '.json', readFileSync('/tmp/pals-test-cred.json'));
 writeFileSync('/tmp/pals-test-cred.json', JSON.stringify({ stamp, pass }), { mode: 0o600 });
 const W = (p, ms) => p.waitForTimeout(ms);
-async function account(tag, species, device, gfx) {
+async function account(tag, species, device, gfx = process.env.PARK_GFX) {
   const d = { ...devices[device] }; if (engine !== 'chromium') delete d.defaultBrowserType;
-  const ctx = await browser.newContext({ ...d, serviceWorkers: 'block' }); const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push(tag + ': ' + String(e)));
+  const ctx = await emuContext(browser, { ...d }); const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push(tag + ': ' + String(e)));
   await p.goto(base + 'app.html#/signup'); await p.waitForSelector('#signup-form');
-  await p.fill('#p-name', 'Park Tester ' + tag); await p.fill('#p-user', `pk${tag}${stamp}`); await p.fill('#p-email', `kemy.pals.test+${tag}${stamp}@example.com`); await p.fill('#p-pass', pass); await p.check('#p-agree');
+  await signup(p, { name: 'Park Tester ' + tag, user: `pk${tag}${stamp}`, email: `kemy.pals.test+${tag}${stamp}@example.com`, pass });
   await p.click('#p-btn'); await p.waitForSelector('#welcome-title', { timeout: 30000 }); await p.click('#modal-root [data-close]'); await W(p, 300);
   await p.evaluate((g) => { localStorage.setItem('kemy-pals-debug', '1'); localStorage.setItem('kemy-tut-park', '1'); if (g) localStorage.setItem('kemy-pal-gfx', g); location.hash = '#/me'; }, gfx || ''); await p.waitForSelector('#pal-crack', { timeout: 20000 });
   await p.evaluate(() => document.getElementById('theme-ask')?.querySelector('button:last-child')?.click()); await W(p, 400);
   for (let i = 0; i < 3; i++) { await p.evaluate(() => document.getElementById('pal-crack')?.click()); await W(p, 250); }
   await p.waitForSelector('#pal-form'); await W(p, 800);
   await p.evaluate((s) => document.querySelector(`[data-species="${s}"]`)?.click(), species); await p.fill('#pal-name', tag === 'a' ? 'Bloop' : 'Toots'); await p.evaluate(() => document.querySelector('#pal-form [type=submit]').click()); await W(p, 3000);
-  await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/park'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 60000 }).catch(async (e) => { await p.screenshot({ path: "/workspace/park3d-dbg-" + tag + ".png" }); throw e; });
+  await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/park'; }); await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: +(process.env.PARK_WAIT || 60000) }).catch(async (e) => { await p.screenshot({ path: "/workspace/park3d-dbg-" + tag + ".png" }); console.log("p3 state", await p.evaluate(() => JSON.stringify({ p3: window.__p3 ? Object.keys(window.__p3).slice(0, 8) : null, frame: window.__p3?.frame, hash: location.hash, kw: !!window.__kw }))); throw e; });
   return p;
 }
 const out = {};

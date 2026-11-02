@@ -315,7 +315,16 @@ export function createEngineSound() { const a = ac(); if (!a) return { set() {},
 export function honk() { const a = ac(); if (!a) return; const t = a.currentTime; for (const [hz, d] of [[420, 0], [530, 0]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'square'; o.frequency.value = hz; o.connect(g); g.connect(a.destination); g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.06, t + d + 0.02); g.gain.setValueAtTime(0.06, t + 0.32); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4); o.start(t); o.stop(t + 0.45); } }
 
 // ---------------------------------------------------------------- 🔖 custom license plates (original designs; text is kid-safe filtered by the caller)
-// p = { t: 'ABC123' (1-7 A-Z/0-9), b: background idx, f: text idx, r: border idx, fr: frame idx }
+// p = { t: 'ABC123' (1-7 A-Z/0-9), b: background idx, f: text idx, r: border idx, fr: frame idx (+ PLATE_HC bit = ♿ accessible badge) }
+// The accessible badge rides in bit 8 of fr so every existing save path (presence nibble, house car list, prefs) carries it unchanged.
+export const PLATE_HC = 8;
+export const plateHc = (p) => !!(p && ((p.fr | 0) & PLATE_HC));
+// white wheelchair symbol (international access style) drawn with paths, centred at cx,cy, size s
+export function drawWheelchair(x, cx, cy, s, col = '#ffffff') { x.save(); x.strokeStyle = col; x.fillStyle = col; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = s * 0.09;
+  x.beginPath(); x.arc(cx - s * 0.06, cy - s * 0.36, s * 0.09, 0, 7); x.fill();
+  x.beginPath(); x.moveTo(cx - s * 0.08, cy - s * 0.22); x.lineTo(cx - s * 0.04, cy + s * 0.04); x.lineTo(cx + s * 0.2, cy + s * 0.04); x.lineTo(cx + s * 0.3, cy + s * 0.3); x.stroke();
+  x.beginPath(); x.moveTo(cx - s * 0.07, cy - s * 0.1); x.lineTo(cx + s * 0.14, cy - s * 0.1); x.stroke();
+  x.beginPath(); x.arc(cx - s * 0.06, cy + s * 0.16, s * 0.24, -0.35 * Math.PI, 1.15 * Math.PI); x.stroke(); x.restore(); }
 export const PLATE_PREVIEW = 'KEMY1';
 // Empty text matches the preview: the editor draws PLATE_PREVIEW until the player types.
 export function plateText(t) { const s = String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7); return s || PLATE_PREVIEW; }
@@ -326,13 +335,14 @@ export function showPlateError(root, text) { if (!root) return; const top = root
 export const PLATE_COLS = ['#ffffff', '#fef3c7', '#fde047', '#fb923c', '#ef4444', '#f9a8d4', '#c084fc', '#7c3aed', '#60a5fa', '#1d4ed8', '#5eead4', '#22c55e', '#166534', '#94a3b8', '#111827', '#7c2d12'];
 export const PLATE_FRAMES = ['Plain', 'Chrome', 'Gold', 'Stars', 'Hearts', 'Rainbow', 'Dots'];
 export function drawPlate(cv, p) { const x = cv.getContext('2d'), W = cv.width, H = cv.height, C = PLATE_COLS; const bg = C[p.b] || C[0], tx = C[p.f] ?? C[14], br = C[p.r] ?? C[14];
-  x.clearRect(0, 0, W, H); const fr = p.fr | 0, pad = fr ? H * 0.12 : 0; const rr = (a, b, w, h, r) => { x.beginPath(); x.roundRect ? x.roundRect(a, b, w, h, r) : x.rect(a, b, w, h); };
+  x.clearRect(0, 0, W, H); const hc = plateHc(p), fr = (p.fr | 0) & 7, pad = fr ? H * 0.12 : 0; const rr = (a, b, w, h, r) => { x.beginPath(); x.roundRect ? x.roundRect(a, b, w, h, r) : x.rect(a, b, w, h); };
   if (fr === 1 || fr === 2) { const g = x.createLinearGradient(0, 0, 0, H); const s = fr === 1 ? ['#f8fafc', '#94a3b8', '#e2e8f0'] : ['#fef08a', '#ca8a04', '#fde68a']; g.addColorStop(0, s[0]); g.addColorStop(0.5, s[1]); g.addColorStop(1, s[2]); x.fillStyle = g; rr(0, 0, W, H, H * 0.14); x.fill(); }
   else if (fr === 5) { const g = x.createLinearGradient(0, 0, W, 0); ['#ef4444', '#f59e0b', '#fde047', '#22c55e', '#3b82f6', '#a855f7'].forEach((c, i) => g.addColorStop(i / 5, c)); x.fillStyle = g; rr(0, 0, W, H, H * 0.14); x.fill(); }
   else if (fr) { x.fillStyle = fr === 3 ? '#1e1b4b' : fr === 4 ? '#fce7f3' : '#0f172a'; rr(0, 0, W, H, H * 0.14); x.fill(); }
   x.fillStyle = bg; rr(pad, pad, W - pad * 2, H - pad * 2, H * 0.1); x.fill(); x.lineWidth = H * 0.05; x.strokeStyle = br; rr(pad + H * 0.04, pad + H * 0.04, W - pad * 2 - H * 0.08, H - pad * 2 - H * 0.08, H * 0.08); x.stroke();
   if (fr === 3 || fr === 4 || fr === 6) { x.font = `${H * 0.1}px system-ui`; x.textAlign = 'center'; x.textBaseline = 'middle'; for (let i = 0; i < 9; i++) { const ax = (i + 0.5) * W / 9; for (const ay of [pad / 2, H - pad / 2]) { if (fr === 6) { x.fillStyle = '#fde047'; x.beginPath(); x.arc(ax, ay, H * 0.03, 0, 7); x.fill(); } else x.fillText(fr === 3 ? '★' : '♥', ax, ay); } } x.fillStyle = fr === 3 ? '#fde047' : '#ec4899'; }
-  x.fillStyle = tx; x.textAlign = 'center'; x.textBaseline = 'middle'; const t = String(p.t || '').slice(0, 7); x.font = `900 ${Math.min(H * 0.56, (W - pad * 2) * 1.5 / Math.max(3, t.length))}px Inter, Arial, sans-serif`; x.fillText(t, W / 2, H / 2 + H * 0.03); }
+  let tx0 = 0; if (hc) { const bs = H - pad * 2 - H * 0.22, bx = pad + H * 0.11, by = (H - bs) / 2; x.fillStyle = '#1d4ed8'; rr(bx, by, bs, bs, bs * 0.14); x.fill(); drawWheelchair(x, bx + bs / 2, by + bs / 2 + bs * 0.02, bs * 0.9); tx0 = bs + H * 0.08; }
+  x.fillStyle = tx; x.textAlign = 'center'; x.textBaseline = 'middle'; const t = String(p.t || '').slice(0, 7); x.font = `900 ${Math.min(H * 0.56, (W - pad * 2 - tx0) * 1.5 / Math.max(3, t.length))}px Inter, Arial, sans-serif`; x.fillText(t, (W + tx0) / 2, H / 2 + H * 0.03); }
 export function addPlate(car, p) { const c = car.userData.def; if (!c) return; for (const o of car.userData.plates || []) { o.parent && o.parent.remove(o); o.material.map.dispose(); o.material.dispose(); } car.userData.plates = []; if (!p || !p.t) return;
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; drawPlate(cv, p); const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; car.userData.plateTex = tex;
   const ch = car.userData.chassis || car; for (const s of [1, -1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.14), new THREE.MeshBasicMaterial({ map: tex })); const q = car.userData.pl || { fz: c.L / 2 + 0.1, rz: c.L / 2 + 0.1, fy: c.H * 0.25, ry: c.H * 0.25 }; m.position.set(0, s > 0 ? q.fy : q.ry, s > 0 ? q.fz : -q.rz); m.rotation.y = s > 0 ? 0 : Math.PI; m.userData.plate = 1; ch.add(m); car.userData.plates.push(m); } }
