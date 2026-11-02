@@ -194,7 +194,7 @@ export function mountGuide(host, tab) {
 
 // Small badges beside common on-screen buttons (Back, Close) when not on touch.
 const BADGE_SEL = [
-  ['.gm-bar a[aria-label="Back"], a[aria-label="Leave Pal Park"], #modal-root [data-close], .kg-card .kg-x', 'b', 'Esc']
+  ['.gm-bar a[aria-label="Back"], a[aria-label="Leave Pal Park"], #modal-root [data-close], .kg-card .kg-x, .kk-ov [data-close]', 'b', 'Esc']
 ];
 let badgeQ = 0;
 function paintBadges() {

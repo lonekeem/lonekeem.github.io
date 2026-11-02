@@ -3,6 +3,7 @@
 // Houses, fences, yards and decorations are merged / instanced; lights are pooled; far things are culled by distance.
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
+import { tickKustoms } from './kustom-look.js';
 import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear, streetLamps, STREET_SIGNS, placeSign } from './layout.js';
 import { attachCities, applyExt, forgetTagged } from './cities.js';
 import { attachMap } from './map.js';
@@ -420,9 +421,27 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     box.push({ x0: HALL.x - 6, x1: HALL.x + 6, z0: HALL.z - 4, z1: HALL.z + 4, top: gy + 4.4, bot: gy });
   }
   const prevBingoAct = api.onAction; api.onAction = (a) => { if (a === 'bingo') location.hash = '#/arcade/bingo'; else if (prevBingoAct) prevBingoAct(a); };
+  // 🔧 Kemy Kustoms: a car customization garage (the garage UI lazy-loads when you step in)
+  const KKB = { x: 62, z: 248, door: [62, 255.4] };
+  { const gy = ground(KKB.x, KKB.z);
+    const bx = (color, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(G.box, std(color, { r: 0.6 })); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = !LOW; m.receiveShadow = true; root.add(m); return m; };
+    bx('#3b2a75', KKB.x, gy + 2.1, KKB.z, 11, 4.2, 8);
+    bx('#ffd23f', KKB.x, gy + 4.35, KKB.z, 11.6, 0.4, 8.6);
+    bx('#9ca3af', KKB.x, gy + 1.5, KKB.z + 4.02, 6.2, 3, 0.12); // roll-up door
+    for (let i = 0; i < 5; i++) bx('#6b7280', KKB.x, gy + 0.4 + i * 0.55, KKB.z + 4.1, 6.2, 0.06, 0.06);
+    bx('#a855f7', KKB.x - 4.4, gy + 0.06, KKB.z + 4.2, 1.2, 0.12, 0.3); bx('#38bdf8', KKB.x + 4.4, gy + 0.06, KKB.z + 4.2, 1.2, 0.12, 0.3);
+    bx('#4b5563', KKB.x, gy + 0.05, KKB.z + 6.4, 6.4, 0.1, 4.2);
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const g2 = cv.getContext('2d'); g2.fillStyle = '#ffd23f'; g2.fillRect(0, 0, 256, 64); g2.fillStyle = '#2b1d55'; g2.font = '800 26px sans-serif'; g2.textAlign = 'center'; g2.textBaseline = 'middle'; g2.fillText('KEMY KUSTOMS', 128, 34);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 1.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) })); sign.position.set(KKB.x, gy + 3.55, KKB.z + 4.1); root.add(sign);
+    box.push({ x0: KKB.x - 5.5, x1: KKB.x + 5.5, z0: KKB.z - 4, z1: KKB.z + 4, top: gy + 4.6, bot: gy });
+  }
+  const prevKkAct = api.onAction; api.onAction = (a) => { if (a === 'kustoms') { if (W.drive && W.drive.openKustoms) W.drive.openKustoms(); } else if (prevKkAct) prevKkAct(a); };
   const D = attachDrive(api, W); W.drive = D;
   const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
+  { const pl = W.landmarks; W.landmarks = () => (pl ? pl() : []).concat([{ name: '🔧 Kemy Kustoms', x: KKB.x, z: KKB.z, gx: KKB.x, gz: KKB.door[1] }]);
+    const pp = api.prompt; api.prompt = () => { const p0 = pp && pp(); if (p0) return p0; if (!W.driving() && Math.hypot(P.x - KKB.door[0], P.z - KKB.door[1]) < 3.4) return { id: 'kustoms', label: '🔧 Enter Kemy Kustoms' }; return null; };
+    const pml = W.mapLabels; W.mapLabels = (g, mx, mz) => { if (pml) pml(g, mx, mz); g.fillStyle = '#ffd23f'; g.font = 'bold 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('🔧 Kustoms', mx(KKB.x), mz(KKB.z)); }; }
   const prevLm = W.landmarks; W.landmarks = () => (prevLm ? prevLm() : []).concat([{ name: '⭐ Bingo Hall', x: HALL.x, z: HALL.z, gx: HALL.x, gz: HALL.door[1] }]);
   const prevHallPrompt = api.prompt; api.prompt = () => { const p0 = prevHallPrompt && prevHallPrompt(); if (p0) return p0; if (Math.hypot(P.x - HALL.door[0], P.z - HALL.door[1]) < 3.2) return { id: 'bingo', label: '⭐ Enter Bingo Hall' }; return null; };
   const prevLab = W.mapLabels; W.mapLabels = (g, mx, mz) => { if (prevLab) prevLab(g, mx, mz); g.fillStyle = '#ffd34d'; g.font = 'bold 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('⭐ Bingo', mx(HALL.x), mz(HALL.z)); };
@@ -431,7 +450,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const Kh = attachHelper(api, W);
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat, tag: (t) => { ptag = t; }, forget: (group) => { const meshes = []; group.traverse((o) => { if (o.isMesh) meshes.push(o); }); forgetTagged(tagged, meshes); } }); const Mp = attachMap(api, W);
   window.__kwApi.buildAround = (x, z) => W.buildAround && W.buildAround(x, z);
-  W.update = (dt, now) => { D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Th.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
+  W.update = (dt, now) => { tickKustoms(now); D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Th.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); update(dt, now); };
   W.destroy = () => { for (const x of [D, E, Ci, Hm, Th, Mp, Rs, Kh]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }

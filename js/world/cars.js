@@ -48,6 +48,7 @@ export async function registerCarItems() { const cat = await import('../pals/cat
 const MAT = new Map();
 function mat(key, make) { if (!MAT.has(key)) MAT.set(key, make()); return MAT.get(key); }
 export function paintMat(col) { return mat('p' + col, () => new THREE.MeshPhysicalMaterial({ color: col, metalness: 0.55, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.25 })); }
+export const carMats = () => M; // shared materials (Kemy Kustoms reuses them: no new shader programs)
 const M = {
   glass: () => mat('glass', () => new THREE.MeshPhysicalMaterial({ color: '#1b2a3c', metalness: 0.2, roughness: 0.04, transparent: true, opacity: 0.42, envMapIntensity: 1.6, clearcoat: 1, depthWrite: false })),
   chrome: () => mat('chrome', () => new THREE.MeshStandardMaterial({ color: '#e9eef5', metalness: 1, roughness: 0.12, envMapIntensity: 1.5 })),
@@ -143,7 +144,7 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
     const tire = new THREE.Mesh(new THREE.TorusGeometry(r * 0.78, r * 0.24, lite ? 8 : 14, lite ? 18 : 32), M.rubber()); tire.rotation.y = Math.PI / 2; tire.scale.set(1, 1, ww / (r * 0.48)); sp.add(tire);
     sp.add(rim(r, ww, c.style === 'truck' ? 6 : c.style === 'cruiser' ? 12 : 5)); wheels.push({ st, sp, front, s, z, x: s * tw, comp: 0, vel: 0, y: r }); }
   root.traverse((m) => { if (m.isMesh) { m.castShadow = !o.noShadow && m.material !== M.glass(); m.receiveShadow = false; } });
-  root.userData = { pl: { fz: fz + 0.035, rz: c.L / 2 + bev * 0.9 + 0.045, fy: by - 0.2, ry: c.H * 0.24 }, def: c, chassis: ch, wheels, doors, steer, seat: new THREE.Vector3(drvX, seatY + 0.07, seatZ), dashZ, color: col, tails: [] };
+  root.userData = { pl: { fz: fz + 0.035, rz: c.L / 2 + bev * 0.9 + 0.045, fy: by - 0.2, ry: c.H * 0.24 }, def: c, chassis: ch, wheels, doors, steer, seat: new THREE.Vector3(drvX, seatY + 0.07, seatZ), dashZ, color: col, tails: [], paint, cab, spokes: c.style === 'truck' ? 6 : c.style === 'cruiser' ? 12 : 5, lite };
   ch.traverse((m) => { if (m.userData.tail) root.userData.tails.push(m); });
   return root; }
 export function setBrakeLights(car, on) { for (const t of car.userData.tails) t.material = on ? M.brake() : M.tail(); }
