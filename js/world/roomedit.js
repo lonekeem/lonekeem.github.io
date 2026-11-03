@@ -1,6 +1,6 @@
 // Room-by-room house editor. Loaded only after Decorate opens. Positions stay in
 // plan units (the same ones interior.js saves). No THREE in here. Written by Lone Keem.
-import { DECOR, hex6, FLOORS } from './interior.js';
+import { DECOR, hex6, FLOORS, decorBox } from './interior.js';
 
 // How many placed pieces one room may hold. Six rooms at this cap stay under the
 // saved items length (2,000) even when a few beds carry three part colours.
@@ -74,16 +74,23 @@ export function itemRoom(x, z, f) {
 }
 
 const snap = (v) => Math.round(v * 2) / 2;
+// Inner wall faces per room (plan units, same faces flushFit uses).
+const WALLS = { L: { x0: -6, x1: -1.09, z0: -0.91, z1: 6 }, K: { x0: -6, x1: -1.09, z0: -6, z1: -1.09 }, B: { x0: 1.09, x1: 6, z0: -6, z1: -0.09 }, T: { x0: 1.09, x1: 6, z0: 0.09, z1: 4.81 }, H: { x0: -0.91, x1: 0.91, z0: -6, z1: 6 } };
+// [minX, maxX, minZ, maxZ] of the piece around its centre, plan units, after r quarter turns (matches flushFit).
+function rotExt(code, r) { const b = decorBox(code); if (!b || b[0] > b[1]) return [0, 0, 0, 0]; const q = [[b[0], b[1], b[4], b[5]], [b[4], b[5], -b[1], -b[0]], [-b[1], -b[0], -b[5], -b[4]], [-b[5], -b[4], b[0], b[1]]][r & 3]; return q.map((v) => v / 1.4); }
 export function clampToRoom(it, roomId) {
   const R = BY[roomId]; const D = it && DECOR[it.c];
   if (!R || !D || !Number.isFinite(+it.x) || !Number.isFinite(+it.z)) return null;
   it.r = (it.r | 0) & 3;
   it.f = roomId === 'U' ? 1 : 0;
-  let hx = 0, hz = 0;
-  if (D.foot) { const [w, d] = (it.r & 1) ? [D.foot[1], D.foot[0]] : D.foot; hx = w / 2; hz = d / 2; }
-  const x0 = R.x0 + hx, x1 = R.x1 - hx, z0 = R.z0 + hz, z1 = R.z1 - hz;
-  it.x = snap(x0 <= x1 ? Math.max(x0, Math.min(x1, +it.x)) : (R.x0 + R.x1) / 2);
-  it.z = snap(z0 <= z1 ? Math.max(z0, Math.min(z1, +it.z)) : (R.z0 + R.z1) / 2);
+  // Tight rotated footprint (the real mesh box, metres -> plan units) against the wall faces, not the
+  // padded centre bounds with the metre foot read as plan units (that left ~half a bed of gap at walls).
+  // The 0.5 grid point closest to the wall that does not cut into it; flushFit closes the last bit.
+  const W = WALLS[roomId] || R; const e = rotExt(it.c, it.r);
+  const x0 = Math.ceil((W.x0 - e[0]) * 2 - 1e-6) / 2, x1 = Math.floor((W.x1 - e[1]) * 2 + 1e-6) / 2;
+  const z0 = Math.ceil((W.z0 - e[2]) * 2 - 1e-6) / 2, z1 = Math.floor((W.z1 - e[3]) * 2 + 1e-6) / 2;
+  it.x = x0 <= x1 ? Math.max(x0, Math.min(x1, snap(+it.x))) : snap((R.x0 + R.x1) / 2);
+  it.z = z0 <= z1 ? Math.max(z0, Math.min(z1, snap(+it.z))) : snap((R.z0 + R.z1) / 2);
   it.x = Math.max(-6, Math.min(6, it.x));
   it.z = Math.max(-6, Math.min(6, it.z));
   return settle(it, roomId);

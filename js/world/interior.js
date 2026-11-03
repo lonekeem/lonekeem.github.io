@@ -141,7 +141,7 @@ export function flushFit(it, sup) { const D = DECOR[it.c]; if (!D) return { dx: 
     return { dx, dz, dy }; }
   dy = -b[2]; // rest on the floor
   if (sup && D.foot && D.foot[0] * D.foot[1] <= 0.5) for (const t of sup) if (t.it !== it && it.x > t.x0 && it.x < t.x1 && it.z > t.z0 && it.z < t.z1 && (t.it.f | 0) === (it.f | 0)) dy = Math.max(dy, t.top - b[2]);
-  const reach = 0.6 / sc; let f;
+  const reach = 0.52; let f; // just over half a grid step, so a piece clamped to the grid sits flush
   if ((f = faceFrom(FX, x1, 1, reach)) != null && f - x1 < reach) dx = f - x1 - gap; else if ((f = faceFrom(FX, x0, -1, reach)) != null) dx = f - x0 + gap;
   const zl = hall ? [-6, 6] : FZ; if ((f = faceFrom(zl, z1, 1, reach)) != null) dz = f - z1 - gap; else if ((f = faceFrom(zl, z0, -1, reach)) != null) dz = f - z0 + gap;
   return { dx, dz, dy }; }
