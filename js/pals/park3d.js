@@ -508,7 +508,7 @@ export function createPark3D(ctx) {
         if (now - at > 120000) { deleteDoc(ch.doc.ref).catch(() => {}); return; }
         const [x, z] = toW(d.x, d.y); let o = others.get(id);
         if (!o) { o = { uid: id, x, z, ix: x, iz: z, ivx: 0, ivz: 0, iyaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, dl: 120, fade: 0, y: typeof d.h === 'number' ? d.h / 10 : ground(x, z), yaw: typeof d.r === 'number' ? d.r * Math.PI / 180 : 0, seenS: d.sayAt || 0, seenE: d.eAt || 0, t: Math.random() * 100 }; others.set(id, o); }
-        { const ct = typeof d.ct === 'number' ? d.ct : at; const off = Date.now() - ct; o.off = o.off == null ? off : Math.min(off, o.off + (off - o.off) * 0.1); const B = o.buf || (o.buf = []);
+        { const ct = typeof d.ct === 'number' ? d.ct : at; const off = Date.now() - ct; o.off = o.off == null ? off : Math.min(off, o.off + (off - o.off) * 0.1); o.offM = o.offM == null ? off : o.offM + (off - o.offM) * 0.08; o.offJ = (o.offJ || 0) + (Math.abs(off - o.offM) - (o.offJ || 0)) * 0.08; const B = o.buf || (o.buf = []);
           if (!B.length || ct > B[B.length - 1].t) { const st = B.length >= 8 ? B.shift() : {}; st.t = ct; st.x = x; st.z = z; st.yaw = typeof d.r === 'number' ? d.r * Math.PI / 180 : null; st.vx = (d.vx || 0) / 10; st.vz = (d.vz || 0) / 10; B.push(st); } o.an = d.an || ''; }
         if (d.name === KEMY_NAME) noteAdminUid(id);
         Object.assign(o, { tx: x, tz: z, th: typeof d.h === 'number' ? d.h / 10 : null, tr: typeof d.r === 'number' ? d.r * Math.PI / 180 : null, dn: d.dn || '', pl: d.pl || '', name: d.name, uname: d.uname, color: d.color, pal: d.pal, at, e: d.e, eAt: d.eAt, say: d.say, sayAt: d.sayAt, tgt: d.tgt });
@@ -770,11 +770,18 @@ export function createPark3D(ctx) {
     function interp(o, dt) { const B = o.buf; if (!B || !B.length) { o.ix = o.tx; o.iz = o.tz; o.ivx = 0; o.ivz = 0; return; }
       const veh = inVehicle(o.dn) || o.an === 'drive';
       if (veh) {
-        o.dl = RENDER_BEHIND_MS;
-        const pose = samplePose(B, Date.now() - (o.off || 0), RENDER_BEHIND_MS, extrapSec(o.an, o.dn));
+        // Jitter buffer: render behind the typical latency (not the fastest one ever seen) plus its jitter,
+        // so phone/Firestore latency spikes interpolate instead of overshooting and snapping back.
+        const dl = Math.min(400, RENDER_BEHIND_MS + 2.5 * (o.offJ || 0)); o.dl = dl;
+        const pose = samplePose(B, Date.now() - (o.offM != null ? o.offM : (o.off || 0)), dl, extrapSec(o.an, o.dn));
         if (!pose) return;
         const shown = takePose(o.ix == null ? null : { x: o.ix, z: o.iz, yaw: o.iyaw || 0 }, pose);
-        o.ix = shown.x; o.iz = shown.z; o.ivx = pose.vx; o.ivz = pose.vz; o.iyaw = shown.yaw; return;
+        if (shown.snap) { o.ix = shown.x; o.iz = shown.z; o.iyaw = shown.yaw; }
+        else { // predict with velocity, then ease small corrections in (never a 1-frame backward pop)
+          const h = Math.min(0.1, dt || 0.016), k = 1 - Math.exp(-9 * h), ky = 1 - Math.exp(-10 * h);
+          o.ix += pose.vx * h; o.iz += pose.vz * h; o.ix += (pose.x - o.ix) * k; o.iz += (pose.z - o.iz) * k;
+          const dy = Math.atan2(Math.sin(pose.yaw - (o.iyaw || 0)), Math.cos(pose.yaw - (o.iyaw || 0))); o.iyaw = (o.iyaw || 0) + dy * ky; }
+        o.ivx = pose.vx; o.ivz = pose.vz; return;
       }
       const span = B.length >= 2 ? B[B.length - 1].t - B[B.length - 2].t : 100;
       const want = Math.min(150, Math.max(DELAY, Math.min(150, span * 1.1)));
