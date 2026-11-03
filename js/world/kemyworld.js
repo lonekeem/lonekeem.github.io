@@ -4,7 +4,7 @@
 // Knock on doors for candy + Star Coins (per-house cooldown + daily cap, coins through the existing kemy:coins path).
 // Kid-safe: nothing scary, cars always stop for people and only ever push gently. Written by Lone Keem.
 import { tickKustoms } from './kustom-look.js';
-import { ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear, streetLamps, STREET_SIGNS, placeSign } from './layout.js';
+import { DEAD_ENDS, ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear, streetLamps, STREET_SIGNS, placeSign } from './layout.js';
 import { attachCities, applyExt, forgetTagged } from './cities.js';
 import { attachMap } from './map.js';
 const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
@@ -75,6 +75,11 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
       put('road', G.plane, '#3b3d48', cx, y - 0.004 + seam, cz, ang, r.w, 1, len + Math.min(r.w * 0.22, 1.4));
       for (const s2 of [-1, 1]) put('mark', G.plane, '#e8e8e8', cx - dz * s2 * (r.w / 2 - 0.35), y + seam + 0.014, cz + dx * s2 * (r.w / 2 - 0.35), ang, 0.16, 1, len);
       for (let t = 3; t < len - 3; t += 6) { const k = t / len; put('mark', G.plane, '#ffd84a', ax + (bx - ax) * k, y + seam + 0.016, az + (bz - az) * k, ang, 0.16, 1, 3); } }
+    // 🛑 dead-end caps: round turnaround pad + red/white barrier (posts + rail) just past the road end
+    for (const d of DEAD_ENDS) { const R = d.w * 0.75, ang = Math.atan2(d.dx, d.dz); put('road', G.cyl, '#3b3d48', d.x, y - 0.03, d.z, 0, R * 2, 0.05, R * 2);
+      const bx = d.x + d.dx * (R + 0.4), bz = d.z + d.dz * (R + 0.4), px = -d.dz, pz = d.dx, n = 4, seg = d.w / n;
+      for (let i = 0; i < n; i++) { const o = -d.w / 2 + seg * (i + 0.5); put('walk', G.box, i % 2 ? '#f4f4f5' : '#e8434f', bx + px * o, FLAT + 0.75, bz + pz * o, ang, seg, 0.28, 0.12); }
+      for (const o of [-d.w / 2, d.w / 2]) put('walk', G.box, '#6b7280', bx + px * o, FLAT + 0.45, bz + pz * o, ang, 0.16, 0.9, 0.16); }
     const markMat = std('#fff', { vc: true, r: 0.6, x: { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 } });
     flush('road', asphalt, false); flush('walk', std('#fff', { vc: true, r: 0.85 }), false); flush('mark', markMat, false); }
 

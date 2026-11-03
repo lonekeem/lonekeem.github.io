@@ -304,3 +304,10 @@ export function areaAt(x, z) { if (x > ROMS_X) return '🏠 Inside';
 const HG = new Map(); for (const h of HOUSES) { const k = Math.floor(h.x / 64) + ',' + Math.floor(h.z / 64); if (!HG.has(k)) HG.set(k, []); HG.get(k).push(h); }
 export function housesNear(x, z, r) { const out = []; const x0 = Math.floor((x - r) / 64), x1 = Math.floor((x + r) / 64), z0 = Math.floor((z - r) / 64), z1 = Math.floor((z + r) / 64);
   for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) { const a = HG.get(i + ',' + j); if (a) for (const h of a) out.push(h); } return out; }
+// 🛑 dead ends in the old world (Kemy Street + Open Plains + downtown): road ends that stop at grass get a round turnaround pad
+// + a striped barrier (drawn in kemyworld.js, merged into existing batches = no extra draw calls). Driveways (w <= 6) and the
+// park link (e0, it runs into the park gate) are meant to stop, so they are skipped.
+export const DEAD_ENDS = (() => { const all = ALL_ROADS(), out = [];
+  for (const r of ROADS.concat(ROADS2, ROADS3)) { if (r.w <= 6 || r.id === 'e0') continue; for (const e of ['a', 'b']) { const p = r[e], q = e === 'a' ? r.b : r.a;
+    if (all.some((o) => o !== r && segD(p[0], p[1], o) <= o.w / 2 + 1)) continue; const L = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    out.push({ id: r.id, x: p[0], z: p[1], w: r.w, dx: (p[0] - q[0]) / L, dz: (p[1] - q[1]) / L }); } } return out; })();
