@@ -42,6 +42,9 @@ export const PLAINS = { x0: -97, x1: 118, z0: 174, z1: 540 };
 // 🎬 Lone Keem Studio movie theater (js/world/theater-gate.js + theater.js). On the Open Plains just south of Kemy Street,
 // west of country road pa (x = 91). Building faces east onto its own lined parking lot; the inside is a hidden room (x > 392).
 export const THEATER = { x0: 22, x1: 58, z0: 186, z1: 228, h: 13, door: [59.6, 207], lot: { x0: 62, x1: 86.4, z0: 182, z1: 232 }, flat: { x0: 16, x1: 86.5, z0: 178, z1: 238 }, room: { x: 460, z: 760 }, plot: 'h990' };
+// 🚗 Kemy Motors car dealership (js/world/dealer.js): Open Plains block between country roads pb (z 270), pa (x 91) and pd (x -40),
+// across pb from the Bingo Hall / Kemy Kustoms. Paved + perfectly flat. Entrances off pb (x 30) and pa (z 330). Anyone can walk in.
+export const DEALER = { x0: -24, x1: 84, z0: 280, z1: 376, gateN: [30, 274], gateE: [87, 330], show: { x0: 4, x1: 56, z0: 342, z1: 370, h: 9, door: [24, 36] }, desk: [71, 352], exit: [30, 290, Math.PI] };
 export const ROADS3 = [
   { id: 'pa', a: [91, 145], b: [91, 440], w: 8, cr: 1 }, { id: 'pb', a: [-86, 270], b: [122, 270], w: 8, cr: 1 },
   { id: 'pc', a: [-86, 440], b: [122, 440], w: 14, cr: 1, bv: 1 }, { id: 'pd', a: [-40, 270], b: [-40, 440], w: 14, cr: 1, bv: 1 },
@@ -113,9 +116,14 @@ export const ROADS4 = [
   St('c1', [-442, 100], [-442, 194]), St('c2', [-520, 260], [-442, 260]), St('c3', [-1042, 100], [-1042, 194]), St('c4', [-520, 1000], [-442, 1000]),
   St('c5', [-1240, 1000], [-1042, 1000]), St('c6', [62, 1000], [91, 1000]), St('c7', [-318, 1066], [-318, 1400]), St('c8', [-918, 1066], [-918, 1400]), St('c9', [312, 1026], [312, 1400]),
   // private estate roads (the old palace drive is gone; that hillside is ordinary country now)
-  St('e1', [-300, 100], [-300, 55.2], 6), St('e2', [-820, 100], [-820, 52], 6), St('e3', [-520, 560], [-200, 560], 6), St('e5', [-1240, 1180], [-1100, 1180], 6), St('e6', [312, 894], [372, 894], 6)];
+  St('e1', [-300, 100], [-300, 55.2], 6), St('e2', [-820, 100], [-820, 52], 6), St('e3', [-520, 560], [-264, 560], 6), St('e5', [-1240, 1180], [-1100, 1180], 6), St('e6', [312, 894], [356, 894], 6)];
 for (const c of CITIES) { for (let j = 0; j < 4; j++) ROADS4.push(St(c.id + 's' + j, [c.x - 62, c.z - 66 + 44 * j], [c.x + 62, c.z - 66 + 44 * j]));
   for (const s of [-1, 1]) ROADS4.push(St(c.id + 'v' + (s > 0 ? 'e' : 'w'), [c.x + s * 62, c.z - 66], [c.x + s * 62, c.z + 66])); }
+// v268 road audit: close the two loose west ends (appended last so older road indexes never move)
+//  - Kemy Street: s2 stopped at x -95 in the grass; a short link down to s1 / the W1 highway joins it (clear of houses h13/h18 at x -87)
+//  - estate drives e3 / e6 ran on past their last estate into the grass; they now end at the estate gate
+//  - Open Plains: pb + pc ran past pd and stopped at x -86 in the meadow; a country road joins their west ends into a loop
+ROADS4.push({ id: 'aw', a: [-97, 96], b: [-97, 149], w: 8 }, { id: 'pw', a: [-86, 266], b: [-86, 447], w: 8, cr: 1 });
 // 👑 the palace sits on the old Maple Heights pad (mansion size). No private lot and no second house.
 export const ADMIN_HOME = { x: -300, z: 18, name: '👑 Kemy Palace' };
 export const PALACE_SIGN = '👑 Kemy Palace';
@@ -253,6 +261,7 @@ export function bigGround(x, z) { let h = FLAT;
 // street level and the outer world rim gets gentle hills.
 export function worldGround(x, z, h) { const { W, H } = PARK;
   if (x > ROMS_X) return FLAT;
+  { const f = DEALER; if (x > f.x0 - 8 && x < f.x1 + 10 && z > f.z0 - 12 && z < f.z1 + 8) { const k = Math.min(sstep(f.x0 - 8, f.x0, x), 1 - sstep(f.x1 + 4, f.x1 + 10, x), sstep(f.z0 - 12, f.z0 - 4, z), 1 - sstep(f.z1, f.z1 + 8, z)); if (k >= 1) return FLAT; if (k > 0) return FLAT + (worldGround0(x, z, h) - FLAT) * (1 - k); } }
   { const f = THEATER.flat; if (x > f.x0 - 6 && x < f.x1 + 6 && z > f.z0 - 6 && z < f.z1 + 6) { const k = Math.min(sstep(f.x0 - 6, f.x0, x), 1 - sstep(f.x1, f.x1 + 6, x), sstep(f.z0 - 6, f.z0, z), 1 - sstep(f.z1, f.z1 + 6, z)); if (k >= 1) return FLAT; if (k > 0) return FLAT * k + worldGround0(x, z, h) * (1 - k); } }
   return worldGround0(x, z, h); }
 function worldGround0(x, z, h) { const { W, H } = PARK;
