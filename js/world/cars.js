@@ -186,6 +186,18 @@ export const LOOK = {
   boulder: { p: { rh: 0.94, nose: 1.06 }, x: ['bull', 'lamps', 'basket', 'flare', 'mud'], sp: 5, rm: 'dark', ww: 1.15, ride: 0.14 },
   ranger: { p: { rh: 0.84, rf: 0.03 }, x: ['bull', 'bar', 'snork', 'flare'], sp: 10, rm: 'dark', ride: 0.04, two: '#1f2937' },
   haul: { p: { deck: 1.0, rh: 1.12 }, x: ['visor', 'ladder', 'band'], sp: 7, rm: 'steel', ride: -0.03, two: '#f59e0b' },
+  // batch 2: the coupes, supercars and GTs that shared a body style
+  star: { p: { rh: 1.04 }, x: ['lamps'], sp: 6, rm: 'chrome' },
+  tide: { p: { rb: 0.14, deck: 0.9, nose: 0.95 }, x: ['spoiler', 'skirt'], sp: 7, rm: 'white', two: '#1f2937' },
+  breeze: { p: { rh: 1.18, nose: 1.1, rf: -0.05 }, x: ['visor'], sp: 12, rm: 'white', ww: 0.9 },
+  pixie: { p: { nose: 1.15, deck: 1.15, rh: 1.1, cx: -0.04 }, x: ['band'], sp: 3, rm: 'gold', ww: 0.9, two: '#f4f4f5' },
+  comet: { p: { nose: 0.8, rh: 0.88 }, x: ['canard', 'diff'], sp: 10, rm: 'gold', ride: -0.03 },
+  nova: { p: { rf: 0.06, rb: -0.08, nose: 0.75 }, x: ['skirt'], sp: 5, rm: 'white', two: '#1f2937' },
+  blaze: { p: { deck: 1.15, rh: 0.92 }, x: ['wing', 'pipes'], sp: 7, rm: 'dark', ww: 1.15 },
+  aurum: { p: { nose: 0.9 }, x: ['skirt', 'spoiler', 'diff'], sp: 16, rm: 'gold', two: '#1f2937' },
+  aurora: { p: { cx: -0.06, nose: 0.9 }, x: ['skirt'], sp: 10, rm: 'chrome' },
+  glide: { p: { rb: -0.1, deck: 0.88 }, x: ['spoiler'], sp: 12, rm: 'white', two: '#f4f4f5' },
+  storm: { p: { nose: 0.85, rh: 0.9 }, x: ['wing', 'canard', 'flare'], sp: 6, rm: 'dark', ride: -0.04 },
 };
 function reshape(pr, c, lk) { const p = lk.p || {}, L = c.L, H = c.H, f = L / 2, b = -L / 2, cl = c.wr * 0.55; const each = (q, fn) => { for (let i = 0; i < q.length; i += 2) { const [x, y] = fn(q[i], q[i + 1]); q[i] = x; q[i + 1] = y; } };
   const sy = (k, x0, x1) => (x, y) => (x > x0 && x < x1 && y > cl + 0.02 ? [x, cl + (y - cl) * k] : [x, y]);
