@@ -41,8 +41,8 @@ export function makeCockpit(THREE, { low = false } = {}) {
       for (const s of [1, -1]) { const mx = s * (W / 2 + 0.09); mesh(geo(new THREE.BoxGeometry(0.2, 0.13, 0.06)), dashM, mx, E - 0.2, dashZ - 0.12); const gl = mesh(geo(new THREE.PlaneGeometry(0.17, 0.1)), chromeM, mx, E - 0.2, dashZ - 0.155); gl.rotation.y = Math.PI + s * 0.25; }
       mesh(geo(new THREE.BoxGeometry(0.48, 0.14, 0.5)), softM, -sx, seat.y + 0.07, sz); mesh(geo(new THREE.BoxGeometry(0.48, 0.62, 0.12)), softM, -sx, seat.y + 0.4, sz - 0.27).rotation.x = -0.12; }
     // hide the car's own body from the driver's eye (restored on unmount)
-    // the cockpit lives beside the car (not inside it) so the whole body mesh can be hidden, then follows the car's matrix
-    const hid = car.visible ? [car] : []; car.visible = false; g.matrixAutoUpdate = false; (car.parent || car).add(g); car.updateMatrixWorld(true); g.matrix.copy(car.matrixWorld);
+    // the cockpit lives beside the car (not inside it) so the whole body mesh can be hidden, then follows the car (sibling, local matrix)
+    const hid = car.visible ? [car] : []; car.visible = false; g.matrixAutoUpdate = false; (car.parent || car).add(g); car.updateMatrix(); g.matrix.copy(car.matrix);
     ck = { g, car, disp, hid, cv, tex, spin, t: 0, key: '', max: Math.max(120, Math.round((def.top || 25) * 3.6 / 20) * 20 + 20), red: def.redline || 7000 }; draw(0, 0, 1, 1, false); return ck; }
   function draw(kmh, rpm, gear, fuel, rev) { const { cv } = ck, g = cv.getContext('2d'), w = cv.width, h = cv.height, r = h * 0.44;
     g.fillStyle = '#05070c'; g.fillRect(0, 0, w, h); const dial = (cx, v, max, red, lab, txt) => { g.strokeStyle = '#334155'; g.lineWidth = h * 0.05; g.beginPath(); g.arc(cx, h * 0.55, r, Math.PI * 0.8, Math.PI * 2.2); g.stroke();
@@ -54,7 +54,7 @@ export function makeCockpit(THREE, { low = false } = {}) {
     g.fillStyle = '#fff'; g.font = `900 ${h * 0.3}px system-ui,sans-serif`; g.textAlign = 'center'; g.fillText(rev ? 'R' : String(gear || 1), w * 0.5, h * 0.48);
     g.fillStyle = '#334155'; g.fillRect(w * 0.4, h * 0.72, w * 0.2, h * 0.07); g.fillStyle = fuel < 0.2 ? '#ef4444' : '#22c55e'; g.fillRect(w * 0.4, h * 0.72, w * 0.2 * Math.max(0, Math.min(1, fuel)), h * 0.07); g.fillStyle = '#94a3b8'; g.font = `700 ${h * 0.09}px system-ui,sans-serif`; g.fillText('⛽', w * 0.5, h * 0.95);
     ck.tex.needsUpdate = true; }
-  function update(dt, steer, kmh, rpm, gear, fuel, rev) { if (!ck) return; ck.car.updateMatrixWorld(true); ck.g.matrix.copy(ck.car.matrixWorld); ck.g.matrixWorldNeedsUpdate = true; ck.spin.rotation.z = -steer * 2.4; ck.t += dt; if (ck.t < (low ? 0.2 : 0.1)) return; ck.t = 0;
+  function update(dt, steer, kmh, rpm, gear, fuel, rev) { if (!ck) return; ck.car.updateMatrix(); ck.g.matrix.copy(ck.car.matrix); ck.g.matrixWorldNeedsUpdate = true; ck.spin.rotation.z = -steer * 2.4; ck.t += dt; if (ck.t < (low ? 0.2 : 0.1)) return; ck.t = 0;
     const key = kmh + '|' + Math.round(rpm / 100) + '|' + gear + '|' + rev + '|' + Math.round(fuel * 50); if (key !== ck.key) { ck.key = key; draw(kmh, rpm, gear, fuel, rev); } }
   function unmount() { if (!ck) return; ck.g.parent && ck.g.parent.remove(ck.g); for (const o of ck.hid) o.visible = true; for (const d of ck.disp) d.dispose(); ck = null; }
   return { mount, unmount, update, get on() { return !!ck; }, get car() { return ck && ck.car; } };
