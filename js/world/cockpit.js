@@ -42,6 +42,7 @@ export function makeCockpit(THREE, { low = false } = {}) {
       mesh(geo(new THREE.BoxGeometry(0.48, 0.14, 0.5)), softM, -sx, seat.y + 0.07, sz); mesh(geo(new THREE.BoxGeometry(0.48, 0.62, 0.12)), softM, -sx, seat.y + 0.4, sz - 0.27).rotation.x = -0.12; }
     // hide the car's own body from the driver's eye (restored on unmount)
     // the cockpit lives beside the car (not inside it) so the whole body mesh can be hidden, then follows the car (sibling, local matrix)
+    for (const k of g.children) k.position.y -= truck ? 0.18 : 0.12; // keep the dash below the sight line (clear windshield)
     const hid = car.visible ? [car] : []; car.visible = false; g.matrixAutoUpdate = false; (car.parent || car).add(g); car.updateMatrix(); g.matrix.copy(car.matrix);
     ck = { g, car, disp, hid, cv, tex, spin, t: 0, key: '', max: Math.max(120, Math.round((def.top || 25) * 3.6 / 20) * 20 + 20), red: def.redline || 7000 }; draw(0, 0, 1, 1, false); return ck; }
   function draw(kmh, rpm, gear, fuel, rev) { const { cv } = ck, g = cv.getContext('2d'), w = cv.width, h = cv.height, r = h * 0.44;
