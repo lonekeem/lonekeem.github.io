@@ -101,10 +101,16 @@ for (const f of cfg.news || []) {
     try { const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + v.id)}`); if (r.ok) keep.push(v); else { skipped++; console.log(`  embedding disabled (${r.status}), skipped: ${v.channel} ${v.id}`); } }
     catch { keep.push(v); }
   }
-  console.log(`embeddable: ${keep.length}/${out.videos.length}`); out.videos = keep;
+  console.log(`embeddable: ${keep.length}/${out.videos.length}`);
+  // a rate-limited/blocked oEmbed check (429/403 from the runner) rejects everything: don't let that wipe the feed
+  if (keep.length >= Math.min(20, out.videos.length * 0.5)) out.videos = keep; else console.log('oEmbed check looks blocked; keeping all fetched videos');
 }
 out.videos.sort((a, b) => b.published.localeCompare(a.published));
 out.news.sort((a, b) => b.published.localeCompare(a.published));
 console.log(`total: ${out.videos.length} videos (${shortsN} Shorts), ${out.news.length} headlines, ${skipped} skipped by the kid-safe filter`);
+// YouTube feeds sometimes fail from the runner: never publish an empty / gutted video list, keep the last good one
+{ let old = null; try { old = JSON.parse(fs.readFileSync(root + 'data/discover.json', 'utf8')); } catch { /* */ }
+  const prev = (old && old.videos) || []; if (out.videos.length < Math.min(30, prev.length * 0.5)) { console.log(`only ${out.videos.length} videos fetched (had ${prev.length}); keeping the previous videos`); out.videos = prev; }
+  if (!out.news.length && old && old.news) out.news = old.news; }
 if (!out.videos.length && !out.news.length) { console.log('Nothing fetched; keeping the old file.'); process.exit(0); }
 fs.writeFileSync(root + 'data/discover.json', JSON.stringify(out, null, 1) + '\n');
