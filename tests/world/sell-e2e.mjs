@@ -2,6 +2,8 @@
 // Needs: firebase emulators (firebase.emu.json) + python3 -m http.server 8947. Optional EMU_FS / EMU_AUTH ports when 8199/9199 are busy.
 // usage: node tests/world/kustom-call-e2e.mjs [shotPrefix]
 import { createRequire } from 'node:module'; const require = createRequire('/workspace/pw/');
+import { readFileSync } from 'node:fs';
+if (/export const SELL_CARS = false/.test(readFileSync(new URL('../../js/world/drive.js', import.meta.url), 'utf8'))) { console.log('SKIPPED: car selling is switched off (SELL_CARS = false in js/world/drive.js)'); process.exit(0); }
 const pw = require('playwright'); const { devices } = pw;
 const base = 'http://localhost:8947/'; const shot = process.argv[2] || '/workspace/sell-'; const FS = process.env.EMU_FS || '8199', AU = process.env.EMU_AUTH || '9199';
 const browser = await pw.chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });

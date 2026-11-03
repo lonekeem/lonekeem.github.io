@@ -1,4 +1,4 @@
-// Badge-edition cars (shared models, own emblem): shop listing, drive + Kustoms + plate, presence code, sell (local emulators only).
+// Badge-edition cars (shared models, own emblem): shop listing, drive + Kustoms + plate, presence code, no Sell while selling is off (local emulators only).
 import { playwright, exe, GL, emuContext, signup, assertLocal } from '../helpers/emu.mjs';
 const base = (process.argv[2] || 'http://localhost:8947/').replace(/\/?$/, '/'); assertLocal(base); const shot = process.argv[3] || '/workspace/reg-newcars-';
 const FS = process.env.EMU_FS || '8199', AU = process.env.EMU_AUTH || '9199', P = 'lone-keem-studios';
@@ -24,11 +24,11 @@ try {
   await fsSet(`users/${uid}/inv/car_haul`, { n: { integerValue: '1' }, at: { timestampValue: new Date(Date.now() - 6e4).toISOString() } });
   await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/park'; });
   await p.waitForFunction(() => window.__p3 && window.__p3.pos && window.__kdApi, null, { timeout: 240000 }); await W(3000);
-  await p.evaluate(() => window.__kdApi.myCars()); await p.waitForSelector('[data-sell="ember"]', { timeout: 60000 }).catch(() => {}); await W(1500);
+  await p.evaluate(() => window.__kdApi.myCars()); await p.waitForSelector('[data-plate="ember"]', { timeout: 60000 }).catch(() => {}); await W(1500);
   const names = await p.evaluate(() => [...document.querySelectorAll('.kd-car b')].map((b) => b.textContent));
   const want = ['Ember Dart', 'Frost Fang', 'Blitz Hornet', 'Wisp Glider', 'Jolt Kit', 'Petal Zip', 'Mighty Mule', 'Boulder Buddy', 'Ranger Rex', 'Haul Hero'];
   ok(want.every((n) => names.includes(n)), 'all 10 badge cars listed in My Cars shop', names.length);
-  await p.evaluate(() => document.querySelector('[data-sell="ember"]')?.closest('.kd-car')?.scrollIntoView({ block: 'center' })); await W(500); await p.screenshot({ path: shot + 'shop.png' });
+  await p.evaluate(() => document.querySelector('[data-plate="ember"]')?.closest('.kd-car')?.scrollIntoView({ block: 'center' })); await W(500); await p.screenshot({ path: shot + 'shop.png' });
   await p.evaluate(() => { const e = [...document.querySelectorAll('.kd-car b')].find((b) => b.textContent === 'Haul Hero'); e && e.closest('.kd-car').scrollIntoView({ block: 'center' }); }); await W(500); await p.screenshot({ path: shot + 'shop2.png' });
   await p.evaluate(() => document.querySelector('.ks-card [data-close], .kk-ov [data-close], [data-close]')?.click()); await W(800);
   for (const id of ['ember', 'boulder', 'blitz']) {
@@ -45,11 +45,11 @@ try {
   const pl = await p.evaluate(() => { for (const k of Object.keys(localStorage)) { try { const v = JSON.parse(localStorage.getItem(k)); if (v && v.plates && v.plates.haul) return v.plates; } catch {} } return { keys: Object.keys(localStorage).filter((k) => /plates/.test(localStorage.getItem(k))), ed: document.querySelector('.kd-plate input')?.value ?? 'no-editor' }; });
   ok(pl && pl.haul && pl.haul.t === 'HAUL1' && (pl.haul.fr & 8), 'badge car plate saved with ♿ badge', JSON.stringify(pl));
   await p.evaluate(() => document.querySelector('.kk-x, [data-close], .kk [aria-label="Close"]')?.click()); await p.keyboard.press('Escape'); await W(1500);
-  // sell the owned badge car: +450 (half of 900)
-  const w0 = await fsGet(`users/${uid}/pal/wallet`); const c0 = +(w0.fields?.coins?.integerValue ?? -1);
-  await p.evaluate(() => window.__kdApi.myCars()); await p.waitForSelector('[data-sell="ember"]', { timeout: 60000 });
-  await p.click('[data-sell="ember"]'); await W(700); await p.click('[data-sell="ember"]'); await p.waitForFunction(() => !document.querySelector('[data-sell="ember"]'), null, { timeout: 15000 }).catch(() => {}); await W(3000);
-  const w1 = await fsGet(`users/${uid}/pal/wallet`); const c1 = +(w1.fields?.coins?.integerValue ?? -1); const inv = await fsGet(`users/${uid}/inv/car_ember`);
-  ok(c1 >= c0 + 449 && c1 <= c0 + 451 && inv.error && inv.error.code === 404, 'sold Ember Dart for half price (rules accepted car_ember)', [c0, c1, inv.error && inv.error.code]);
+  // selling is switched off (SELL_CARS = false): My Cars shows no Sell button for the owned badge car
+
+  await p.evaluate(() => window.__kdApi.myCars()); await p.waitForSelector('[data-plate="ember"]', { timeout: 60000 }); await W(800);
+  ok(!(await p.$('[data-sell]')), 'no Sell button in My Cars', '');
+
+
 } catch (e) { fails++; console.log('ERR', e.message); await p.screenshot({ path: shot + 'error.png' }).catch(() => {}); }
 ok(!errors.length, 'no page errors', errors.slice(0, 3).join(' | ')); await browser.close(); console.log(fails ? `${fails} FAILED` : 'ALL PASSED'); process.exit(fails ? 1 : 0);

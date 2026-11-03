@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Kemy Cars contact sheet</title>
+<style>body{margin:0;background:#1b1c22;color:#eee;font:12px Arial}#g{display:grid;grid-template-columns:repeat(var(--n,7),300px);gap:4px;padding:4px}figure{margin:0;background:#2a2b33}img{display:block;width:300px;height:190px}figcaption{padding:2px 6px}</style><div id="g"></div>
+<script type="module">
+// every car (or ?pairs=1: each badge edition beside its base) rendered once, with its triangle count
+import * as THREE from '../../js/vendor/three-0.170.0.module.min.js';
+import { CARS, CAR, buildCar, poseCar } from '../../js/world/cars.js';
+const Q = new URLSearchParams(location.search), pairs = Q.get('pairs'), only = Q.get('ids');
+const cv = document.createElement('canvas'); const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true }); R.setSize(600, 380, false); R.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#9aa3c7'); scene.add(new THREE.HemisphereLight('#ffffff', '#555577', 2.2)); const sun = new THREE.DirectionalLight('#fff', 2.2); sun.position.set(6, 10, 8); scene.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: '#4a4c58' })); gnd.rotation.x = -Math.PI / 2; scene.add(gnd);
+const cam = new THREE.PerspectiveCamera(30, 600 / 380, 0.1, 200);
+let list = CARS; if (only) list = only.split(',').map((i) => CAR[i]); if (pairs) list = CARS.filter((c) => c.base).flatMap((c) => [CAR[c.base], c]);
+document.getElementById('g').style.setProperty('--n', pairs ? 4 : 7);
+const tris = (o) => { let n = 0; o.traverse((m) => { if (m.isMesh) n += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; }); return Math.round(n); };
+const out = []; for (const c of list) { const m = buildCar(c, c.color); scene.add(m); poseCar(m, { x: 0, y: 0, z: 0, yaw: 0.75 }, 0, 0); const d = Math.max(c.L, 3.6) * 1.55; cam.position.set(d * 1.05, d * 0.3, -d * 0.12); cam.lookAt(0, c.H * 0.45, 0);
+  R.render(scene, cam); const t = tris(m); out.push({ id: c.id, base: c.base || '', tris: t }); const f = document.createElement('figure'); f.innerHTML = `<img src="${cv.toDataURL()}"><figcaption>${c.emoji || ''} <b>${c.id}</b> ${c.name}${c.base ? ' (base ' + c.base + ')' : ''} · ${t} tris</figcaption>`; document.getElementById('g').appendChild(f); scene.remove(m); }
+window.sheet = out; window.done = 1;
+</script>

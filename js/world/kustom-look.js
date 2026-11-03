@@ -149,7 +149,7 @@ function rimTemplate(style, r, w, chrome, trim) { const k = style + '|' + r.toFi
 
 // ---------------------------------------------------------------- surface probe (once per car model, cached): top height along the length
 const PROBE = new Map(); const rc = new THREE.Raycaster(); const v0 = new THREE.Vector3(), v1 = new THREE.Vector3(0, -1, 0);
-function probeTop(car) { const c = car.userData.def; const key = (c.base || c.id) + (car.userData.lite ? 'l' : ''); if (PROBE.has(key)) return PROBE.get(key);
+function probeTop(car) { const c = car.userData.def; const key = c.id + (car.userData.lite ? 'l' : ''); if (PROBE.has(key)) return PROBE.get(key);
   const ch = car.userData.chassis; const paint = car.userData.paint, glass = car.userData.cab;
   const hits = ch.children.filter((m) => m.isMesh && (m.material === paint || m === glass) && m.geometry.type !== 'TorusGeometry' && m.geometry.type !== 'ConeGeometry' && m.geometry.type !== 'SphereGeometry' && !m.userData.roof).map((m) => { const o = new THREE.Mesh(m.geometry); o.position.copy(m.position); o.rotation.copy(m.rotation); o.scale.copy(m.scale); o.userData.glass = m === glass; o.updateMatrixWorld(true); return o; });
   const N = 44, out = []; for (const x of [0, 0.16]) { const row = []; for (let i = 0; i <= N; i++) { const z = -c.L / 2 + (c.L * i) / N; v0.set(x, c.H + 3, z); rc.set(v0, v1); const h = rc.intersectObjects(hits, false)[0]; row.push(h ? { y: h.point.y, glass: h.object.userData.glass, z } : null); } out.push(row); }
@@ -197,11 +197,11 @@ function topBand(car, x0, x1, zFrom, zTo, hex, key, g) { const gm = geo(key + (c
     const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.computeVertexNormals(); return gg; });
   g.add(new THREE.Mesh(gm, flat(hex))); }
 function decalGroup(car, style, light) { const c = car.userData.def; const g = new THREE.Group(); g.userData.kk = 1;
-  if (style === 1) { for (const xs of [-0.17, 0.17]) topBand(car, xs - 0.07, xs + 0.07, -99, 99, light ? '#1f2937' : '#f8fafc', 'st' + (c.base || c.id) + xs, g); return g; }
+  if (style === 1) { for (const xs of [-0.17, 0.17]) topBand(car, xs - 0.07, xs + 0.07, -99, 99, light ? '#1f2937' : '#f8fafc', 'st' + c.id + xs, g); return g; }
   if (SIDE[style]) sideSet(car, SIDE[style], 'd' + style, light, g); return g; }
 function wrapGroup(car, style) { const c = car.userData.def, W = c.Wd; const g = new THREE.Group(); g.userData.kk = 1; if (!style) return g;
-  if (style === 1) { const zc = (car.userData.kk && car.userData.kk.cabF) || c.L * 0.1; topBand(car, -W * 0.36, W * 0.36, zc + 0.05, 99, '#1c1d22', 'wc' + (c.base || c.id), g); return g; }
-  if (style === 5) { topBand(car, -W * 0.12, W * 0.12, -99, 99, '#111318', 'wb' + (c.base || c.id), g); }
+  if (style === 1) { const zc = (car.userData.kk && car.userData.kk.cabF) || c.L * 0.1; topBand(car, -W * 0.36, W * 0.36, zc + 0.05, 99, '#1c1d22', 'wc' + c.id, g); return g; }
+  if (style === 5) { topBand(car, -W * 0.12, W * 0.12, -99, 99, '#111318', 'wb' + c.id, g); }
   if (WRAP[style]) sideSet(car, WRAP[style], 'w' + style, false, g); return g; }
 
 // ---------------------------------------------------------------- spoilers

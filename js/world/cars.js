@@ -86,7 +86,7 @@ export const PAINTS = ['#e8434f', '#7c3aed', '#2f7fe6', '#14b8a6', '#f59e0b', '#
 export const isTruck = (c) => !!(c && (c.truck || c.style === 'truck'));
 // display models (garages, NPCs) are built once per design and their geometry cached: big/new models only cost when first seen
 export const ORIGINAL_DESIGNS = CARS.slice(0, 14).map((c) => c.id);
-export const geoId = (c) => c.base || c.id; // badge editions share their base car's cached geometry
+export const geoId = (c) => c.id; // every design has its own look now (badge editions no longer share their base's body)
 export const carItem = (c) => (c.prem ? 'z_car_' : 'car_') + c.id;
 export const carProduct = (c) => 'kemy_car_' + c.id; // placeholder product id (not used, no real money)
 export async function registerCarItems() { const cat = await import('../pals/catalog.js');
@@ -98,6 +98,7 @@ const MAT = new Map();
 function mat(key, make) { if (!MAT.has(key)) MAT.set(key, make()); return MAT.get(key); }
 export function paintMat(col) { return mat('p' + col, () => new THREE.MeshPhysicalMaterial({ color: col, metalness: 0.55, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.25 })); }
 export const carMats = () => M; // shared materials (Kemy Kustoms reuses them: no new shader programs)
+const RIM = { chrome: () => M.chrome(), dark: () => mat('rimd', () => new THREE.MeshStandardMaterial({ color: '#2a2d35', metalness: 0.8, roughness: 0.3 })), gold: () => mat('rimg', () => new THREE.MeshStandardMaterial({ color: '#d4a63a', metalness: 1, roughness: 0.2 })), white: () => mat('rimw', () => new THREE.MeshStandardMaterial({ color: '#f1f1ee', metalness: 0.2, roughness: 0.35 })), steel: () => mat('rims', () => new THREE.MeshStandardMaterial({ color: '#8b9099', metalness: 0.7, roughness: 0.45 })) };
 const M = {
   glass: () => mat('glass', () => new THREE.MeshPhysicalMaterial({ color: '#1b2a3c', metalness: 0.2, roughness: 0.04, transparent: true, opacity: 0.42, envMapIntensity: 1.6, clearcoat: 1, depthWrite: false })),
   chrome: () => mat('chrome', () => new THREE.MeshStandardMaterial({ color: '#e9eef5', metalness: 1, roughness: 0.12, envMapIntensity: 1.5 })),
@@ -171,7 +172,50 @@ function profiles(c) { const L = c.L, H = c.H, r = c.wr, cl = r * 0.55; const f 
     default: return { body: [[b, cl], [f, cl], [f + 0.04, H * 0.4, f - 0.06, H * 0.5], [f - L * 0.32, H * 0.56], [b + 0.12, H * 0.6], [b - 0.03, H * 0.48, b, cl]],
       cabin: [[f - L * 0.34, H * 0.55], [f - L * 0.5, H * 0.95, f - L * 0.56, H * 0.96], [b + L * 0.2, H * 0.93], [b + L * 0.1, H * 0.6]], roofW: 0.82, duck: 1 };
   } }
-function rim(r, w, spokes) { const g = new THREE.Group(); const ch = M.chrome();
+// ------------------------------------------------------------ per-car looks: every design gets its own nose, roofline, tail, add-ons + wheels
+// p: profile tweaks (nose/deck = front/rear height scale, rh = roof height, rf/rb = windscreen/back-glass top shift, cx = cabin shift; all x as a share of L)
+// x: cheap shared add-ons (cached boxes/cylinders, shared materials) | sp: rim spokes | rm: rim finish | ww: tire width | ride: visual body lift (physics untouched) | two: contrast paint (roof + side band)
+export const LOOK = {
+  ember: { p: { nose: 0.82, rb: -0.09, rh: 0.9 }, x: ['wing', 'skirt', 'diff'], sp: 10, rm: 'dark', ww: 1.15, ride: -0.04, two: '#1f2937' },
+  frost: { p: { rh: 1.12, rf: -0.04 }, x: ['rack', 'bar', 'mud', 'flare'], sp: 6, rm: 'white', ww: 1.1, ride: 0.09 },
+  blitz: { p: { nose: 0.86, deck: 1.14 }, x: ['blower', 'pipes', 'skirt'], sp: 16, rm: 'chrome', ww: 1.3, two: '#f4f4f5' },
+  wisp: { p: { rb: 0.16, rh: 1.04 }, x: ['rack', 'spoiler'], sp: 8, rm: 'gold', two: '#f4f4f5' },
+  jolt: { p: { nose: 0.9, rh: 0.92 }, x: ['wing', 'canard', 'flare', 'diff'], sp: 4, rm: 'dark', ww: 1.2, ride: -0.05 },
+  petal: { p: { nose: 1.12, deck: 1.08, rh: 0.86 }, x: ['trunkrack', 'lamps'], sp: 12, rm: 'white', ww: 0.9, two: '#f4f4f5' },
+  mule: { p: { rh: 1.06 }, x: ['ladder', 'bull', 'bar', 'mud'], sp: 8, rm: 'steel', ride: 0.06 },
+  boulder: { p: { rh: 0.94, nose: 1.06 }, x: ['bull', 'lamps', 'basket', 'flare', 'mud'], sp: 5, rm: 'dark', ww: 1.15, ride: 0.14 },
+  ranger: { p: { rh: 0.84, rf: 0.03 }, x: ['bull', 'bar', 'snork', 'flare'], sp: 10, rm: 'dark', ride: 0.04, two: '#1f2937' },
+  haul: { p: { deck: 1.0, rh: 1.12 }, x: ['visor', 'ladder', 'band'], sp: 7, rm: 'steel', ride: -0.03, two: '#f59e0b' },
+};
+function reshape(pr, c, lk) { const p = lk.p || {}, L = c.L, H = c.H, f = L / 2, b = -L / 2, cl = c.wr * 0.55; const each = (q, fn) => { for (let i = 0; i < q.length; i += 2) { const [x, y] = fn(q[i], q[i + 1]); q[i] = x; q[i + 1] = y; } };
+  const sy = (k, x0, x1) => (x, y) => (x > x0 && x < x1 && y > cl + 0.02 ? [x, cl + (y - cl) * k] : [x, y]);
+  pr.body = pr.body.map((q) => { q = q.slice(); if (p.nose) each(q, sy(p.nose, f - L * 0.3, 99)); if (p.deck) each(q, sy(p.deck, -99, b + L * 0.3)); return q; });
+  const y0 = pr.cabin[0].length === 4 ? pr.cabin[0][3] : pr.cabin[0][1];
+  pr.cabin = pr.cabin.map((q, i) => { q = q.slice(); each(q, (x, y) => { if (p.cx) x += p.cx * L; if (i === 1 && p.rf) x += p.rf * L; if (i === 2 && p.rb) x -= p.rb * L; if ((i === 1 || i === 2) && p.rh) y = y0 + (y - y0) * p.rh; return [x, y]; }); return q; }); return pr; }
+function addOns(lk, c, add, A) { const { W, H, r, b0, f0, roofY, cabF, cabB, hood, deck, by, bumpY, axF, axR, paint, two } = A; const L = c.L, T = M.trim(), C = M.chrome(), X = lk.x || [];
+  const rc = (cabF + cabB) / 2, rl = Math.max(0.4, (cabF - cabB) * 0.7);
+  for (const k of X) switch (k) {
+    case 'spoiler': add(BOX(W * 0.8, 0.04, 0.22), paint, (m) => { m.position.set(0, deck + 0.06, b0 + 0.16); m.rotation.x = 0.2; }); break;
+    case 'wing': add(BOX(W * 0.96, 0.05, 0.34), T, (m) => { m.position.set(0, deck + 0.42, b0 + 0.2); m.rotation.x = 0.1; }); for (const s of [-1, 1]) { add(BOX(0.05, 0.42, 0.14), T, (m) => m.position.set(s * W * 0.3, deck + 0.21, b0 + 0.24)); add(BOX(0.03, 0.2, 0.42), paint, (m) => m.position.set(s * W * 0.48, deck + 0.44, b0 + 0.2)); } break;
+    case 'diff': for (const s of [-0.3, -0.1, 0.1, 0.3]) add(BOX(0.03, 0.14, 0.3), T, (m) => m.position.set(s * W, r * 0.5, b0 - 0.02)); add(BOX(W * 0.8, 0.03, 0.32), T, (m) => m.position.set(0, r * 0.45, b0 - 0.02)); break;
+    case 'canard': for (const s of [-1, 1]) for (const dy of [0, 0.1]) add(BOX(0.22, 0.025, 0.12), T, (m) => { m.position.set(s * (W / 2 - 0.05), by - 0.15 + dy, f0 - 0.02); m.rotation.z = s * 0.2; }); add(BOX(W * 0.9, 0.03, 0.18), T, (m) => m.position.set(0, r * 0.4, f0 + 0.06)); break;
+    case 'skirt': for (const s of [-1, 1]) add(BOX(0.07, 0.1, Math.max(0.3, axF - axR - r * 2.3)), T, (m) => m.position.set(s * (W / 2 + 0.01), r * 0.55, (axF + axR) / 2)); break;
+    case 'flare': for (const z of [axF, axR]) for (const s of [-1, 1]) add(BOX(0.12, 0.07, r * 2.5), T, (m) => m.position.set(s * (W / 2 + 0.04), r * 1.42, z)); break;
+    case 'mud': for (const z of [axF, axR]) for (const s of [-1, 1]) add(BOX(0.03, r * 0.8, 0.03), T, (m) => m.position.set(s * (W / 2 - r * 0.2), r * 0.55, z - r * 1.12)); for (const s of [-1, 1]) add(BOX(r * 0.6, r * 0.7, 0.025), M.rubber(), (m) => m.position.set(s * (W / 2 - r * 0.2), r * 0.5, axR - r * 1.12)); break;
+    case 'rack': for (const s of [-1, 1]) add(BOX(0.04, 0.05, rl), T, (m) => m.position.set(s * W * 0.34, roofY + 0.07, rc)); for (const dz of [-0.4, 0, 0.4]) add(BOX(W * 0.74, 0.03, 0.04), T, (m) => m.position.set(0, roofY + 0.1, rc + dz * rl)); break;
+    case 'basket': add(BOX(W * 0.72, 0.03, rl), T, (m) => m.position.set(0, roofY + 0.08, rc)); for (const s of [-1, 1]) { add(BOX(0.04, 0.16, rl), T, (m) => m.position.set(s * W * 0.36, roofY + 0.16, rc)); add(BOX(W * 0.72, 0.16, 0.04), T, (m) => m.position.set(0, roofY + 0.16, rc + s * rl / 2)); } add(BOX(0.4, 0.2, 0.3), M.cargo(), (m) => m.position.set(0, roofY + 0.2, rc)); break;
+    case 'bar': add(BOX(W * 0.7, 0.09, 0.1), M.glow('#fff7cc'), (m) => m.position.set(0, roofY + 0.09, cabF - 0.12)); add(BOX(W * 0.74, 0.04, 0.14), T, (m) => m.position.set(0, roofY + 0.03, cabF - 0.12)); break;
+    case 'visor': add(BOX(W * 0.86, 0.04, 0.3), T, (m) => { m.position.set(0, roofY - 0.04, cabF + 0.1); m.rotation.x = -0.15; }); break;
+    case 'bull': { const z = f0 + 0.2; for (const s of [-1, 1]) add(CYL(0.035, 0.035, H * 0.42, 6), C, (m) => m.position.set(s * W * 0.3, bumpY + H * 0.16, z)); for (const dy of [0, H * 0.3]) add(CYL(0.035, 0.035, W * 0.66, 6), C, (m) => { m.rotation.z = Math.PI / 2; m.position.set(0, bumpY + 0.04 + dy, z); }); break; }
+    case 'lamps': for (const s of [-1, 1]) add(gc('lamp', () => new THREE.SphereGeometry(0.09, 10, 6)), M.head(), (m) => { m.scale.set(1, 1, 0.6); m.position.set(s * W * 0.2, bumpY + 0.2, f0 + 0.24); }); break;
+    case 'ladder': { const lz = rc - 0.2, ll = Math.max(1.0, (cabF - b0) * 0.9); for (const s of [-1, 1]) add(BOX(0.05, 0.05, ll), C, (m) => m.position.set(s * W * 0.38, roofY + 0.12, cabF - ll / 2)); for (let i = 0; i < 4; i++) add(BOX(W * 0.76, 0.03, 0.03), C, (m) => m.position.set(0, roofY + 0.12, cabF - 0.1 - i * (ll - 0.2) / 3)); void lz; break; }
+    case 'snork': add(CYL(0.06, 0.06, roofY - hood + 0.1, 8), T, (m) => m.position.set(W / 2 + 0.04, (roofY + hood) / 2 + 0.05, cabF - 0.02)); add(BOX(0.14, 0.1, 0.18), T, (m) => m.position.set(W / 2 + 0.04, roofY + 0.1, cabF + 0.02)); break;
+    case 'blower': add(BOX(W * 0.28, 0.24, 0.4), C, (m) => m.position.set(0, hood + 0.12, f0 - L * 0.22)); add(BOX(W * 0.34, 0.08, 0.3), T, (m) => m.position.set(0, hood + 0.3, f0 - L * 0.22)); break;
+    case 'pipes': for (const s of [-1, 1]) add(CYL(0.05, 0.05, L * 0.4, 8), C, (m) => { m.rotation.x = Math.PI / 2; m.position.set(s * (W / 2 + 0.06), r * 0.62, (axF + axR) / 2); }); break;
+    case 'trunkrack': for (const dz of [0.12, 0.3, 0.48]) add(BOX(W * 0.56, 0.025, 0.03), C, (m) => m.position.set(0, deck + 0.06, b0 + dz)); for (const s of [-1, 1]) add(BOX(0.03, 0.03, 0.42), C, (m) => m.position.set(s * W * 0.28, deck + 0.07, b0 + 0.3)); add(BOX(0.42, 0.22, 0.3), M.seat(), (m) => m.position.set(0, deck + 0.18, b0 + 0.3)); break;
+    case 'band': add(BOX(W + 0.03, H * 0.08, L * 0.8), two || T, (m) => m.position.set(0, H * 0.36, -L * 0.04)); break;
+  } }
+function rim(r, w, spokes, fin) { const g = new THREE.Group(); const ch = RIM[fin || 'chrome']();
   const d = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.66, r * 0.66, w * 0.86, 24), ch); d.rotation.z = Math.PI / 2; g.add(d);
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.16, r * 0.16, w * 1.02, 12), M.trim()); hub.rotation.z = Math.PI / 2; g.add(hub);
   for (let i = 0; i < spokes; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(w * 0.2, r * 1.1, r * 0.13), ch); s.rotation.x = (i / spokes) * Math.PI; s.position.x = 0; g.add(s); }
@@ -184,14 +228,14 @@ const CYL = (r0, r1, h, n = 12) => gc(`c${r0.toFixed(3)}|${r1.toFixed(3)}|${h.to
 export const axles = (c) => [c.L * (c.axF ?? 0.33), -c.L * (c.axR ?? 0.32)];
 export function buildCar(def, color, o = {}) { const c = typeof def === 'string' ? CAR[def] : def; const col = PAINTS[color ?? c.color] || PAINTS[0]; const lite = !!o.lite;
   const root = new THREE.Group(); const ch = new THREE.Group(); root.add(ch); const paint = paintMat(col); const TR = isTruck(c);
-  const pr = profiles(c); const cab0 = pr.cabin; if (c.conv) { const f = c.L / 2, H = c.H; pr.cabin = [[f - c.L * 0.3, H * 0.55], [f - c.L * 0.4, H * 0.84], [f - c.L * 0.43, H * 0.84], [f - c.L * 0.37, H * 0.55]]; } const W = c.Wd, r = c.wr; const bev = Math.min(0.16, W * 0.08);
+  const lk = LOOK[c.id] || {}; const pr = lk.p ? reshape(profiles(c), c, lk) : profiles(c); const cab0 = pr.cabin; if (c.conv) { const f = c.L / 2, H = c.H; pr.cabin = [[f - c.L * 0.3, H * 0.55], [f - c.L * 0.4, H * 0.84], [f - c.L * 0.43, H * 0.84], [f - c.L * 0.37, H * 0.55]]; } const W = c.Wd, r = c.wr; const bev = Math.min(0.16, W * 0.08);
   const gk = geoId(c) + (lite ? 'l' : 'h'); const add = (gm, m, f) => { const x = new THREE.Mesh(gm, m); if (f) f(x); ch.add(x); return x; };
   const body = add(gc(gk + 'body', () => sculpt(extrudeSide(pr.body, W, bev, lite ? 6 : 12), c, c.H * 0.3, c.H * 0.62)), paint);
   const cabW = W * pr.roofW; const cab = add(gc(gk + 'cab', () => sculpt(extrudeSide(pr.cabin, cabW, 0.1, lite ? 6 : 12), c, c.H * 0.55, c.H, 1.1)), M.glass()); cab.renderOrder = 2;
   const pt = (p) => (p.length === 4 ? [p[2], p[3]] : p); const roofY = Math.max(...pr.cabin.map((p) => pt(p)[1])); const cabF = pt(pr.cabin[0])[0], cabB = pt(pr.cabin[pr.cabin.length - 1])[0];
   // roof skin (paint) as a thin slab following the top of the cabin
   if (!c.conv) { const top = pr.cabin.filter((p, i) => i === 1 || i === 2).map(pt); const x0 = Math.min(top[0][0], top[1][0]) , x1 = Math.max(top[0][0], top[1][0]); const y = Math.max(top[0][1], top[1][1]);
-    add(gc(gk + 'roof', () => extrudeSide([[x0 + 0.05, y - 0.06], [x1 - 0.05, y - 0.06], [x1 - 0.12, y + 0.03], [x0 + 0.12, y + 0.03]], cabW * 0.9, 0.05, 4)), paint, (m) => { m.userData.roof = 1; }); }
+    add(gc(gk + 'roof', () => extrudeSide([[x0 + 0.05, y - 0.06], [x1 - 0.05, y - 0.06], [x1 - 0.12, y + 0.03], [x0 + 0.12, y + 0.03]], cabW * 0.9, 0.05, 4)), lk.two ? paintMat(lk.two) : paint, (m) => { m.userData.roof = 1; }); }
   // wheel arch flares
   const [axF, axR] = axles(c), tw = W / 2 - r * 0.2;
   if (!pr.mon) for (const z of [axF, axR]) for (const s of [-1, 1]) add(gc('fl' + r.toFixed(3), () => new THREE.TorusGeometry(r * 1.12, r * 0.18, 8, 18, Math.PI)), paint, (fl) => { fl.rotation.y = Math.PI / 2; fl.position.set(s * (W / 2 - 0.02), r, z); fl.scale.set(1, 1, 1.4); fl.userData.flare = 1; });
@@ -234,6 +278,7 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
     for (const s of [-1, 1]) { add(CYL(0.075, 0.075, H * 0.75, 10), M.chrome(), (st) => st.position.set(s * (W / 2 - 0.02), H * 0.72, sz1 - 0.05)); add(CYL(0.2, 0.2, 1.1, 14), M.chrome(), (ft) => { ft.rotation.x = Math.PI / 2; ft.position.set(s * (W / 2 - 0.16), r * 0.95, (sz0 + sz1) / 2 + 0.15); }); } }
   if (pr.spare) { add(gc('sp' + r.toFixed(3), () => new THREE.TorusGeometry(r * 0.72, r * 0.24, 8, 20)), M.rubber(), (t) => t.position.set(0, H * 0.48, b0 - 0.17)); add(CYL(r * 0.5, r * 0.5, 0.1, 14), M.chrome(), (h) => { h.rotation.x = Math.PI / 2; h.position.set(0, H * 0.48, b0 - 0.17); }); }
   if (pr.pods) for (const z of [axF, axR]) for (const s of [-1, 1]) add(gc('pod' + r.toFixed(3), () => new THREE.SphereGeometry(r * 1.25, 16, 10)), paint, (p) => { p.scale.set(0.42, 0.72, 1.18); p.position.set(s * (W / 2 - 0.08), r * 1.02, z); p.userData.flare = 1; });
+  { const deck = Math.max(...pr.body.flatMap((q) => (q.length === 4 ? [[q[0], q[1]], [q[2], q[3]]] : [q])).filter((q) => q[0] < 0).map((q) => q[1])); addOns(lk, c, add, { W, H, r, b0, f0, roofY, cabF, cabB, hood: pt(pr.body[3] || pr.body[2])[1], deck, by, bumpY, axF, axR, paint, two: lk.two && paintMat(lk.two) }); }
   // interior: seats, dash, steering wheel (visible through the glass, used by the POV camera)
   const cabBot = Math.min(...cab0.map((p) => pt(p)[1])); const seatY = Math.max(r * 0.9, c.H * 0.38, cabBot - 0.35), drvX = W * 0.22, seatZ = (cab0[0][0] + cab0[cab0.length - 1][0]) / 2 - 0.1;
   for (const s of [1, -1]) { add(BOX(0.46, 0.14, 0.48), M.seat(), (st) => { st.position.set(s * drvX, seatY, seatZ); st.userData.seat = 1; }); add(BOX(0.46, 0.6, 0.12), M.seat(), (bk) => { bk.position.set(s * drvX, seatY + 0.32, seatZ - 0.26); bk.rotation.x = -0.18; bk.userData.seat = 1; }); }
@@ -248,14 +293,15 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
     const pnl = new THREE.Mesh(BOX(0.05, dh, dlen), paint); pnl.position.set(0, dh / 2 - 0.05, -dlen / 2); piv.add(pnl);
     const hd = new THREE.Mesh(BOX(0.05, 0.03, 0.16), M.chrome()); hd.position.set(s * 0.03, dh - 0.12, -dlen * 0.8); piv.add(hd); doors.push({ piv, s, a: 0 }); }
   // wheels: steer pivot -> spin group (tire + rim)
-  const wheels = []; const ww = r * 0.75 * (TR ? 1.3 : 1) * (pr.mon ? 1.25 : 1); const spokes = TR ? 6 : c.style === 'cruiser' || c.style === 'retro' ? 12 : 5;
-  const tireG = gc('tire' + r.toFixed(3) + (lite ? 'l' : 'h'), () => new THREE.TorusGeometry(r * 0.78, r * 0.24, lite ? 8 : 14, lite ? 18 : 32)); const rimT = gc('rim' + r.toFixed(3) + '|' + ww.toFixed(3) + '|' + spokes, () => rim(r, ww, spokes));
+  const wheels = []; const ww = r * 0.75 * (TR ? 1.3 : 1) * (pr.mon ? 1.25 : 1) * (lk.ww || 1); const spokes = lk.sp || (TR ? 6 : c.style === 'cruiser' || c.style === 'retro' ? 12 : 5);
+  const tireG = gc('tire' + r.toFixed(3) + (lite ? 'l' : 'h'), () => new THREE.TorusGeometry(r * 0.78, r * 0.24, lite ? 8 : 14, lite ? 18 : 32)); const rimT = gc('rim' + r.toFixed(3) + '|' + ww.toFixed(3) + '|' + spokes + (lk.rm || ''), () => rim(r, ww, spokes, lk.rm));
   for (const [z, front] of [[axF, 1], [axR, 0]]) for (const s of [-1, 1]) { const st = new THREE.Group(); st.position.set(s * tw, r, z); root.add(st); const sp = new THREE.Group(); st.add(sp);
     const tire = new THREE.Mesh(tireG, M.rubber()); tire.rotation.y = Math.PI / 2; tire.scale.set(1, 1, ww / (r * 0.48)); sp.add(tire);
     sp.add(rimT.clone()); wheels.push({ st, sp, front, s, z, x: s * tw, comp: 0, vel: 0, y: r }); }
+  const ride = lk.ride || 0; if (ride) for (const m of ch.children) m.position.y += ride;
   root.traverse((m) => { if (m.isMesh) { m.castShadow = !o.noShadow && m.material !== M.glass(); m.receiveShadow = false; } });
-  root.userData = { pl: { fz: fz + 0.035, rz: c.L / 2 + bev * 0.9 + 0.045, fy: by - 0.2, ry }, def: c, chassis: ch, wheels, doors, steer, seat: new THREE.Vector3(drvX, seatY + 0.07, seatZ), dashZ, color: col, tails: [], paint, cab, spokes, lite,
-    heads, kk: { by: by + 0.05, hz: (pr.hz ?? fz) - 0.06, hsx, ty, fz, rz: c.L / 2 + bev * 0.9, bumpY, roofY, cabF, cabB, bedY, truck: TR, ww, tw, axF, axR, seatY, seatZ, drvX, bed: !!pr.bed, hood: pt(pr.body[3] || pr.body[2])[1] } };
+  root.userData = { pl: { fz: fz + 0.035, rz: c.L / 2 + bev * 0.9 + 0.045, fy: by - 0.2 + ride, ry: ry + ride }, def: c, chassis: ch, wheels, doors, steer, seat: new THREE.Vector3(drvX, seatY + 0.07 + ride, seatZ), ride, dashZ, color: col, tails: [], paint, cab, spokes, lite,
+    heads, kk: { by: by + 0.05 + ride, hz: (pr.hz ?? fz) - 0.06, hsx, ty: ty + ride, fz, rz: c.L / 2 + bev * 0.9, bumpY: bumpY + ride, roofY: roofY + ride + (lk.x && (lk.x.includes('rack') || lk.x.includes('basket') || lk.x.includes('ladder')) ? 0.14 : 0), cabF, cabB, bedY: bedY + ride, truck: TR, ww, tw, axF, axR, seatY: seatY + ride, seatZ, drvX, bed: !!pr.bed, hood: pt(pr.body[3] || pr.body[2])[1] + ride } };
   ch.traverse((m) => { if (m.userData.tail) root.userData.tails.push(m); });
   return root; }
 export function setBrakeLights(car, on) { for (const t of car.userData.tails) t.material = on ? M.brake() : M.tail(); }
