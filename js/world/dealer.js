@@ -9,7 +9,7 @@ import { DEALER, FLAT } from './layout.js';
 import { buildCar, poseCar, CARS, CAR } from './cars.js';
 import { device, labelKind } from '../input.js';
 
-export function attachDealer(api, W, K) {
+export function attachDealer(api, W, K) { const SELL = () => !!(W.drive && W.drive.sellOn); // Sell counter dormant while car selling is off
   const { THREE, scene, Q, P, box } = api; const LOW = !!api.LOW, PH = !!(Q && Q.phone); const { put, flush, G, std } = K;
   const D = DEALER, S = D.show, Y = FLAT; const root = new THREE.Group(); root.name = 'kemy-motors'; scene.add(root);
   const k = (n) => 'dl-' + n; const tv = new THREE.Vector3(), tq = new THREE.Quaternion(), ts = new THREE.Vector3(), M4 = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
@@ -53,7 +53,7 @@ export function attachDealer(api, W, K) {
   const [kx, kz] = D.desk; const cx0 = 60, cx1 = 82, cz0 = 342, cz1 = 364;
   for (const [x, z] of [[cx0, cz0], [cx1, cz0], [cx0, cz1], [cx1, cz1]]) { put(k('frame'), G.cyl, '#94a3b8', x, Y + 2.6, z, 0, 0.4, 5.2, 0.4); api.cyl.push({ x, z, r: 0.25, top: 99 }); }
   put(k('bld'), G.box, '#1e1b4b', (cx0 + cx1) / 2, Y + 5.4, (cz0 + cz1) / 2, 0, cx1 - cx0 + 1.4, 0.5, cz1 - cz0 + 1.4); put(k('glow'), G.box, '#facc15', (cx0 + cx1) / 2, Y + 5.1, cz0 - 0.71, 0, cx1 - cx0 + 1.4, 0.14, 0.05);
-  put(k('bld'), G.box, '#f59e0b', kx, Y + 0.6, kz + 1.4, 0, 6, 1.2, 1.2); put(k('trim'), G.box, '#fef3c7', kx, Y + 1.24, kz + 1.4, 0, 6.2, 0.08, 1.4); box.push({ x0: kx - 3, x1: kx + 3, z0: kz + 0.8, z1: kz + 2, top: Y + 1.2, bot: -99 });
+  if (SELL()) { put(k('bld'), G.box, '#f59e0b', kx, Y + 0.6, kz + 1.4, 0, 6, 1.2, 1.2); put(k('trim'), G.box, '#fef3c7', kx, Y + 1.24, kz + 1.4, 0, 6.2, 0.08, 1.4); box.push({ x0: kx - 3, x1: kx + 3, z0: kz + 0.8, z1: kz + 2, top: Y + 1.2, bot: -99 }); }
   put(k('trim'), G.box, '#e2e8f0', (cx0 + cx1) / 2, Y + 0.08, (cz0 + cz1) / 2, 0, cx1 - cx0, 0.1, cz1 - cz0);
   // ---------------------------------------------------------------- tall pylon sign by the road
   const PY = [D.gateN[0] - 20, 277.2]; put(k('bld'), G.box, '#1e1b4b', PY[0], Y + 7, PY[1], 0, 1.2, 14, 1.2); put(k('glow'), G.box, '#38bdf8', PY[0], Y + 14.2, PY[1], 0, 6.6, 0.25, 1.4); box.push({ x0: PY[0] - 0.6, x1: PY[0] + 0.6, z0: PY[1] - 0.6, z1: PY[1] + 0.6, top: 99, bot: -99 });
@@ -67,11 +67,11 @@ export function attachDealer(api, W, K) {
   const logo = (g, w, h, sub) => { g.fillStyle = '#1e1b4b'; g.fillRect(0, 0, w, h); g.strokeStyle = '#38bdf8'; g.lineWidth = 8; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = '#facc15'; g.beginPath(); g.arc(h * 0.5, h * 0.5, h * 0.3, 0, 7); g.fill(); g.fillStyle = '#1e1b4b'; g.font = `900 ${h * 0.34}px system-ui,sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('K', h * 0.5, h * 0.53);
     g.fillStyle = '#fff'; g.font = `900 ${h * (sub ? 0.32 : 0.4)}px system-ui,sans-serif`; g.fillText('KEMY MOTORS', (w + h * 0.8) / 2, h * (sub ? 0.4 : 0.52)); if (sub) { g.fillStyle = '#7dd3fc'; g.font = `700 ${h * 0.16}px system-ui,sans-serif`; g.fillText(sub, (w + h * 0.8) / 2, h * 0.74); } };
   const sMat = (t) => new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide, toneMapped: false });
-  const pyT = signTex(512, 256, (g, w, h) => logo(g, w, h, 'Every car + truck · Buy & Sell')); const pyS = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.2), sMat(pyT)); pyS.position.set(PY[0], Y + 12.2, PY[1]); root.add(pyS);
+  const pyT = signTex(512, 256, (g, w, h) => logo(g, w, h, SELL() ? 'Every car + truck · Buy & Sell' : 'Every car + truck')); const pyS = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.2), sMat(pyT)); pyS.position.set(PY[0], Y + 12.2, PY[1]); root.add(pyS);
   const faT = signTex(1024, 160, (g, w, h) => logo(g, w, h)); const fa = new THREE.Mesh(new THREE.PlaneGeometry(22, 3.4), sMat(faT)); fa.position.set(scx, Y + S.h + 2.1, S.z0 - 1.25); fa.rotation.y = Math.PI; root.add(fa);
   const faB = new THREE.Mesh(new THREE.BoxGeometry(23, 3.8, 0.4), std('#1e1b4b')); faB.position.set(scx, Y + S.h + 2.1, S.z0 - 1.0); root.add(faB);
   const slT = signTex(512, 128, (g, w, h) => { g.fillStyle = '#f59e0b'; g.fillRect(0, 0, w, h); g.fillStyle = '#1e1b4b'; g.font = '900 54px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('💰 SELL YOUR CAR', w / 2, h / 2 + 2); });
-  const sl = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), sMat(slT)); sl.position.set((cx0 + cx1) / 2, Y + 4.4, cz0 - 0.75); sl.rotation.y = Math.PI; root.add(sl);
+  const sl = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), sMat(slT)); sl.position.set((cx0 + cx1) / 2, Y + 4.4, cz0 - 0.75); sl.rotation.y = Math.PI; if (SELL()) root.add(sl);
   // flags along the front + lot lamps (instanced; lamp heads glow, no real lights)
   { const fl = []; for (let x = D.x0 + 3; x < D.x1 - 2; x += 8) if (Math.abs(x - D.gateN[0]) > 7 && Math.abs(x - PY[0]) > 2) fl.push(x);
     const poleG = new THREE.CylinderGeometry(0.06, 0.08, 6, 6); poleG.translate(0, 3, 0); const flagG = new THREE.BoxGeometry(1.6, 0.9, 0.03); flagG.translate(0.82, 5.4, 0);
@@ -120,12 +120,12 @@ export function attachDealer(api, W, K) {
   const price = (c) => (c.free ? 'Free' : c.p ? '⭐ ' + c.p : '💎 ' + c.d);
   function nearSlot() { let best = null, bd = 1e9; for (const s of slots) { const dx = Math.abs(P.x - s.x) - (s.in ? 2.6 : s.c.Wd / 2), dz = Math.abs(P.z - s.z) - (s.in ? 2.6 : s.half); const d = Math.max(dx, dz); if (d < 2.4 && d < bd) { bd = d; best = s; } } return best; }
   const driving = () => (W.driving ? W.driving() : false);
-  const pp = api.prompt; api.prompt = () => { if (!driving() && Math.hypot(P.x - kx, P.z - kz) < 3.2) return { id: 'dl:sell', label: `${pre()}💰 Sell a car` }; const p0 = pp && pp(); if (p0) return p0; if (driving() || Math.abs(P.x - px) > 70 || Math.abs(P.z - pz) > 60) return null;
-    if (Math.hypot(P.x - kx, P.z - kz) < 3.2) return { id: 'dl:sell', label: `${pre()}💰 Sell a car` };
+  const pp = api.prompt; api.prompt = () => { if (SELL() && !driving() && Math.hypot(P.x - kx, P.z - kz) < 3.2) return { id: 'dl:sell', label: `${pre()}💰 Sell a car` }; const p0 = pp && pp(); if (p0) return p0; if (driving() || Math.abs(P.x - px) > 70 || Math.abs(P.z - pz) > 60) return null;
+    if (SELL() && Math.hypot(P.x - kx, P.z - kz) < 3.2) return { id: 'dl:sell', label: `${pre()}💰 Sell a car` };
     const s = nearSlot(); if (!s) return null; const c = s.c; if (W.drive && W.drive.isOwned && W.drive.isOwned(c.id)) return { id: 'dl:drive:' + c.id, label: `✅ Owned · ${pre()}Drive ${c.name}` };
     return { id: 'dl:buy:' + c.id, label: `${pre()}Buy ${c.name} · ${price(c)}` }; };
   const pa = api.onAction; api.onAction = (a) => { if (!a || !a.startsWith('dl:')) { if (pa) pa(a); return; } const [, v, id] = a.split(':'); const Dr = W.drive; if (!Dr) return;
-    if (v === 'sell') Dr.openSell(); else if (v === 'drive') driveOut(id); else if (v === 'buy') buyPanel(id); };
+    if (v === 'sell') { if (SELL()) Dr.openSell(); } else if (v === 'drive') driveOut(id); else if (v === 'buy') buyPanel(id); };
   function driveOut(id) { const Dr = W.drive; const pref = Dr.pref || {}; const [x, z, yaw] = D.exit; Dr.place(id, (pref.colors || {})[id] ?? CAR[id].color, { x, z, yaw }, true); window.__kdl.out = id; }
   let panel = null; const host = K.hud || W.hud || api.view;
   function buyPanel(id) { if (panel) panel.remove(); panel = null; const c = CAR[id]; if (!c || (W.drive.isOwned && W.drive.isOwned(id))) return; const d = document.createElement('div'); d.className = 'ks-panel dl-buy'; panel = d;
