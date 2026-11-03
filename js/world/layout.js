@@ -116,14 +116,9 @@ export const ROADS4 = [
   St('c1', [-442, 100], [-442, 194]), St('c2', [-520, 260], [-442, 260]), St('c3', [-1042, 100], [-1042, 194]), St('c4', [-520, 1000], [-442, 1000]),
   St('c5', [-1240, 1000], [-1042, 1000]), St('c6', [62, 1000], [91, 1000]), St('c7', [-318, 1066], [-318, 1400]), St('c8', [-918, 1066], [-918, 1400]), St('c9', [312, 1026], [312, 1400]),
   // private estate roads (the old palace drive is gone; that hillside is ordinary country now)
-  St('e1', [-300, 100], [-300, 55.2], 6), St('e2', [-820, 100], [-820, 52], 6), St('e3', [-520, 560], [-264, 560], 6), St('e5', [-1240, 1180], [-1100, 1180], 6), St('e6', [312, 894], [356, 894], 6)];
+  St('e1', [-300, 100], [-300, 55.2], 6), St('e2', [-820, 100], [-820, 52], 6), St('e3', [-520, 560], [-200, 560], 6), St('e5', [-1240, 1180], [-1100, 1180], 6), St('e6', [312, 894], [372, 894], 6)];
 for (const c of CITIES) { for (let j = 0; j < 4; j++) ROADS4.push(St(c.id + 's' + j, [c.x - 62, c.z - 66 + 44 * j], [c.x + 62, c.z - 66 + 44 * j]));
   for (const s of [-1, 1]) ROADS4.push(St(c.id + 'v' + (s > 0 ? 'e' : 'w'), [c.x + s * 62, c.z - 66], [c.x + s * 62, c.z + 66])); }
-// v268 road audit: close the two loose west ends (appended last so older road indexes never move)
-//  - Kemy Street: s2 stopped at x -95 in the grass; a short link down to s1 / the W1 highway joins it (clear of houses h13/h18 at x -87)
-//  - estate drives e3 / e6 ran on past their last estate into the grass; they now end at the estate gate
-//  - Open Plains: pb + pc ran past pd and stopped at x -86 in the meadow; a country road joins their west ends into a loop
-ROADS4.push({ id: 'aw', a: [-97, 96], b: [-97, 149], w: 8 }, { id: 'pw', a: [-86, 266], b: [-86, 447], w: 8, cr: 1 });
 // 👑 the palace sits on the old Maple Heights pad (mansion size). No private lot and no second house.
 export const ADMIN_HOME = { x: -300, z: 18, name: '👑 Kemy Palace' };
 export const PALACE_SIGN = '👑 Kemy Palace';

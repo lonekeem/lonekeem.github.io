@@ -4,7 +4,6 @@
 // remote cars interpolated + predicted. Cars never hurt anyone: people are only nudged aside. Written by Lone Keem.
 import { CARS, CAR, CAR_IDX, PAINTS, carItem, buildCar, poseCar, setDoors, setBrakeLights, createVehicle, createEngineSound, honk, registerCarItems, addPlate, drawPlate, PLATE_COLS, PLATE_FRAMES, PLATE_PREVIEW, plateText, showPlateError, PLATE_HC } from './cars.js';
 import { checkInput } from '../pals/talk.js';
-import { makeCockpit } from './cockpit.js';
 import { ALL_ROADS, FLAT, roadD } from './layout.js';
 import { createDriveHud } from './drivehud.js';
 import { getCfg, setCfg, onCfg, buzz, linkAccount } from './drivecfg.js';
@@ -50,7 +49,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     let p = at; if (!p) { const r = nearestRoad(P.x, P.z); p = r && r.d < 40 ? r : { x: P.x + Math.sin(P.yaw) * 3.5, z: P.z + Math.cos(P.yaw) * 3.5, yaw: P.yaw + Math.PI / 2 }; }
     V.place(p.x, p.z, p.yaw); const cy = { x: p.x, z: p.z, r: def.Wd * 0.55, top: 99, mycar: 1 }; api.cyl.push(cy);
     my = { id, color, m, V, state: 'parked', t: 0, door: 0, doorWant: 0, cy, rs: V.update(0, inp) }; poseCar(m, my.rs, 0, 0); window.__kd && (window.__kd.spawned = id); return my; }
-  function removeCar() { if (!my) return; CKP.unmount(); if (my.state !== 'parked') exitNow(); scene.remove(my.m); const i = api.cyl.indexOf(my.cy); if (i >= 0) api.cyl.splice(i, 1); my = null; }
+  function removeCar() { if (!my) return; if (my.state !== 'parked') exitNow(); scene.remove(my.m); const i = api.cyl.indexOf(my.cy); if (i >= 0) api.cyl.splice(i, 1); my = null; }
   function dropCy() { const i = my ? api.cyl.indexOf(my.cy) : -1; if (i >= 0) api.cyl.splice(i, 1); }
   // input never stays latched: pedals, handbrake, joystick all cleared on enter/exit/blur
   function resetInput() { try { H.reset(); } catch { /* */ } held.gas = held.brake = 0; inp.thr = inp.brk = inp.steer = inp.hand = 0; try { api.tc.reset && api.tc.reset(); } catch { /* */ } document.querySelectorAll('.kd-b.on').forEach((b) => b.classList.remove('on')); if (my) { my.stuckT = 0; } }
@@ -186,16 +185,13 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   const CK2 = { t: 0, lean: 0, yaw0: null, n: 0, fov: 72 }; let mirror = null; const rearCam = new THREE.PerspectiveCamera(55, 3.2, 0.3, 260); const fwdV = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0);
   function mirrorOn() { if (mirror || LOW || !api.R) return mirror; const rt = new THREE.WebGLRenderTarget(256, 80); rt.texture.colorSpace = THREE.SRGBColorSpace; rt.texture.wrapS = THREE.RepeatWrapping; rt.texture.repeat.x = -1; rt.texture.offset.x = 1;
     const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.14), new THREE.MeshBasicMaterial({ color: '#111827' })); const gl = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12), new THREE.MeshBasicMaterial({ map: rt.texture, toneMapped: false })); gl.position.z = 0.002; fr.add(gl); fr.renderOrder = 9; gl.renderOrder = 10; fr.visible = false; scene.add(fr); mirror = { rt, m: fr }; return mirror; }
-  const CKP = makeCockpit(THREE, { low: LOW || !!(api.Q && api.Q.phone) }); const ckSeat = new THREE.Vector3();
-  function cockpitOn() { if (CKP.on && CKP.car === my.m) return; seatWorld(my.m, ckSeat); my.m.updateMatrixWorld(true); my.m.worldToLocal(ckSeat); const pm = (my.m.userData.kkPaint || [])[0]; CKP.mount(my.m, my.m.userData.def || CAR[my.id], ckSeat, pm && pm.material && pm.material.color ? pm.material.color.clone() : null); }
   function cockpitCam(dt, rs, fx, fz) { const spd = Math.abs(my.V.vf); if (CK2.yaw0 == null) CK2.yaw0 = rs.yaw; let dyaw = rs.yaw - CK2.yaw0; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)); CK2.yaw0 = rs.yaw; const yr = dyaw / Math.max(dt, 1e-3);
     CK2.t += dt * (1 + spd * 0.25); CK2.lean += (clamp(-yr * spd * 0.012, -0.09, 0.09) - CK2.lean) * Math.min(1, dt * 4); const bob = Math.sin(CK2.t * 7) * Math.min(0.018, spd * 0.0009);
-    seatWorld(my.m, sv); camP.set(sv.x + fx * 0.05, sv.y + 0.62 + bob, sv.z + fz * 0.05); camP.x += Math.cos(rs.yaw) * CK2.lean * 0.6; camP.z -= Math.sin(rs.yaw) * CK2.lean * 0.6; camL.set(camP.x + fx * 10, camP.y - 0.5, camP.z + fz * 10); cam.position.copy(camP); cam.lookAt(camL); cam.rotateZ(CK2.lean);
-    cockpitOn(); CKP.update(dt, my.V.steer || 0, Math.round(spd * 3.6), my.V.rpm || 0, my.V.gear, my.V.fuel ?? 1, !!my.V.rev);
-    const fov = 76 + Math.min(14, spd * 0.4); if (Math.abs(fov - CK2.fov) > 0.2) { CK2.fov += (fov - CK2.fov) * Math.min(1, dt * 3); cam.fov = CK2.fov; cam.updateProjectionMatrix(); } me.visible = false;
+    seatWorld(my.m, sv); camP.set(sv.x + fx * 0.05, sv.y + 0.62 + bob, sv.z + fz * 0.05); camP.x += Math.cos(rs.yaw) * CK2.lean * 0.6; camP.z -= Math.sin(rs.yaw) * CK2.lean * 0.6; camL.set(camP.x + fx * 10, camP.y - 0.7, camP.z + fz * 10); cam.position.copy(camP); cam.lookAt(camL); cam.rotateZ(CK2.lean);
+    const fov = 72 + Math.min(16, spd * 0.45); if (Math.abs(fov - CK2.fov) > 0.2) { CK2.fov += (fov - CK2.fov) * Math.min(1, dt * 3); cam.fov = CK2.fov; cam.updateProjectionMatrix(); } me.visible = false;
     const M2 = mirrorOn(); if (M2) { cam.getWorldDirection(fwdV); M2.m.quaternion.copy(cam.quaternion); upV.set(0, 1, 0).applyQuaternion(cam.quaternion); M2.m.position.copy(cam.position).addScaledVector(fwdV, 0.6).addScaledVector(upV, 0.33); M2.m.scale.setScalar(0.55 * Math.min(1, cam.aspect * 1.4)); M2.m.visible = true;
       if (++CK2.n % 3 === 0) { rearCam.position.set(camP.x, camP.y + 0.15, camP.z); rearCam.lookAt(camP.x - fx * 20, camP.y - 0.6, camP.z - fz * 20); const R0 = api.R, prevT = R0.getRenderTarget(); M2.m.visible = false; R0.setRenderTarget(M2.rt); R0.render(scene, rearCam); R0.setRenderTarget(prevT); M2.m.visible = true; } }
-    window.__kd = Object.assign(window.__kd || {}, { cockpit: { on: CKP.on, fov: +CK2.fov.toFixed(1), lean: +CK2.lean.toFixed(3), mirror: !!M2 } }); }
+    window.__kd = Object.assign(window.__kd || {}, { cockpit: { fov: +CK2.fov.toFixed(1), lean: +CK2.lean.toFixed(3), mirror: !!M2 } }); }
   const mirrorOff = () => { if (mirror) mirror.m.visible = false; CK2.yaw0 = null; };
   function publishSync() { if (!api.sync) return; if (my && my.state !== 'parked') { api.sync.vel = carWorldVel(my.V.yaw, my.V.vf, my.V.vl); const p = (pref.plates || {})[my.id]; api.sync.plate = p && p.t ? plateCode(p) : ''; } else if (ride && ride.st === 'on') { const R = remote.get(ride.drv); api.sync.vel = R ? { x: R.v.x, z: R.v.z } : null; api.sync.plate = ''; } else { api.sync.vel = null; api.sync.plate = ''; } }
   function update(dt, now) { const nowMs = performance.now(); remoteCars(dt, nowMs); rideTick(dt, nowMs); if (!my) { publishSync(); return; }
@@ -231,9 +227,9 @@ export function attachDrive(api, world) { const W_EXTRA = {};
       // camera
       if (drive || my.state === 'exit') { const fx = Math.sin(rs.yaw), fz = Math.cos(rs.yaw);
         window.__kd && (window.__kd.camMode = camMode); if (camMode === 'pov') cockpitCam(dt, rs, fx, fz);
-        else { mirrorOff(); CKP.unmount(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = camWant.set(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
+        else { mirrorOff(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = camWant.set(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
           if (!camInit) { camP.copy(want); camInit = true; } else camP.lerp(want, Math.min(1, dt * 5)); camL.set(rs.x + fx * 2, rs.y + 1.0, rs.z + fz * 2); cam.position.copy(camP); if (getCfg().shake && Math.abs(my.V.vf) > 14) { const k = Math.min(1, (Math.abs(my.V.vf) - 14) / 20) * 0.035, t = nowMs / 1000; camP.x += Math.sin(t * 37) * k; camP.y += Math.sin(t * 43 + 1) * k; } cam.position.copy(camP); cam.lookAt(camL); const fv = getCfg().fov + Math.min(8, Math.abs(my.V.vf) * 0.2); if (Math.abs(cam.fov - fv) > 0.3) { cam.fov = fv; cam.updateProjectionMatrix(); } } } }
-    else { CKP.unmount(); poseCar(my.m, my.rs, 0, my.V.spin); setDoors(my.m, my.door); FX.update(dt, null); H.blur.style.opacity = 0; }
+    else { poseCar(my.m, my.rs, 0, my.V.spin); setDoors(my.m, my.door); FX.update(dt, null); H.blur.style.opacity = 0; }
     publishSync();
     window.__kd = Object.assign(window.__kd || {}, { state: my.state, kmh: Math.round(Math.abs(my.V.vf) * 3.6), gear: my.V.gear, rpm: Math.round(my.V.rpm), x: my.V.x, z: my.V.z, yaw: my.V.yaw, pitch: my.rs.pitch, roll: my.rs.roll, heave: my.rs.heave, cam: camMode, remote: remote.size }); }
   // ---------------------------------------------------------------- 🧑‍🤝‍🧑 Ride along: passenger seat (synced through the presence 'dn' code, no extra writes)
