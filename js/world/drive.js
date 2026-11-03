@@ -10,6 +10,7 @@ import { ALL_ROADS, FLAT, roadD } from './layout.js';
 import { createDriveHud } from './drivehud.js';
 import { getCfg, setCfg, onCfg, buzz, linkAccount } from './drivecfg.js';
 import { createCarFx } from './carfx.js';
+import { makeCockpit } from './cockpit.js';
 import { onSample } from '../input.js';
 import { plateCode, parsePlate, carWorldVel } from '../pals/presence-sync.js';
 import { carMats } from './cars.js';
@@ -23,7 +24,7 @@ export function parseCar(dn) { if (!dn || dn.slice(0, 2) !== '~c' || dn.length <
 
 const plateBad = (t) => { const s = String(t || ''); const l = s.toLowerCase(); return !!(checkInput(s) || checkInput(l) || checkInput(l.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't').replace(/8/g, 'b'))); };
 export function attachDrive(api, world) { const W_EXTRA = {};
-  const { THREE, scene, P, me, view, S, db, cam, ground, LOW, Q } = api; const uid = (S.user && S.user.uid) || 'anon'; const hud = world.hud; const say = world.say;
+  const { THREE, scene, P, me, view, S, db, cam, ground, LOW, Q } = api; const uid = (S.user && S.user.uid) || 'anon'; const hud = world.hud; const say = world.say; const CKP = makeCockpit(THREE, { low: LOW });
   const CK = 'kemy-car-cam', SK = 'kemy-car-cam-set', MK = 'kemy-mycars-' + uid;
   let camMode = CAMS.includes(lsg(CK)) ? lsg(CK) : 'chase'; let camSet = { dist: 6.5, h: 2.4 }; try { camSet = { ...camSet, ...(JSON.parse(lsg(SK) || '{}') || {}) }; } catch { /* */ }
   let pref = {}; try { pref = JSON.parse(lsg(MK) || '{}') || {}; } catch { pref = {}; } pref.colors = pref.colors || {}; pref.kustom = pref.kustom || {};
@@ -51,7 +52,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
     let p = at; if (!p) { const r = nearestRoad(P.x, P.z); p = r && r.d < 40 ? r : { x: P.x + Math.sin(P.yaw) * 3.5, z: P.z + Math.cos(P.yaw) * 3.5, yaw: P.yaw + Math.PI / 2 }; }
     V.place(p.x, p.z, p.yaw); const cy = { x: p.x, z: p.z, r: def.Wd * 0.55, top: 99, mycar: 1 }; api.cyl.push(cy);
     my = { id, color, m, V, state: 'parked', t: 0, door: 0, doorWant: 0, cy, rs: V.update(0, inp) }; poseCar(m, my.rs, 0, 0); window.__kd && (window.__kd.spawned = id); return my; }
-  function removeCar() { if (!my) return; if (my.state !== 'parked') exitNow(); scene.remove(my.m); const i = api.cyl.indexOf(my.cy); if (i >= 0) api.cyl.splice(i, 1); my = null; }
+  function removeCar() { CKP.unmount(); if (!my) return; if (my.state !== 'parked') exitNow(); scene.remove(my.m); const i = api.cyl.indexOf(my.cy); if (i >= 0) api.cyl.splice(i, 1); my = null; }
   function dropCy() { const i = my ? api.cyl.indexOf(my.cy) : -1; if (i >= 0) api.cyl.splice(i, 1); }
   // input never stays latched: pedals, handbrake, joystick all cleared on enter/exit/blur
   function resetInput() { try { H.reset(); } catch { /* */ } held.gas = held.brake = 0; inp.thr = inp.brk = inp.steer = inp.hand = 0; try { api.tc.reset && api.tc.reset(); } catch { /* */ } document.querySelectorAll('.kd-b.on').forEach((b) => b.classList.remove('on')); if (my) { my.stuckT = 0; } }
@@ -152,7 +153,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   function enterSync() { P.dance = myCode(); P.danceUntil = Date.now() + 864e5; api.markDirty(); }
   function getIn() { if (!my || my.state !== 'parked') return; my.state = 'enter'; my.t = 0; my.from = { x: P.x, z: P.z }; my.cy.r = 0; dropCy(); resetInput(); my.eng = my.eng || createEngineSound(); enterSync(); H.show(true); H.setFade(true); setTimeout(() => H.setFade(false), 320); buzz(20); myB.hidden = true; api.tc.root.classList.add('kd-on'); world.hud.querySelector('.ks-act').hidden = true; window.__kd && (window.__kd.state = 'enter'); }
   function getOut() { if (!my || my.state !== 'drive') return; if (my.V.speed() <= 1.2) mirrorOff(); if (my.V.speed() > 1.2) { say('Stop the car to get out 🙂'); return; } my.state = 'exit'; my.t = 0; held.gas = held.brake = 0; }
-  function exitNow() { if (!my) return; const c = my.m.userData.def; const s = Math.sin(my.V.yaw), co = Math.cos(my.V.yaw); const side = c.Wd / 2 + 0.8; P.x = my.V.x + co * side; P.z = my.V.z - s * side; P.y = ground(P.x, P.z); me.scale.setScalar(1); me.visible = true;
+  function exitNow() { if (!my) return; CKP.unmount(); const c = my.m.userData.def; const s = Math.sin(my.V.yaw), co = Math.cos(my.V.yaw); const side = c.Wd / 2 + 0.8; P.x = my.V.x + co * side; P.z = my.V.z - s * side; P.y = ground(P.x, P.z); me.scale.setScalar(1); me.visible = true;
     my.state = 'parked'; my.cy.x = my.V.x; my.cy.z = my.V.z; my.cy.r = c.Wd * 0.55; if (!api.cyl.includes(my.cy)) api.cyl.push(my.cy); resetInput(); P.dance = ''; P.danceUntil = 0; api.markDirty(); H.show(false); H.setFade(true); setTimeout(() => H.setFade(false), 320); myB.hidden = false; api.tc.root.classList.remove('kd-on'); if (my.eng) { my.eng.stop(); my.eng = null; } setBrakeLights(my.m, false); }
   // ---------------------------------------------------------------- remote cars (interpolation + prediction)
   const remote = new Map(); // uid -> { m, id, color, s:{x,z,yaw}, v:{x,z,w}, last:{x,z,yaw,t}, door }
@@ -228,8 +229,8 @@ export function attachDrive(api, world) { const W_EXTRA = {};
       H.blur.style.opacity = !LOW && (Q.tier === 'high' || Q.tier === 'ultra' || api.ULTRA) && drive ? clamp((Math.abs(my.V.vf) - 16) / 18, 0, 0.85) : 0;
       // camera
       if (drive || my.state === 'exit') { const fx = Math.sin(rs.yaw), fz = Math.cos(rs.yaw);
-        window.__kd && (window.__kd.camMode = camMode); if (camMode === 'pov') cockpitCam(dt, rs, fx, fz);
-        else { mirrorOff(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = camWant.set(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
+        window.__kd && (window.__kd.camMode = camMode); if (camMode === 'pov') { cockpitCam(dt, rs, fx, fz); const chs = my.m.userData.chassis; if (CKP.car !== chs) CKP.mount(chs, c, my.m.userData.seat, my.color || c.color); CKP.update(dt, my.V.steer || 0, kmh, my.V.rpm, my.V.gear, my.fuel ?? 1, !!my.V.rev); }
+        else { mirrorOff(); CKP.unmount(); me.visible = true; const dist = camSet.dist * (camMode === 'far' ? 1.9 : 1) + Math.abs(my.V.vf) * 0.04, h = camSet.h * (camMode === 'far' ? 1.6 : 1); const want = camWant.set(rs.x - fx * dist, rs.y + h, rs.z - fz * dist); want.y = Math.max(want.y, ground(want.x, want.z) + 0.6);
           if (!camInit) { camP.copy(want); camInit = true; } else camP.lerp(want, Math.min(1, dt * 5)); camL.set(rs.x + fx * 2, rs.y + 1.0, rs.z + fz * 2); cam.position.copy(camP); if (getCfg().shake && Math.abs(my.V.vf) > 14) { const k = Math.min(1, (Math.abs(my.V.vf) - 14) / 20) * 0.035, t = nowMs / 1000; camP.x += Math.sin(t * 37) * k; camP.y += Math.sin(t * 43 + 1) * k; } cam.position.copy(camP); cam.lookAt(camL); const fv = getCfg().fov + Math.min(8, Math.abs(my.V.vf) * 0.2); if (Math.abs(cam.fov - fv) > 0.3) { cam.fov = fv; cam.updateProjectionMatrix(); } } } }
     else { poseCar(my.m, my.rs, 0, my.V.spin); setDoors(my.m, my.door); FX.update(dt, null); H.blur.style.opacity = 0; }
     publishSync();
