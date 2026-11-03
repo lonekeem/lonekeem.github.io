@@ -68,7 +68,10 @@ export function createPalStore(ctx) {
     const TH = new Map(); let P3 = null, q = []; import('./pal3d.js').then((m) => { P3 = m; pump(); }).catch(() => {});
     function thumbs(g) { q = [...g.querySelectorAll('[data-th]')]; pump(); }
     let pumping = false;
-    async function pump() { if (!P3 || pumping) return; pumping = true; try { while (q.length) { const el = q.shift(); if (!document.body.contains(el)) continue; const id = el.dataset.th;
+    let touchT = 0; addEventListener('touchstart', () => { touchT = performance.now(); }, { passive: true, capture: true }); addEventListener('scroll', () => { touchT = performance.now(); }, { passive: true, capture: true });
+    // one thumb per idle slice, never while the finger is on the screen or the page scrolls (iOS has no parallel shader compile, so back-to-back thumbs froze taps)
+    const idle = () => new Promise((r) => { const go = () => (performance.now() - touchT < 350 ? setTimeout(go, 200) : (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 600 }) : setTimeout(r, 60))); requestAnimationFrame(() => setTimeout(go, 16)); });
+    async function pump() { if (!P3 || pumping) return; pumping = true; try { while (q.length) { await idle(); const el = q.shift(); if (!el || !document.body.contains(el)) continue; const id = el.dataset.th;
         const w = WEAR_BY[id]; const k = JSON.stringify([p.species, p.colors, p.level >= 12 ? 2 : p.level >= 5 ? 1 : 0, id]); let cv = TH.get(k);
         if (!cv) { const T = P3.renderItemThumbAsync || (async (...a) => P3.renderItemThumb(...a)); try { cv = w ? await T(p, w.slot, id, 96) : RARE[id] ? await T(p, null, '', 96, { variant: id }) : PATTERNS.find((x) => x.id === id) ? await T(p, null, '', 96, { pattern: id }) : null; } catch { cv = null; } if (cv) TH.set(k, cv); await new Promise((r) => requestAnimationFrame(r)); }
         if (cv && document.body.contains(el)) { const c2 = document.createElement('canvas'); c2.width = c2.height = 96; c2.className = 'ps-th'; c2.getContext('2d').drawImage(cv, 0, 0); el.replaceWith(c2); } } } finally { pumping = false; } }

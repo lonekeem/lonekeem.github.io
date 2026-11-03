@@ -45,8 +45,8 @@ export function poleSpot(e) { const n = e.b; const rx = -e.dz, rz = e.dx; let cw
   const x = n.x + e.dx * (cw / 2 + 1.3) + rx * (e.r.w / 2 + 1.3), z = n.z + e.dz * (cw / 2 + 1.3) + rz * (e.r.w / 2 + 1.3); const p = clearSpot(x, z, [[0, 0, POLE_R]], 3, 0.25); return p; }
 
 export function attachTraffic(api, W) { const { THREE, scene, Q, P, ground } = api; const LOW = !!api.LOW, PH = !!Q.phone;
-  // phones / low: few AI cars (each one is a dozen+ draw calls), a short radius and only the closest junctions (lag + memory fix, v264)
-  const CAP = LOW ? 3 : PH ? 4 : Q.tier === 'medium' ? 10 : 16, RAD = PH || LOW ? 105 : 170, SIGCAP = PH || LOW ? 10 : 28;
+  // phones / low: no AI cars (iPhone was being closed for memory after v257/v258; stoplights + markings stay), desktop: few AI cars (each one is a dozen+ draw calls), a short radius and only the closest junctions (lag + memory fix, v264)
+  const CAP = LOW || PH ? 0 : Q.tier === 'medium' ? 10 : 16, RAD = PH || LOW ? 105 : 170, SIGCAP = PH || LOW ? 10 : 28;
   const root = new THREE.Group(); root.name = 'kemy-traffic'; scene.add(root); let G = null, ready = false, t0 = performance.now(), simT = 0;
   const st = { cars: 0, cap: CAP, signals: 0, junctions: 0, edges: 0, shownSig: 0, stoppedRed: 0 }; window.__kt = st;
   const tm = new THREE.Matrix4(), tq = new THREE.Quaternion(), tv = new THREE.Vector3(), ts = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), col = new THREE.Color();

@@ -195,3 +195,4 @@ body.kb-open .pal-float { display: none; }
 .pal-chip.sp{position:relative}.pal-chip.sp .pal-newtag{position:absolute;top:2px;right:2px;font-style:normal;font-size:.55rem;font-weight:800;line-height:1;padding:2px 5px;border-radius:999px;background:linear-gradient(90deg,#ffb53a,#ff8fb8);color:#2a1458;box-shadow:0 1px 3px rgba(0,0,0,.18);pointer-events:none}
 .pal-chip.sp[data-species="capybara"]{background:linear-gradient(160deg,#fff4e4,#ffe2c0);border-color:#e7a35a;color:#4a2a10}
 .pal-chip.sp[data-species="capybara"].on{box-shadow:0 0 0 2px #e98a2a}
+.ps-emo[data-th]{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:12px;background:radial-gradient(circle at 50% 40%,#3a1f78,#1a0c3a)} /* reserve the thumb box: no jump when the 3D picture lands */
