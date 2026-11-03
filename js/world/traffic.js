@@ -45,7 +45,8 @@ export function poleSpot(e) { const n = e.b; const rx = -e.dz, rz = e.dx; let cw
   const x = n.x + e.dx * (cw / 2 + 1.3) + rx * (e.r.w / 2 + 1.3), z = n.z + e.dz * (cw / 2 + 1.3) + rz * (e.r.w / 2 + 1.3); const p = clearSpot(x, z, [[0, 0, POLE_R]], 3, 0.25); return p; }
 
 export function attachTraffic(api, W) { const { THREE, scene, Q, P, ground } = api; const LOW = !!api.LOW, PH = !!Q.phone;
-  const CAP = LOW ? 8 : PH ? 10 : Q.tier === 'medium' ? 14 : 20, RAD = PH || LOW ? 140 : 190, SIGCAP = PH || LOW ? 20 : 36;
+  // phones / low: few AI cars (each one is a dozen+ draw calls), a short radius and only the closest junctions (lag + memory fix, v264)
+  const CAP = LOW ? 3 : PH ? 4 : Q.tier === 'medium' ? 10 : 16, RAD = PH || LOW ? 105 : 170, SIGCAP = PH || LOW ? 10 : 28;
   const root = new THREE.Group(); root.name = 'kemy-traffic'; scene.add(root); let G = null, ready = false, t0 = performance.now(), simT = 0;
   const st = { cars: 0, cap: CAP, signals: 0, junctions: 0, edges: 0, shownSig: 0, stoppedRed: 0 }; window.__kt = st;
   const tm = new THREE.Matrix4(), tq = new THREE.Quaternion(), tv = new THREE.Vector3(), ts = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
@@ -117,7 +118,7 @@ export function attachTraffic(api, W) { const { THREE, scene, Q, P, ground } = a
       const tmp = { e, s, lane }; const [x, z] = posOn(tmp); if (Math.hypot(x - P.x, z - P.z) < 45) continue; if (pool.some((o) => o.on && Math.hypot(o.x - x, o.z - z) < 14)) continue;
       Object.assign(c, { on: true, e, s, lane, turn: null, next: null, v: 4, vmax: vmaxOf(e.r), x, z, yaw: Math.atan2(e.dx, e.dz), spin: 0, brake: false }); c.m.visible = true; return true; } c.on = false; c.m.visible = false; return false; }
   function free(c) { if (c.turn && c.turn.node.occ) c.turn.node.occ.delete(c); c.turn = null; c.on = false; c.m.visible = false; }
-  let near = [], nearT = 9, buildQ = 0;
+  let near = [], nearT = 9, buildQ = 0, spT = 0;
   function nearEdges() { near = G.edges.filter((e) => !PRIVATE.test(e.r.id) && Math.min(Math.hypot(e.a.x - P.x, e.a.z - P.z), Math.hypot(e.b.x - P.x, e.b.z - P.z), segDist(e)) < RAD - 20); }
   const segDist = (e) => { const t = Math.max(0, Math.min(e.len, (P.x - e.a.x) * e.dx + (P.z - e.a.z) * e.dz)); return Math.hypot(e.a.x + e.dx * t - P.x, e.a.z + e.dz * t - P.z); };
   function people() { const out = [{ x: P.x, z: P.z, r: 1.4 }]; if (api.others) for (const o of api.others.values()) if (o && o.x != null) out.push({ x: o.x, z: o.z, r: 1.4 }); if (W.peds) for (const p of W.peds()) out.push({ x: p.x, z: p.z, r: 1.2 });
@@ -147,11 +148,12 @@ export function attachTraffic(api, W) { const { THREE, scene, Q, P, ground } = a
     const inRoom = P.x > 392; root.visible = !inRoom; if (inRoom) { for (const c of pool) if (c.on) free(c); return; }
     if (!packAt || Math.hypot(P.x - packAt[0], P.z - packAt[1]) > 40 || (packT += dt) > 6) { packT = 0; pack(); }
     paint(false);
-    if ((tileT += dt) > 1) { tileT = 0; for (const im of tiles.values()) { const [cx, cz] = im.userData.c; im.visible = Math.abs(cx - P.x) < TILE * 0.5 + 260 && Math.abs(cz - P.z) < TILE * 0.5 + 260; } }
+    if ((tileT += dt) > 1) { tileT = 0; for (const im of tiles.values()) { const [cx, cz] = im.userData.c; const vr = TILE * 0.5 + (PH || LOW ? 120 : 260); im.visible = Math.abs(cx - P.x) < vr && Math.abs(cz - P.z) < vr; } }
     if ((nearT += dt) > 1.5) { nearT = 0; nearEdges(); }
     // lazy pool: build at most one car per frame (no hitch), up to the device cap
     if (pool.length < CAP && near.length && (buildQ += dt) > 0.25) { buildQ = 0; const m = buildCar(designs[pool.length % designs.length], Math.floor(rnd() * 12), { lite: true, noShadow: true }); m.visible = false; root.add(m); pool.push({ m, on: false }); }
-    for (const c of pool) { if (c.on && Math.hypot(c.x - P.x, c.z - P.z) > RAD + 30) free(c); if (!c.on && near.length) spawn(c, near); }
+    const trySpawn = (spT += dt) > 0.5; if (trySpawn) spT = 0; // spawn retries twice a second, not every frame
+    for (const c of pool) { if (c.on && Math.hypot(c.x - P.x, c.z - P.z) > RAD + 30) free(c); if (!c.on && near.length && trySpawn) spawn(c, near); }
     const ppl = people(); st.stoppedRed = 0; let n = 0; for (const c of pool) if (c.on) { drive(c, dt, ppl); n++; } st.cars = n;
     // gentle push: a walking player overlapping a car slides aside (never hurt)
     for (const c of pool) if (c.on) { const dx = P.x - c.x, dz = P.z - c.z, d = Math.hypot(dx, dz); if (d < 2.2 && d > 0.01) { P.x += dx / d * (2.2 - d) * 0.3; P.z += dz / d * (2.2 - d) * 0.3; } } }

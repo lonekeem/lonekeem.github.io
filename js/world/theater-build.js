@@ -2,7 +2,6 @@
 // so each editable surface is ONE mesh + ONE material the owner can recolor live. Inside is unlit (MeshBasicMaterial with
 // baked shading) so dimming the house lights is just a material color change: no real lights, no shadow maps, phone fast.
 import { DECOR, SEATS } from './interior.js';
-import { addAccessibleBay, addAccessibleSign } from './accessible.js';
 
 // Default look = the red reference auditorium + a burgundy/gold lobby and facade. Keys are what the owner recolors.
 export const SURF = {
@@ -174,9 +173,7 @@ export function buildExterior(THREE, kit, parent, T, F, LOW) {
   const lampMat = new THREE.MeshBasicMaterial({ color: '#fff4cf', toneMapped: false }); for (const [x, z] of poles) { const l = new THREE.Mesh(G.box, lampMat); l.scale.set(1.3, 0.06, 0.3); l.position.set(x, F + 6.88, z); parent.add(l); }
   const pCv = textCanvas(128, 128, (g) => { g.fillStyle = '#1d4ed8'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#fff'; g.font = '900 96px Inter, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', 64, 70); });
   { const x = Lt.x1 - 1.2, z = gap0 - 0.8; p('oDoor', G.cyl, x, F + 1.4, Lt.z0 - 1.6 + 0.01, 0.01, 0.01, 0.01); void z; const ps = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(pCv) })); ps.position.set(poles[2][0] + 0.12, F + 2.6, poles[2][1]); ps.rotation.y = Math.PI / 2; parent.add(ps); }
-  // ♿ three accessible bays in row A, the stalls nearest the front door, each with a sign post on the building sidewalk
-  { const rowA = stalls.filter((s) => s.yaw < 0 && Math.abs(s.x - (ax0 + ax1) / 2) < 0.01).sort((a, b) => Math.abs(a.z - dz) - Math.abs(b.z - dz)).slice(0, 3);
-    for (const st of rowA) { st.hc = 1; addAccessibleBay(THREE, parent, { x: st.x, z: st.z, yaw: st.yaw, w: 3, l: 5.5 }, F); const c = addAccessibleSign(THREE, parent, Lt.x0 - 0.9, st.z, Math.PI / 2, F); if (c) cols.push(c); } }
+  const meshes = {};
   for (const k of ['oWall', 'oTrim', 'oMarq', 'oSign', 'oDoor', 'oWalk', 'oLot', 'oLine']) meshes[k] = flush(k, lit(k, k === 'oMarq' ? { r: 0.35, m: 0.5 } : k === 'oDoor' ? { r: 0.4, m: 0.3 } : {}), parent, !LOW && ['oWall', 'oTrim', 'oSign', 'oMarq', 'oDoor'].includes(k));
   meshes.oLot && (meshes.oLot.receiveShadow = true); meshes.oWalk && (meshes.oWalk.receiveShadow = true);
   return { mats, bulbs, bulbN: bulbPts.length, signCv, signTex, bladeCv, bladeTex, marqCv, marqTex, cols, stalls, meshes, extPosters };

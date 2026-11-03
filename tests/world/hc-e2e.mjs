@@ -4,7 +4,7 @@ import { playwright, exe, GL, emuContext, signup, assertLocal } from '../helpers
 const base = (process.argv[2] || 'http://localhost:8947/').replace(/\/?$/, '/'); assertLocal(base); const shot = process.argv[3] || '/workspace/hc-';
 const { chromium } = await playwright(); const browser = await chromium.launch({ executablePath: exe(), args: GL }); const errors = []; let fails = 0;
 const ok = (c, m, x = '') => { if (!c) fails++; console.log((c ? 'PASS ' : 'FAIL ') + m, x); };
-const ctx = await emuContext(browser, { viewport: { width: 900, height: 600 } }); const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push(String(e)));
+const ctx = await emuContext(browser, { viewport: { width: 900, height: 600 } }); const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push(String(e))); p.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('console', m.type(), m.text().slice(0, 300)); });
 const W = (ms) => p.waitForTimeout(ms); const tag = Date.now().toString(36).slice(-6);
 try {
   await p.goto(base + 'app.html#/signup'); await p.waitForSelector('#signup-form');
@@ -16,13 +16,16 @@ try {
   await p.waitForSelector('#pal-form'); await W(800); await p.fill('#pal-name', 'Bloop'); await p.evaluate(() => document.querySelector('#pal-form [type=submit]').click()); await W(3000);
   await p.evaluate(() => { document.getElementById('modal-root').innerHTML = ''; location.hash = '#/park'; });
   await p.waitForFunction(() => window.__p3 && window.__p3.pos, null, { timeout: 240000 });
-  // walk to the theater lot (west aisle) and look at row A by the door
-  await p.evaluate(() => { window.__p3.teleport(74, 207); window.__p3.setYaw(-Math.PI / 2); });
-  await p.waitForFunction(() => window.__p3.scene().getObjectByName('hc-bay'), null, { timeout: 240000, polling: 1000 });
-  const sc = await p.evaluate(() => { let bays = 0, signs = 0; const at = []; window.__p3.scene().traverse((o) => { if (o.name === 'hc-bay') { bays++; at.push([+o.position.x.toFixed(1), +o.position.z.toFixed(1)]); } if (o.name === 'hc-sign') signs++; }); return { bays, signs, at }; });
-  ok(sc.bays === 3, 'three accessible bays by the theater door', JSON.stringify(sc)); ok(sc.signs === 3, 'each bay has a sign post on the sidewalk');
-  const f0 = await p.evaluate(() => window.__p3.frame); await p.waitForFunction((t) => window.__p3.frame > t + 4, f0, { timeout: 120000 }); await p.screenshot({ path: shot + 'theater-lot.png' });
-  await p.evaluate(() => { window.__p3.teleport(70, 200); window.__p3.setYaw(-2.2); }); const f1 = await p.evaluate(() => window.__p3.frame); await p.waitForFunction((t) => window.__p3.frame > t + 4, f1, { timeout: 120000 }); await p.screenshot({ path: shot + 'theater-lot-2.png' });
+  // the theater area is back to pre-v263: no accessible bays or sign posts near the doors
+  const sc = await p.evaluate(() => { let n = 0; window.__p3.scene().traverse((o) => { if (o.name === 'hc-bay' || o.name === 'hc-sign') n++; }); return n; }); ok(sc === 0, 'no handicap bays/signs at the theater', sc);
+  // theater entry: stand on the door walkway, the Enter button must show and work, and nothing may sit on the leave spot
+  await p.evaluate(() => { window.__p3.teleport(62, 207); window.__p3.setYaw(Math.PI / 2); });
+  await p.waitForFunction(() => { const b = document.getElementById('ks-act'); return b && !b.hidden && /Enter Lone Keem/.test(b.textContent); }, null, { timeout: 120000, polling: 500 }).catch(() => {});
+  const lbl = await p.evaluate(() => document.getElementById('ks-act')?.textContent || ''); ok(/Enter Lone Keem/.test(lbl), 'theater Enter button shows at the door', lbl);
+  await p.evaluate(() => document.getElementById('ks-act').click());
+  const inside = await p.waitForFunction(() => { const h = document.querySelector('.th-hud'); return h && !h.hidden; }, null, { timeout: 120000, polling: 500 }).then(() => true).catch(() => false);
+  ok(inside, 'entered the movie theater', await p.evaluate(() => [...document.querySelectorAll('.ks-toast, .toast, [class*=say], [class*=toast]')].map((e) => e.textContent).join(' | ').slice(0, 300))); await W(3000); await p.screenshot({ path: '/workspace/fix-theater.png' });
+  await p.evaluate(() => { const b = [...document.querySelectorAll('.th-hud button')].find((x) => /leave|exit/i.test(x.textContent)); b && b.click(); }); await W(3000);
   // plate: spawn a car (debug), Kustoms -> 🔖 Plate -> type text, pick a frame, toggle ♿, save
   await p.evaluate(() => window.__kdApi.spawn('pip', 2)); await W(1500);
   await p.evaluate(() => window.__kdApi.kk('pip')); await p.waitForSelector('[data-plate]', { timeout: 60000 }); await W(1500); await p.screenshot({ path: shot + 'kustoms.png' });
