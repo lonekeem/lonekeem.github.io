@@ -359,14 +359,15 @@ export function createPark3D(ctx) {
     const snapOf = (p) => (p ? { species: p.species, name: p.name, colors: p.colors || {}, pattern: p.pattern || '', acc: p.acc || '', outfit: p.outfit || {}, level: p.level || 1, variant: p.variant || '' } : { species: 'kemy', name: 'Kemy', level: 1, outfit: {} });
     let palSnap = snapOf(pal);
     const HEIGHT = 1.45;
-    let J; const D2R = Math.PI / 180; const bodyParts = [], armParts = new Set();
+    let J, mine = new THREE.Group(); const D2R = Math.PI / 180; const bodyParts = [], armParts = new Set();
     function dress(holder, ps, shadow) { const m = makePal3D(ps); const bb = new THREE.Box3().setFromObject(m); const h = Math.max(0.5, bb.max.y - bb.min.y); const k = HEIGHT / h; m.scale.multiplyScalar(k); m.position.y = -bb.min.y * k;
       m.traverse((o) => { if (o.isMesh) { o.castShadow = shadow; o.frustumCulled = false; } });
       for (const c of [...holder.children]) holder.remove(c); holder.add(m); holder.userData.m = m; holder.userData.eye = (bb.max.y - bb.min.y) * k * 0.82;
+      holder.userData.J = m.userData.J; if (holder !== mine) return holder; // only OUR pal drives the POV head/arm refs (other pals used to overwrite J -> camera at their head / origin)
       J = m.userData.J; bodyParts.length = 0; armParts.clear(); holder.traverse((o) => { if (o.isMesh) bodyParts.push(o); });
       for (const n of ['LeftUpperArm', 'RightUpperArm']) if (J && J[n]) J[n].traverse((o) => armParts.add(o)); return holder; }
     function palObj(ps, shadow) { return dress(new THREE.Group(), ps, shadow); }
-    const me = palObj(palSnap, !LOW); scene.add(me);
+    const me = dress(mine, palSnap, !LOW); scene.add(me);
     // eye height per species: the head bone's world height in rest pose
     { me.updateMatrixWorld(true); const hp = new THREE.Vector3(); J.Head.getWorldPosition(hp); me.userData.eye = Math.max(0.5, hp.y + 0.12); }
     // spawn near the plaza
