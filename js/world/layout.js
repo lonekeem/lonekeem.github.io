@@ -42,6 +42,9 @@ export const PLAINS = { x0: -97, x1: 118, z0: 174, z1: 540 };
 // 🎬 Lone Keem Studio movie theater (js/world/theater-gate.js + theater.js). On the Open Plains just south of Kemy Street,
 // west of country road pa (x = 91). Building faces east onto its own lined parking lot; the inside is a hidden room (x > 392).
 export const THEATER = { x0: 22, x1: 58, z0: 186, z1: 228, h: 13, door: [59.6, 207], lot: { x0: 62, x1: 86.4, z0: 182, z1: 232 }, flat: { x0: 16, x1: 86.5, z0: 178, z1: 238 }, room: { x: 460, z: 760 }, plot: 'h990' };
+// 🚗 Kemy Motors car dealership (js/world/dealer.js): Open Plains block between country roads pb (z 270), pa (x 91) and pd (x -40),
+// across pb from the Bingo Hall / Kemy Kustoms. Paved + perfectly flat. Entrances off pb (x 30) and pa (z 330). Anyone can walk in.
+export const DEALER = { x0: -24, x1: 84, z0: 280, z1: 376, gateN: [30, 274], gateE: [87, 330], show: { x0: 4, x1: 56, z0: 342, z1: 370, h: 9, door: [24, 36] }, desk: [71, 352], exit: [30, 290, Math.PI] };
 export const ROADS3 = [
   { id: 'pa', a: [91, 145], b: [91, 440], w: 8, cr: 1 }, { id: 'pb', a: [-86, 270], b: [122, 270], w: 8, cr: 1 },
   { id: 'pc', a: [-86, 440], b: [122, 440], w: 14, cr: 1, bv: 1 }, { id: 'pd', a: [-40, 270], b: [-40, 440], w: 14, cr: 1, bv: 1 },
@@ -253,6 +256,7 @@ export function bigGround(x, z) { let h = FLAT;
 // street level and the outer world rim gets gentle hills.
 export function worldGround(x, z, h) { const { W, H } = PARK;
   if (x > ROMS_X) return FLAT;
+  { const f = DEALER; if (x > f.x0 - 8 && x < f.x1 + 10 && z > f.z0 - 12 && z < f.z1 + 8) { const k = Math.min(sstep(f.x0 - 8, f.x0, x), 1 - sstep(f.x1 + 4, f.x1 + 10, x), sstep(f.z0 - 12, f.z0 - 4, z), 1 - sstep(f.z1, f.z1 + 8, z)); if (k >= 1) return FLAT; if (k > 0) return FLAT + (worldGround0(x, z, h) - FLAT) * (1 - k); } }
   { const f = THEATER.flat; if (x > f.x0 - 6 && x < f.x1 + 6 && z > f.z0 - 6 && z < f.z1 + 6) { const k = Math.min(sstep(f.x0 - 6, f.x0, x), 1 - sstep(f.x1, f.x1 + 6, x), sstep(f.z0 - 6, f.z0, z), 1 - sstep(f.z1, f.z1 + 6, z)); if (k >= 1) return FLAT; if (k > 0) return FLAT * k + worldGround0(x, z, h) * (1 - k); } }
   return worldGround0(x, z, h); }
 function worldGround0(x, z, h) { const { W, H } = PARK;

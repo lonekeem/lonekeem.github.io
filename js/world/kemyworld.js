@@ -17,6 +17,7 @@ import { isStyleDn, styleAt, danceBeat } from '../pals/dance-menu.js';
 import { attachRespawn } from './respawn.js';
 import { attachHelper } from '../helper/pal.js';
 import { buildCar, poseCar, CAR_IDX, CARS } from './cars.js';
+import { attachDealer } from './dealer.js';
 import { attachDrive } from './drive.js';
 import { attachTraffic } from './traffic.js';
 export { worldGround, worldClamp } from './layout.js';
@@ -440,6 +441,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const D = attachDrive(api, W); W.drive = D;
   const E = (() => { try { return attachEast(api, W, { put, flush, G, std, rng, loopAt, cars, glowMat, lightSpots }); } finally { GV.nob = false; } })();
   const Hm = attachHomes(api, W, { put, flush, G, std, rng, doors, glowMat });
+  const Dl = attachDealer(api, W, { put, flush, G, std, say, hud });
   { const pl = W.landmarks; W.landmarks = () => (pl ? pl() : []).concat([{ name: '🔧 Kemy Kustoms', x: KKB.x, z: KKB.z, gx: KKB.x, gz: KKB.door[1] }]);
     const pp = api.prompt; api.prompt = () => { const p0 = pp && pp(); if (p0) return p0; if (!W.driving() && Math.hypot(P.x - KKB.door[0], P.z - KKB.door[1]) < 3.4) return { id: 'kustoms', label: '🔧 Enter Kemy Kustoms' }; return null; };
     const pml = W.mapLabels; W.mapLabels = (g, mx, mz) => { if (pml) pml(g, mx, mz); g.fillStyle = '#ffd23f'; g.font = 'bold 9px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('🔧 Kustoms', mx(KKB.x), mz(KKB.z)); }; }
@@ -452,8 +454,8 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
   const Ci = attachCities(api, W, { put, flush, G, std, rng, glowMat, tag: (t) => { ptag = t; }, forget: (group) => { const meshes = []; group.traverse((o) => { if (o.isMesh) meshes.push(o); }); forgetTagged(tagged, meshes); } }); const Mp = attachMap(api, W);
   W.peds = () => bots.map((b) => ({ x: b.x, z: b.z })); const Tf = attachTraffic(api, W); W.traffic = Tf;
   window.__kwApi.buildAround = (x, z) => W.buildAround && W.buildAround(x, z);
-  W.update = (dt, now) => { tickKustoms(now); D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Th.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); Tf.update(dt, now); update(dt, now); };
-  W.destroy = () => { for (const x of [D, E, Ci, Hm, Th, Mp, Rs, Kh, Tf]) try { x.destroy(); } catch { /* */ } destroy(); };
+  W.update = (dt, now) => { tickKustoms(now); D.update(dt, now); E.update(dt, now); Ci.update(dt, now); Hm.update(dt, now); Dl.update(dt, now); Th.update(dt, now); Mp.update(dt, now); Kh.update(dt); Rs.update(dt); Tf.update(dt, now); update(dt, now); };
+  W.destroy = () => { for (const x of [D, E, Ci, Hm, Dl, Th, Mp, Rs, Kh, Tf]) try { x.destroy(); } catch { /* */ } destroy(); };
   return W;
 }
 export const WORLDS = [{ id: 'park', name: 'Pal Park', emoji: '🌳', href: '#/park' }, { id: 'street', name: 'Kemy Street', emoji: '🎃', href: '#/street', tag: 'Halloween' }];
