@@ -294,7 +294,7 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
     const hd = new THREE.Mesh(BOX(0.05, 0.03, 0.16), M.chrome()); hd.position.set(s * 0.03, dh - 0.12, -dlen * 0.8); piv.add(hd); doors.push({ piv, s, a: 0 }); }
   // wheels: steer pivot -> spin group (tire + rim)
   const wheels = []; const ww = r * 0.75 * (TR ? 1.3 : 1) * (pr.mon ? 1.25 : 1) * (lk.ww || 1); const spokes = lk.sp || (TR ? 6 : c.style === 'cruiser' || c.style === 'retro' ? 12 : 5);
-  const tireG = gc('tire' + r.toFixed(3) + (lite ? 'l' : 'h'), () => new THREE.TorusGeometry(r * 0.78, r * 0.24, lite ? 8 : 14, lite ? 18 : 32)); const rimT = gc('rim' + r.toFixed(3) + '|' + ww.toFixed(3) + '|' + spokes + (lk.rm || ''), () => rim(r, ww, spokes, lk.rm));
+  const tireG = gc('tire' + r.toFixed(3) + (lite ? 'l' : 'h'), () => new THREE.TorusGeometry(r * 0.78, r * 0.24, lite ? 8 : 12, lite ? 18 : 28)); const rimT = gc('rim' + r.toFixed(3) + '|' + ww.toFixed(3) + '|' + spokes + (lk.rm || ''), () => rim(r, ww, spokes, lk.rm));
   for (const [z, front] of [[axF, 1], [axR, 0]]) for (const s of [-1, 1]) { const st = new THREE.Group(); st.position.set(s * tw, r, z); root.add(st); const sp = new THREE.Group(); st.add(sp);
     const tire = new THREE.Mesh(tireG, M.rubber()); tire.rotation.y = Math.PI / 2; tire.scale.set(1, 1, ww / (r * 0.48)); sp.add(tire);
     sp.add(rimT.clone()); wheels.push({ st, sp, front, s, z, x: s * tw, comp: 0, vel: 0, y: r }); }

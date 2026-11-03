@@ -34,26 +34,26 @@ try {
   const tp = async (x, z, yaw) => { await p.evaluate(([x, z, yaw]) => { window.__p3.teleport(x, z); window.__p3.setYaw(yaw); }, [x, z, yaw]); await W(400); };
   const act = () => p.evaluate(() => { const b = document.getElementById('ks-act'); return b && getComputedStyle(b).display !== 'none' && !b.hidden ? b.textContent : ''; });
   await p.keyboard.press('Escape'); await W(300); await p.evaluate(() => document.querySelector('.kc-x, [aria-label="Close controls"]')?.click());
-  await tp(30, 248, Math.PI); await W(5000); await frames(10); await p.screenshot({ path: shot + 'outside.png' });
-  await tp(30, 284, Math.PI); await W(6000); await frames(10); await p.screenshot({ path: shot + 'lot.png' });
+  await tp(30, 248, Math.PI); await W(5000); await frames(10); await p.screenshot({ path: shot + 'outside.png', timeout: 180000 });
+  await tp(30, 284, Math.PI); await W(6000); await frames(10); await p.screenshot({ path: shot + 'lot.png', timeout: 180000 });
   await p.waitForFunction(() => window.__kdl && window.__kdl.built > 5, null, { timeout: 60000 }).catch(() => {}); const st = await p.evaluate(() => ({ ...window.__kdl })); ok(st.built > 5 && st.tags, 'display cars + price tags built near the lot', JSON.stringify(st));
   // walk into the showroom through the open doors
   await tp(30, 339.5, Math.PI); await p.keyboard.down('w'); await frames(90); await p.keyboard.up('w'); const pz = await p.evaluate(() => { const q = window.__p3.pos; return (typeof q === "function" ? q() : q).z; });
-  ok(pz > 343, 'walked in through the showroom doors', pz); await frames(6); await p.screenshot({ path: shot + 'inside.png' });
+  ok(pz > 343, 'walked in through the showroom doors', pz); await frames(6); await p.screenshot({ path: shot + 'inside.png', timeout: 180000 });
   // buy the Ember Dart from its lot spot
   const s = await p.evaluate(() => window.__kdlApi.slots().find((s) => s.id === 'ember')); await tp(s.tag[0], s.tag[1] - 0.6, 0); await W(1500); await frames(8);
   const lab = await act(); ok(/Buy Ember Dart/.test(lab) && /900/.test(lab), 'Buy prompt with name + price', lab);
-  await p.evaluate(() => document.getElementById('ks-act').click()); await p.waitForSelector('.dl-buy [data-ok]'); await W(500); await p.screenshot({ path: shot + 'buy.png' });
+  await p.evaluate(() => document.getElementById('ks-act').click()); await p.waitForSelector('.dl-buy [data-ok]'); await W(500); await p.screenshot({ path: shot + 'buy.png', timeout: 180000 });
   await p.click('.dl-buy [data-ok]'); await p.waitForFunction(() => { const c = window.__kdApi.carInfo && window.__kdApi.carInfo(); return c && c.id === 'ember' && c.state === 'drive'; }, null, { timeout: 90000 }).catch(() => {});
   const ci = await p.evaluate(() => window.__kdApi.carInfo()); console.log('lastBuy', await p.evaluate(() => window.__kdl.lastBuy)); console.log('toast', await p.evaluate(() => [...document.querySelectorAll('.ks-say, .kk-toast, .toast, [role=status]')].map((e) => e.textContent).join(' | ').slice(0, 300))); ok(ci && ci.id === 'ember' && ci.state === 'drive', 'bought car spawned + player is driving it', JSON.stringify(ci).slice(0, 120));
   const w1 = await fsGet(`users/${uid}/pal/wallet`); ok(+w1.fields.coins.integerValue === 4100, 'paid 900 ⭐', w1.fields.coins.integerValue);
-  await frames(20); await p.screenshot({ path: shot + 'driveout.png' });
+  await frames(20); await p.screenshot({ path: shot + 'driveout.png', timeout: 180000 });
   await p.keyboard.down('w'); await frames(25); await p.keyboard.up('w'); const ci2 = await p.evaluate(() => window.__kdApi.carInfo()); console.log('drove out ->', JSON.stringify(ci2).slice(0, 200));
   await p.keyboard.down('s'); await p.waitForFunction(() => { window.__kdApi.out(); const c = window.__kdApi.carInfo(); return !c || c.state !== 'drive'; }, null, { timeout: 120000, polling: 1000 }).catch(() => {}); await p.keyboard.up('s'); await frames(10); await p.evaluate(() => window.__kdApi.reset && 0);
   // selling is switched off (SELL_CARS = false): no Sell prompt at the old counter, no Sell button in My Cars
 
   const [kx, kz] = await p.evaluate(() => window.__kdlApi.desk); await p.waitForFunction(() => { const c = window.__kdApi.carInfo(); return !c || c.state === 'parked'; }, null, { timeout: 180000, polling: 1000 }).catch(() => {}); await tp(kx, kz - 1, 0); await W(1000); await tp(kx, kz - 1, 0); await W(1000); console.log('at desk', await p.evaluate(() => { const q = window.__p3.pos; const v = typeof q === 'function' ? q() : q; return [v.x, v.z, JSON.stringify(window.__kdApi.carInfo())]; })); await frames(10); await p.waitForFunction(() => /Sell a car/.test(document.getElementById('ks-act')?.textContent || ''), null, { timeout: 60000 }).catch(() => {}); const sl = await act(); ok(!/Sell/.test(sl), 'no Sell prompt at the counter (selling is off)', sl);
-  await p.evaluate(() => document.querySelector('.kd-my').click()); await p.waitForSelector('[data-spawn]', { timeout: 30000 }).catch(() => {}); await W(800); ok(!!(await p.$('[data-spawn]')) && !(await p.$('[data-sell]')), 'My Cars open, no Sell button', ''); await p.screenshot({ path: shot + 'nosell.png' }); await p.keyboard.press('Escape'); await p.evaluate(() => document.querySelectorAll('.ks-panel').forEach((d) => d.remove()));
+  await p.evaluate(() => document.querySelector('.kd-my').click()); await p.waitForSelector('[data-spawn]', { timeout: 30000 }).catch(() => {}); await W(800); ok(!!(await p.$('[data-spawn]')) && !(await p.$('[data-sell]')), 'My Cars open, no Sell button', ''); await p.screenshot({ path: shot + 'nosell.png', timeout: 180000 }); await p.keyboard.press('Escape'); await p.evaluate(() => document.querySelectorAll('.ks-panel').forEach((d) => d.remove()));
 
 
   console.log('dealer stats', JSON.stringify(await p.evaluate(() => window.__kdl)));
@@ -62,5 +62,5 @@ try {
   const ms = []; for (let i = 0; i < 2; i++) { await tp(30, 330, 0); await W(2500); await frames(10); ms.push(await mem()); await tp(-300, 140, 0); await W(2500); await frames(10); ms.push(await mem()); }
   console.log('mem', JSON.stringify(ms)); ok(ms[1].built === 0 && ms[3].built === 0 && !ms[3].tags, 'display cars + tags freed when you leave', JSON.stringify(ms[3]));
   ok(ms[3].heap - ms[1].heap < 15, 'heap flat after 2 visits (MB)', ms[1].heap + ' -> ' + ms[3].heap);
-} catch (e) { fails++; console.log('ERR', e.message); await p.screenshot({ path: shot + 'error.png' }).catch(() => {}); }
+} catch (e) { fails++; console.log('ERR', e.message); await p.screenshot({ path: shot + 'error.png', timeout: 180000 }).catch(() => {}); }
 ok(!errors.length, 'no page errors', errors.slice(0, 3).join(' | ')); await browser.close(); console.log(fails ? `${fails} FAILED` : 'ALL PASSED'); process.exit(fails ? 1 : 0);

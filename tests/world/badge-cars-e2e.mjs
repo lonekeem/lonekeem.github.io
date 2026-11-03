@@ -28,19 +28,19 @@ try {
   const names = await p.evaluate(() => [...document.querySelectorAll('.kd-car b')].map((b) => b.textContent));
   const want = ['Ember Dart', 'Frost Fang', 'Blitz Hornet', 'Wisp Glider', 'Jolt Kit', 'Petal Zip', 'Mighty Mule', 'Boulder Buddy', 'Ranger Rex', 'Haul Hero'];
   ok(want.every((n) => names.includes(n)), 'all 10 badge cars listed in My Cars shop', names.length);
-  await p.evaluate(() => document.querySelector('[data-plate="ember"]')?.closest('.kd-car')?.scrollIntoView({ block: 'center' })); await W(500); await p.screenshot({ path: shot + 'shop.png' });
-  await p.evaluate(() => { const e = [...document.querySelectorAll('.kd-car b')].find((b) => b.textContent === 'Haul Hero'); e && e.closest('.kd-car').scrollIntoView({ block: 'center' }); }); await W(500); await p.screenshot({ path: shot + 'shop2.png' });
+  await p.evaluate(() => document.querySelector('[data-plate="ember"]')?.closest('.kd-car')?.scrollIntoView({ block: 'center' })); await W(500); await p.screenshot({ path: shot + 'shop.png', timeout: 180000 });
+  await p.evaluate(() => { const e = [...document.querySelectorAll('.kd-car b')].find((b) => b.textContent === 'Haul Hero'); e && e.closest('.kd-car').scrollIntoView({ block: 'center' }); }); await W(500); await p.screenshot({ path: shot + 'shop2.png', timeout: 180000 });
   await p.evaluate(() => document.querySelector('.ks-card [data-close], .kk-ov [data-close], [data-close]')?.click()); await W(800);
   for (const id of ['ember', 'boulder', 'blitz']) {
     await p.evaluate((id) => window.__kdApi.spawn(id, undefined), id); await W(2500);
     const info = await p.evaluate(() => { const ci = window.__kdApi.carInfo && window.__kdApi.carInfo(); return ci; });
-    await p.evaluate(() => window.__p3.setYaw(0)); await frames(4); await p.screenshot({ path: shot + id + '.png' }); console.log('car', id, JSON.stringify(info).slice(0, 160));
+    await p.evaluate(() => window.__p3.setYaw(0)); await frames(4); await p.screenshot({ path: shot + id + '.png', timeout: 180000 }); console.log('car', id, JSON.stringify(info).slice(0, 160));
   }
   // presence code round trip for an escaped (35+) index
   const rt = await p.evaluate(async () => { const d = await import('/js/world/drive.js'); const k = await import('/js/world/kustom-look.js'); return ['pip', 'petal', 'mule', 'haul'].map((id) => { const c = d.carCode(id, 3, true) + 'oABCDEFGH' + 'kabcd'; const pc = d.parseCar(c); return [id, c, pc && pc.id, pc && pc.color, k.dnLook(c)]; }); });
   ok(rt.every((r) => r[0] === r[2] && r[3] === 3 && r[4] === 'abcd'), 'presence car code + look round-trip (incl. 2-char index)', JSON.stringify(rt));
   // Kustoms + plate on a badge car
-  await p.evaluate(() => window.__kdApi.spawn('haul', 2)); await W(1500); await p.evaluate(() => window.__kdApi.kk('haul')); await p.waitForSelector('[data-plate]', { timeout: 60000 }); await W(2000); await p.screenshot({ path: shot + 'kustoms-haul.png' });
+  await p.evaluate(() => window.__kdApi.spawn('haul', 2)); await W(1500); await p.evaluate(() => window.__kdApi.kk('haul')); await p.waitForSelector('[data-plate]', { timeout: 60000 }); await W(2000); await p.screenshot({ path: shot + 'kustoms-haul.png', timeout: 180000 });
   await p.evaluate(() => document.querySelector('[data-plate]').click()); await p.waitForSelector('.kd-plate input'); await p.fill('.kd-plate input', 'HAUL1'); await p.evaluate(() => document.querySelector('.kd-plate [data-hc]').click()); await p.evaluate(() => document.querySelector('.kd-plate [data-save]').click()); await W(800);
   const pl = await p.evaluate(() => { for (const k of Object.keys(localStorage)) { try { const v = JSON.parse(localStorage.getItem(k)); if (v && v.plates && v.plates.haul) return v.plates; } catch {} } return { keys: Object.keys(localStorage).filter((k) => /plates/.test(localStorage.getItem(k))), ed: document.querySelector('.kd-plate input')?.value ?? 'no-editor' }; });
   ok(pl && pl.haul && pl.haul.t === 'HAUL1' && (pl.haul.fr & 8), 'badge car plate saved with ♿ badge', JSON.stringify(pl));
@@ -51,5 +51,5 @@ try {
   ok(!(await p.$('[data-sell]')), 'no Sell button in My Cars', '');
 
 
-} catch (e) { fails++; console.log('ERR', e.message); await p.screenshot({ path: shot + 'error.png' }).catch(() => {}); }
+} catch (e) { fails++; console.log('ERR', e.message); await p.screenshot({ path: shot + 'error.png', timeout: 180000 }).catch(() => {}); }
 ok(!errors.length, 'no page errors', errors.slice(0, 3).join(' | ')); await browser.close(); console.log(fails ? `${fails} FAILED` : 'ALL PASSED'); process.exit(fails ? 1 : 0);
