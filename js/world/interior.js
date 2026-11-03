@@ -119,6 +119,32 @@ function tintOf(code) {
 }
 // Snap onto the 0.5 grid and keep the piece's footprint inside the room.
 // There is no under-floor height: f is only "upstairs" (1) or the ground floor (0).
+// 🧲 flush fit (render time only, saved layouts untouched): every piece's local bounding box from its parts, so floor pieces
+// sit exactly on the floor, wall pieces mount flat on the wall face behind them (+1 cm) and floor pieces within 60 cm of a
+// wall slide against it. Wall faces are the inner faces of the shell + hall / room walls (plan units, see Wl() below).
+const BBOX = new Map(); const RAD = { sph: 0.5, cone4: 0.7071, prism: 1 };
+export function decorBox(code) { if (BBOX.has(code)) return BBOX.get(code); const D = DECOR[code]; const b = [1e9, -1e9, 1e9, -1e9, 1e9, -1e9];
+  for (const [sh, , x, y, z, sx, sy, sz] of (D && D.p) || []) { const r = RAD[sh] || 0.5; b[0] = Math.min(b[0], x - sx * r); b[1] = Math.max(b[1], x + sx * r); b[2] = Math.min(b[2], y - sy / 2); b[3] = Math.max(b[3], y + sy / 2); b[4] = Math.min(b[4], z - sz * r); b[5] = Math.max(b[5], z + sz * r); }
+  BBOX.set(code, b); return b; }
+const FX = [-6, 6, -1.09, -0.91, 0.91, 1.09], FZL = [-6, 6, -1.09, -0.91], FZR = [-6, 6, -0.09, 0.09, 4.81, 4.99];
+// nearest wall face (plan units) on one axis, searching from v in direction dir, within reach; null if none
+const faceFrom = (list, v, dir, reach) => { let best = null; for (const f of list) { const d = (f - v) * dir; if (d >= -0.06 && d <= reach && (best == null || d < (best - v) * dir)) best = f; } return best; };
+// returns { dx, dz, dy } in plan units (dx/dz) and metres (dy) for one placed piece. sup = small-surface tops for tabletop pieces.
+export function flushFit(it, sup) { const D = DECOR[it.c]; if (!D) return { dx: 0, dz: 0, dy: 0 }; const b = decorBox(it.c), sc = SC, r = it.r & 3;
+  // world-axis extents of the rotated box (local z faces the room; r = quarter turns)
+  const ex = [[b[0], b[1], b[4], b[5]], [b[4], b[5], -b[1], -b[0]], [-b[1], -b[0], -b[5], -b[4]], [-b[5], -b[4], b[0], b[1]]][r]; // [minX, maxX, minZ, maxZ] metres
+  const x0 = it.x + ex[0] / sc, x1 = it.x + ex[1] / sc, z0 = it.z + ex[2] / sc, z1 = it.z + ex[3] / sc; const FZ = it.f === 1 ? [-6, 6] : it.x < -0.95 ? FZL : it.x > 0.95 ? FZR : []; const hall = Math.abs(it.x) <= 0.95;
+  let dx = 0, dz = 0, dy = 0; const gap = 0.01 / sc;
+  if (D.wall) { // back of the piece onto the wall behind it: r 0 back is -z, 1 is -x, 2 is +z, 3 is +x
+    if (r === 0 || r === 2) { const dir = r === 0 ? -1 : 1, e = dir < 0 ? z0 : z1, f = faceFrom(hall ? [-6, 6] : FZ, e, dir, 1.2 / sc + 1); if (f != null) dz = f - e - dir * gap; }
+    else { const dir = r === 1 ? -1 : 1, e = dir < 0 ? x0 : x1, f = faceFrom(FX, e, dir, 1.2 / sc + 1); if (f != null) dx = f - e - dir * gap; }
+    return { dx, dz, dy }; }
+  dy = -b[2]; // rest on the floor
+  if (sup && D.foot && D.foot[0] * D.foot[1] <= 0.5) for (const t of sup) if (t.it !== it && it.x > t.x0 && it.x < t.x1 && it.z > t.z0 && it.z < t.z1 && (t.it.f | 0) === (it.f | 0)) dy = Math.max(dy, t.top - b[2]);
+  const reach = 0.6 / sc; let f;
+  if ((f = faceFrom(FX, x1, 1, reach)) != null && f - x1 < reach) dx = f - x1 - gap; else if ((f = faceFrom(FX, x0, -1, reach)) != null) dx = f - x0 + gap;
+  const zl = hall ? [-6, 6] : FZ; if ((f = faceFrom(zl, z1, 1, reach)) != null) dz = f - z1 - gap; else if ((f = faceFrom(zl, z0, -1, reach)) != null) dz = f - z0 + gap;
+  return { dx, dz, dy }; }
 export function placeItem(it) {
   const D = it && DECOR[it.c];
   if (!D || !Number.isFinite(+it.x) || !Number.isFinite(+it.z)) return null;
@@ -255,13 +281,16 @@ export function buildInterior(api, K, h, cx, cz, decor) {
       for (const s of [-1, 1]) put(fk, G.box, col, px0 + (alongX ? s * side : ix * inn), y + yy - 0.05, pz0 + (alongX ? iz * inn : s * side), 0, alongX ? panel : 0.07, hh * 0.84, alongX ? 0.07 : panel); }
     floorM = flush(fk, vc({ roughness: 0.9 }), false, g); }
   function setItems(L) { items = L; if (decG) { g.remove(decG); decG.traverse((o) => o.geometry && o.geometry.dispose()); } for (const b of decCols) { const i = box.indexOf(b); if (i >= 0) box.splice(i, 1); } decCols = []; decG = new THREE.Group(); g.add(decG);
-    const dk = k + 'd', gk = k + 'dg'; seats = []; screens = []; for (const it of L) { const D = DECOR[it.c]; if (!D || !Number.isFinite(it.x) || !Number.isFinite(it.z) || Math.abs(it.x) > 6 || Math.abs(it.z) > 6) continue; const th = it.r * Math.PI / 2, c = Math.cos(th), s = Math.sin(th), yb = it.f === 1 && two ? 3.35 : 0; const ix = it.x * SC, iz = it.z * SC;
+    const dk = k + 'd', gk = k + 'dg'; seats = []; screens = [];
+    // tabletop surfaces: tables / desks / counters (foot pieces 0.4..1.2 m tall) that small pieces can rest on
+    const sup = []; for (const it of L) { const D = DECOR[it.c]; if (!D || !D.foot || D.wall || !Number.isFinite(it.x)) continue; const b = decorBox(it.c); if (b[3] < 0.4 || b[3] > 1.2 || D.foot[0] * D.foot[1] <= 0.5) continue; const [w, d] = it.r & 1 ? [D.foot[1], D.foot[0]] : D.foot; sup.push({ it, x0: it.x - w / 2 / SC, x1: it.x + w / 2 / SC, z0: it.z - d / 2 / SC, z1: it.z + d / 2 / SC, top: b[3] - b[2] }); }
+    for (const it of L) { const D = DECOR[it.c]; if (!D || !Number.isFinite(it.x) || !Number.isFinite(it.z) || Math.abs(it.x) > 6 || Math.abs(it.z) > 6) continue; const th = it.r * Math.PI / 2, c = Math.cos(th), s = Math.sin(th); const ff = flushFit(it, sup); const yb = (it.f === 1 && two ? 3.35 : 0) + ff.dy; const ix = (it.x + ff.dx) * SC, iz = (it.z + ff.dz) * SC;
       for (const [x, sy, z, dy] of SEATS[it.c] || []) seats.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th + dy, fx: Math.sin(th + dy), fz: Math.cos(th + dy), fl: y + yb, c: it.c });
       if (SCREENS[it.c]) { const [x, sy, z, w, hh] = SCREENS[it.c]; screens.push({ x: cx + ix + x * c + z * s, z: cz + iz - x * s + z * c, y: y + yb + sy, yaw: th, w, h: hh, fl: y + yb }); }
       const tint = hex6(it.col), mode = tint ? tintOf(it.c) : ''; const owned = it.parts || null;
       const pc = (col, part) => { const custom = part && owned && hex6(owned[part]); if (custom) return custom; return mode && (mode === 'A' ? col === 'A' : col === mode) ? tint : (col === 'A' ? A : col === 'T' ? T : col); };
       for (const [sh, col, x, yy, z, sx, sy, sz, gl, part] of D.p) { const wx = x * c + z * s, wz = -x * s + z * c; put(gl ? gk : dk, G[sh], pc(col, part), cx + ix + wx, y + yb + yy, cz + iz + wz, th, sx, sy, sz); }
-      if (D.foot) { const [w, d] = it.r & 1 ? [D.foot[1], D.foot[0]] : D.foot; const b = { x0: cx + ix - w / 2, x1: cx + ix + w / 2, z0: cz + iz - d / 2, z1: cz + iz + d / 2, top: y + (it.f && two ? 3.35 : 0) + 1.2, bot: it.f && two ? y + 3.3 : -99 }; box.push(b); decCols.push(b); } }
+      if (D.foot) { const [w, d] = it.r & 1 ? [D.foot[1], D.foot[0]] : D.foot; const b = { x0: cx + ix - w / 2, x1: cx + ix + w / 2, z0: cz + iz - d / 2, z1: cz + iz + d / 2, top: y + yb + 1.2, bot: it.f && two ? y + 3.3 : -99 }; box.push(b); decCols.push(b); } }
     flush(dk, vc(), !LOW, decG); flush(gk, new THREE.MeshBasicMaterial({ vertexColors: true }), false, decG); }
   setFloor(decor.floor || S.floor, decor.floors || ''); setItems(items);
   function update() { /* doors removed */ }
