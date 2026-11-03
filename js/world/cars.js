@@ -66,12 +66,27 @@ export const CARS = [
   { id: 'bubble', name: 'Retro Bubble', style: 'retro', emoji: '🫧', p: 2000, blurb: 'A round retro classic with fender pods, chrome and whitewall tires.',
     L: 3.95, Wd: 1.8, H: 1.5, wr: 0.36, mass: 1050, torque: 260, redline: 6000, gears: [3.4, 2.1, 1.4, 1.0], fd: 4.0, grip: 1.0, steer: 0.58, top: 20, susp: 24, damp: 2.4, color: 6 },
 ];
+{ const CARV = Object.fromEntries(CARS.map((c) => [c.id, c])); const strip = (c) => { const o = { ...c }; delete o.prem; delete o.d; delete o.free; delete o.emb; return o; }; for (const k in CARV) CARV[k] = strip(CARV[k]);
+  CARS.push(
+  // 🏷️ Badge editions: same models as the cars above (shared geometry, no new meshes), own name, emblem and default color. Appended.
+  { ...CARV.star, id: 'ember', name: 'Ember Dart', base: 'star', emoji: '🔥', p: 900, blurb: 'A zippy coupe wearing the fiery Ember Dart crest.', color: 0, emb: { t: 'ED', ring: '#f97316', bg: '#1f1300' } },
+  { ...CARV.zapper, id: 'frost', name: 'Frost Fang', base: 'zapper', emoji: '❄️', p: 3300, blurb: 'The Zap Wedge shape with an icy Frost Fang snowflake badge.', color: 7, emb: { t: '✻', ring: '#7dd3fc', bg: '#0c2a3d' } },
+  { ...CARV.hoof, id: 'blitz', name: 'Blitz Hornet', base: 'hoof', emoji: '🐝', p: 3100, blurb: 'A loud muscle car with the striped Blitz Hornet badge.', color: 9, emb: { t: 'BH', ring: '#facc15', bg: '#111111' } },
+  { ...CARV.ripple, id: 'wisp', name: 'Wisp Glider', base: 'ripple', emoji: '🌙', p: 2700, blurb: 'A sleek fastback with the moon-crest Wisp badge.', color: 1, emb: { t: '☾', ring: '#c4b5fd', bg: '#2e1065' } },
+  { ...CARV.foxy, id: 'jolt', name: 'Jolt Kit', base: 'foxy', emoji: '🔋', p: 3500, blurb: 'A slidey drift coupe from the made-up Jolt Kit garage.', color: 10, emb: { t: 'JK', ring: '#38bdf8', bg: '#082f49' } },
+  { ...CARV.roady, id: 'petal', name: 'Petal Zip', base: 'roady', emoji: '🌸', p: 2800, blurb: 'A tiny roadster with a flower Petal Zip emblem.', color: 6, emb: { t: '✿', ring: '#f9a8d4', bg: '#500724' } },
+  { ...CARV.sunny, id: 'mule', name: 'Mighty Mule', base: 'sunny', emoji: '🐴', p: 1900, blurb: 'A hard-working pickup with the Mighty Mule shield.', color: 8, emb: { t: 'M', ring: '#e5e7eb', bg: '#374151' } },
+  { ...CARV.rocky, id: 'boulder', name: 'Boulder Buddy', base: 'rocky', emoji: '🪨', p: 3700, blurb: 'A lifted 4x4 with the mountain-peak Boulder badge.', color: 4, emb: { t: '▲', ring: '#fbbf24', bg: '#3b2205' } },
+  { ...CARV.trail, id: 'ranger', name: 'Ranger Rex', base: 'trail', emoji: '🦕', p: 1700, blurb: 'An open jeep with the Ranger Rex explorer badge.', color: 5, emb: { t: 'RX', ring: '#86efac', bg: '#052e16' } },
+  { ...CARV.parcel, id: 'haul', name: 'Haul Hero', base: 'parcel', emoji: '🦸', p: 2300, blurb: 'A big box truck with the star-shield Haul Hero emblem.', color: 2, emb: { t: '★', ring: '#93c5fd', bg: '#172554' } },
+  ); }
 export const CAR = Object.fromEntries(CARS.map((c) => [c.id, c]));
 export const CAR_IDX = CARS.map((c) => c.id); // append-only: used in the compact multiplayer code
 export const PAINTS = ['#e8434f', '#7c3aed', '#2f7fe6', '#14b8a6', '#f59e0b', '#22c55e', '#ff7ab6', '#f4f4f5', '#1f2937', '#ffd23f', '#38bdf8', '#a3e635'];
 export const isTruck = (c) => !!(c && (c.truck || c.style === 'truck'));
 // display models (garages, NPCs) are built once per design and their geometry cached: big/new models only cost when first seen
 export const ORIGINAL_DESIGNS = CARS.slice(0, 14).map((c) => c.id);
+export const geoId = (c) => c.base || c.id; // badge editions share their base car's cached geometry
 export const carItem = (c) => (c.prem ? 'z_car_' : 'car_') + c.id;
 export const carProduct = (c) => 'kemy_car_' + c.id; // placeholder product id (not used, no real money)
 export async function registerCarItems() { const cat = await import('../pals/catalog.js');
@@ -95,6 +110,10 @@ const M = {
   brake: () => mat('brake', () => new THREE.MeshStandardMaterial({ color: '#ff3048', emissive: '#ff2040', emissiveIntensity: 4, roughness: 0.3 })),
   cargo: () => mat('cargo', () => new THREE.MeshStandardMaterial({ color: '#f3f1ea', roughness: 0.55, metalness: 0.1 })),
   glow: (c) => mat('g' + c, () => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 2.5, roughness: 0.3 })),
+  emb: (e) => mat('emb' + e.t + e.ring + e.bg, () => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d');
+    x.fillStyle = e.ring; x.beginPath(); x.arc(64, 64, 60, 0, 7); x.fill(); x.fillStyle = e.bg; x.beginPath(); x.arc(64, 64, 50, 0, 7); x.fill();
+    x.fillStyle = e.ring; x.font = `900 ${e.t.length > 1 ? 46 : 62}px Inter, Arial, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(e.t, 64, 68);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return new THREE.MeshStandardMaterial({ map: t, metalness: 0.6, roughness: 0.25, transparent: true }); }),
   badge: () => mat('badge', () => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d');
     const g = x.createLinearGradient(0, 0, 128, 128); g.addColorStop(0, '#f3f4f6'); g.addColorStop(1, '#9ca3af'); x.fillStyle = g; x.beginPath(); x.arc(64, 64, 60, 0, 7); x.fill();
     x.fillStyle = '#5b21b6'; x.beginPath(); x.arc(64, 64, 50, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '900 54px Inter, Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('KL', 64, 68);
@@ -166,7 +185,7 @@ export const axles = (c) => [c.L * (c.axF ?? 0.33), -c.L * (c.axR ?? 0.32)];
 export function buildCar(def, color, o = {}) { const c = typeof def === 'string' ? CAR[def] : def; const col = PAINTS[color ?? c.color] || PAINTS[0]; const lite = !!o.lite;
   const root = new THREE.Group(); const ch = new THREE.Group(); root.add(ch); const paint = paintMat(col); const TR = isTruck(c);
   const pr = profiles(c); const cab0 = pr.cabin; if (c.conv) { const f = c.L / 2, H = c.H; pr.cabin = [[f - c.L * 0.3, H * 0.55], [f - c.L * 0.4, H * 0.84], [f - c.L * 0.43, H * 0.84], [f - c.L * 0.37, H * 0.55]]; } const W = c.Wd, r = c.wr; const bev = Math.min(0.16, W * 0.08);
-  const gk = c.id + (lite ? 'l' : 'h'); const add = (gm, m, f) => { const x = new THREE.Mesh(gm, m); if (f) f(x); ch.add(x); return x; };
+  const gk = geoId(c) + (lite ? 'l' : 'h'); const add = (gm, m, f) => { const x = new THREE.Mesh(gm, m); if (f) f(x); ch.add(x); return x; };
   const body = add(gc(gk + 'body', () => sculpt(extrudeSide(pr.body, W, bev, lite ? 6 : 12), c, c.H * 0.3, c.H * 0.62)), paint);
   const cabW = W * pr.roofW; const cab = add(gc(gk + 'cab', () => sculpt(extrudeSide(pr.cabin, cabW, 0.1, lite ? 6 : 12), c, c.H * 0.55, c.H, 1.1)), M.glass()); cab.renderOrder = 2;
   const pt = (p) => (p.length === 4 ? [p[2], p[3]] : p); const roofY = Math.max(...pr.cabin.map((p) => pt(p)[1])); const cabF = pt(pr.cabin[0])[0], cabB = pt(pr.cabin[pr.cabin.length - 1])[0];
@@ -182,7 +201,7 @@ export function buildCar(def, color, o = {}) { const c = typeof def === 'string'
     add(BOX(c.style === 'gt' ? W * 0.3 : 0.32, 0.1, 0.06), M.tail(), (tl) => { tl.position.set(s * W * 0.3, ty, -c.L / 2 - bev * 0.9 - 0.01); tl.userData.tail = 1; }); }
   add(BOX(W * 0.42, c.H * (pr.semi ? 0.24 : 0.12), 0.05), pr.semi ? M.chrome() : M.trim(), (gr) => gr.position.set(0, by - 0.08, fz - 0.03));
   const ry = pr.ry ?? c.H * 0.24;
-  for (const [z, rot] of [[fz + 0.005, 0], [-c.L / 2 - bev * 0.9 - 0.03, Math.PI]]) add(gc('badge', () => new THREE.CircleGeometry(0.09, 20)), M.badge(), (b) => { b.position.set(0, rot ? ry + 0.13 : by + 0.1, z); b.rotation.y = rot; });
+  for (const [z, rot] of [[fz + 0.005, 0], [-c.L / 2 - bev * 0.9 - 0.03, Math.PI]]) add(gc('badge', () => new THREE.CircleGeometry(0.09, 20)), c.emb ? M.emb(c.emb) : M.badge(), (b) => { b.position.set(0, rot ? ry + 0.13 : by + 0.1, z); b.rotation.y = rot; });
   // bumpers (chrome for the cruiser, trucks and the retro classic)
   const bumpY = pr.bumpY ?? r * 0.75;
   for (const z of [c.L / 2, -c.L / 2]) add(gc('bm' + W.toFixed(3), () => new THREE.CapsuleGeometry(0.07, W - 0.3, 4, 10)), c.style === 'cruiser' || c.style === 'retro' || TR ? M.chrome() : M.trim(), (bm) => { bm.rotation.z = Math.PI / 2; bm.position.set(0, bumpY, z); });

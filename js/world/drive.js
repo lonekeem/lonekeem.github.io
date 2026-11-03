@@ -14,8 +14,10 @@ import { carMats } from './cars.js';
 import { applyKustom, parseLook, lookCode, lookDn, dnLook, playHorn, registerKustomItems } from './kustom-look.js';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)); const lsg = (k) => { try { return localStorage.getItem(k); } catch { return null; } }, lss = (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } };
 export const CAMS = ['chase', 'far', 'pov']; const CAM_NAME = { chase: 'Chase', far: 'Far chase', pov: 'Cockpit view' };
-export const carCode = (id, color, door) => '~c' + CAR_IDX.indexOf(id).toString(36) + (color | 0).toString(36) + (door ? '1' : '0');
-export function parseCar(dn) { if (!dn || dn.slice(0, 2) !== '~c' || dn.length < 5) return null; const id = CAR_IDX[parseInt(dn[2], 36)]; if (!id) return null; return { id, color: parseInt(dn[3], 36) || 0, door: dn[4] === '1' }; }
+// car index: 0-34 = one base36 char; 35+ = 'z' + one more char (old apps read 'z' as an unknown car and just skip it)
+const idxCode = (i) => (i < 35 ? i.toString(36) : 'z' + (i - 35).toString(36));
+export const carCode = (id, color, door) => '~c' + idxCode(CAR_IDX.indexOf(id)) + (color | 0).toString(36) + (door ? '1' : '0');
+export function parseCar(dn) { if (!dn || dn.slice(0, 2) !== '~c' || dn.length < 5) return null; const o = dn[2] === 'z' ? 1 : 0; if (o && dn.length < 6) return null; const id = CAR_IDX[o ? 35 + parseInt(dn[3], 36) : parseInt(dn[2], 36)]; if (!id) return null; return { id, color: parseInt(dn[3 + o], 36) || 0, door: dn[4 + o] === '1' }; }
 
 const plateBad = (t) => { const s = String(t || ''); const l = s.toLowerCase(); return !!(checkInput(s) || checkInput(l) || checkInput(l.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't').replace(/8/g, 'b'))); };
 export function attachDrive(api, world) { const W_EXTRA = {};
@@ -232,7 +234,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   // The passenger mesh is parented to the driver's car. That car is drawn from poses buffered ~130 ms back.
   const U8 = (u) => String(u || '').slice(0, 8); const me8 = U8(uid); let rider = null, riderSeen = 0; let ride = null; const asked = new Map(); const sp = new THREE.Vector3();
   const myCode = () => { const c = carCode(my.id, my.color, my.door > 0.5) + (rider ? 'o' + rider : ''); return c + lookDn(lookOf(my.id), 20 - c.length); }; // presence dn max 20 chars
-  const riderOf = (dn) => (dn && dn.slice(0, 2) === '~c' && dn[5] === 'o' ? dn.slice(6, 14) : null);
+  const riderOf = (dn) => { if (!dn || dn.slice(0, 2) !== '~c') return null; const o = dn[2] === 'z' ? 1 : 0; return dn[5 + o] === 'o' ? dn.slice(6 + o, 14 + o) : null; };
   const seatP = (car, out) => { car.updateMatrixWorld(true); out.copy(car.userData.seat); out.x = -out.x; out.y -= 0.1; return out.applyMatrix4(car.userData.chassis.matrixWorld); };
   function mountDriver(mesh, car) { const ch = car && car.userData && car.userData.chassis, s = car && car.userData && car.userData.seat; if (!mesh || !ch || !s) return false; if (mesh.parent !== ch) ch.attach(mesh); mesh.position.set(s.x, s.y - 0.1, s.z); mesh.rotation.set(0, 0, 0); mesh.scale.setScalar(0.6); mesh.visible = true; return true; }
   function mountIn(mesh, car) { const ch = car && car.userData && car.userData.chassis, s = car && car.userData && car.userData.seat; if (!mesh || !ch || !s) return false; if (mesh.parent !== ch) ch.attach(mesh); mesh.position.set(-s.x, s.y - 0.1, s.z); mesh.rotation.set(0, 0, 0); mesh.scale.setScalar(0.6); mesh.visible = true; return true; }
