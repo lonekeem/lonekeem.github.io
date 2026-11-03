@@ -198,6 +198,25 @@ export const LOOK = {
   aurora: { p: { cx: -0.06, nose: 0.9 }, x: ['skirt'], sp: 10, rm: 'chrome' },
   glide: { p: { rb: -0.1, deck: 0.88 }, x: ['spoiler'], sp: 12, rm: 'white', two: '#f4f4f5' },
   storm: { p: { nose: 0.85, rh: 0.9 }, x: ['wing', 'canard', 'flare'], sp: 6, rm: 'dark', ride: -0.04 },
+  // batch 3: everything else
+  pip: { p: { rh: 1.12 }, x: ['rack'], sp: 4, rm: 'white', ww: 0.9, two: '#f4f4f5' },
+  cruise: { p: { deck: 1.1, rh: 0.9 }, x: ['skirt', 'pipes'], sp: 12, rm: 'chrome', two: '#f4f4f5' },
+  bear: { p: { rh: 1.1 }, x: ['rack', 'skirt'], sp: 8, rm: 'chrome', ride: 0.04, two: '#1f2937' },
+  halo: { p: { nose: 0.8, rf: 0.05 }, x: ['diff', 'skirt'], sp: 10, rm: 'dark', ride: -0.05 },
+  zapper: { p: { rh: 0.88 }, x: ['spoiler'], sp: 5, rm: 'gold' },
+  ripple: { p: { nose: 0.92 }, x: ['skirt'], sp: 6, rm: 'dark' },
+  hoof: { x: ['spoiler', 'band'], sp: 5, rm: 'chrome', two: '#1f2937' },
+  roady: { p: { nose: 0.9, rh: 0.92 }, x: ['band', 'pipes'], sp: 6, rm: 'chrome', ww: 1.1, two: '#f4f4f5' },
+  foxy: { p: { rh: 0.95 }, x: ['skirt', 'canard'], sp: 5, rm: 'white', ride: -0.03 },
+  sunny: { p: { nose: 1.05 }, x: ['lamps', 'band'], sp: 12, rm: 'chrome', two: '#f4f4f5' },
+  rocky: { x: ['bar', 'rack'], sp: 6, rm: 'steel', ride: 0.08 },
+  stomp: { x: ['bar', 'bull'], sp: 8, rm: 'dark' },
+  parcel: { x: ['mud', 'lamps'], sp: 6, rm: 'white' },
+  hooky: { x: ['bull', 'mud'], sp: 8, rm: 'steel', two: '#f4f4f5' },
+  whale: { x: ['visor', 'lamps'], sp: 10, rm: 'chrome' },
+  trail: { p: { rh: 1.08 }, x: ['rack'], sp: 5, rm: 'steel' },
+  funbus: { p: { rh: 1.1 }, x: ['rack', 'band'], sp: 12, rm: 'white', two: '#f4f4f5' },
+  bubble: { p: { rh: 1.1, nose: 1.08 }, x: ['visor', 'band'], sp: 16, rm: 'chrome', two: '#f4f4f5' },
 };
 function reshape(pr, c, lk) { const p = lk.p || {}, L = c.L, H = c.H, f = L / 2, b = -L / 2, cl = c.wr * 0.55; const each = (q, fn) => { for (let i = 0; i < q.length; i += 2) { const [x, y] = fn(q[i], q[i + 1]); q[i] = x; q[i + 1] = y; } };
   const sy = (k, x0, x1) => (x, y) => (x > x0 && x < x1 && y > cl + 0.02 ? [x, cl + (y - cl) * k] : [x, y]);
