@@ -50,11 +50,17 @@ try {
   await frames(20); await p.screenshot({ path: shot + 'driveout.png' });
   await p.keyboard.down('w'); await frames(25); await p.keyboard.up('w'); const ci2 = await p.evaluate(() => window.__kdApi.carInfo()); console.log('drove out ->', JSON.stringify(ci2).slice(0, 200));
   await p.keyboard.down('s'); await p.waitForFunction(() => { window.__kdApi.out(); const c = window.__kdApi.carInfo(); return !c || c.state !== 'drive'; }, null, { timeout: 120000, polling: 1000 }).catch(() => {}); await p.keyboard.up('s'); await frames(10); await p.evaluate(() => window.__kdApi.reset && 0);
-  // sell counter
+  // sell counter (slim shop doc again, like sell-e2e: the full doc can trip the emulator's 1000-expression rules limit on sells)
+  await fsSet('config/palShop', { prices: { mapValue: { fields: { car_ember: { integerValue: '900' }, car_haul: { integerValue: '800' } } } } });
   const [kx, kz] = await p.evaluate(() => window.__kdlApi.desk); await p.waitForFunction(() => { const c = window.__kdApi.carInfo(); return !c || c.state === 'parked'; }, null, { timeout: 180000, polling: 1000 }).catch(() => {}); await tp(kx, kz - 1, 0); await W(1000); await tp(kx, kz - 1, 0); await W(1000); console.log('at desk', await p.evaluate(() => { const q = window.__p3.pos; const v = typeof q === 'function' ? q() : q; return [v.x, v.z, JSON.stringify(window.__kdApi.carInfo())]; })); await frames(10); await p.waitForFunction(() => /Sell a car/.test(document.getElementById('ks-act')?.textContent || ''), null, { timeout: 60000 }).catch(() => {}); const sl = await act(); ok(/Sell a car/.test(sl), 'Sell prompt at the counter', sl);
   await p.evaluate(() => document.getElementById('ks-act').click()); await p.waitForSelector('[data-sell="haul"]', { timeout: 30000 }); await W(800); await p.screenshot({ path: shot + 'sell.png' });
   await p.click('[data-sell="haul"]'); await W(700); await p.click('[data-sell="haul"]'); await p.waitForFunction(() => !document.querySelector('[data-sell="haul"]'), null, { timeout: 15000 }).catch(() => {}); await W(3000);
   const w2 = await fsGet(`users/${uid}/pal/wallet`); const inv = await fsGet(`users/${uid}/inv/car_haul`); ok(+w2.fields.coins.integerValue === +w1.fields.coins.integerValue + 400 && inv.error && inv.error.code === 404, 'sold Haul Hero at the counter for half', [w1.fields.coins.integerValue, w2.fields.coins.integerValue]);
   console.log('dealer stats', JSON.stringify(await p.evaluate(() => window.__kdl)));
+  // quick memory check: walk away -> display cars + tags freed; come back + leave twice -> heap / GPU geometry stay flat
+  const mem = () => p.evaluate(() => ({ heap: Math.round((performance.memory?.usedJSHeapSize || 0) / 1048576), geo: window.__p3?.R?.info?.memory?.geometries ?? window.__kwApi?.R?.info?.memory?.geometries ?? null, tex: window.__p3?.R?.info?.memory?.textures ?? null, built: window.__kdl.built, tags: window.__kdl.tags }));
+  const ms = []; for (let i = 0; i < 2; i++) { await tp(30, 330, 0); await W(2500); await frames(10); ms.push(await mem()); await tp(-300, 140, 0); await W(2500); await frames(10); ms.push(await mem()); }
+  console.log('mem', JSON.stringify(ms)); ok(ms[1].built === 0 && ms[3].built === 0 && !ms[3].tags, 'display cars + tags freed when you leave', JSON.stringify(ms[3]));
+  ok(ms[3].heap - ms[1].heap < 15, 'heap flat after 2 visits (MB)', ms[1].heap + ' -> ' + ms[3].heap);
 } catch (e) { fails++; console.log('ERR', e.message); await p.screenshot({ path: shot + 'error.png' }).catch(() => {}); }
 ok(!errors.length, 'no page errors', errors.slice(0, 3).join(' | ')); await browser.close(); console.log(fails ? `${fails} FAILED` : 'ALL PASSED'); process.exit(fails ? 1 : 0);

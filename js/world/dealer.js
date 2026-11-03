@@ -100,7 +100,7 @@ export function attachDealer(api, W, K) {
   function dropTags() { if (!tags) return; root.remove(tags.mesh, tags.meshB, tags.pI); tags.meshB.geometry.dispose(); tags.meshB.material.dispose(); tags.mesh.geometry.dispose(); tags.mesh.material.dispose(); tags.tex.dispose(); tags.pI.geometry.dispose(); tags.pI.material.dispose(); tags.pI.dispose(); tags = null; }
 
   // ---------------------------------------------------------------- lazy display cars
-  const NEAR = LOW || PH ? 46 : 85, FAR = NEAR + 22, PER = LOW || PH ? 1 : 2, MAXB = PH ? 6 : LOW ? 10 : 40; const order = slots.slice(); const st = { built: 0, tags: false, tris: 0 }; window.__kdl = st;
+  const NEAR = LOW || PH ? 46 : 85, FAR = NEAR + 22, PER = LOW || PH ? 1 : 2, MAXB = PH ? 6 : LOW ? 10 : 24; const order = slots.slice(); const st = { built: 0, tags: false, tris: 0 }; window.__kdl = st;
   function buildSlot(s) { const m = buildCar(s.c, s.c.color, { lite: true, noShadow: true }); poseCar(m, { x: s.x, y: Y + (s.in ? 0.3 : 0), z: s.z, yaw: s.yaw }, 0, 0); m.userData.dl = 1; root.add(m); s.m = m; }
   function dropSlot(s) { if (!s.m) return; root.remove(s.m); s.m = null; } // geometry + materials are shared via cars.js caches (nothing per car to free)
   let tick = 0, tAll = 0, visT = 0;
