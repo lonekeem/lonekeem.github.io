@@ -1,6 +1,7 @@
 // Kemy World map screen + GPS. Full-screen map (pinch-zoom, drag, tap to drop a pin, pick a city / home / landmark),
 // road-graph route (Dijkstra over every road incl. intersections + T-junctions), a glowing 3D route ribbon, a small
 // turn-by-turn hint at the top edge, auto-reroute, arrival chime. On foot or in a car. No database use. Written by Lone Keem.
+import { nearPlayers, drawPlayer } from './mapdots.js';
 import { ALL_ROADS, BOUNDS, WATER, CITIES, ESTATES, HOUSES, BRIDGES, PARK, TOWNS, segD } from './layout.js';
 export function buildGraph(roads) { const nodes = []; const near = (x, z) => { for (let i = 0; i < nodes.length; i++) if (Math.abs(nodes[i].x - x) < 2.5 && Math.abs(nodes[i].z - z) < 2.5) return i; nodes.push({ x, z, e: [] }); return nodes.length - 1; };
   const segs = roads.map((r) => ({ r, ts: [0, 1] }));
@@ -54,7 +55,7 @@ export function attachMap(api, W) { const { THREE, scene, P, view } = api; const
     const label = (t, x, z, big, col) => { const [a, b] = S(x, z); cx.font = (big ? '800 14px' : '700 11px') + ' Inter,system-ui,sans-serif'; cx.textAlign = 'center'; cx.lineWidth = 4; cx.strokeStyle = 'rgba(255,255,255,.95)'; cx.strokeText(t, a, b); cx.fillStyle = col || '#111'; cx.fillText(t, a, b); };
     for (const t of TOWNS) label(t.name, t.x, t.z, !!t.city || V.s < 0.4); if (V.s > 0.25) for (const e of ESTATES) if (!e.skip) label('🏰 ' + e.spot.replace(/^\S+\s/, ''), e.x, e.z - 30, false); if (V.s > 0.5) for (const w of WATER) label('〰️ ' + w.name, (w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2, false);
     for (const L of LANDMARKS()) label(L.name, L.x, L.z, true, '#7c5800');
-    if (api.others) for (const o of api.others.values()) { if (o.x > 392) continue; const [a, b] = S(o.x, o.z); cx.fillStyle = '#7c3aed'; cx.beginPath(); cx.arc(a, b, 4, 0, 7); cx.fill(); }
+    for (const p of nearPlayers(api.others, P.x, P.z, 30)) { const [a, b] = S(p.x, p.z); if (a < -20 || b < -20 || a > r.width + 20 || b > r.height + 20) continue; drawPlayer(cx, a, b, p, true, 1.2); }
     const hs = W.homeSpot && W.homeSpot(); if (hs) { const [a, b] = S(hs.x, hs.z); cx.font = '20px system-ui'; cx.textAlign = 'center'; cx.fillText('🏠', a, b + 7); }
     if (marker) { const [a, b] = S(marker.x, marker.z); cx.fillStyle = '#dc2626'; cx.beginPath(); cx.arc(a, b - 14, 8, 0, 7); cx.fill(); cx.beginPath(); cx.moveTo(a - 6, b - 10); cx.lineTo(a + 6, b - 10); cx.lineTo(a, b); cx.fill(); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(a, b - 14, 3, 0, 7); cx.fill(); }
     { const [a, b] = S(P.x, P.z); cx.save(); cx.translate(a, b); cx.rotate(-heading() + Math.PI); cx.fillStyle = '#2563eb'; cx.strokeStyle = '#fff'; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(0, -11); cx.lineTo(8, 8); cx.lineTo(0, 4); cx.lineTo(-8, 8); cx.closePath(); cx.fill(); cx.stroke(); cx.restore(); } }
@@ -102,7 +103,7 @@ export function attachMap(api, W) { const { THREE, scene, P, view } = api; const
   hint.querySelector('button').onclick = () => { stop(); marker = null; };
   function chime() { try { const A = new (window.AudioContext || window.webkitAudioContext)(); const t = A.currentTime; [523, 659, 784, 1047].forEach((f, i) => { const o = A.createOscillator(), g = A.createGain(); o.frequency.value = f; o.connect(g); g.connect(A.destination); g.gain.setValueAtTime(0.0001, t + i * 0.12); g.gain.exponentialRampToValueAtTime(0.12, t + i * 0.12 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.4); o.start(t + i * 0.12); o.stop(t + i * 0.12 + 0.45); }); setTimeout(() => A.close(), 1500); } catch { /* */ } }
   let tk = 0;
-  function update(dt) { if (!ov.hidden && (tk += dt) > 0.15) { tk = 0; draw(); } if (!nav) return; ribM.opacity = 0.28 + Math.sin(performance.now() / 260) * 0.1; chevrons(); beacon.rotation.y += dt; if ((nav.t += dt) < 0.25) return; nav.t = 0;
+  function update(dt) { if (!ov.hidden && (tk += dt) > 0.25) { tk = 0; draw(); } if (!nav) return; ribM.opacity = 0.28 + Math.sin(performance.now() / 260) * 0.1; chevrons(); beacon.rotation.y += dt; if ((nav.t += dt) < 0.25) return; nav.t = 0;
     const Q2 = nav.pts; let best = 1e9, bi = 0, bt = 0; for (let i = 0; i < Q2.length - 1; i++) { const a = Q2[i], b = Q2[i + 1]; const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((P.x - a.x) * dx + (P.z - a.z) * dz) / L2)); const d = Math.hypot(P.x - a.x - dx * t, P.z - a.z - dz * t); if (d < best) { best = d; bi = i; bt = t; } }
     let along = 0; for (let i = 0; i < bi; i++) along += Math.hypot(Q2[i + 1].x - Q2[i].x, Q2[i + 1].z - Q2[i].z); along += bt * Math.hypot(Q2[bi + 1].x - Q2[bi].x, Q2[bi + 1].z - Q2[bi].z); const left = Math.max(0, nav.len - along); nav.along = along;
     if (Math.hypot(nav.to.x - P.x, nav.to.z - P.z) < 10 || left < 6) { stop(); marker = null; chime(); say('🎉 Arrived!'); window.__km.arrived = (window.__km.arrived || 0) + 1; return; }

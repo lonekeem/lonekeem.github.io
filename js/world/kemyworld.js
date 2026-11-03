@@ -7,6 +7,7 @@ import { tickKustoms } from './kustom-look.js';
 import { DEAD_ENDS, ROADS3, PLAINS, HOUSES, ROADS, SIDEWALK, GATE, PARK_CORNER, STATION, STREET, PARK, FLAT, roadD, segD, BOUNDS, ALL_ROADS, areaAt, TOWN_PAL, OLD, GV, WATER, housesNear, streetLamps, STREET_SIGNS, placeSign } from './layout.js';
 import { attachCities, applyExt, forgetTagged } from './cities.js';
 import { attachMap } from './map.js';
+import { nearPlayers, drawPlayer } from './mapdots.js';
 const OLDH = HOUSES.filter((h) => !h.city && !h.estate); // the hand-built houses (the new cities + estates stream in cities.js)
 import { attachEast } from './east.js';
 import { currentSeason, SEASONS } from '../seasons.js';
@@ -355,8 +356,8 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     mapX.clearRect(0, 0, S2, S2); mapX.save(); mapX.beginPath(); mapX.arc(S2 / 2, S2 / 2, S2 / 2 - 2, 0, 7); mapX.clip(); mapX.fillStyle = 'rgba(30,60,40,.7)'; mapX.fillRect(0, 0, S2, S2); mapX.translate(S2 / 2, S2 / 2); mapX.rotate(th); mapX.translate(-S2 / 2, -S2 / 2); mapX.fillStyle = '#3fa7d6'; for (const w of WATER) mapX.fillRect(mx(w.x0), mz(w.z0), (w.x1 - w.x0) * sc, (w.z1 - w.z0) * sc); if (W.mapExtra) W.mapExtra(mapX, mx, mz, sc); mapX.fillStyle = 'rgba(80,160,80,.55)'; mapX.fillRect(mx(-PARK.W), mz(-PARK.H), PARK.W * 2 * sc, PARK.H * 2 * sc); mapX.fillStyle = 'rgba(70,50,120,.6)'; mapX.fillRect(mx(STREET.x0), mz(STREET.z0), (STREET.x1 - STREET.x0) * sc, (STREET.z1 - STREET.z0) * sc);
     for (const r of ALL_ROADS()) { mapX.strokeStyle = r.hw ? '#fbbf24' : '#e7e5e4'; mapX.lineWidth = r.hw ? 4 : 2.5; mapX.beginPath(); mapX.moveTo(mx(r.a[0]), mz(r.a[1])); mapX.lineTo(mx(r.b[0]), mz(r.b[1])); mapX.stroke(); }
     mapX.fillStyle = '#ff8a1f'; for (const h of housesNear(P.x, P.z, RM)) mapX.fillRect(mx(h.x) - 1, mz(h.z) - 1, 2, 2); if (W.mapRoute) W.mapRoute(mapX, mx, mz); if (W.mapLabels) W.mapLabels(mapX, mx, mz);
-    mapX.fillStyle = '#7dd3fc'; for (const o of api.others.values()) { if (o.x > 392) continue; mapX.beginPath(); mapX.arc(mx(o.x), mz(o.z), 3, 0, 7); mapX.fill(); }
-    mapX.restore(); const c2 = S2 / 2; mapX.fillStyle = '#ffd23f'; mapX.strokeStyle = '#111'; mapX.lineWidth = 2; mapX.beginPath(); mapX.moveTo(c2, c2 - 13); mapX.lineTo(c2 + 9, c2 + 9); mapX.lineTo(c2, c2 + 4); mapX.lineTo(c2 - 9, c2 + 9); mapX.closePath(); mapX.fill(); mapX.stroke();
+    const pl = nearPlayers(api.others, P.x, P.z, 30); mapX.restore();
+    { const cs = Math.cos(th), sn = Math.sin(th), c0 = S2 / 2; pl.forEach((p, i) => { const u = mx(p.x) - c0, v = mz(p.z) - c0; const a = c0 + u * cs - v * sn, b = c0 + u * sn + v * cs; if (Math.hypot(a - c0, b - c0) > c0 - 6) return; drawPlayer(mapX, a, b, p, i < 4, 0.9); }); } const c2 = S2 / 2; mapX.fillStyle = '#ffd23f'; mapX.strokeStyle = '#111'; mapX.lineWidth = 2; mapX.beginPath(); mapX.moveTo(c2, c2 - 13); mapX.lineTo(c2 + 9, c2 + 9); mapX.lineTo(c2, c2 + 4); mapX.lineTo(c2 - 9, c2 + 9); mapX.closePath(); mapX.fill(); mapX.stroke();
     { const nx = c2 + Math.cos(th - Math.PI / 2) * (c2 - 14), ny = c2 + Math.sin(th - Math.PI / 2) * (c2 - 14); mapX.fillStyle = '#fff'; mapX.beginPath(); mapX.arc(nx, ny, 10, 0, 7); mapX.fill(); mapX.fillStyle = '#b91c1c'; mapX.font = '800 13px system-ui'; mapX.textAlign = 'center'; mapX.textBaseline = 'middle'; mapX.fillText('N', nx, ny + 1); }
     mapX.strokeStyle = 'rgba(255,255,255,.85)'; mapX.lineWidth = 4; mapX.beginPath(); mapX.arc(c2, c2, c2 - 2, 0, 7); mapX.stroke(); }
   mapC.onclick = () => { if (W.openMap) W.openMap(); };
