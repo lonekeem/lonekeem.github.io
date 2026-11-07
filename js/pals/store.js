@@ -7,6 +7,7 @@ import { BGS, BG, drawBg } from './bgs.js';
 import { addItems, addDiamondItems, RARITY } from './catalog.js';
 import { HALLOWEEN, HW_ON, HW_ENDS } from './halloween.js';
 import { drawDancer } from './dance.js';
+import { copyPal } from './floppy-bunny.js';
 import { SPECIES } from './art.js';
 import { RARE_SPECIES } from './species.js';
 // premium items join the shop catalog (config/palShop prices) so purchases validate server-side
@@ -52,7 +53,7 @@ export function createPalStore(ctx) {
     $('#ps-rot').onclick = () => { spin = !spin; };
     let t = 0; const frame = () => { if (!document.body.contains(cv) || !loopTok.on) return; t++; if (spin) yaw += 0.02; c.clearRect(0, 0, W, H);
       if (!drawBg(c, W, H, D.bg, t)) { c.fillStyle = '#2a1458'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill(); }
-      drawDancer(c, W / 2, H - 12, 120 * zoom, { ...p, outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }, { t, mode: 'idle', yaw }); requestAnimationFrame(frame); }; frame();
+      drawDancer(c, W / 2, H - 12, 120 * zoom, copyPal(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }), { t, mode: 'idle', yaw }); requestAnimationFrame(frame); }; frame();
     const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; const uc0 = u.filter((x) => !x.d), ud0 = u.filter((x) => x.d); pv.textContent = u.length ? `Preview · ${u.length} to buy${uc0.length ? ` · ★${uc0.reduce((a, b) => a + (b.p || 0), 0)}` : ''}${ud0.length ? ` · 💎${ud0.reduce((a, b) => a + b.d, 0)}` : ''}` : '';
       const bb = $('#ps-buy'); bb.innerHTML = u.length ? (ud0.length && !uc0.length ? buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: ud0.reduce((a, b) => a + b.d, 0), balance: 0, id: 'ps-buynow' }).replace(/★(\d)/, '💎$1').replace(/<small[^>]*>[^<]*<\/small>/, '<small style="display:block;font-weight:600;color:#f1e6ff">👑 Premium · Diamonds</small>') : buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: uc0.reduce((a, b) => a + (b.p || 0), 0), balance: (e.w && e.w.coins) || 0, id: 'ps-buynow' }) + (ud0.length ? '<small style="display:block;text-align:center">+ 💎 premium items (paid next)</small>' : '')) : ''; if (u.length) bb.querySelector('#ps-buynow').onclick = () => save(); grid(); };
     const tile = (id, name, price, r, emo, on, ownd, extra = '') => `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${extra} style="--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}"><span class="ps-emo" data-th="${esc(id)}">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : (typeof price === 'string' ? price : `★ ${price}`)}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`;

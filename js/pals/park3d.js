@@ -14,6 +14,7 @@ import { getCountFromServer, doc, getDocs, setDoc, deleteDoc, collection, query,
 import { THREE, makePal3D, posePal3D, gfxLevel } from './pal3d.js';
 import { WALK_V } from './motion3d.js';
 import { getActivePal } from './core.js';
+import { withOwner } from './floppy-bunny.js';
 import { clean } from './talk.js';
 import { treasures, EMOTES, PHRASES, PORTALS } from './park.js';
 import { createControls } from '../controls.js';
@@ -357,7 +358,7 @@ export function createPark3D(ctx) {
     const pal = await getActivePal(db, S.user.uid).catch(() => null);
     if (!document.body.contains(cv)) { unhookSize(); R.dispose(); return; }
     const snapOf = (p) => (p ? { species: p.species, name: p.name, colors: p.colors || {}, pattern: p.pattern || '', acc: p.acc || '', outfit: p.outfit || {}, level: p.level || 1, variant: p.variant || '' } : { species: 'kemy', name: 'Kemy', level: 1, outfit: {} });
-    let palSnap = snapOf(pal);
+    let palSnap = withOwner(snapOf(pal), S.user.uid);
     const HEIGHT = 1.45;
     let J, mine = new THREE.Group(); const D2R = Math.PI / 180; const bodyParts = [], armParts = new Set();
     function dress(holder, ps, shadow) { const m = makePal3D(ps); const bb = new THREE.Box3().setFromObject(m); const h = Math.max(0.5, bb.max.y - bb.min.y); const k = HEIGHT / h; m.scale.multiplyScalar(k); m.position.y = -bb.min.y * k;
@@ -580,7 +581,7 @@ export function createPark3D(ctx) {
     }
     const meTag = { }; tagFor(meTag, true);
     let palGen = 0;
-    const onPal = () => { const gen = ++palGen; getActivePal(db, S.user.uid).then((p) => { if (gen !== palGen || !p || !document.body.contains(cv)) return; const next = snapOf(p); if (lookKey(next) === lookKey(palSnap) && next.name === palSnap.name) return; palSnap = next; dress(me, palSnap, !LOW); me.userData.povVis = undefined; dirty = true; const span = meTag.tag && meTag.tag.querySelector(':scope > span'); if (span) { const label = 'You · ' + (palSnap.name || 'Pal'); span.dataset.n = label; span.textContent = label; } }).catch(() => {}); };
+    const onPal = () => { const gen = ++palGen; getActivePal(db, S.user.uid).then((p) => { if (gen !== palGen || !p || !document.body.contains(cv)) return; const next = withOwner(snapOf(p), S.user.uid); if (lookKey(next) === lookKey(palSnap) && next.name === palSnap.name) return; palSnap = next; dress(me, palSnap, !LOW); me.userData.povVis = undefined; dirty = true; const span = meTag.tag && meTag.tag.querySelector(':scope > span'); if (span) { const label = 'You · ' + (palSnap.name || 'Pal'); span.dataset.n = label; span.textContent = label; } }).catch(() => {}); };
     addEventListener('kemy:pal-changed', onPal);
     const v3 = new THREE.Vector3();
     function placeTag(o, x, y, z, say, sayAt, hide) {
@@ -840,7 +841,7 @@ export function createPark3D(ctx) {
         if (blocked.has(o.uid) || nowMs - o.at > (o.house ? 8000 : STALE_MS)) { drop(o.uid); continue; }
         if (o.obj && o.pal) { const lk = lookKey(o.pal); if (o.objKey && o.objKey !== lk) { o.obj.removeFromParent(); o.obj = null; } } // re-dress when they change outfit, colours, or accessories
         interp(o, dt); const nearD = Math.hypot((o.ix ?? o.x) - P.x, (o.iz ?? o.z) - P.z); if (!keepRemotePal(drawSet.has(o.uid), o.dn, nearD, LOW)) { o.x = o.ix; o.z = o.iz; if (o.obj) o.obj.visible = false; if (o.tag) o.tag.style.display = 'none'; o.hidAt = o.hidAt || nowMs; if (o.obj && nowMs - o.hidAt > 20000) { o.obj.removeFromParent(); o.obj = null; o.objKey = null; } continue; } o.hidAt = 0;
-        if (!o.obj && o.pal) { try { o.obj = palObj(o.pal, !LOW); o.objKey = lookKey(o.pal); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
+        if (!o.obj && o.pal) { try { withOwner(o.pal, o.uid); o.obj = palObj(o.pal, !LOW); o.objKey = lookKey(o.pal); o.obj.userData.uid = o.uid; o.obj.traverse((c) => { c.userData.uid = c.userData.uid || undefined; }); scene.add(o.obj); } catch { o.obj = null; } tagFor(o); }
         const px = o.x, pz = o.z; o.x = o.ix; o.z = o.iz; o.jump = Math.max(o.jump || 0, Math.hypot(o.x - px, o.z - pz)); const mvd = o.buf && o.buf.length ? Math.hypot(o.ivx, o.ivz) : Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
         const gy = floorAt(o.x, o.z, o.y + 0.3); const holdY = o.dn === 'sit' || o.dn === 'sleep'; const aimY = o.th != null ? (holdY ? o.th : Math.max(o.th, gy - 0.05)) : gy; o.y += (aimY - o.y) * Math.min(1, dt * 10);
         const riding = inVehicle(o.dn); if (riding && o.iyaw != null) o.yaw = o.iyaw; else if (o.buf && o.buf.length) { let dy = o.iyaw - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (o.tr != null) { let dy = o.tr - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 22); } else if (mvd > 0.3) o.yaw = Math.atan2(o.x - px, o.z - pz);

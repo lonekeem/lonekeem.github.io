@@ -7,6 +7,7 @@
 import { dressBody, dressHead, bodyScale } from './cloth3d.js';
 import * as THREE from '../vendor/three-0.170.0.module.min.js';
 import { SPEC, SPECIES, stageOf } from './art.js';
+import { floppyBunny } from './floppy-bunny.js';
 import { ITEM } from './catalog.js';
 import { WEAR_BY } from './wardrobe.js';
 import { dressHalloween } from './halloween3d.js';
@@ -248,7 +249,13 @@ function build(pal) {
     if (ea === 'round' || ea === 'biground') { const r = ea === 'round' ? 0.13 : 0.2; m = mesh(sph(1), mB, e); m.scale.set(r, r, r * 0.55); const i = mesh(sph(1), mat(ex.has('eyepatch') ? A : '#ffc0d8'), e); i.scale.set(r * 0.6, r * 0.6, r * 0.2); i.position.z = r * 0.42; e.position.set(s * (ea === 'round' ? 0.34 : 0.4), 0.34, -0.02); }
     if (ea === 'capy') { m = mesh(sph(1), mat(shade(B, -0.08), { fur: 1 }), e); m.material = mat(shade(B, -0.3), { fur: 1 }); m.scale.set(0.05, 0.045, 0.032); const i = mesh(sph(1), mat(shade(A, -0.1)), e); i.scale.set(0.028, 0.024, 0.01); i.position.z = 0.024; e.position.set(s * 0.26, 0.355, -0.24); e.rotation.z = -s * 0.25; }
     if (ea === 'pointy') { m = mesh(cone(0.13, 0.3), sp.id === 'fox' || sp.id === 'redpanda' ? mA : mB, e); m.position.y = 0.12; m.scale.z = 0.6; const ie = mesh(cone(0.075, 0.2), mat('#ffc0d8'), e); ie.position.set(0, 0.1, 0.035); ie.scale.z = 0.3; e.rotation.z = -s * 0.25; }
-    if (ea === 'long') { m = mesh(cap(0.08, 0.38), mB, e); m.position.y = 0.26; m.scale.z = 0.5; const i = mesh(cap(0.045, 0.3), mat('#ffb3cf'), e); i.position.set(0, 0.26, 0.03); i.scale.z = 0.3; e.position.set(s * 0.14, 0.4, 0); e.rotation.z = -s * 0.12; }
+    if (ea === 'long' && floppyBunny(pal)) {
+      // Hang the same long ear beside the cheek. A straight fold from the crown lands inside the round head.
+      e.position.set(s * 0.18, 0.48, 0.02); e.rotation.z = -s * 0.08; e.userData.z = e.rotation.z; e.userData.lop = 1;
+      const drop = mesh(cap(0.07, 0.78), mB, e); drop.position.set(s * 0.36, -0.46, 0.1); drop.rotation.z = -s * 0.12; drop.rotation.x = 0.12; drop.scale.z = 0.42;
+      const inn = mesh(cap(0.038, 0.58), mat('#ffb3cf'), e); inn.position.set(s * 0.36, -0.42, 0.14); inn.rotation.z = -s * 0.12; inn.rotation.x = 0.12; inn.scale.z = 0.22;
+      m = drop;
+    } else if (ea === 'long') { m = mesh(cap(0.08, 0.38), mB, e); m.position.y = 0.26; m.scale.z = 0.5; const i = mesh(cap(0.045, 0.3), mat('#ffb3cf'), e); i.position.set(0, 0.26, 0.03); i.scale.z = 0.3; e.position.set(s * 0.14, 0.4, 0); e.rotation.z = -s * 0.12; }
     if (ea === 'floppy') { m = mesh(cap(0.1, 0.22), mA, e); m.position.y = -0.14; m.scale.z = 0.45; e.position.set(s * 0.42, 0.22, 0); e.rotation.z = s * 0.35; }
     if (ea === 'big') { m = mesh(sph(1), mB, e); m.scale.set(0.3, 0.36, 0.075); m.position.set(s * 0.24, 0, 0); m.rotation.y = -s * 0.35; const i = mesh(sph(1), mat('#ffb8d4'), e); i.scale.set(0.21, 0.26, 0.04); i.position.set(s * 0.25, 0, 0.045); i.rotation.y = -s * 0.35; e.position.set(s * 0.36, 0.04, -0.06); e.userData.flap = 1; }
     if (ea === 'ossicones') { m = mesh(cap(0.03, 0.16), mDark, e); m.position.y = 0.1; mesh(sph(0.055), mA, e).position.y = 0.22; e.position.set(s * 0.14, 0.42, 0); }
@@ -393,7 +400,7 @@ function apply(rootObj, P, t, mode) {
   const br = Math.sin(t * 0.05) * 0.015; J.Chest.scale.set(1 + br, 1 + br, 1 + br);
   const bt = t % 260; const shut = bt < 5 || (Math.floor(t / 260) % 3 === 1 && bt > 14 && bt < 19) || mode === 'sleep'; /* blink, sometimes a double blink */ for (const e of J.eyes) { const l = e.userData.lid; if (l) { l.position.y += ((shut ? l.userData.shut : l.userData.open) - l.position.y) * (l.userData.vis && mode === 'sleep' ? 1 : 0.6); l.visible = l.position.y < (l.userData.vis ?? l.userData.open * 0.95); if (l.userData.hls) for (const h of l.userData.hls) h.visible = !l.visible; const ln = l.userData.ln; if (ln) { const q = ln.userData.p; ln.position.y = l.visible ? q[2] : q[0]; ln.position.z = l.visible ? q[3] : q[1]; } } }
   const sg = springs(rootObj, P); sp.e = sg.e[0] * 2.2 + (P.hrz || 0) * 0.3; // spring-driven floppy parts
-  J.ears.forEach((e, i) => { e.rotation.x = sp.e * 0.4 + sg.e[0] * 0.3; e.rotation.y = e.userData.flap ? (i ? 1 : -1) * (Math.sin(t * 0.09) * 0.18 + (mode === 'react' ? Math.sin(t * 0.6) * 0.4 : 0)) : 0; e.userData.z ??= e.rotation.z; e.rotation.z = e.userData.z + Math.sin(t * 0.07 + i) * 0.04 + (i ? -1 : 1) * sp.e * 0.2; });
+  J.ears.forEach((e, i) => { const lop = e.userData.lop; e.rotation.x = lop ? sg.e[0] * 0.08 : sp.e * 0.4 + sg.e[0] * 0.3; e.rotation.y = e.userData.flap ? (i ? 1 : -1) * (Math.sin(t * 0.09) * 0.18 + (mode === 'react' ? Math.sin(t * 0.6) * 0.4 : 0)) : 0; e.userData.z ??= e.rotation.z; e.rotation.z = e.userData.z + Math.sin(t * 0.07 + i) * (lop ? 0.02 : 0.04) + (lop ? 0 : (i ? -1 : 1) * sp.e * 0.2); });
   sp.tl = sg.tl[0]; if (J.yuzu) { J.yuzu.rotation.z = 0.12 + Math.sin(t * 0.08) * 0.06 + sp.e * 0.3; J.yuzu.rotation.x = sg.e[0] * 0.4; } // capybara's yuzu wobbles
   if (J.gill) J.gill.forEach((g, i) => { g.rotation.z = g.userData.base + Math.sin(t * 0.11 + i * 1.3) * 0.06 + sg.e[1] * 0.25 * (i % 2 ? 1 : -1); g.rotation.x = Math.sin(t * 0.07 + i) * 0.08 + sg.e[0] * 0.3; });
   J.tail.forEach((b, i) => { if (i) b.rotation.set(0.3 + sg.tl[1] * 0.3 * i, 0, Math.sin(t * (P.tw || 0.1) - i * 0.6) * 0.25 + sp.tl * (0.3 + i * 0.12)); else { b.rotation.z = Math.sin(t * (P.tw || 0.1)) * 0.3 + sp.tl; b.rotation.x = sg.tl[1] * 0.3; } });
@@ -449,7 +456,7 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   if (lost) { // context lost (iOS backgrounding / memory): placeholder until restored, or rebuild after 2.5 s
     if (now - lostAt > 2500 && !document.hidden) { if (rebuilds >= 6) return false; rebuild(); } else { drawLoading(c, x, y, size); return true; }
   }
-  const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.variant || '', pal.pattern || '', stageOf(pal.level || 1)]);
+  const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.variant || '', pal.pattern || '', stageOf(pal.level || 1), floppyBunny(pal) ? 1 : 0]);
   let m = cache.get(key); if (!m) { m = build(pal); cache.set(key, m); if (cache.size > 24) { const k0 = cache.keys().next().value; cache.delete(k0); } }
   // per-canvas animation state: the same cached model drawn on two canvases (card + Pal Box, floating Pal, store)
   // must not share easing/spring/gait state (that double-stepped it: fast, jittery motion). Time is real time
