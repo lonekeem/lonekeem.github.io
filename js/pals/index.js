@@ -18,6 +18,7 @@ import { emoteMs } from './emotes.js';
 import { createDanceUI, initFloat, registerDanceItems } from './dance-ui.js';
 import { ITEM } from './catalog.js';
 import { createStore, liveStats, moodOf, patPal, readPet, firstPet, formName, isNight, xpToLevel, MAX_PALS, tsMs, listPals, getActivePal, playdate, newPlaydates } from './core.js';
+import { copyPal, withOwner } from './floppy-bunny.js';
 
 const FAVS = { panda: 'bamboo', redpanda: 'bamboo', koala: 'leaf', lamb: 'leaf', giraffe: 'leaf', turtle: 'leaf', bunny: 'carrot', kitten: 'fish', penguin: 'fish', seal: 'fish', otter: 'fish', lion: 'fish', tiger: 'fish', bear: 'honey', hamster: 'seed', chick: 'seed', duckling: 'seed', owl: 'seed', elephant: 'apple', piglet: 'apple', dragon: 'apple', puppy: 'cookie', unicorn: 'cake', starsprite: 'cake', cloudpuff: 'cake' };
 const FAV_FOOD = (sp) => FAVS[sp] || 'berry';
@@ -88,7 +89,7 @@ export function createPals(ctx) {
   function glowUp(p) {
     snd('glow');
     openModal(`<div class="pal-glow"><div class="pal-glow-stage"></div><h2>Glow up!</h2><p>${esc(p.name)} glowed up into <b>${esc(formName(p))}</b>!</p><button class="btn" data-close>Yay!</button></div>`);
-    const host = document.querySelector('.pal-glow-stage'); const s = stage(host, 260, 200); const fx = particles(); const frm = { ...p, level: p.level < 12 ? 4 : 11 };
+    const host = document.querySelector('.pal-glow-stage'); const s = stage(host, 260, 200); const fx = particles(); const frm = copyPal(p, { level: p.level < 12 ? 4 : 11 });
     const f = (t) => { const c = s.c; c.clearRect(0, 0, 260, 200); const flash = t < 70 ? t / 70 : Math.max(0, 1 - (t - 70) / 40);
       const show = t < 70 ? frm : p; drawPal(c, 130, 180, 130, show, { t, mode: t > 90 ? 'happy' : 'idle' });
       c.fillStyle = `rgba(255,255,255,${flash})`; c.fillRect(0, 0, 260, 200); if (t === 72) fx.add(130, 110, 'star', 24); fx.draw(c); };
@@ -147,7 +148,7 @@ export function createPals(ctx) {
       if (play) stepPlay(t, c);
       // while Care / Talk / Dance shows this Pal in a sheet, the card behind it keeps only its stage (one Pal on screen)
       const sheetUp = isMine && !!document.querySelector('.pal-sheet, .pal-talk, .pal-dance');
-      if (!sheetUp) for (const A of [...all].sort((a, b) => a.size - b.size)) drawDancer(c, A.x, H - 8, A.size, A.guest ? { ...A.p, _others: 1, _off: 0.5 } : (isMine ? A.p : { ...A.p, _others: 1 }), { t, face: A.face, mode: A.mode, mood: { ...A.mood, sad: A.mood.sad && A.mode !== 'react' } });
+      if (!sheetUp) for (const A of [...all].sort((a, b) => a.size - b.size)) drawDancer(c, A.x, H - 8, A.size, A.guest ? copyPal(A.p, { _others: 1, _off: 0.5 }) : (isMine ? A.p : copyPal(A.p, { _others: 1 })), { t, face: A.face, mode: A.mode, mood: { ...A.mood, sad: A.mood.sad && A.mode !== 'react' } });
       if (guest) { c.fillStyle = 'rgba(255,255,255,.85)'; c.font = '600 10px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(guest.p.name, guest.x, H - 8 - guest.size - 4); c.textAlign = 'left'; }
       fx.draw(c);
     };
@@ -290,7 +291,8 @@ export function createPals(ctx) {
       }
       const faceTo = G.mode === 'catch' && G.ball ? Math.sign(G.ball.x - G.palX) || 1 : 1;
       const playing = G.mode === 'toys' && G.toy;
-      drawPal(c, G.palX, PY, SIZE, G.eat > 0 && G.eatFood ? { ...p, outfit: { ...(p.outfit || {}), held: 'f_food_' + G.eatFood } } : playing ? { ...p, outfit: { ...(p.outfit || {}), held: G.toy.id } } : p, G.emo && G.mode === 'home' && performance.now() < G.emoUntil ? { t, mode: 'idle', dance3d: G.emo, beat: performance.now() / 1000 * 116 / 60, amt: 1, dance: G.emo } : playing ? { t, mode: 'idle', dance3d: 'happyshimmy', beat: t / 20, amt: 0.8, dance: 'happyshimmy' } : { t, mode: mode === 'idle' && G.mode === 'catch' ? 'idle' : mode, face: faceTo, mood: { dirty: mood.dirty && !(G.mode === 'shower' && G.lather > 0.3), sad: mood.sad && G.react <= 0, bandage: G.bandage || mood.low && G.mode === 'home' && false } });
+      const held = G.eat > 0 && G.eatFood ? 'f_food_' + G.eatFood : playing ? G.toy.id : '';
+      drawPal(c, G.palX, PY, SIZE, held ? copyPal(p, { outfit: { ...(p.outfit || {}), held } }) : p, G.emo && G.mode === 'home' && performance.now() < G.emoUntil ? { t, mode: 'idle', dance3d: G.emo, beat: performance.now() / 1000 * 116 / 60, amt: 1, dance: G.emo } : playing ? { t, mode: 'idle', dance3d: 'happyshimmy', beat: t / 20, amt: 0.8, dance: 'happyshimmy' } : { t, mode: mode === 'idle' && G.mode === 'catch' ? 'idle' : mode, face: faceTo, mood: { dirty: mood.dirty && !(G.mode === 'shower' && G.lather > 0.3), sad: mood.sad && G.react <= 0, bandage: G.bandage || mood.low && G.mode === 'home' && false } });
       // shower layer
       if (G.mode === 'shower') {
         for (const bb of G.bubbles) drawBubble(c, bb.x + Math.sin(t * 0.05 + bb.r) * 0.6, bb.y, bb.r);
@@ -319,7 +321,7 @@ export function createPals(ctx) {
   }
   // ---------------------------------------------------------------- creator
   function creator({ pal, slot, first, onDone }) {
-    const d = pal ? { species: pal.species, name: pal.name, colors: { ...pal.colors }, pattern: pal.pattern, acc: pal.acc } : { species: 'kemy', name: '', colors: { body: SPEC.kemy.body, accent: SPEC.kemy.acc, eye: '#24133f' }, pattern: 'none', acc: 'none' };
+    const d = pal ? withOwner({ species: pal.species, name: pal.name, colors: { ...pal.colors }, pattern: pal.pattern, acc: pal.acc }, pal.owner) : { species: 'kemy', name: '', colors: { body: SPEC.kemy.body, accent: SPEC.kemy.acc, eye: '#24133f' }, pattern: 'none', acc: 'none' };
     const chips = (key, list, lab) => list.map((v) => `<button type="button" class="pal-chip ${d[key] === v ? 'on' : ''}" data-${key}="${v}">${esc(lab[v])}</button>`).join('');
     openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="pal-creator" id="pal-form"><h2>${pal ? 'Style ' + esc(pal.name) : first ? 'Meet your Pal!' : 'New Pal'}</h2><div id="pal-coins" style="text-align:center"></div>
       <div class="pal-prev"></div>
@@ -344,7 +346,7 @@ export function createPals(ctx) {
     const styles = () => { const sp = SPEC[d.species]; const el = f.querySelector('#pal-styles'); if (!sp) { el.innerHTML = ''; return; } const hx = (c) => '#' + c.match(/\d+/g).slice(0, 3).map((v) => (+v).toString(16).padStart(2, '0')).join(''); const st = [['Original', sp.body, sp.acc], ['Pastel', hx(shade(sp.body, 0.45)), hx(shade(sp.acc, 0.35))], ['Night', hx(shade(sp.body, -0.45)), hx(shade(sp.acc, 0.2))]];
       el.innerHTML = st.map(([n, b, a]) => `<button type="button" class="pal-chip" data-sty="${b}|${a}" style="border-left:14px solid ${b}">${n}</button>`).join(''); };
     styles(); if (shop.econ()) shop.econ().wallet().then((w) => { const el = f.querySelector('#pal-coins'); if (el) el.innerHTML = coinBadge(w.coins); }).catch(() => {}); let owned = {}; shop.econ() && shop.econ().inventory().then((i) => { owned = i || {}; }).catch(() => {});
-    const draw = (t) => { s.c.clearRect(0, 0, 220, 150); if (d.species === 'mystery') { drawEgg(s.c, 110, 145, 120, RM() ? 0 : t); return; } drawPal(s.c, 110, 140, 120, { ...d, level: pal ? pal.level : 1 }, { t, mode: t % 300 < 90 ? 'react' : 'idle' }); }; draw.el = s.cv; loop(draw);
+    const draw = (t) => { s.c.clearRect(0, 0, 220, 150); if (d.species === 'mystery') { drawEgg(s.c, 110, 145, 120, RM() ? 0 : t); return; } drawPal(s.c, 110, 140, 120, copyPal(d, { level: pal ? pal.level : 1 }), { t, mode: t % 300 < 90 ? 'react' : 'idle' }); }; draw.el = s.cv; loop(draw);
     f.addEventListener('click', (e) => { const b = e.target.closest('button[type=button]'); if (!b) return;
       for (const k of ['species', 'pattern', 'acc']) if (b.dataset[k]) { d[k] = b.dataset[k]; f.querySelectorAll(`[data-${k}]`).forEach((x) => x.classList.toggle('on', x === b)); if (k === 'species' && SPEC[d.species]) { d.colors.body = SPEC[d.species].body; d.colors.accent = SPEC[d.species].acc; } }
       for (const k of ['body', 'accent', 'eye']) if (b.dataset[k]) d.colors[k] = b.dataset[k];

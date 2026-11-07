@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Floppy bunny compare</title>
+<body style="margin:0;background:#24143f;color:#fff;font:600 16px sans-serif">
+<canvas id="c" width="960" height="720"></canvas>
+<script type="module">
+import { drawPal3D } from '../../js/pals/pal3d.js';
+import { drawPal } from '../../js/pals/art.js';
+import { withOwner, FLOPPY_BUNNY_UID } from '../../js/pals/floppy-bunny.js';
+const c = document.getElementById('c').getContext('2d');
+const colors = { body: '#d0d0e0', accent: '#5fae6e', eye: '#3b6b3a' };
+const base = { species: 'bunny', name: 'Tilly Eyelash', colors, pattern: 'stripes', acc: 'none', level: 1, outfit: {} };
+const other = withOwner({ ...base }, 'other-account');
+const hers = withOwner({ ...base }, FLOPPY_BUNNY_UID);
+const puppy = { species: 'puppy', name: 'Puppy', colors: {}, level: 1, outfit: {} };
+let t = 0;
+const go = () => {
+  t++;
+  c.clearRect(0, 0, 960, 720);
+  c.fillStyle = '#3a2468';
+  c.fillRect(0, 0, 960, 360);
+  c.fillStyle = '#fff';
+  c.fillText('Other bunny (upright)', 48, 28);
+  c.fillText('@tilly.eyelash bunny (floppy)', 520, 28);
+  const a = drawPal3D(c, 220, 330, 200, other, { t: 40, mode: 'idle', still: true });
+  const b = drawPal3D(c, 720, 330, 200, hers, { t: 40, mode: 'idle', still: true });
+  c.fillStyle = '#1c1033';
+  c.fillRect(0, 360, 960, 360);
+  c.fillStyle = '#fff';
+  c.fillText('2D fallback, same two bunnies', 48, 392);
+  c.fillText('Puppy stays on its own floppy ears', 520, 392);
+  drawPal(c, 220, 690, 180, other, { t: 40, mode: 'idle', flat: true });
+  drawPal(c, 520, 690, 150, hers, { t: 40, mode: 'idle', flat: true });
+  drawPal(c, 780, 690, 150, puppy, { t: 40, mode: 'idle', flat: true });
+  if ((a && b) || t > 40) window.ready = true;
+  else requestAnimationFrame(go);
+};
+setTimeout(go, 200);
+</script>

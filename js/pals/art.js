@@ -2,6 +2,7 @@
 const TAU = Math.PI * 2;
 export const VIBES = { water: { name: 'Water', c: '#5aa8ff' }, star: { name: 'Star', c: '#ffd34d' }, leaf: { name: 'Leaf', c: '#6fd39a' }, flame: { name: 'Flame', c: '#ff8a5c' }, spark: { name: 'Spark', c: '#ffe14d' }, moon: { name: 'Moon', c: '#b9a6ff' } };
 import { drawWear } from './wear.js';
+import { floppyBunny } from './floppy-bunny.js';
 import { SPECIES , FOUNDER } from './species.js';
 export { SPECIES };
 const ALIAS = { twinkbun: 'bunny', nimbo: 'cloudpuff', ember: 'puppy', mossy: 'turtle', prism: 'fox', zap: 'chick', luno: 'owl', petal: 'hamster' };
@@ -55,7 +56,7 @@ let NEED3D = null; export const onNeed3D = (fn) => { NEED3D = fn; };
 const thumbs = new Map();
 // Cached still image of a Pal (3D when available). Returns a canvas; re-renders once 3D becomes available.
 export function getPalThumbnail(pal, px = 128) {
-  const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.level >= 12 ? 2 : pal.level >= 5 ? 1 : 0, px, !!R3]);
+  const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.level >= 12 ? 2 : pal.level >= 5 ? 1 : 0, px, !!R3, floppyBunny(pal) ? 1 : 0]);
   let cv = thumbs.get(key); if (cv) return cv;
   cv = document.createElement('canvas'); cv.width = cv.height = px; const c = cv.getContext('2d');
   drawPal(c, px / 2, px * 0.92, px * 0.62, pal, { t: 30, mode: 'idle' });
@@ -148,7 +149,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (ears === 'capy') earPair((s) => { c.translate(s * 5.9, hy - 7.3); c.rotate(s * (0.35 + earF)); c.lineWidth = 0.6; ell(c, 0, 0, 1.1, 0.75); fillS(shade(B, -0.35)); ell(c, 0, 0.1, 0.45, 0.25); c.fillStyle = shade(A, -0.1); c.fill(); }); // tiny, high, toward the back
   if (ears === 'biground') earPair((s) => { ell(c, s * 8, hy - 4, 4.6, 4.6); fillS(B); ell(c, s * 8, hy - 4, 2.8, 2.8); c.fillStyle = A; c.fill(); });
   if (ears === 'pointy') earPair((s) => { c.translate(s * 5.8, hy - 5); c.rotate(s * (0.25 + earF)); c.beginPath(); c.moveTo(-3.4, 2); c.lineTo(0, -6 - stage); c.lineTo(3.4, 2); c.closePath(); fillS(sp.id === 'fox' || sp.id === 'redpanda' ? B : B); c.beginPath(); c.moveTo(-1.6, 1); c.lineTo(0, -3.6 - stage); c.lineTo(1.6, 1); c.closePath(); c.fillStyle = sp.id === 'piglet' ? A : shade('#ff9fc8', 0.3); c.fill(); });
-  if (ears === 'long') earPair((s) => { c.translate(s * 3.8, hy - 6); c.rotate(s * (0.18 + earF)); ell(c, 0, -6, 2.8, 7 + stage); fillS(B); ell(c, 0, -6, 1.3, 5 + stage); c.fillStyle = A; c.fill(); });
+  if (ears === 'long' && !floppyBunny(pal)) earPair((s) => { c.translate(s * 3.8, hy - 6); c.rotate(s * (0.18 + earF)); ell(c, 0, -6, 2.8, 7 + stage); fillS(B); ell(c, 0, -6, 1.3, 5 + stage); c.fillStyle = A; c.fill(); });
   if (ears === 'floppy') earPair((s) => { c.translate(s * 8, hy - 3); c.rotate(s * (0.35 + earF)); ell(c, s * 1, 4, 2.8, 5.5); fillS(A); });
   if (ears === 'big') earPair((s) => { c.translate(s * 8, hy); c.rotate(s * (Math.sin(t * (R === 'spray' ? 0.6 : 0.08)) * 0.2 + earF)); ell(c, s * 3, 0, 5.5 + stage, 7.5 + stage); fillS(B); ell(c, s * 3, 0.5, 3.6 + stage * 0.6, 5.4 + stage * 0.6); c.fillStyle = A; c.fill(); });
   if (ears === 'ossicones') earPair((s) => { c.strokeStyle = shade(B, -0.3); c.lineWidth = 1.6; c.beginPath(); c.moveTo(s * 2.5, hy - 6); c.lineTo(s * 3, hy - 11 - stage); c.stroke(); c.fillStyle = A; ell(c, s * 3, hy - 11.5 - stage, 1.6, 1.6); c.fill(); c.lineWidth = 1; c.strokeStyle = line; ell(c, s * 8.5, hy - 3, 3, 1.6, s * 0.4); fillS(B); });
@@ -160,6 +161,7 @@ export function drawPal(c, x, y, size, pal, st = {}) {
   if (kind === 'blob' && ex.has('capyface')) { c.beginPath(); c.roundRect(-10.4, hy - 7.2, 20.8, 13.8, [7.6, 7.6, 6, 6]); const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 12); g.addColorStop(0, shade(B, 0.45)); g.addColorStop(0.6, shade(B, 0.15)); g.addColorStop(1, B); fillS(g); // boxy loaf head
     P(() => { c.strokeStyle = shade(B, -0.28); c.lineWidth = 0.55; for (const [a, b, d] of [[-3.2, -7, -0.5], [-1.6, -7.4, 0], [0, -7.3, 0.4], [-8.6, -1, -0.9], [-9.4, 1.6, -0.8], [9.4, 1.8, 0.8], [8.8, -1.2, 0.9]]) { c.beginPath(); c.moveTo(a, hy + b + 0.9); c.lineTo(a + d * 0.6, hy + b - 0.5); c.stroke(); } }); } // shaggy tufts
   else if (kind === 'blob') { ell(c, 0, hy, hr * (ex.has('cheeks') ? cheek * 1.05 : 1), 7.6); const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(0.6, shade(B, 0.25)); g.addColorStop(1, B); fillS(g); }
+  if (ears === 'long' && floppyBunny(pal)) earPair((s) => { c.translate(s * 9.8, hy - 8.4); c.rotate(s * (0.06 + earF * 0.2)); ell(c, 0, 9.2, 2.05, 9.1); fillS(B); ell(c, 0, 9.5, 0.9, 6.7); c.fillStyle = '#ffb3cf'; c.fill(); });
   if (kind === 'jelly') { c.beginPath(); c.moveTo(-10, hy + 6); c.bezierCurveTo(-10, hy - 10, 10, hy - 10, 10, hy + 6); c.quadraticCurveTo(5, hy + 9, 0, hy + 7); c.quadraticCurveTo(-5, hy + 9, -10, hy + 6); c.globalAlpha = 0.92; const g = c.createRadialGradient(-2, hy - 3, 2, 0, hy, 11); g.addColorStop(0, shade(B, 0.65)); g.addColorStop(1, B); fillS(g); c.globalAlpha = 1; }
   if (ex.has('cheeks')) { c.fillStyle = shade(B, 0.45); ell(c, -6.5, hy + 3, 3.4 * cheek, 2.8 * cheek); c.fill(); ell(c, 7.5, hy + 3, 3.4 * cheek, 2.8 * cheek); c.fill(); }
   if (ex.has('mask')) { c.fillStyle = '#fff6ee'; ell(c, -4.5, hy + 2, 3.4, 2.6); c.fill(); ell(c, 6, hy + 2, 3.4, 2.6); c.fill(); c.fillStyle = shade(B, 0.6); ell(c, 1, hy - 4.5, 1.6, 1.2); c.fill(); }

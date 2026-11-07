@@ -2,6 +2,7 @@
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, writeBatch, serverTimestamp, increment, deleteDoc, deleteField }
   from '../fsq.js';
 import { SPEC } from './art.js';
+import { withOwner } from './floppy-bunny.js';
 export const MAX_PALS = 6;
 export const STATS = ['happy', 'hunger', 'energy', 'clean']; // hunger = fullness (100 = full)
 const DECAY = { happy: 2, hunger: 4, energy: 3, clean: 3 };   // points per hour
@@ -75,8 +76,8 @@ export function createStore(db, uid) {
   const ref = (id) => doc(db, 'users', uid, 'pets', id);
   let lastWrite = 0, chain = Promise.resolve();
   return {
-    async list() { const s = await getDocs(col()); return s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); },
-    async get(id) { const s = await getDoc(ref(id)); return s.exists() ? { id, ...s.data() } : null; },
+    async list() { const s = await getDocs(col()); return s.docs.map((d) => withOwner({ id: d.id, ...d.data() }, uid)).sort((a, b) => a.id.localeCompare(b.id)); },
+    async get(id) { const s = await getDoc(ref(id)); return s.exists() ? withOwner({ id, ...s.data() }, uid) : null; },
     async create(id, data) { await setDoc(ref(id), newPal(id, data)); return this.get(id); },
     // save stats/xp/look. xp gain per write is capped at 60 by the rules, and writes are 1s apart.
     // Saves are queued one at a time (rapid shop taps used to fire two writes inside the rules' 1 s window and get
@@ -118,13 +119,13 @@ export async function patPal(db, ownerUid, petId, me) {
   const old = await getDoc(pr); if (old.exists() && Date.now() - tsMs(old.data().at) < 20 * 3600000) return false;
   const b = writeBatch(db); b.set(pr, { uid: me, at: serverTimestamp() }); b.update(doc(db, 'users', ownerUid, 'pets', petId), { pats: increment(1) }); await b.commit(); return true;
 }
-export async function readPet(db, uid, id) { const s = await getDoc(doc(db, 'users', uid, 'pets', id)); return s.exists() ? { id, ...s.data() } : null; }
-export async function firstPet(db, uid) { const s = await getDocs(collection(db, 'users', uid, 'pets')); const l = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); return l[0] || null; }
+export async function readPet(db, uid, id) { const s = await getDoc(doc(db, 'users', uid, 'pets', id)); return s.exists() ? withOwner({ id, ...s.data() }, uid) : null; }
+export async function firstPet(db, uid) { const s = await getDocs(collection(db, 'users', uid, 'pets')); const l = s.docs.map((d) => withOwner({ id: d.id, ...d.data() }, uid)).sort((a, b) => a.id.localeCompare(b.id)); return l[0] || null; }
 export const formName = (p) => { const sp = SPEC[p.species]; return sp ? sp.forms[p.level >= 12 ? 2 : p.level >= 5 ? 1 : 0] : ''; };
 export { deleteDoc };
 // ---- public read API (also for Phase 2: Pal vs Pal games and the Pal Park)
 import { query, where, limit } from '../fsq.js';
-export async function listPals(db, uid) { const s = await getDocs(collection(db, 'users', uid, 'pets')); return s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id)); }
+export async function listPals(db, uid) { const s = await getDocs(collection(db, 'users', uid, 'pets')); return s.docs.map((d) => withOwner({ id: d.id, ...d.data() }, uid)).sort((a, b) => a.id.localeCompare(b.id)); }
 // a user's active Pal (users/{uid}.activePet, else their first Pal), readable by anyone
 export async function getActivePal(db, uid) {
   const u = await getDoc(doc(db, 'users', uid)); const id = u.exists() ? u.data().activePet : '';

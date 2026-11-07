@@ -5,6 +5,7 @@ import { EMOTE_DANCES, priceOf, BASIC, TRENDING, PRICE, RARITY_NAME, allDances, 
 import { addItems, addDiamondItems, ITEM, shopDoc } from './catalog.js';
 import { createDiamonds } from './armory.js';
 import { doc, getDoc, setDoc } from '../fsq.js';
+import { copyPal } from './floppy-bunny.js';
 
 const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const R2 = { c: 'c', r: 'r', l: 'l' };
@@ -43,7 +44,7 @@ export function createDanceUI(ctx) {
     forcePreview(true); let t = 0;
     const frame = () => { if (!document.body.contains(cv)) { forcePreview(false); return; } t++; c.clearRect(0, 0, 220, 150);
       const d = prev ? danceById(prev) : sel !== 'free' ? danceById(sel) : null;
-      drawDancer(c, 110, 140, 96, { ...pal, _dance: d && ownsDance(d) ? d.id : 'free' }, { t, dance: d || undefined });
+      drawDancer(c, 110, 140, 96, copyPal(pal, { _dance: d && ownsDance(d) ? d.id : 'free' }), { t, dance: d || undefined });
       root.querySelector('.pal-dance-now').textContent = prev ? `Preview: ${danceById(prev).name}` : d ? `Favourite: ${d.name}` : 'Freestyle: mixes all your moves to the beat';
       requestAnimationFrame(frame); };
     requestAnimationFrame(frame);
