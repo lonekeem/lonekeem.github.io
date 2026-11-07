@@ -9,7 +9,7 @@ const C = { pink: '#f4a6c4', red: '#d9505c', blue: '#6f9fe0', navy: '#2f3d6e', g
 const T = { pink: 'Pink', red: 'Red', blue: 'Blue', navy: 'Navy', green: 'Green', yellow: 'Sunny', purple: 'Purple', white: 'White', black: 'Midnight', orange: 'Orange', mint: 'Mint', lilac: 'Lilac', gold: 'Gold', silver: 'Silver', rose: 'Rose Gold', teal: 'Teal' , sage: 'Sage', cream: 'Cream', denim: 'Denim', camel: 'Camel', mocha: 'Mocha', blush: 'Blush', butter: 'Butter', sky: 'Sky', plum: 'Plum', forest: 'Forest' };
 // [base id, name, slot, style, g, colours, premium price (0 = free), rarity]
 const BASE = [
-  ['cap', 'Cap', 'head', 'cap', 'a', ['red', 'blue', 'black', 'green'], 0], ['beanie', 'Beanie', 'head', 'beanie', 'a', ['pink', 'navy', 'mint'], 0],
+  ['cap', 'Cap', 'head', 'cap', 'a', ['red', 'blue', 'black', 'green'], 0], ['beanie', 'Beanie', 'head', 'beanie', 'a', ['pink', 'navy', 'mint', 'black', 'white', 'red', 'blue', 'green'], 0],
   ['bucket', 'Bucket Hat', 'head', 'bucket', 'a', ['yellow', 'lilac'], 0], ['tiara', 'Tiara', 'head', 'tiara', 'g', ['silver', 'gold', 'pink'], 150, 'r'],
   ['crown', 'Crown', 'head', 'crown', 'a', ['gold', 'silver'], 400, 'e'], ['tophat', 'Top Hat', 'head', 'tophat', 'b', ['black', 'purple'], 120, 'r'],
   ['helmet', 'Sports Helmet', 'head', 'helmet', 'b', ['blue', 'red'], 0], ['earband', 'Kitty Ear Band', 'head', 'earband', 'g', ['pink', 'black'], 0],
