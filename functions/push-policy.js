@@ -90,6 +90,15 @@ function inboxPush(n) {
       tag: 'invite-' + id.slice(0, 40)
     };
   }
+  if (n.type === 'play') {
+    return {
+      type: 'play',
+      title: 'Play app',
+      body: clip(n.text, 140) || `${name} is on Kemy`,
+      url: 'app.html#/members',
+      tag: 'play-' + String(n.fromUid || '').slice(0, 40)
+    };
+  }
   if (n.type === 'house') {
     const ring = /doorbell|rang/i.test(String(n.text || ''));
     return {

@@ -91,6 +91,11 @@ test('inbox events map to invite and house only', () => {
   assert.equal(house.url, 'app.html#/street');
   const follow = p.inboxPush({ type: 'follow', fromName: 'Cam', fromUsername: 'cam' });
   assert.equal(follow.url, 'app.html#/u/cam');
+  const play = p.inboxPush({ type: 'play', fromName: 'Ada', fromUid: 'ada', text: '🧪 @ada is on Kemy (Play app)' });
+  assert.equal(play.type, 'play');
+  assert.equal(play.url, 'app.html#/members');
+  assert.match(play.body, /@ada is on Kemy/);
+  assert.equal(p.inboxPush({ type: 'play' }).body.length > 0, true);
 });
 
 test('announcements stay on Kemy and strip outside links', () => {

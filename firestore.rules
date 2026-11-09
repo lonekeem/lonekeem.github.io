@@ -301,14 +301,19 @@ service cloud.firestore {
               || (request.auth.token.email == null && d.email == ''));
       }
       function memberShape(d) {
-        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive'])
+        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive', 'playApp', 'playAppSeen', 'playTold', 'playJoined'])
           && nameOk(d)
           && isStr(d.displayNameLower, 0, 100)
           && isStr(d.color, 1, 20)
           && (d.photoURL == '' || cloudinaryImageUrl(d.photoURL))
           && d.createdAt is timestamp
           && d.signup in ['email', 'google', '']
-          && (!('lastActive' in d) || d.lastActive is timestamp);
+          && (!('lastActive' in d) || d.lastActive is timestamp)
+          // Play app flag (js/play-app.js). playTold is the last time Keem was notified.
+          && (!('playApp' in d) || d.playApp == true)
+          && (!('playAppSeen' in d) || d.playAppSeen is timestamp)
+          && (!('playTold' in d) || d.playTold is timestamp)
+          && (!('playJoined' in d) || d.playJoined == true);
       }
       // A visit can set lastActive to now. It cannot be moved to some other time.
       function lastActiveOk() {
@@ -325,12 +330,28 @@ service cloud.firestore {
       function z67() { let qq = Nd(); return signedIn() && uid == me() && memberShape(qq)
         && qq.createdAt == Tn()
         && qq.lastActive == Tn()
-        && qq.signup == memberSignup(); }
+        && qq.signup == memberSignup()
+        && (!('playAppSeen' in qq) || qq.playAppSeen == Tn())
+        && (!('playTold' in qq) || qq.playTold == Tn())
+        && (!('playJoined' in qq) || qq.playJoined == true); }
       allow create: if z67();
+      // Play flag: set true, stamp times to now. playTold moves at most once every 3 hours. playJoined sticks.
+      function playFlagOk() {
+        let ch = Nd().diff(Od()).affectedKeys();
+        let next = Nd();
+        let prev = Od();
+        return (!ch.hasAny(['playApp', 'playAppSeen'])
+            || (next.get('playApp', false) == true && (!('playAppSeen' in ch) || next.playAppSeen == Tn())))
+          && (!('playTold' in ch)
+            || (next.playTold == Tn()
+              && (!('playTold' in prev) || prev.playTold + duration.value(3, 'h') <= Tn())))
+          && (!('playJoined' in ch) || (next.playJoined == true && prev.get('playJoined', false) != true));
+      }
       function z66() { let qq = Nd(); return signedIn() && uid == me() && memberShape(qq)
         && qq.createdAt == Od().createdAt
         && qq.signup == Od().signup
-        && lastActiveOk(); }
+        && lastActiveOk()
+        && playFlagOk(); }
       allow update: if z66();
       allow delete: if isAdmin() || (signedIn() && uid == me());
       // The email is not on the member row. Only the admin can read it, and only when they tap.
@@ -581,6 +602,29 @@ service cloud.firestore {
           && isStr(qq.postId, 0, 100)
           && cleanStr(qq.text, 0, 140); }
         allow create: if z55();
+        // Play app opened or a new Play signup. Only onto the admin account (display name Kemy), with the 3-hour stamp.
+        function z54() {
+          let qq = Nd();
+          let mem = Dp('members', me());
+          let before = get(mem).data;
+          let after = getAfter(mem).data;
+          let joined = qq.text == '🧪 New Play tester joined: @' + qq.fromUsername;
+          let visit = qq.text == '🧪 @' + qq.fromUsername + ' is on Kemy (Play app)';
+          let firstJoin = after.get('playJoined', false) == true && before.get('playJoined', false) != true;
+          return signedIn() && uid != me() && sessionOk(me())
+            && !isBlocked(uid, qq.fromUid)
+            && nShape(qq)
+            && qq.type == 'play' && qq.fromUid == me() && qq.postId == ''
+            && qq.fromName == get(userPath(me())).data.displayName
+            && qq.fromUsername == get(userPath(me())).data.username
+            && get(userPath(uid)).data.displayName == 'Kemy'
+            && exists(mem)
+            && after.playApp == true
+            && after.playTold == Tn()
+            && (joined ? firstJoin : (visit && !firstJoin
+              && (!('playTold' in before) || before.playTold + duration.value(3, 'h') <= Tn())));
+        }
+        allow create: if z54();
       }
     }
 

@@ -9,6 +9,8 @@ import { signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp
 } from './fsq.js';
+import { inPlayApp, playNoted } from './play-app.js';
+import { tellPlayAdmin } from './play-notify.js';
 
 const KEY = 'kemy-device-id';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -32,7 +34,7 @@ const ms = (t) => (t && t.toMillis ? t.toMillis() : 0);
 const when = (t) => new Date(ms(t) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 export const alertText = (label, t) => `New sign-in on ${label} at ${when(t)}. Not you? Tap Sign out everywhere.`;
 
-export function createDevices({ auth, db, isPrivileged, toast }) {
+export function createDevices({ auth, db, isPrivileged, toast, isAdmin, profile }) {
   const st = { uid: null, unsubs: [], devices: [], alerts: null, authMs: 0, mine: deviceId(), seen: false };
   const privileged = () => !!(isPrivileged && isPrivileged());
   const alertsOn = () => (st.alerts == null ? privileged() : st.alerts);
@@ -72,6 +74,14 @@ export function createDevices({ auth, db, isPrivileged, toast }) {
     if (st.uid !== uid) return;
     // Opening Kemy counts as a visit, so the admin list can tell who has been quiet for 30 days.
     updateDoc(doc(db, 'members', uid), { lastActive: serverTimestamp() }).catch(() => {});
+    // Play app: flag this row, and tell Keem at most once every 3 hours. Not for Keem's own account.
+    if (inPlayApp() && !playNoted()) {
+      const p = (profile && profile()) || {};
+      tellPlayAdmin(db, {
+        uid, kind: 'visit', admin: !!(isAdmin && isAdmin()),
+        username: p.username || '', displayName: p.displayName || ''
+      }).catch(() => {});
+    }
     if (isNew && alertsOn()) {
       setDoc(doc(collection(db, 'users', uid, 'notifications')), { type: 'security', fromUid: uid, fromName: 'Kemy Security', fromUsername: '',
         postId: st.mine, text: alertText(label), createdAt: serverTimestamp(), read: false }).catch((e) => console.warn('security note failed', e));
