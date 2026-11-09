@@ -372,6 +372,26 @@ function build(pal) {
 }
 // ---------------------------------------------------------------- posing
 const ez = (k, dt) => 1 - Math.pow(1 - k, dt); // frame-rate independent easing
+// Head / hip / spine angles are wrapped. A straight lerp from 0 to just under a full turn spins the long way
+// (the Jelly face, which sits on the head bone, whips around once when Kemy Street loads, then stops).
+const ANG = new Set(['hrx', 'hry', 'hrz', 'nx', 'ny', 'nz', 'sx', 'sy', 'sz', 'cx', 'cy', 'cz']);
+export const angDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
+export function stepAngle(from, to, k, snap) {
+  if (snap || !Number.isFinite(from)) return to;
+  return from + angDelta(from, to) * k;
+}
+function easePose(prev, next, dt60, snap) {
+  if (snap || !prev) return next;
+  const kL = ez(0.2, dt60), kB = ez(0.3, dt60), o = {};
+  for (const key in next) {
+    const a = prev[key], b = next[key];
+    if (FT.has(key)) o[key] = b;
+    else if (Array.isArray(b)) o[key] = b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * kL : v));
+    else if (typeof b === 'number' && typeof a === 'number' && key !== 'ry') o[key] = ANG.has(key) ? stepAngle(a, b, kB) : a + (b - a) * kB;
+    else o[key] = b;
+  }
+  return o;
+}
 const slots = new WeakMap();
 function slotFor(c, key) { let m = slots.get(c); if (!m) { m = new Map(); slots.set(c, m); } let s = m.get(key); if (!s) { s = { clock: 0, last: 0 }; m.set(key, s); if (m.size > 12) m.delete(m.keys().next().value); } return s; }
 // Applies a full-body human-style pose (see dances3d.js for the joint format) plus procedural life:
@@ -384,10 +404,14 @@ function apply(rootObj, P, t, mode) {
   const sq = clamp1(P.sq || 0); J.Hips.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5); // squash & stretch (jumps)
   for (const [n, s, v] of [['Left', 1, P.shL], ['Right', -1, P.shR]]) if (J[n + 'Shoulder']) J[n + 'Shoulder'].rotation.set(v ? v[0] : 0, 0, v ? s * v[1] + (P.sh || 0) * 0 : 0); // shoulder rolls
   J.Spine.rotation.set(P.sx || 0, P.sy || 0, P.sz || 0); J.Chest.rotation.set(P.cx || 0, P.cy || 0, P.cz || 0);
-  // head with lag (follow-through)
-  const sp = rootObj.userData.sp0 || (rootObj.userData.sp0 = { hx: 0, hz: 0, e: 0, tl: 0 }); const dk = ez(0.25, rootObj.userData.dt60 || 1);
-  sp.hx += ((P.nx || 0) - sp.hx) * dk; sp.hz += ((P.nz || 0) - sp.hz) * dk;
-  J.Neck.rotation.set(sp.hx * 0.4, (P.ny || 0) * 0.5, sp.hz * 0.4); J.Head.rotation.set(sp.hx * 0.6, (P.ny || 0) * 0.5, sp.hz * 0.6);
+  // head with lag (follow-through). The first frame snaps to the pose so a fresh Pal does not spin from 0.
+  const sp = rootObj.userData.sp0 || (rootObj.userData.sp0 = { hx: 0, hz: 0, hy: 0, e: 0, tl: 0, ready: false });
+  const dk = ez(0.25, rootObj.userData.dt60 || 1);
+  const nx = P.nx || 0, nz = P.nz || 0, ny = P.ny || 0;
+  if (!sp.ready || rootObj.userData.snapHead) { sp.hx = nx; sp.hz = nz; sp.hy = ny; sp.ready = true; rootObj.userData.snapHead = false; }
+  else { sp.hx += (nx - sp.hx) * dk; sp.hz += (nz - sp.hz) * dk; sp.hy = stepAngle(sp.hy, ny, dk); }
+  J.Neck.rotation.order = 'YXZ'; J.Head.rotation.order = 'YXZ';
+  J.Neck.rotation.set(sp.hx * 0.4, sp.hy * 0.5, sp.hz * 0.4); J.Head.rotation.set(sp.hx * 0.6, sp.hy * 0.5, sp.hz * 0.6);
   // arms: [abduct°, forward°, elbow°, twist°]
   for (const [n, s, a] of [['Left', 1, P.aL], ['Right', -1, P.aR]]) {
     const [ab = 14, fw = 0, el = 10, tw = 0] = a || [];
@@ -441,7 +465,9 @@ const clamp1 = (v) => Math.max(-0.4, Math.min(0.4, v));
 const FT = new Set(['fL', 'fR']);
 function blend(a, b, k) { const o = {}; for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) { const x = a[key], y = b[key];
     if (FT.has(key)) { if (x && y) o[key] = x.map((v, i) => v + (y[i] - v) * k); else if (x || y) { const z = x || y; const w = x ? 1 - k : k; o[key] = [z[0] * w, z[1] * w, z[2] * w, z[3] * w, z[4] * w]; } continue; }
-    if (key === 'slide') { o[key] = k > 0.5 ? y : x; continue; } if (Array.isArray(x) || Array.isArray(y)) { const X = x || [14, 0, 10, 0], Y = y || [14, 0, 10, 0]; o[key] = X.map((v, i) => v + ((Y[i] ?? v) - v) * k); } else o[key] = (x || 0) + ((y || 0) - (x || 0)) * k; } return o; }
+    if (key === 'slide') { o[key] = k > 0.5 ? y : x; continue; } if (Array.isArray(x) || Array.isArray(y)) { const X = x || [14, 0, 10, 0], Y = y || [14, 0, 10, 0]; o[key] = X.map((v, i) => v + ((Y[i] ?? v) - v) * k); }
+    else if (ANG.has(key)) o[key] = stepAngle(x || 0, y || 0, k);
+    else o[key] = (x || 0) + ((y || 0) - (x || 0)) * k; } return o; }
 // ---------------------------------------------------------------- draw into a 2D canvas (same args as drawPal)
 let frameN = -1, frameCount = 0; const BUDGET = 8;
 let lastF = 0, slow = 0;
@@ -482,7 +508,7 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
   if (!sane(P)) P = modePose('idle', t); // never leave a broken / T-pose on screen
   // overlap & follow-through: every joint eases toward its target (limbs a bit slower than the hips), so moves and
   // dance changes flow into each other instead of snapping
-  const pv = m.userData.prev; if (pv && Math.abs(t - (m.userData.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }
+  const pv = m.userData.prev; const snapPose = !m.userData.posed || m.userData.snapHead; if (!snapPose && pv && Math.abs(t - (m.userData.pt || 0)) < 30) P = easePose(pv, P, dt60); m.userData.posed = true;
   m.userData.prev = P; m.userData.pt = t;
   if (m.userData.J && m.userData.J.spark) { const g = m.userData.J.spark; g.visible = gfxLevel() !== 'low'; g.rotation.y = t * 0.008; g.children.forEach((o) => { const k = 0.5 + 0.5 * Math.sin(t * 0.06 + o.userData.ph * 1.7); o.material.opacity = k; o.position.y = o.userData.y0 + Math.sin(t * 0.02 + o.userData.ph) * 0.12; }); }
   apply(m, P, t, st.mode); grip(m, st.dance3d ? st.amt ?? 1 : 0, st.mode, t);
@@ -647,7 +673,7 @@ export function posePal3D(m, st = {}) {
   else if (st.dance3d) { const D3 = clipFor(st.dance3d, ud.sp); P = blend(P, D3(st.beat || 0, t), st.amt ?? 1); }
   if (st.extra) P = { ...P, ...st.extra };
   if (!sane(P)) P = modePose('idle', t);
-  const pv = ud.prev; if (pv && Math.abs(t - (ud.pt || 0)) < 30) { const o = {}; for (const k in P) { const a = pv[k], b = P[k]; o[k] = FT.has(k) ? b : Array.isArray(b) ? b.map((v, i) => (a && Number.isFinite(a[i]) ? a[i] + (v - a[i]) * ez(0.2, dt60) : v)) : typeof b === 'number' && typeof a === 'number' && k !== 'ry' ? a + (b - a) * ez(0.3, dt60) : b; } P = o; }
+  const pv = ud.prev; const snapPose = !ud.posed || ud.snapHead; if (!snapPose && pv && Math.abs(t - (ud.pt || 0)) < 30) P = easePose(pv, P, dt60); ud.posed = true;
   ud.prev = P; ud.pt = t;
   // whole-body turns from the dance styles (spins, cartwheels): procedural, applied after smoothing so they never unwind
   if (ud.ry0 == null) ud.ry0 = m.rotation.y; m.rotation.y = ud.ry0 + (st.ry || 0);
