@@ -14,6 +14,7 @@ import {
 } from './fsq.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import { SPECIES, FOUNDER } from './pals/species.js';
+import { playTesterChip } from './play-app.js';
 
 const PAGE = 12;
 const TZ = 'America/New_York';
@@ -174,10 +175,11 @@ async function paintCounts(stale) {
     countMembersFrom(week).then((n) => n, () => null),
     countMembersFrom(month).then((n) => n, () => null),
     countOnline().then((n) => n, () => null),
-    countWhere('lastActive', '<', cutoff).then((n) => n, () => null)
+    countWhere('lastActive', '<', cutoff).then((n) => n, () => null),
+    countWhere('playApp', '==', true).then((n) => n, () => null)
   ]);
   if (stale && stale()) return;
-  const [todayN, weekN, monthN, online, inactiveN] = settled;
+  const [todayN, weekN, monthN, online, inactiveN, playN] = settled;
   period.innerHTML = [
     countCell(todayN, 'Joined today'),
     countCell(weekN, 'This week'),
@@ -186,6 +188,8 @@ async function paintCounts(stale) {
   ].join('');
   const inactiveEl = document.getElementById('nm-n-inactive');
   if (inactiveEl) inactiveEl.textContent = inactiveN == null ? '—' : comma(inactiveN);
+  const playEl = document.getElementById('nm-play');
+  if (playEl) playEl.textContent = 'Play app: ' + (playN == null ? '—' : comma(playN));
   let prev = null;
   liveUnsub = onSnapshot(doc(db, 'stats', 'members'), (snap) => {
     if (stale && stale()) return;
@@ -399,7 +403,7 @@ function rowHtml(m, fresh) {
     <button type="button" class="nm-open" data-open="${esc(m.uid)}" aria-label="Open ${esc(name)}">
       ${avatarHtml(m)}
       <span class="nm-meta">
-        <span class="nm-name"><b>${esc(name)}</b>${quiet ? '<span class="nm-tag">Inactive</span>' : ''}${fresh ? '<span class="nm-new">New</span>' : ''}</span>
+        <span class="nm-name"><b>${esc(name)}</b>${quiet ? '<span class="nm-tag">Inactive</span>' : ''}${playTesterChip(m.playApp)}${fresh ? '<span class="nm-new">New</span>' : ''}</span>
         ${handle ? `<span class="nm-handle">${esc(handle)}</span>` : ''}
         <span class="nm-when">${quiet ? 'Last seen ' + esc(seen || 'not recorded') + ' · ' : ''}${esc(nyTime(m.createdAt))}</span>
         <span class="nm-how">${esc(signupLine(m.signup))}</span>
@@ -436,6 +440,7 @@ export async function page(main, { stale, toast, mod } = {}) {
     <div id="nm-counts" aria-live="polite">
       <p class="nm-total"><b id="nm-live-total">…</b><span>members</span><span id="nm-delta" class="nm-delta" aria-hidden="true"></span></p>
       <div class="nm-stats" id="nm-period"></div>
+      <p class="muted small" id="nm-play">Play app: …</p>
       <p class="muted small nm-count-note">Today, this week, and this month start at midnight in New York. Online is Pal Park in the last minute. Inactive means no visit for 30 days. Left Kemy is an account that was deleted.</p>
       <p class="muted small nm-verified" id="nm-verified">Not verified yet</p>
       <p class="small"><button type="button" class="btn btn-sm btn-ghost" id="nm-recount">Recount</button> <span class="muted small" id="nm-recount-msg"></span></p>
@@ -602,7 +607,7 @@ export async function page(main, { stale, toast, mod } = {}) {
         </div>`;
     return `<button type="button" class="nm-back" id="nm-back">← New Members</button>
       <article class="nm-card-detail">
-        <div class="nm-detail-head">${avatarHtml(m)}<div><h1>${esc(name)}</h1>${handle ? `<a class="nm-handle" href="#/u/${esc(m.username)}">${esc(handle)}</a>` : ''}<p class="nm-pal">${esc(palLine)}</p></div></div>
+        <div class="nm-detail-head">${avatarHtml(m)}<div><h1>${esc(name)} ${playTesterChip(m.playApp)}</h1>${handle ? `<a class="nm-handle" href="#/u/${esc(m.username)}">${esc(handle)}</a>` : ''}<p class="nm-pal">${esc(palLine)}</p></div></div>
         <p class="nm-when">Joined ${esc(nyTime(m.createdAt))}</p>
         <p class="nm-when">Last active ${esc(info.devicesOk ? (nyStamp(info.last) || nyStamp(m.lastActive) || 'Not recorded yet') : 'Not available')}</p>
         ${banNote ? `<p class="nm-ban">${esc(banNote)}</p>` : ''}

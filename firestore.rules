@@ -301,14 +301,17 @@ service cloud.firestore {
               || (request.auth.token.email == null && d.email == ''));
       }
       function memberShape(d) {
-        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive'])
+        return d.keys().hasOnly(['displayName', 'username', 'displayNameLower', 'color', 'photoURL', 'createdAt', 'signup', 'lastActive', 'playApp', 'playAppSeen'])
           && nameOk(d)
           && isStr(d.displayNameLower, 0, 100)
           && isStr(d.color, 1, 20)
           && (d.photoURL == '' || cloudinaryImageUrl(d.photoURL))
           && d.createdAt is timestamp
           && d.signup in ['email', 'google', '']
-          && (!('lastActive' in d) || d.lastActive is timestamp);
+          && (!('lastActive' in d) || d.lastActive is timestamp)
+          // Play app flag (js/play-app.js). Optional. Only true, and the time is a timestamp.
+          && (!('playApp' in d) || d.playApp == true)
+          && (!('playAppSeen' in d) || d.playAppSeen is timestamp);
       }
       // A visit can set lastActive to now. It cannot be moved to some other time.
       function lastActiveOk() {
@@ -325,12 +328,21 @@ service cloud.firestore {
       function z67() { let qq = Nd(); return signedIn() && uid == me() && memberShape(qq)
         && qq.createdAt == Tn()
         && qq.lastActive == Tn()
-        && qq.signup == memberSignup(); }
+        && qq.signup == memberSignup()
+        && (!('playAppSeen' in qq) || qq.playAppSeen == Tn()); }
       allow create: if z67();
+      // Play flag: the owner may set playApp true and stamp playAppSeen to now. It cannot be cleared.
+      function playFlagOk() {
+        let ch = Nd().diff(Od()).affectedKeys();
+        return !ch.hasAny(['playApp', 'playAppSeen'])
+          || (Nd().get('playApp', false) == true
+            && (!('playAppSeen' in ch) || Nd().playAppSeen == Tn()));
+      }
       function z66() { let qq = Nd(); return signedIn() && uid == me() && memberShape(qq)
         && qq.createdAt == Od().createdAt
         && qq.signup == Od().signup
-        && lastActiveOk(); }
+        && lastActiveOk()
+        && playFlagOk(); }
       allow update: if z66();
       allow delete: if isAdmin() || (signedIn() && uid == me());
       // The email is not on the member row. Only the admin can read it, and only when they tap.

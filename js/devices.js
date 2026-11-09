@@ -9,6 +9,7 @@ import { signOut } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp
 } from './fsq.js';
+import { inPlayApp, playNoted, rememberPlayNoted } from './play-app.js';
 
 const KEY = 'kemy-device-id';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -72,6 +73,11 @@ export function createDevices({ auth, db, isPrivileged, toast }) {
     if (st.uid !== uid) return;
     // Opening Kemy counts as a visit, so the admin list can tell who has been quiet for 30 days.
     updateDoc(doc(db, 'members', uid), { lastActive: serverTimestamp() }).catch(() => {});
+    // Play app (TWA): one flag on this person's own member row, once per tab session. No read first.
+    if (inPlayApp() && !playNoted()) {
+      updateDoc(doc(db, 'members', uid), { playApp: true, playAppSeen: serverTimestamp() })
+        .then(() => rememberPlayNoted()).catch(() => {});
+    }
     if (isNew && alertsOn()) {
       setDoc(doc(collection(db, 'users', uid, 'notifications')), { type: 'security', fromUid: uid, fromName: 'Kemy Security', fromUsername: '',
         postId: st.mine, text: alertText(label), createdAt: serverTimestamp(), read: false }).catch((e) => console.warn('security note failed', e));
