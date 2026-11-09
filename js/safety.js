@@ -157,6 +157,7 @@ export const RULES = [
   ['🧼', 'Keep it clean', 'No swearing and no adult, scary or violent content.'],
   ['🔒', 'Keep your info private', 'Never share your address, school, phone number, email, or a link to another app. Players can’t privately message each other.'],
   ['🎨', 'Post your own stuff', 'Only post things you made or have the right to share.'],
+  ['🤖', 'No AI fakes of real people', 'AI videos and characters you make up are fine. Don\'t make AI videos, photos or voices of real people without their permission.'],
   ['🎵', 'No copyrighted music or videos', 'Don\'t upload songs, shows or movies made by someone else.'],
   ['🙅', 'No false reports', 'Only report real problems. Reporting people to be mean or as a joke can pause your reporting.'],
   ['🚩', 'Report anything that feels wrong', 'Tap ⋯ or 🚩 Report. Moderators check every report, and it\'s private.']
