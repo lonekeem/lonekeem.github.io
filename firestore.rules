@@ -201,6 +201,12 @@ service cloud.firestore {
     function isNewAcct(d) { return d.get('createdAt', Tn()) > Tn() - duration.value(3, 'd'); }
     // Links in free text (our own Cloudinary media links don't count).
     function linkText(t) { return t.replace('https://res[.]cloudinary[.]com/[^\\s]*', ''); }
+    // True when the caption has no "http" or "www." marker, so it cannot contain a link.
+    // Used by media posts so the backtracking link scan is not run for an ordinary caption.
+    function tNoMark(t) {
+      return t.lower().replace('http', '').size() == t.size()
+        && t.lower().replace('www.', '').size() == t.size();
+    }
     function hasLink(t) { return linkText(t).matches('(?is).*(https?://|www[.]).*'); }
     function tooManyLinks(t) { return linkText(t).matches('(?is)(.*(https?://|www[.])){3,}.*'); }
     // New accounts: no links; everyone else: at most 2 links per post / comment / message.
@@ -627,6 +633,64 @@ service cloud.firestore {
             && d.sound.vol is number && d.sound.vol >= 0 && d.sound.vol <= 1
             && d.sound.orig is number && d.sound.orig >= 0 && d.sound.orig <= 1);
     }
+    // Photo and video posts. One profile read covers the author name, the 13+ check, and the
+    // 3-day video hold. Movie and song rules are not evaluated.
+    // An empty caption cannot fail the invisible-character or link scans, so those are not run.
+    // When the width/poster fields are present, validMediaExtras already checks the Cloudinary
+    // host, so this function does not check those same URLs again.
+    function mediaCore(d, u) {
+      return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
+                               'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
+                               'commentCount', 'lastCommentId', 'studio',
+                               'posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId',
+                               'keywords', 'hashtags', 'cat', 'sound', 'minAge'])
+        && d.type == 'media'
+        && !('work' in d)
+        && d.get('minAge', 0) in [0, 13, 17]
+        && validPostSearch(d)
+        && validSound(d)
+        && (!('cat' in d) || d.cat in postCats())
+        && d.keys().hasAll(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
+                            'linkUrl', 'mediaUrl', 'mediaType', 'poster', 'createdAt', 'likeCount',
+                            'commentCount', 'lastCommentId', 'studio'])
+        && d.authorName == u.displayName
+        && d.authorUsername == u.username
+        && d.authorColor == u.color
+        && (d.text == '' || (cleanStr(d.text, 0, 2000)
+            && (d.authorId == 'studio' || isAdmin()
+                || (tNoMark(d.text) || linksOk(d.text, u)))))
+        && isStr(d.linkUrl, 0, 300)
+        && isStr(d.mediaUrl, 0, 500)
+        && d.mediaType in ['', 'image', 'video']
+        && isStr(d.poster, 0, 500)
+        && (d.linkUrl == '' || d.linkUrl.matches('^https://([a-z0-9-]+[.])*(youtube[.]com|youtu[.]be|tiktok[.]com)/.*$'))
+        && (d.keys().hasAll(['posterUrl', 'width', 'height', 'duration', 'cloudinaryPublicId'])
+            || ((d.authorId == 'studio' || d.mediaUrl == '' || cloudinaryUrl(d.mediaUrl))
+                && (d.authorId == 'studio' || d.poster == '' || cloudinaryUrl(d.poster))))
+        && (d.mediaUrl == '' || d.mediaType in ['image', 'video'])
+        && validMediaExtras(d)
+        && (d.text.size() > 0 || d.linkUrl != '' || d.mediaUrl != '')
+        && d.createdAt == Tn()
+        && d.likeCount == 0 && d.commentCount == 0 && d.lastCommentId == ''
+        && d.studio == (d.authorId == 'studio')
+        && getAfter(userPath(d.authorId)).data.lastPostAt == Tn();
+    }
+    function mediaHeldOk(d) {
+      let u = get(userPath(d.authorId)).data;
+      return mediaCore(d, u)
+        && (isAdmin() || d.authorId == 'studio' || (knownTeen(u) && u.get('rulesAt', null) is timestamp && !exists(u13Path(d.authorId))));
+    }
+    function mediaCreateOk(d) {
+      let u = get(userPath(d.authorId)).data;
+      let banned = exists(banPath(d.authorId));
+      return signedIn() && actingAs(d.authorId)
+        && (isAdmin() || !banned || get(banPath(d.authorId)).data.until <= Tn())
+        && (isAdmin() || d.authorId == 'studio' || (knownTeen(u) && u.get('rulesAt', null) is timestamp && !exists(u13Path(d.authorId))))
+        && (d.get('mediaType', '') != 'video' || isAdmin() || d.authorId == 'studio' || u.createdAt < Tn() - duration.value(3, 'd'))
+        && !(hasMedia(d) && d.authorId != 'studio' && !isAdmin()
+             && (banned || (exists(watchPath(d.authorId)) && get(watchPath(d.authorId)).data.until > Tn())))
+        && mediaCore(d, u);
+    }
     function validNewPost(d) {
       let u = get(userPath(d.authorId)).data;
       return d.keys().hasOnly(['authorId', 'authorName', 'authorUsername', 'authorColor', 'type', 'text',
@@ -719,9 +783,11 @@ service cloud.firestore {
       }
 
       allow read: if true;
-      function z54() { let qq = Nd(); return signedIn() && notBanned() && actingAs(qq.authorId) && validNewPost(qq) && canCreate(qq.authorId)
-        && newVideoOk(qq)
-        && !(hasMedia(qq) && watched(qq.authorId)); }
+      function z54() { let qq = Nd(); return qq.get('type', '') == 'media'
+        ? mediaCreateOk(qq)
+        : (signedIn() && notBanned() && actingAs(qq.authorId) && validNewPost(qq) && canCreate(qq.authorId)
+          && newVideoOk(qq)
+          && !(hasMedia(qq) && watched(qq.authorId))); }
       allow create: if z54();
       // Moderator "Restore": an exact copy of the held post, moved out of heldPosts in the same batch.
       allow create: if isMod() && exists(Dp('heldPosts', postId))
@@ -1956,7 +2022,7 @@ service cloud.firestore {
         && hp().post is map && hp().authorId == hp().post.authorId
         && isStr(hp().reason, 1, 200) && hp().level in ['bad', 'borderline', 'mod']
         && hp().createdAt == Tn()
-        && ((hp().level != 'mod' && !('by' in hp()) && actingAs(hp().authorId) && validNewPost(hp().post) && canCreate(hp().authorId))
+        && ((hp().level != 'mod' && !('by' in hp()) && actingAs(hp().authorId) && (hp().post.get('type', '') == 'media' ? mediaHeldOk(hp().post) : (validNewPost(hp().post) && canCreate(hp().authorId))))
             // a moderator pulls a live post into review
             || (hp().level == 'mod' && isMod() && hp().by == me() && exists(livePost())
                 && hp().post == get(livePost()).data && !existsAfter(livePost())));
