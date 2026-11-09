@@ -6,9 +6,12 @@ import { KEMY, CAPY, snap } from './driver.js';
 
 export function loadCss() {
   if (document.getElementById('rush-css')) return;
-  const l = document.createElement('link'); l.id = 'rush-css'; l.rel = 'stylesheet'; l.href = 'css/rush.css?v=2'; document.head.appendChild(l);
+  const l = document.createElement('link'); l.id = 'rush-css'; l.rel = 'stylesheet'; l.href = 'css/rush.css?v=3'; document.head.appendChild(l);
 }
-export function music() { import('../gamemusic.js').then(async (m) => { try { await m.mountGameMusic({ corner: 'top-right' }); if (!m.isPlaying()) m.playStation('theme', { volume: 0.18 }); } catch { /* optional */ } }).catch(() => {}); }
+// Menus keep the wide now-playing pill at the bottom so it does not sit on Pal Park,
+// Arcade, and All games. A race is full screen, so the button moves to the top-right.
+// The pill itself hides while driving (css/rush.css).
+export function music(corner = '') { import('../gamemusic.js').then(async (m) => { try { await m.mountGameMusic({ corner }); if (!m.isPlaying()) m.playStation('theme', { volume: 0.18 }); } catch { /* optional */ } }).catch(() => {}); }
 const PAL_TTL = 60000; let palCache = { uid: '', at: 0, pal: null };
 export async function myPal(ctx) {
   const uid = ctx.S.user && ctx.S.user.uid; if (!uid) return null;
@@ -48,6 +51,7 @@ export async function page(ctx, b, params, token) {
   return menu();
 
   function menu() {
+    music('');
     const s = STAGE[D().stage], v = VEHICLE[D().vid];
     ui.shell(GAME_NAME, `<div class="rush-page" id="rush">
       <div class="rush-top">${bank()}<span class="muted small">Drive, flip and collect stars!</span></div>
@@ -87,6 +91,7 @@ export async function page(ctx, b, params, token) {
   }
 
   function stages() {
+    music('');
     ui.shell('Stages', `<div class="rush-page"><div class="rush-top">${bank()}<span class="muted small">${st.pass ? 'Every world is open with your pass.' : 'Earn Rush Stars to unlock new worlds.'}</span></div>
       <div class="rush-grid" id="rush-sg">${STAGES.map((s) => { const open = st.opened(s.id); return `<button type="button" class="rush-card2 ${open ? '' : 'lock'} ${D().stage === s.id ? 'sel' : ''}" data-s="${s.id}" aria-label="${esc(s.name)}${open ? '' : ', locked, ' + s.cost + ' stars'}">
         <canvas></canvas>${open ? '' : `<span class="lk">🔒 ⭐ ${fmt(s.cost)}</span>`}<b>${s.emoji} ${esc(s.name)}</b><small>${esc(s.quirk)}</small>
@@ -103,6 +108,7 @@ export async function page(ctx, b, params, token) {
   }
 
   function garage() {
+    music('');
     const vid = params.v && VEHICLE[params.v] ? params.v : D().vid; const v = VEHICLE[vid], own = st.owns(vid), tv = tuned(vid, st.ups(vid));
     ui.shell('Garage', `<div class="rush-page"><div class="rush-top">${bank()}<span class="muted small">Pick a car, then tune it up.</span></div>
       <div class="rush-hero"><canvas id="rush-gc"></canvas></div>
@@ -132,6 +138,7 @@ export async function page(ctx, b, params, token) {
 
   // ---------------------------------------------------------------- play
   async function run(mode) {
+    music('top-right');
     const { startRun } = await import('./game.js');
     const s = STAGE[D().stage], vid = D().vid; pal = await myPal(ctx);
     const bots = mode === 'cpu' ? botField(s) : [];

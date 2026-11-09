@@ -1,6 +1,8 @@
 /* Kemy Hill Rush (lazy-loaded). Rounded glossy Kemy controls, single bar style. */
 html.rush-on, html.rush-on body { overflow: hidden; overscroll-behavior: none; }
 html.rush-on .gm-music, html.rush-on #gm-music { z-index: 10010; }
+/* Menus keep the pill at the bottom. While driving, only the round music button stays, clear of the speed bars. */
+html.rush-on .gm-radio, html.rush-on .gmr-toast { display: none !important; }
 .rush-run { position: fixed; inset: 0; z-index: 10000; background: #6cc8ff; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
 .rush-cv { position: absolute; inset: 0; display: block; }
 .rush-hud { position: absolute; left: max(10px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top)); right: 120px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; pointer-events: none; }
@@ -53,7 +55,7 @@ html.rush-on .gm-music, html.rush-on #gm-music { z-index: 10010; }
   .rush-pedal { width: clamp(84px, 25vmin, 110px); height: clamp(84px, 25vmin, 110px); bottom: max(12px, env(safe-area-inset-bottom)); } .rush-pops { top: 24%; } }
 
 /* ---------- menu, garage, stages */
-.rush-page { display: grid; gap: 14px; }
+.rush-page { display: grid; gap: 14px; padding-bottom: 72px; }
 .rush-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .rush-bank { display: inline-flex; gap: 6px; align-items: center; padding: 8px 14px; border-radius: 999px; background: linear-gradient(#fff6c6, #ffd23f); border: 3px solid #2b1d4a; font-weight: 900; color: #2b1d4a; box-shadow: 0 3px 0 #2b1d4a; }
 .rush-hero { position: relative; border-radius: 24px; overflow: hidden; border: 3px solid #2b1d4a; box-shadow: 0 5px 0 #2b1d4a; aspect-ratio: 16/8; background: #6cc8ff; }

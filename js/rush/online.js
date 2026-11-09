@@ -71,6 +71,7 @@ export async function online(ctx, g0, token) {
     if (g.players.length >= 2) { if (!twoAt) twoAt = Date.now(); if (!autoT) autoT = setTimeout(start, Math.max(500, 15000 - (Date.now() - twoAt))); }
   }
   async function race() {
+    music('top-right');
     const m = parseMode(g.mode), s = STAGE[m.stage]; const { startRun } = await import('./game.js'); if (!alive || game) return;
     const startAt = Date.now() + (ms(g.roundAt) + CD - net.serverNow()); const lim = LIMIT[m.len];
     game = await startRun({ stage: s, vid: st.d.vid, ups: st.ups(st.d.vid), pal, diaCap: pass ? Infinity : undefined, name: 'You', seed: g.round | 0, mode: 'online', raceLen: RACE_LEN[m.len], timeLimit: lim, startAt: Math.max(Date.now() + 800, startAt), sfx: ui.sfx, lag: 520,
