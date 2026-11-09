@@ -22,8 +22,11 @@ export const SHERIFF_IN_THEATER = false;
 const DIR = new URL('../../assets/series/sheriff/', import.meta.url).href;
 const FD = new URL('../../assets/theater/films/', import.meta.url).href;
 export const CREDIT = '© Blender Foundation | studio.blender.org, CC BY';
+// Directors from each film's Blender Studio credits page (studio.blender.org/projects/.../pages/credits/).
+const DIRECTORS = { bbb: 'Sacha Goedegebure', spring: 'Andy Goralczyk', c2: 'Pablo Vazquez', c3: 'Pablo Vazquez', wing: 'Rik Schutte', sing: 'Andy Goralczyk' };
+const withDirector = (director, rights) => director ? `Directed by ${director} · ${rights}` : rights;
 const EPS = SHERIFF_EPISODES.filter(isOut).map((e) => ({ n: e.n, title: e.title, dur: e.dur, src: `${DIR}ep${e.n}.mp4`, w: 720, h: 1156 }));
-const blender = (id, title, file, dur, w, h, lic, year) => ({ id, title, short: title, poster: FD + file + '.webp', reels: [{ src: FD + file + '.mp4', dur, w, h }], dur, credit: `${title} ${CREDIT}${lic.slice(5)}`, by: CREDIT, org: 'Blender Foundation', makers: 'Blender Studio / Blender Foundation', src: 'https://studio.blender.org', page: `https://studio.blender.org/films/${file}/`, lic, year, rating: 'All ages' });
+const blender = (id, title, file, dur, w, h, lic, year) => { const director = DIRECTORS[id] || ''; return { id, title, short: title, poster: FD + file + '.webp', reels: [{ src: FD + file + '.mp4', dur, w, h }], dur, director, credit: withDirector(director, `${CREDIT}${lic.slice(5)}`), by: CREDIT, org: 'Blender Foundation', makers: 'Blender Studio / Blender Foundation', src: 'https://studio.blender.org', page: `https://studio.blender.org/films/${file}/`, lic, year, rating: 'All ages' }; };
 export const FILMS = {
   sheriff: { id: 'sheriff', title: 'The Sheriff of Lone Keem', short: 'The Sheriff', poster: DIR + 'ep1.webp', hero: DIR + 'hero.webp', reels: EPS, dur: EPS.reduce((a, e) => a + e.dur, 0), credit: '', rating: '13+', min: 13 },
   bbb: blender('bbb', 'Big Buck Bunny', 'big-buck-bunny', 596.48, 1280, 720, 'CC BY 3.0', 2008),
@@ -33,7 +36,7 @@ export const FILMS = {
   wing: blender('wing', 'Wing It!', 'wing-it', 237.917, 1280, 720, 'CC BY 4.0', 2023),
   sing: blender('sing', 'Singularity', 'singularity', 391.008, 1280, 536, 'CC BY 4.0', 2026)
 };
-FILMS.sing.credit = 'Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0'; // Blender Studio's own credit line
+FILMS.sing.credit = withDirector(FILMS.sing.director, 'Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0'); // Blender Studio's own credit line, plus the verified director
 FILMS.c2.short = 'Caminandes 2'; FILMS.c3.short = 'Caminandes 3';
 export const DOUBLE_POSTER = FD + 'caminandes-double.webp';
 // the program slot the Sheriff would use (SHERIFF_IN_THEATER), and the family film shown in it instead (flag off / under 13)
@@ -235,20 +238,24 @@ const F = (wt, px) => `${wt} ${Math.round(px)}px Inter, Arial, sans-serif`;
 const bg = (g, w, h, now) => { const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#2a0610'); gr.addColorStop(1, '#0d0204'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
   g.globalAlpha = 0.25; for (let i = 0; i < 30; i++) { const x = (i * 97.3 + now * 7 * (1 + (i % 3))) % w, y = (i * 53.7) % h; g.fillStyle = '#d4af37'; g.fillRect(x, y, 3, 3); } g.globalAlpha = 1; };
 // the attribution line for a slot (one per rights holder: the Blender shorts share one line)
-export const creditOf = (ids) => [...new Set(ids.map((id) => FILMS[id]).filter((f) => f.credit).map((f) => (f.by === CREDIT ? CREDIT : f.credit)))].join(' · ');
+export const creditOf = (ids) => { const films = ids.map((id) => FILMS[id]).filter((f) => f && f.credit); const dirs = [...new Set(films.map((f) => f.director).filter(Boolean))]; const rights = [...new Set(films.map((f) => (f.by === CREDIT ? CREDIT : f.credit)))]; return [dirs.length ? `Directed by ${dirs.join(' · ')}` : '', ...rights].filter(Boolean).join(' · '); };
 const ORG = { 'Blender Foundation': 'Blender Foundation (CC BY)' };
 export const boardFooter = (list) => 'Open films: ' + [...new Set(list.map((e) => e.film.org).filter(Boolean))].map((o) => ORG[o] || o).join(' · ');
 // word-wrap for canvas text (max n lines; the last one is squeezed by fillText's maxWidth)
 function wrap(g, text, maxW, n = 2) { const out = []; let cur = '';
   for (const wd of String(text).split(' ')) { const t = cur ? cur + ' ' + wd : wd; if (cur && g.measureText(t).width > maxW && out.length < n - 1) { out.push(cur); cur = wd; } else cur = t; }
   if (cur) out.push(cur); return out; }
+// "Directed by X · © ..." stays two short lines so the center column does not squash it
+function splitCredit(text) { const s = String(text), at = s.indexOf(' · ©'); if (at >= 0) return [s.slice(0, at), s.slice(at + 3)]; const dir = s.indexOf(' · '); return s.startsWith('Directed by ') && dir >= 0 ? [s.slice(0, dir), s.slice(dir + 3)] : [s]; }
+function paintCredit(g, text, cx, y, maxW, step) { splitCredit(text).forEach((l, i) => g.fillText(l, cx, y + i * step, maxW)); }
 // full-screen credit card (the last CARD s before each film): black, gold frame, big white / gold type, no posters
 export function drawCreditCard(g, w, h, f, left) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowBlur = 0;
   g.fillStyle = '#000000'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = Math.max(4, h * 0.012); g.strokeRect(h * 0.03, h * 0.03, w - h * 0.06, h - h * 0.06);
   const cx = w / 2, tw = w * 0.86;
   g.fillStyle = '#ffffff'; g.font = F(900, h * 0.15); g.fillText(f.title, cx, h * 0.17, tw);
-  g.font = F(700, h * 0.072); const by = wrap(g, 'by ' + f.makers, tw, 2); g.fillStyle = '#ffffff';
+  if (f.director) { g.fillStyle = '#ffd36b'; g.font = F(800, h * 0.05); g.fillText(`Directed by ${f.director}`, cx, h * 0.28, tw); }
+  g.font = F(700, h * 0.062); const by = wrap(g, 'by ' + f.makers, tw, 2); g.fillStyle = '#ffffff';
   by.forEach((l, i) => g.fillText(l, cx, h * (by.length > 1 ? 0.34 : 0.37) + i * h * 0.088, tw));
   g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.095); g.fillText(`Licensed under ${f.lic}`, cx, h * 0.6, tw);
   g.fillStyle = '#ffffff'; g.font = F(700, h * 0.058); g.fillText(licDeed(f.lic), cx, h * 0.715, tw);
@@ -264,8 +271,8 @@ export function drawMovieScreen(g, w, h, sh, now) {
     g.fillStyle = 'rgba(212,175,55,.55)'; g.font = F(900, h * 0.07);
     if (f.id === 'sheriff') { const e = EPS[sh.ep]; g.fillText('THE SHERIFF', w * 0.2, h * 0.42, w * 0.3); g.fillText('OF LONE KEEM', w * 0.2, h * 0.52, w * 0.3);
       g.fillStyle = 'rgba(243,227,195,.45)'; g.font = F(700, h * 0.045); g.fillText(`Episode ${e.n}`, w * 0.8, h * 0.42, w * 0.3); g.fillText(e.title, w * 0.8, h * 0.5, w * 0.3); }
-    else if (sh.reel && sh.reel.epN) { g.fillText(f.title, w / 2, h * 0.4, w * 0.8); g.fillStyle = 'rgba(243,227,195,.5)'; g.font = F(700, h * 0.05); g.fillText(`Episode ${sh.reel.epN}: ${sh.reel.epTitle}`, w / 2, h * 0.52, w * 0.8); g.font = F(700, h * 0.04); g.fillText(f.credit, w / 2, h * 0.62, w * 0.9); }
-    else { g.fillText(f.title, w / 2, h * 0.45, w * 0.8); g.fillStyle = 'rgba(243,227,195,.5)'; g.font = F(700, h * 0.045); g.fillText(f.credit, w / 2, h * 0.58, w * 0.9); }
+    else if (sh.reel && sh.reel.epN) { g.fillText(f.title, w / 2, h * 0.4, w * 0.8); g.fillStyle = 'rgba(243,227,195,.5)'; g.font = F(700, h * 0.05); g.fillText(`Episode ${sh.reel.epN}: ${sh.reel.epTitle}`, w / 2, h * 0.52, w * 0.8); g.font = F(700, h * 0.04); paintCredit(g, f.credit, w / 2, h * 0.6, w * 0.9, h * 0.05); }
+    else { g.fillText(f.title, w / 2, h * 0.45, w * 0.8); g.fillStyle = 'rgba(243,227,195,.5)'; g.font = F(700, h * 0.04); paintCredit(g, f.credit, w / 2, h * 0.56, w * 0.9, h * 0.05); }
     return true;
   }
   bg(g, w, h, now);
@@ -276,8 +283,8 @@ export function drawMovieScreen(g, w, h, sh, now) {
     g.fillStyle = '#d4af37'; g.font = F(800, h * 0.055); g.fillText('LONE KEEM STUDIO PRESENTS', cx, h * 0.17, tw);
     g.fillStyle = '#ffffff'; g.shadowColor = '#d4af37'; g.shadowBlur = 18; g.font = F(900, h * 0.13); g.fillText(f.short, cx, h * 0.37, tw); g.shadowBlur = 0;
     if (f.sub || f.short !== f.title) { g.fillStyle = '#ffd36b'; g.font = F(800, h * 0.065); g.fillText(f.sub || f.title.split(': ')[1] || '', cx, h * 0.5, tw); }
-    g.fillStyle = '#f3e3c3'; g.font = F(700, h * 0.048); g.fillText(f.credit, cx, h * 0.66, tw);
-    g.fillStyle = 'rgba(243,227,195,.75)'; g.font = F(600, h * 0.04); g.fillText(`${f.year} · ${runtime(f)} · Licensed ${f.lic} (creativecommons.org)`, cx, h * 0.76, tw);
+    g.fillStyle = '#f3e3c3'; g.font = F(700, h * 0.042); paintCredit(g, f.credit, cx, h * 0.62, tw, h * 0.055);
+    g.fillStyle = 'rgba(243,227,195,.75)'; g.font = F(600, h * 0.036); g.fillText(`${f.year} · ${runtime(f)} · Licensed ${f.lic} (creativecommons.org)`, cx, h * 0.78, tw);
     g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.06); g.fillText(`Starting in ${mmss(sh.left)}`, cx, h * 0.88, tw); return true;
   }
   const ids = sh.ids, left = ids.length > 1 ? FILMS[ids[0]].poster : sh.poster, right = ids.length > 1 ? FILMS[ids[1]].poster : FILMS[ids[0]].hero || FILMS[ids[0]].poster;
@@ -285,7 +292,7 @@ export function drawMovieScreen(g, w, h, sh, now) {
     framed(g, slotPoster(sh.nextIds), px, py, pw, ph); framed(g, sh.poster, hx, py, pw, ph);
     g.fillStyle = '#ffd36b'; g.font = F(900, h * 0.12); g.fillText('Thanks for watching!', cx, h * 0.3, tw);
     g.fillStyle = '#f3e3c3'; g.font = F(700, h * 0.06); g.fillText(sh.title, cx, h * 0.45, tw);
-    if (ids.some((id) => FILMS[id].credit)) { g.fillStyle = 'rgba(243,227,195,.7)'; g.font = F(600, h * 0.04); g.fillText(creditOf(ids), cx, h * 0.55, tw); }
+    if (ids.some((id) => FILMS[id].credit)) { g.fillStyle = 'rgba(243,227,195,.7)'; g.font = F(600, h * 0.036); paintCredit(g, creditOf(ids), cx, h * 0.54, tw, h * 0.05); }
     g.fillStyle = '#ffffff'; g.font = F(800, h * 0.065); g.fillText(`Up next: ${sh.nextTitle}`, cx, h * 0.7, tw); g.fillStyle = '#ffd36b'; g.fillText(`at ${clockStr(sh.nextSlot)}`, cx, h * 0.81, tw); return true;
   }
   framed(g, left, px, py, pw, ph); framed(g, right, hx, py, pw, ph);
@@ -294,7 +301,7 @@ export function drawMovieScreen(g, w, h, sh, now) {
   g.fillStyle = '#ffffff'; g.shadowColor = '#d4af37'; g.shadowBlur = 20; g.font = F(900, h * 0.26); g.fillText(mmss(sh.left), cx, h * 0.52, tw); g.shadowBlur = 0;
   const f = sh.film, mins = Math.round(ids.reduce((a, id) => a + FILMS[id].dur, 0) / 60);
   g.fillStyle = 'rgba(243,227,195,.85)'; g.font = F(700, h * 0.05); g.fillText(`Starts ${clockStr(sh.start)} · ${f.id === 'sheriff' ? `${EPS.length} episodes · ` : ''}${mins} min · ${f.rating}`, cx, h * 0.73, tw);
-  g.fillStyle = 'rgba(243,227,195,.65)'; g.font = F(600, h * 0.04); g.fillText(f.credit ? creditOf(ids) : 'A Lone Keem original', cx, h * 0.83, tw);
+  g.fillStyle = 'rgba(243,227,195,.65)'; g.font = F(600, h * 0.036); paintCredit(g, f.credit ? creditOf(ids) : 'A Lone Keem original', cx, h * 0.8, tw, h * 0.05);
   return true;
 }
 // lobby "Now Showing" stand by the entrance (portrait canvas): the current or next show + its time

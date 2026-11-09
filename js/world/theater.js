@@ -340,7 +340,7 @@ export function attachTheater(api, W, K, { far }) {
     const u = (x) => `<span class="th-url">${esc(bareUrl(x))}</span>`;
     const row = (f) => { const sa = /-SA/.test(f.lic), parts = f.reels.length > 1 ? `split into ${f.reels.length} parts played back to back, and ` : '';
       return `<div class="th-cf" data-cf="${f.id}"><b>${esc(f.title)}</b>${f.sub ? ` <span>— ${esc(f.sub)}</span>` : ''} <span>(${esc(String(f.year))})</span>
-<p>${esc(f.credit)}</p><p><span class="th-k">Made by:</span> ${esc(f.makers)}</p>
+<p>${esc(f.credit)}</p>${f.director ? `<p><span class="th-k">Directed by:</span> ${esc(f.director)}</p>` : ''}<p><span class="th-k">Made by:</span> ${esc(f.makers)}</p>
 <p><span class="th-k">License:</span> ${esc(f.lic)} (${esc(licName(f.lic))}) · ${u(licDeed(f.lic))}</p>
 <p><span class="th-k">Source:</span> ${u(f.page || f.src)}</p>
 <p class="th-sub">${sa ? `Kemy shows this film unmodified, except that it is ${parts}re-encoded to 720p for the app. It stays under ${esc(f.lic)}.` : `Shown unchanged, except ${parts}re-encoded to 720p for the app.`}</p></div>`; };
@@ -350,10 +350,12 @@ export function attachTheater(api, W, K, { far }) {
   // lobby posters: title plate + next time (redrawn only when the text changes)
   function drawPlates(L, arr = ib && ib.lobbyPosters) { if (!arr) return; const by = new Map(L.map((e) => [e.id, e])), k = kid();
     for (const p of arr) { const id = p.id === 'sheriff' && k ? program(true)[SHERIFF_SLOT].ids[0] : p.id, e = by.get(id), title = p.id === 'sheriff' && k ? slotTitle(program(true)[SHERIFF_SLOT].ids) : FILMS[id].short;
-      const sub = !e ? 'Coming soon' : e.now ? '▶ Now playing' : `Next show ${clockStr(e.times[0])}`, key = title + '|' + sub; if (key === p.key) continue; p.key = key;
+      const sub = !e ? 'Coming soon' : e.now ? '▶ Now playing' : `Next show ${clockStr(e.times[0])}`, dir = (FILMS[id] && FILMS[id].director) ? `Directed by ${FILMS[id].director}` : '', key = title + '|' + sub + '|' + dir; if (key === p.key) continue; p.key = key;
       const g = p.cv.getContext('2d'), w = p.cv.width, h = p.cv.height; g.fillStyle = '#1b0b0e'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d4af37'; g.lineWidth = 5; g.strokeRect(3, 3, w - 6, h - 6);
-      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd36b'; g.font = '900 40px Inter, Arial, sans-serif'; g.fillText(title.toUpperCase(), w / 2, 40, w - 30);
-      g.fillStyle = e && e.now ? '#ff8a8a' : '#fff6dc'; g.font = '800 30px Inter, Arial, sans-serif'; g.fillText(sub, w / 2, 88, w - 30); p.tex.needsUpdate = true; } }
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (dir) { g.fillStyle = '#ffd36b'; g.font = '900 32px Inter, Arial, sans-serif'; g.fillText(title.toUpperCase(), w / 2, 28, w - 24); g.fillStyle = '#fff6dc'; g.font = '700 22px Inter, Arial, sans-serif'; g.fillText(dir, w / 2, 62, w - 24); g.fillStyle = e && e.now ? '#ff8a8a' : '#fff6dc'; g.font = '800 24px Inter, Arial, sans-serif'; g.fillText(sub, w / 2, 96, w - 24); }
+      else { g.fillStyle = '#ffd36b'; g.font = '900 40px Inter, Arial, sans-serif'; g.fillText(title.toUpperCase(), w / 2, 40, w - 30); g.fillStyle = e && e.now ? '#ff8a8a' : '#fff6dc'; g.font = '800 30px Inter, Arial, sans-serif'; g.fillText(sub, w / 2, 88, w - 30); }
+      p.tex.needsUpdate = true; } }
   // tap the board in the lobby -> the 2D list
   { const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), rz = api.tc && api.tc.root && api.tc.root.querySelector('.kc-r'); let ts = null;
     const onDown = (e) => { if (e.button > 0) return; ts = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }; };

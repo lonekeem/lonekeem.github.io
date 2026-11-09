@@ -52,7 +52,7 @@ const extShots = async (who) => { await p.setViewportSize({ width: 844, height: 
   for (const [n, x, z] of [['facade', 90, 207], ['left-cases', 65.5, 216.5], ['right-cases', 65.5, 197.5]]) { await p.evaluate(([x, z]) => { window.__p3.teleport(x, z); window.__p3.setYaw(Math.PI / 2); }, [x, z]); await W(p, 3500); await p.screenshot({ path: shot + EXT + who + '-' + n + '.png' }); }
   await p.setViewportSize({ width: 390, height: 844 }); await p.evaluate(() => { window.__p3.teleport(80, 207); window.__p3.setYaw(Math.PI / 2); }); await W(p, 3000); await p.screenshot({ path: shot + EXT + who + '-portrait.png' }); return extInfo(); };
 const FILE = { sheriff: /ep[123]\.mp4/, bbb: 'big-buck-bunny.mp4', spring: 'spring.mp4', c2: 'caminandes-2.mp4', c3: 'caminandes-3.mp4', wing: 'wing-it.mp4', sing: 'singularity.mp4' };
-const CR = { sing: 'Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0' };
+const CR = { sing: 'Directed by Andy Goralczyk · Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0' };
 const NF = 6; // films on the board / 2D list
 const result = {};
 const check = (n, c, d) => { result[n] = c ? 'PASS' : 'FAIL ' + JSON.stringify(d).slice(0, 300); console.log(result[n].slice(0, 4), n); };
