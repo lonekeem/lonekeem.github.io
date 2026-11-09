@@ -3,7 +3,7 @@
 // Pal stickers drawn with the Pals renderer (js/pals/art.js, owned by the Pals module).
 // A comment is text, one media item, or text + one media item:
 //   media = { kind: 'gif', id, url, w, h } | { kind: 'photo', url, w, h } | { kind: 'sticker', petId, pose }
-import { CLOUDINARY, GIFS, uploadEndpoint, deliveryBase } from './media-config.js';
+import { CLOUDINARY, GIFS, uploadEndpoint, deliveryBase, fileInMemory } from './media-config.js';
 import { drawPal, heart, star } from './pals/art.js';
 import { guardUpload } from './mediascan.js';
 import { doc, getDoc, getDocs, collection } from './fsq.js';
@@ -106,7 +106,8 @@ export function uploadCommentPhoto(file, uid, onProgress) {
       await guardUpload(file, { where: 'comment' });
       const { blob, w, h } = await shrinkImage(file);
       if (blob.size > 10 * 1048576) throw new Error('That photo is too big (10 MB max).');
-      const fd = new FormData(); fd.append('file', blob, 'comment.jpg'); fd.append('upload_preset', CLOUDINARY.commentPreset || 'lks_comment_media'); fd.append('tags', 'lks_comment'); if (uid) fd.append('context', `uid=${uid}`);
+      const mem = await fileInMemory(blob, 'comment.jpg');
+      const fd = new FormData(); fd.append('file', mem, 'comment.jpg'); fd.append('upload_preset', CLOUDINARY.commentPreset || 'lks_comment_media'); fd.append('tags', 'lks_comment'); if (uid) fd.append('context', `uid=${uid}`);
       const x = new XMLHttpRequest(); x.open('POST', uploadEndpoint());
       x.upload.onprogress = (e) => e.lengthComputable && onProgress && onProgress(e.loaded / e.total);
       x.onload = () => { let j = null; try { j = JSON.parse(x.responseText); } catch { /* */ } if (x.status < 300 && j && j.public_id) resolve({ kind: 'photo', url: `${deliveryBase()}image/upload/c_limit,h_1200,w_1200/f_auto,q_auto/v${j.version}/${j.public_id}`, w: j.width || w, h: j.height || h }); else reject(new Error((j && j.error && j.error.message) || 'Upload failed. Try again.')); };

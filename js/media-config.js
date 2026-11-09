@@ -80,6 +80,28 @@ export const uploadsReady = () =>
 export const uploadEndpoint = () =>
   `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUDINARY.cloudName)}/auto/upload`;
 
+// Chrome Android drops a gallery content:// file out from under XHR
+// (net::ERR_UPLOAD_FILE_CHANGED) and fires onerror immediately. Read the bytes
+// into a new File or Blob before FormData so the request does not touch the picker file.
+export const UNREADABLE_PICK = 'Couldn’t read that video from your phone. Pick it again from Choose another.';
+function unreadable() {
+  const er = new Error(UNREADABLE_PICK);
+  er.userMessage = UNREADABLE_PICK;
+  return er;
+}
+export async function fileInMemory(file, name) {
+  let buf;
+  try { buf = await file.arrayBuffer(); }
+  catch { throw unreadable(); }
+  return new File([buf], name || file.name || 'upload', { type: file.type || '' });
+}
+export async function chunkInMemory(file, start, end) {
+  let buf;
+  try { buf = await file.slice(start, end).arrayBuffer(); }
+  catch { throw unreadable(); }
+  return new Blob([buf], { type: file.type || '' });
+}
+
 export const deliveryBase = () => `https://res.cloudinary.com/${CLOUDINARY.cloudName}/`;
 
 // Build the URLs saved on the post from Cloudinary's upload response.

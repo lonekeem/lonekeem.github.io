@@ -2,7 +2,7 @@
 // square crop with drag + pinch/slider zoom, resize to a 512px JPEG in the browser, then upload
 // to Cloudinary with the unsigned avatar preset (folder lks/avatars). Until the real cloud name
 // is set (js/media-config.js) the editor works but Save shows the "Uploads are almost ready" notice.
-import { CLOUDINARY, LIMITS, uploadsReady, uploadEndpoint, avatarUrl } from './media-config.js';
+import { CLOUDINARY, LIMITS, uploadsReady, uploadEndpoint, avatarUrl, fileInMemory } from './media-config.js';
 import { notReadyNotice } from './create.js';
 import { guardUpload } from './mediascan.js';
 
@@ -156,8 +156,9 @@ export function createAvatarEditor({ esc, toast, friendlyError, getUid, onSaved,
 
   async function upload(file) {
     await guardUpload(file, { where: 'avatar' });
+    const mem = await fileInMemory(file, file.name || 'avatar.jpg');
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', mem);
     fd.append('upload_preset', CLOUDINARY.avatarPreset);
     fd.append('tags', 'lks_avatar');
     const uid = getUid(); if (uid) fd.append('context', `uid=${uid}`);

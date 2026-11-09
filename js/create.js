@@ -4,7 +4,7 @@
 // Until js/media-config.js has a real cloud name, the whole UI works but posting shows an
 // "Uploads are almost ready" notice instead of trying (and failing) to upload.
 import {
-  CLOUDINARY, LIMITS, VIDEO_EXT, IMAGE_EXT, uploadsReady, uploadEndpoint, deliveryUrls
+  CLOUDINARY, LIMITS, VIDEO_EXT, IMAGE_EXT, uploadsReady, uploadEndpoint, deliveryUrls, fileInMemory, chunkInMemory
 } from './media-config.js';
 import { ICONS } from './icons.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
@@ -541,6 +541,7 @@ export function createComposer(ctx) {
     try {
       await guardUpload(file, { where: 'snap', onStatus: (t) => { const h = el.querySelector('h2'); if (h) h.textContent = t; } });
       file = await stripExif(file);
+      file = await fileInMemory(file, file.name || 'snap');
       const r = await new Promise((resolve, reject) => {
         const fd = new FormData(); fd.append('file', file, file.name || 'snap');
         fd.append('upload_preset', CLOUDINARY.snapPreset || CLOUDINARY.uploadPreset);
@@ -690,6 +691,7 @@ export function createComposer(ctx) {
 
     // Uploads straight to Cloudinary. Big files go in ~20 MB chunks (X-Unique-Upload-Id +
     // Content-Range), each retried up to 3 times, so a long video survives a shaky connection.
+    // Each piece is copied into memory first so a gallery file can't change under the request.
     function upload(f, onProgress) { return stripExif(f).then((g) => upload0(g, onProgress)); }
     function upload0(f, onProgress) {
       const CH = LIMITS.chunkMB * 1048576;
@@ -736,14 +738,14 @@ export function createComposer(ctx) {
         if (j && j.public_id && j.secure_url) return j;
         const er = new Error('Upload failed.'); er.userMessage = 'The upload didn’t finish. Please try again.'; throw er;
       };
-      if (f.size <= CH) return withRetry(() => send(f, null, (b) => onProgress(b / f.size))).then(done);
+      if (f.size <= CH) return fileInMemory(f, f.name || 'upload').then((mem) => withRetry(() => send(mem, null, (b) => onProgress(b / mem.size))).then(done));
       return (async () => {
         const id = 'lks-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
         const total = f.size; const parts = Math.ceil(total / CH);
         let last = null;
         for (let i = 0; i < parts; i++) {
           const start = i * CH, end = Math.min(total, start + CH);
-          const blob = f.slice(start, end, f.type);
+          const blob = await chunkInMemory(f, start, end);
           last = await withRetry(() => send(blob, { 'X-Unique-Upload-Id': id, 'Content-Range': `bytes ${start}-${end - 1}/${total}` },
             (b) => onProgress((start + b) / total)), `part ${i + 1} of ${parts}`);
           onProgress(end / total);

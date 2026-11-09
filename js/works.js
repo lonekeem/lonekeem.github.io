@@ -4,7 +4,7 @@
 import { musicEmbed } from './embeds.js';
 import { isYtBlocked, checkYtForUpload } from './ytcheck.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
-import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase } from './media-config.js';
+import { CLOUDINARY, LIMITS, uploadEndpoint, deliveryUrls, deliveryBase as cloudBase, fileInMemory, chunkInMemory } from './media-config.js';
 import { createSeries } from './series.js';
 import { stripExif } from './safety.js';
 import { postStamp, postDone } from './spam.js';
@@ -110,12 +110,13 @@ export function createWorks(ctx) {
       x.send(fd);
     });
     const retry = async (fn) => { for (let a = 1; ; a++) { try { return await fn(); } catch (e) { if (!e.retry || a >= 3) throw e; await new Promise((r) => setTimeout(r, 1500 * a)); } } };
-    if (file.size <= CH) return retry(() => send(file, null, 0));
+    if (file.size <= CH) return fileInMemory(file, file.name || 'upload').then((mem) => retry(() => send(mem, null, 0)));
     return (async () => {
       const id = 'kemy-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); let last = null;
       for (let s = 0; s < file.size; s += CH) {
         const e = Math.min(file.size, s + CH);
-        last = await retry(() => send(file.slice(s, e, file.type), { 'X-Unique-Upload-Id': id, 'Content-Range': `bytes ${s}-${e - 1}/${file.size}` }, s));
+        const blob = await chunkInMemory(file, s, e);
+        last = await retry(() => send(blob, { 'X-Unique-Upload-Id': id, 'Content-Range': `bytes ${s}-${e - 1}/${file.size}` }, s));
       }
       return last;
     })();
