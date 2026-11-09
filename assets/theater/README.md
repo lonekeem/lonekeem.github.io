@@ -71,7 +71,7 @@ the board and 2D list, in the in-play credit line and credits panel, and on `#/s
 
 **Blender Foundation** (studio.blender.org), from official Blender sources:
 
-> *Title* © Blender Foundation | studio.blender.org, CC BY *version* (makers: Blender Studio / Blender Foundation; source page studio.blender.org/films/*file*/)
+> Directed by *Name* · © Blender Foundation | studio.blender.org, CC BY *version* (makers: Blender Studio / Blender Foundation; source page studio.blender.org/films/*file*). Directors are the names on each film's Blender Studio credits page.
 
 | File | Film | Year | License | Size |
 |---|---|---|---|---|
@@ -82,7 +82,7 @@ the board and 2D list, in the in-play credit line and credits panel, and on `#/s
 | wing-it.mp4 | Wing It! | 2023 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 47.3 MB |
 | singularity.mp4 | Singularity | 2026 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 45.4 MB |
 
-Singularity's credit is Blender Studio's own line: *Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0*.
+Singularity's credit keeps Blender Studio's own line, with the director in front: *Directed by Andy Goralczyk · Singularity (CC) Blender Foundation | studio.blender.org, CC BY 4.0*.
 Source: [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:SINGULARITY_-_Blender_Open_Movie-full_movie.webm)
 (4K HDR AV1, CC BY 4.0, Blender Studio). Tone-mapped from HDR to SDR and re-encoded to 1280x536; the poster is a
 frame from the film (6:31 total, no dialogue).
