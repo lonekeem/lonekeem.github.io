@@ -41,6 +41,8 @@ import { initSpam, spamOk, followWait, postStamp, postDone } from './spam.js';
 import { initMediaScan, takeHold } from './mediascan.js';
 import { createAccountDeleter } from './account-delete.js';
 import { createDevices } from './devices.js';
+import { inPlayApp } from './play-app.js';
+import { tellPlayAdmin } from './play-notify.js';
 import { createComments } from './comments.js';
 import { initFriends, friendsUser } from './friends.js';
 import * as parental from './parental.js';
@@ -328,7 +330,7 @@ const mod = createModeration({ secNotice: () => devices.noticeHtml(), secPaint: 
   onChange: (what) => { if (!S.ready) return; if (what === 'ban') route(); else renderChrome($('.bottom-nav [data-nav].active')?.dataset.nav); } });
 initFriends({ db, S, esc, toast, notify: (...x) => notify(...x), getProfile: (u) => getProfile(u), limited: () => safety.limited(), suspended: () => mod.isSuspended(), STUDIO_UID }); // in-game Add friend (js/friends.js)
 // New-device sign-in alerts + Sign out everywhere (js/devices.js).
-const devices = createDevices({ auth, db, isPrivileged: () => mod.iAmMod(), toast });
+const devices = createDevices({ auth, db, isPrivileged: () => mod.iAmMod(), toast, isAdmin: () => isAdmin(), profile: () => S.profile });
 const addComment = (p, text) => comments.addComment(p, text);
 const deleteComment = (postId, c) => comments.deleteComment(postId, typeof c === 'string' ? { id: c } : c);
 // Owner or admin. Removes the Firestore doc; the Cloudinary file stays until an admin cleans it
@@ -1422,6 +1424,7 @@ async function pageNotifications(asStudio, token) {
   const verb = { follow: 'started following you', like: 'gave your post a star', comment: 'commented on your post', reply: 'replied to your comment', comment_like: 'gave your comment a star', message: 'sent you a message', game: 'invited you to play', pal_pat: 'patted your Pal', pal_play: 'brought their Pal over to play', episode: 'posted a new episode', house: '', daily: '', announce: '', mod: '', mod_invite: '' };
   $('#notes').innerHTML = items.length ? items.map((n) => {
     if (n.type === 'security') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="#/settings/account"><span class="avatar mod-av" aria-hidden="true">🔐</span><div class="meta"><div><b>Kemy Security</b><span class="badge mod-badge" aria-hidden="true">✓</span> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
+    if (n.type === 'play') return `<a class="list-item ${n.read ? '' : 'unread'}" href="#/members"><span class="avatar mod-av" aria-hidden="true">🧪</span><div class="meta"><div><b>Play app</b> <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if (n.type === 'mod') return `<a class="list-item mod-note ${n.read ? '' : 'unread'}" href="${n.postId === 'invite' ? '#/mod-invite' : '#/support'}"><span class="avatar mod-av" aria-hidden="true">🛡️</span><div class="meta"><div><b>Kemy Moderators</b><span class="badge mod-badge" aria-hidden="true">✓</span>${mod.aiTag(n.fromUid)} <span class="muted small">· ${esc(timeAgo(n.createdAt))}</span></div><p>${esc(n.text)}</p></div></a>`;
     if ((n.type === 'friend' || n.type === 'friend_ok') && owner === S.user.uid && window.kemyFriends) return window.kemyFriends.noteHtml(n, avatar({ uid: n.fromUid, displayName: n.fromName, username: n.fromUsername }, '', false), shown(n.fromUid, n.fromName), timeAgo(n.createdAt));
     // 🔔 doorbell: answer right here, even away from Pal Park (js/world/doorbell.js)
@@ -1821,6 +1824,10 @@ async function createProfile(displayName, username) {
     .catch((e) => console.warn('Kemy studio follow', e.code || e.message));
   safety.ageHonestSaved();
   try { const t = JSON.parse(sessionStorage.getItem('kemy-topics') || '[]'); if (t.length) { pickTopics(t); } sessionStorage.removeItem('kemy-topics'); } catch { /* */ }
+  // A brand-new account made inside the Play app. One note, before the normal open ping.
+  if (inPlayApp() && !(S.user.email === ADMIN_EMAIL && S.user.emailVerified)) {
+    await tellPlayAdmin(db, { uid, username, displayName: name, admin: false, kind: 'join' }).catch(() => {});
+  }
   await loadSession();
 }
 

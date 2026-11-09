@@ -40,6 +40,6 @@ for (const [id, [col, name]] of Object.entries({ ...kept, ...added })) {
 assert.equal(new Set(ids).size, ids.length, 'beanie ids do not collide after the 15-character cut');
 assert.equal(WEAR_BY.f_cap_black.name, 'Midnight Cap', 'the shared black swatch name is unchanged on other items');
 assert.equal(WEAR_BY.f_hoodie_black.col, '#34303f');
-assert.match(readFileSync(new URL('../../sw.js', import.meta.url), 'utf8'), /const CACHE = 'lks-v288'/);
+assert.match(readFileSync(new URL('../../sw.js', import.meta.url), 'utf8'), /const CACHE = 'lks-v289'/);
 
 console.log('PASS beanie colors', ids.join(' '));
