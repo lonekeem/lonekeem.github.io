@@ -32,7 +32,20 @@ export function createPalStore(ctx) {
     // b_ is free. bp_ is a paid background and only starts with those letters, so it still has to be owned.
     const own = (id) => !id || id.startsWith('f_') || (id.startsWith('b_') && !id.startsWith('bp_')) || ['none', 'spots', 'stripes', 'sparkle'].includes(id) || !!inv[id];
     const saved = () => ({ outfit: { ...(p.outfit || {}) }, bg: p.bg || '', variant: p.variant || '', pattern: p.pattern || 'none' });
-    let D = saved(); const hist = []; let tab = 'outfits', slot = 'all', gf = 'a', yaw = 0, zoom = 1;
+    // Put each item on its real slot, and don't wear a dress over a top. Undo, Random and Look 1-3 all go through here
+    // so the preview and the highlighted tile stay the same outfit.
+    const wearLook = (src) => {
+      const outfit = {};
+      for (const [k, id] of Object.entries((src && src.outfit) || {})) {
+        const w = id && WEAR_BY[id];
+        if (w) outfit[w.slot] = w.id;
+        else if (id && WSLOTS.includes(k)) outfit[k] = id;
+      }
+      if (outfit.full) { delete outfit.body; delete outfit.bottom; }
+      else if (outfit.body || outfit.bottom) delete outfit.full;
+      return { outfit, bg: (src && src.bg) || '', variant: (src && src.variant) || '', pattern: (src && src.pattern) || 'none' };
+    };
+    let D = wearLook(saved()); const hist = []; let tab = 'outfits', slot = 'all', gf = 'a', yaw = 0, zoom = 1;
     const snap = () => { hist.push(JSON.stringify(D)); if (hist.length > 30) hist.shift(); };
     const unowned = () => { const l = []; for (const id of Object.values(D.outfit)) if (id && !own(id)) l.push(WEAR_BY[id]); if (D.bg && !own(D.bg)) l.push(BG[D.bg]); if (D.variant && !own(D.variant)) l.push(RARE[D.variant]); const pt = PATTERNS.find((x) => x.id === D.pattern); if (pt && pt.p && !own(pt.id)) l.push(pt); return l.filter(Boolean); };
     main.innerHTML = `<section class="card pstore"><div class="ps-top"><h2>Pal Store</h2><span class="ps-coins">★ <b id="ps-c">${((e.w && e.w.coins) || 0).toLocaleString()}</b></span></div>
@@ -45,17 +58,19 @@ export function createPalStore(ctx) {
     const $ = (s) => main.querySelector(s);
     // stage: background + 3D Pal, drag to rotate, wheel/pinch to zoom
     const cv = $('#ps-cv'); cv.dataset.palStage = '1'; if (cv._palLoop) cv._palLoop.on = false; const loopTok = cv._palLoop = { on: true }; const W = Math.min(340, main.clientWidth - 24 || 320), H = 260; const dpr = Math.min(2, devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px'; const c = cv.getContext('2d'); c.scale(dpr, dpr);
-    let drag = null, pinch = 0, spin = false; cv.style.touchAction = 'none';
-    cv.onpointerdown = (ev) => { drag = ev.clientX; cv.setPointerCapture(ev.pointerId); }; cv.onpointermove = (ev) => { if (drag !== null) { yaw += (ev.clientX - drag) * 0.015; drag = ev.clientX; } }; cv.onpointerup = cv.onpointercancel = () => { drag = null; };
+    let drag = null, pinch = 0, spin = false, dragging = false; cv.style.touchAction = 'none';
+    cv.onpointerdown = (ev) => { drag = ev.clientX; dragging = true; cv.setPointerCapture(ev.pointerId); }; cv.onpointermove = (ev) => { if (drag !== null) { yaw += (ev.clientX - drag) * 0.015; drag = ev.clientX; } }; cv.onpointerup = cv.onpointercancel = () => { drag = null; dragging = false; };
     cv.onwheel = (ev) => { ev.preventDefault(); zoom = Math.max(0.8, Math.min(1.8, zoom - ev.deltaY * 0.001)); };
     cv.addEventListener('touchmove', (ev) => { if (ev.touches.length === 2) { const d = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY); if (pinch) zoom = Math.max(0.8, Math.min(1.8, zoom * d / pinch)); pinch = d; } }, { passive: true }); cv.addEventListener('touchend', () => { pinch = 0; });
     $('#ps-rot').onclick = () => { spin = !spin; };
-    let t = 0; const frame = () => { if (!document.body.contains(cv) || !loopTok.on) return; t++; if (spin) yaw += 0.02; c.clearRect(0, 0, W, H);
+    let t = 0, lastDraw = 0; const frame = (now) => { if (!document.body.contains(cv) || !loopTok.on) return; requestAnimationFrame(frame);
+      if (document.hidden) return; const box = cv.getBoundingClientRect(); if (box.bottom < 0 || box.top > innerHeight) return;
+      if (!dragging && !spin && now - lastDraw < 34) return; lastDraw = now; t++; if (spin) yaw += 0.02; c.clearRect(0, 0, W, H);
       if (!drawBg(c, W, H, D.bg, t)) { c.fillStyle = '#2a1458'; c.beginPath(); c.roundRect(0, 0, W, H, 18); c.fill(); }
-      drawDancer(c, W / 2, H - 12, 120 * zoom, { ...p, outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }, { t, mode: 'idle', yaw }); requestAnimationFrame(frame); }; frame();
+      drawDancer(c, W / 2, H - 12, 120 * zoom, { ...p, outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern }, { t, mode: 'idle', yaw, still: true }); }; requestAnimationFrame(frame);
     const refresh = () => { const u = unowned(); const pv = $('#ps-prev'); pv.hidden = !u.length; const uc0 = u.filter((x) => !x.d), ud0 = u.filter((x) => x.d); pv.textContent = u.length ? `Preview · ${u.length} to buy${uc0.length ? ` · ★${uc0.reduce((a, b) => a + (b.p || 0), 0)}` : ''}${ud0.length ? ` · 💎${ud0.reduce((a, b) => a + b.d, 0)}` : ''}` : '';
       const bb = $('#ps-buy'); bb.innerHTML = u.length ? (ud0.length && !uc0.length ? buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: ud0.reduce((a, b) => a + b.d, 0), balance: 0, id: 'ps-buynow' }).replace(/★(\d)/, '💎$1').replace(/<small[^>]*>[^<]*<\/small>/, '<small style="display:block;font-weight:600;color:#f1e6ff">👑 Premium · Diamonds</small>') : buyButton({ name: u.length === 1 ? u[0].name : `${u.length} items`, price: uc0.reduce((a, b) => a + (b.p || 0), 0), balance: (e.w && e.w.coins) || 0, id: 'ps-buynow' }) + (ud0.length ? '<small style="display:block;text-align:center">+ 💎 premium items (paid next)</small>' : '')) : ''; if (u.length) bb.querySelector('#ps-buynow').onclick = () => save(); grid(); };
-    const tile = (id, name, price, r, emo, on, ownd, extra = '') => `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${extra} style="--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}"><span class="ps-emo" data-th="${esc(id)}">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : (typeof price === 'string' ? price : `★ ${price}`)}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`;
+    const tile = (id, name, price, r, emo, on, ownd, extra = '') => { let style = `--rc:${RARITY[r] ? RARITY[r].col : '#9aa3b5'}`; const rest = String(extra).replace(/\sstyle="([^"]*)"/, (_, s) => { style += ';' + s; return ''; }); return `<button class="ps-tile ${on ? 'on' : ''}" data-id="${esc(id)}" ${rest} style="${style}"><span class="ps-emo" data-th="${esc(id)}">${emo}</span><b>${esc(name)}</b><small>${ownd ? (price ? '✓ Owned' : 'Free') : (typeof price === 'string' ? price : `★ ${price}`)}${r && r !== 'c' && RARITY[r] ? ` · ${RARITY[r].name}` : ''}</small></button>`; };
     function filters() {
       const f = $('#ps-filters'); if (tab !== 'outfits' && tab !== 'jewelry' && tab !== 'hand') { f.innerHTML = ''; return; }
       const sl = tab === 'hand' ? [] : tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s) && s !== 'held');
@@ -65,16 +80,18 @@ export function createPalStore(ctx) {
       f.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => { slot = b.dataset.s; filters(); grid(); });
     }
     // tile pictures = the real 3D item rendered on this Pal (cached per Pal look + item); emoji only if 3D is off
-    const TH = new Map(); let P3 = null, q = []; import('./pal3d.js').then((m) => { P3 = m; pump(); }).catch(() => {});
-    function thumbs(g) { q = [...g.querySelectorAll('[data-th]')]; pump(); }
+    const TH = new Map(); let P3 = null, thumbRoot = null; import('./pal3d.js').then((m) => { P3 = m; pump(); }).catch(() => {});
+    const visibleThumb = (el) => { const r = el.getBoundingClientRect(); return r.bottom > -40 && r.top < innerHeight + 140; };
+    function thumbs(g) { thumbRoot = g; pump(); }
     let pumping = false;
-    let touchT = 0; addEventListener('touchstart', () => { touchT = performance.now(); }, { passive: true, capture: true }); addEventListener('scroll', () => { touchT = performance.now(); }, { passive: true, capture: true });
-    // one thumb per idle slice, never while the finger is on the screen or the page scrolls (iOS has no parallel shader compile, so back-to-back thumbs froze taps)
+    let touchT = 0; addEventListener('touchstart', () => { touchT = performance.now(); }, { passive: true, capture: true }); addEventListener('scroll', () => { touchT = performance.now(); if (!pumping) pump(); }, { passive: true, capture: true });
+    // one on-screen thumb per idle slice, never while the finger is down (iOS has no parallel shader compile, so a full grid of thumbs froze taps and dropped WebGL)
     const idle = () => new Promise((r) => { const go = () => (performance.now() - touchT < 350 ? setTimeout(go, 200) : (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 600 }) : setTimeout(r, 60))); requestAnimationFrame(() => setTimeout(go, 16)); });
-    async function pump() { if (!P3 || pumping) return; pumping = true; try { while (q.length) { await idle(); const el = q.shift(); if (!el || !document.body.contains(el)) continue; const id = el.dataset.th;
+    async function pump() { if (!P3 || pumping) return; pumping = true; try { while (thumbRoot && thumbRoot.isConnected) { await idle(); const el = [...thumbRoot.querySelectorAll('[data-th]')].find(visibleThumb); if (!el) break; const id = el.dataset.th;
         const w = WEAR_BY[id]; const k = JSON.stringify([p.species, p.colors, p.level >= 12 ? 2 : p.level >= 5 ? 1 : 0, id]); let cv = TH.get(k);
         if (!cv) { const T = P3.renderItemThumbAsync || (async (...a) => P3.renderItemThumb(...a)); try { cv = w ? await T(p, w.slot, id, 96) : RARE[id] ? await T(p, null, '', 96, { variant: id }) : PATTERNS.find((x) => x.id === id) ? await T(p, null, '', 96, { pattern: id }) : null; } catch { cv = null; } if (cv) TH.set(k, cv); await new Promise((r) => requestAnimationFrame(r)); }
-        if (cv && document.body.contains(el)) { const c2 = document.createElement('canvas'); c2.width = c2.height = 96; c2.className = 'ps-th'; c2.getContext('2d').drawImage(cv, 0, 0); el.replaceWith(c2); } } } finally { pumping = false; } }
+        if (cv && document.body.contains(el)) { const c2 = document.createElement('canvas'); c2.width = c2.height = 96; c2.className = 'ps-th'; c2.getContext('2d').drawImage(cv, 0, 0); el.replaceWith(c2); }
+        else if (el && el.isConnected) el.removeAttribute('data-th'); } } finally { pumping = false; } }
     function grid() {
       const g = $('#ps-grid'); let h = '';
       if (tab === 'outfits' || tab === 'jewelry' || tab === 'hand') { const sl = tab === 'hand' ? ['held'] : tab === 'jewelry' ? JEWELRY : WSLOTS.filter((s) => !JEWELRY.includes(s) && s !== 'held');
@@ -107,11 +124,12 @@ export function createPalStore(ctx) {
     function setTab(k) { tab = k; main.querySelectorAll('[data-tab]').forEach((b) => { b.classList.toggle('on', b.dataset.tab === k); b.setAttribute('aria-selected', b.dataset.tab === k); }); slot = 'all'; filters(); grid(); }
     main.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => setTab(b.dataset.tab));
     $('#ps-bgbtn').onclick = () => { setTab('bgs'); $('#ps-grid').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-    $('#ps-undo').onclick = () => { if (!hist.length) return toast('Nothing to undo'); D = JSON.parse(hist.pop()); refresh(); };
-    $('#ps-reset').onclick = () => { snap(); D = saved(); refresh(); toast('Back to your saved look'); };
-    $('#ps-rand').onclick = () => { snap(); const o = {}; for (const s of ['head', 'hair', 'face', 'neck', 'feet', 'held']) if (Math.random() < 0.6) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
-      const fl = WEAR.filter((w) => w.slot === 'full' && w.free); if (Math.random() < 0.5) o.full = fl[Math.floor(Math.random() * fl.length)].id; else for (const s of ['body', 'bottom']) { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); o[s] = l[Math.floor(Math.random() * l.length)].id; }
-      D.outfit = o; const fb = BGS.filter((b) => !b.p); D.bg = fb[Math.floor(Math.random() * fb.length)].id; refresh(); };
+    $('#ps-undo').onclick = () => { if (!hist.length) return toast('Nothing to undo'); D = wearLook(JSON.parse(hist.pop())); refresh(); };
+    $('#ps-reset').onclick = () => { snap(); D = wearLook(saved()); refresh(); toast('Back to your saved look'); };
+    $('#ps-rand').onclick = () => { snap(); const o = {}; const pick = (s) => { const l = WEAR.filter((w) => w.slot === s && w.free && !w.hidden); return l.length ? l[Math.floor(Math.random() * l.length)].id : ''; };
+      for (const s of ['head', 'hair', 'face', 'neck', 'feet', 'held']) if (Math.random() < 0.6) { const id = pick(s); if (id) o[s] = id; }
+      if (Math.random() < 0.5) { const id = pick('full'); if (id) o.full = id; } else for (const s of ['body', 'bottom']) { const id = pick(s); if (id) o[s] = id; }
+      const fb = BGS.filter((b) => !b.p); D = wearLook({ outfit: o, bg: fb.length ? fb[Math.floor(Math.random() * fb.length)].id : '', pattern: D.pattern, variant: D.variant }); refresh(); };
     const commitLook = async () => { const ok = await commit(p, { outfit: D.outfit, bg: D.bg, variant: D.variant, pattern: D.pattern, colors: p.colors }); if (ok === false) return false; dispatchEvent(new Event('kemy:pal-changed')); return true; };
     async function save() {
       const ud = unowned().filter((x) => x.d); // 👑 Diamond items (Halloween premium) first, on their own sheet
@@ -132,7 +150,7 @@ export function createPalStore(ctx) {
     // 3 saved look slots
     async function looks() { let L = []; try { L = await e.looks(); } catch {} const el = $('#ps-looks'); if (!el) return; // left the store before the saved looks loaded
       el.innerHTML = ['l1', 'l2', 'l3'].map((id, i) => { const l = L.find((x) => x.id === id); return `<span class="ps-look"><button class="chip" data-load="${id}" ${l ? '' : 'disabled'}>${l ? esc(l.name) : 'Look ' + (i + 1)}</button><button class="chip" data-store="${id}" aria-label="Save to look ${i + 1}">⤓</button></span>`; }).join('');
-      el.querySelectorAll('[data-load]').forEach((b) => b.onclick = () => { const l = L.find((x) => x.id === b.dataset.load); if (!l) return; snap(); D = { outfit: { ...l.outfit }, bg: l.bg || '', variant: l.variant || '', pattern: l.pattern || 'none' }; refresh(); toast(`Trying on ${l.name}. Tap Save Look to keep it.`); });
+      el.querySelectorAll('[data-load]').forEach((b) => b.onclick = () => { const l = L.find((x) => x.id === b.dataset.load); if (!l) return; snap(); D = wearLook(l); refresh(); toast(`Trying on ${l.name}. Tap Save Look to keep it.`); });
       el.querySelectorAll('[data-store]').forEach((b) => b.onclick = async () => { try { const i = b.dataset.store.slice(1); await e.saveLook(b.dataset.store, 'Look ' + i, D.outfit, { bg: D.bg, variant: D.variant, pattern: D.pattern }); toast(`Saved to Look ${i}`); looks(); } catch (er) { toast(friendlyError(er)); } }); }
     looks(); setTab(location.hash.includes('store-bg') ? 'bgs' : HW_ON() || location.hash.includes('halloween') ? 'halloween' : 'outfits'); refresh();
   }

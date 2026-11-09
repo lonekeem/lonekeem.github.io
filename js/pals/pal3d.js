@@ -26,6 +26,20 @@ const resOf = (g) => (g === 'ultra' ? 448 : g === 'low' ? 176 : 256);
 function applyGfx() { const g = gfxLevel(); RES = resOf(g); R.setSize(RES, RES, false); R.shadowMap.enabled = g !== 'low'; keyL.castShadow = g !== 'low'; shadowPlane.visible = g !== 'low'; keyL.shadow.mapSize.set(g === 'ultra' ? 1024 : 512, g === 'ultra' ? 1024 : 512); keyL.shadow.map?.dispose(); keyL.shadow.map = null; }
 let RES = 448;
 const cache = new Map(); let lost = false, lostAt = 0, rebuilds = 0;
+function dropModel(m) {
+  if (!m) return;
+  try {
+    m.traverse((o) => {
+      if (!o.isMesh || !o.material || o.material.userData.shared) return;
+      for (const x of (Array.isArray(o.material) ? o.material : [o.material])) x.dispose?.();
+    });
+  } catch { /* shared geometries stay; only this model's materials go */ }
+}
+const cacheCap = () => {
+  try { if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return 4; } catch { /* */ }
+  try { if (navigator.deviceMemory && navigator.deviceMemory <= 4) return 6; } catch { /* */ }
+  return 24;
+};
 export function webglOK() {
   try { if (localStorage.getItem('kemy-pal3d') === '0') return false; } catch { /* */ }
   if (gfxLevel() === 'flat') return false; // the user picked 2D art
@@ -450,7 +464,7 @@ export function drawPal3D(c, x, y, size, pal, st = {}) {
     if (now - lostAt > 2500 && !document.hidden) { if (rebuilds >= 6) return false; rebuild(); } else { drawLoading(c, x, y, size); return true; }
   }
   const key = JSON.stringify([pal.species, pal.colors, pal.outfit, pal.variant || '', pal.pattern || '', stageOf(pal.level || 1)]);
-  let m = cache.get(key); if (!m) { m = build(pal); cache.set(key, m); if (cache.size > 24) { const k0 = cache.keys().next().value; cache.delete(k0); } }
+  let m = cache.get(key); if (!m) { m = build(pal); cache.set(key, m); while (cache.size > cacheCap()) { const k0 = cache.keys().next().value; dropModel(cache.get(k0)); cache.delete(k0); } }
   // per-canvas animation state: the same cached model drawn on two canvases (card + Pal Box, floating Pal, store)
   // must not share easing/spring/gait state (that double-stepped it: fast, jittery motion). Time is real time
   // (60 ticks per second), so 120 Hz screens and busy frames don't speed the Pal up.
@@ -575,7 +589,9 @@ export async function renderItemThumbAsync(pal, slot, id, px = 96, opt = {}) {
   if (!R) init(); if (lost || !R) return null;
   const p2 = { ...pal, outfit: id ? { [slot]: id } : {}, variant: opt.variant != null ? opt.variant : '', pattern: opt.pattern || 'none' };
   const m = build(p2); apply(m, modePose('idle', 30), 30, 'idle'); m.rotation.y = slot === 'back' || slot === 'bag' ? 2.6 : 0.35;
-  if (R.compileAsync) { scene.add(m); try { await R.compileAsync(scene, cam); } catch { /* render compiles it */ } scene.remove(m); }
+  // iOS (and SwiftShader) have no KHR_parallel_shader_compile. compileAsync then stalls the tap that opened the store.
+  let parallel = false; try { parallel = !!R.getContext().getExtension('KHR_parallel_shader_compile'); } catch { /* */ }
+  if (parallel && R.compileAsync) { scene.add(m); try { await R.compileAsync(scene, cam); } catch { /* render compiles it */ } scene.remove(m); }
   if (lost || !R) return null; return renderItemThumb(pal, slot, id, px, { ...opt, model: m });
 }
 export function renderItemThumb(pal, slot, id, px = 96, opt = {}) {
