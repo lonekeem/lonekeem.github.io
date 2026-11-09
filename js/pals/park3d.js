@@ -754,7 +754,7 @@ export function createPark3D(ctx) {
       zoom: (dir) => { C.dist = Math.max(2.5, Math.min(16, C.dist * (dir > 0 ? 0.92 : 1.08))); },
       back: () => { const b = document.querySelector('#modal-root [data-close]'); if (b) b.click(); }
     });
-    if (/^#\/street/.test(location.hash)) W3.spawnStreet();
+    if (/^#\/street/.test(location.hash)) { W3.spawnStreet(); C.yaw = P.yaw; P.lastYaw = P.yaw; if (me.userData.m) me.userData.m.userData.snapHead = true; }
     // ---------------------------------------------------------------- main loop
     // Low-power steps never flip shadowMap.enabled / castShadow at runtime: that recompiles every shader (a multi-second freeze
     // on phones). Shadows instead refresh every 6th frame; pixel ratio climbs back at most twice, 30 s after a drop (no resize ping-pong).

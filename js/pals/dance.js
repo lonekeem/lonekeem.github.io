@@ -176,7 +176,7 @@ if (typeof window !== 'undefined') { setPal3DWait(glAvail()); onNeed3D(() => { i
 export function drawDancer(c, x, y, size, pal, st = {}) {
   const b = tickBus(); const amt = st.dance ? 1 : b.amt;
   if (P3 && !st.flat) { // 3D Pal (lazy-loaded); falls back to the 2D rig when over budget / unavailable
-    const on = amt > 0.001 && (st.dance || danceEnabled()); const beat = st.beat ?? (b.beat + (pal._off || 0));
+    const on = !st.still && amt > 0.001 && (st.dance || danceEnabled()); const beat = st.beat ?? (b.beat + (pal._off || 0));
     const d = on ? danceFor(pal, beat, st.dance) : null;
     const g = RM() && d && !d.gentle ? danceById('hula') || d : d;
     let ok3 = false; try { ok3 = P3.drawPal3D(c, x, y, size, pal, { ...st, dance3d: g ? g.id : null, beat, amt: on ? amt * (RM() ? 0.5 : 1) : 0 }); } catch (e) { console.warn('3D Pal draw error:', e); if (++err3 > 30) P3 = null; }
@@ -185,7 +185,7 @@ export function drawDancer(c, x, y, size, pal, st = {}) {
       return;
     }
   }
-  if (amt <= 0.001 || (!st.dance && !danceEnabled())) return drawPal(c, x, y, size, pal, { ...st, flat: !!P3 });
+  if (st.still || amt <= 0.001 || (!st.dance && !danceEnabled())) return drawPal(c, x, y, size, pal, { ...st, flat: !!P3 });
   const gentle = RM(); const beat = st.beat ?? (b.beat + (pal._off || 0));
   const d = danceFor(pal, beat, st.dance); const p = poseAt(d, beat);
   const A = amt * (gentle ? 0.4 : 1) * (0.75 + Math.min(0.5, b.energy) * 0.5); const k = size / 40;
