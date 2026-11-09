@@ -9,6 +9,7 @@ import { auth, db, ADMIN_EMAIL, STUDIO_UID } from './firebase-init.js';
 import { KEMY_NAME, reservedKemy, noteAdminUid, rememberKemy, isAdminUid, faceName, adminNameClass, ownerBadgeHtml } from './kemy-name.js';
 import { mountHeaderChip, gameChip } from './wallet-chip.js';
 import { mountGameMusic, hideGameMusic } from './gamemusic.js';
+import { armWorldLandscape } from './world-orient.js';
 import { findMusicLink, musicEmbed, mountMusicEmbed } from './embeds.js';
 import { catPickerHtml, pickedCat } from './feed-cats.js';
 import { createWatch } from './watch.js';
@@ -748,6 +749,7 @@ function gameMusicFor(hash) {
 }
 // The rotate button is only for game screens. Leave it unloaded on the feed so a body
 // observer never runs while posts are painting.
+armWorldLandscape();
 let rotateReady = null;
 function armRotate(hash) {
   const game = /^#\/(park|street|arcade|games|game)(\/|$|\?)/.test(hash || '');
