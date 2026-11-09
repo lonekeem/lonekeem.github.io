@@ -14,7 +14,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from '../fsq.js';
 import { startHouseParty } from './housemates.js';
 import { attachTheaterNpcs } from './theater-npcs.js';
 import { createTheaterHush } from './theater-hush.js';
-import { FILMS, MOVIE, TC, familyOnly, creditFilms, CARD, licDeed, licName, bareUrl, SHERIFF_SLOT, SHERIFF_FAMILY, boardFooter, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss } from './theater-movie.js';
+import { FILMS, MOVIE, TC, familyOnly, creditFilms, CARD, licDeed, licName, bareUrl, SHERIFF_SLOT, SHERIFF_FAMILY, boardFooter, showAt, listings, anchorFor, program, slotTitle, runtime, createMoviePlayer, drawMovieScreen, drawNowShowing, drawBoard, clockStr, mmss, screenHidesNames } from './theater-movie.js';
 import { sheriffOk } from '../sheriff-age.js';
 
 const TID = 'lone-keem-studio', LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
@@ -239,7 +239,7 @@ export function attachTheater(api, W, K, { far }) {
     if (roomState.camOv === camOv) roomState.camOv = null; if (fogWas) { const f = fogWas.f; if (fogWas.density != null) f.density = fogWas.density; else { f.near = fogWas.near; f.far = fogWas.far; } fogWas = null; }
     if (audio) audio.pause(); if (movie) movie.unload(); movieBlocked = false; closePanels(); hush.leave(); // resume only what was playing before you walked in
     if (!quiet) { P.x = T.door[0] + 1.6; P.z = T.door[1]; P.y = FLAT; P.yaw = Math.PI / 2; P.vy = 0; P.onGround = true; try { window.__p3 && window.__p3.setYaw && window.__p3.setYaw(-Math.PI / 2); } catch { /* */ } }
-    paintHud(); api.markDirty && api.markDirty(); api.send && api.send(true);
+    filmNames = false; paintHud(); document.body.classList.remove('th-film'); api.markDirty && api.markDirty(); api.send && api.send(true);
   }
   // ---------------------------------------------------------------- sitting (auditorium seats + every sittable decor piece)
   const allSeats = () => (inside ? [...(ib ? ib.wSeats : []), ...decSeats.li, ...decSeats.la] : decSeats.lo);
@@ -289,7 +289,7 @@ export function attachTheater(api, W, K, { far }) {
   // ---------------------------------------------------------------- HUD (inside): snacks, view, sound, edit, exit
   if (!document.getElementById('th-css')) { const c = document.createElement('style'); c.id = 'th-css'; c.textContent = `
 .th-hud{position:absolute;right:max(10px,env(safe-area-inset-right));top:calc(max(8px,env(safe-area-inset-top)) + 214px);display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:auto;z-index:7}
-.th-hud[hidden]{display:none}.th-crl{position:absolute;left:max(10px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + 312px);z-index:6;pointer-events:auto;display:flex;align-items:center;gap:6px;max-width:min(72vw,340px);height:30px;box-sizing:border-box;border:1px solid rgba(212,175,55,.6);border-radius:15px;background:rgba(0,0,0,.62);color:#fff;font:700 12px/1 Inter,system-ui,sans-serif;padding:0 10px 0 8px;white-space:nowrap;text-shadow:0 1px 2px #000;transition:opacity .6s ease}.th-crl[hidden]{display:none}.th-crl.fo{opacity:0}.th-crl b{flex:none;font-weight:800}.th-crl .mk{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:600;opacity:.9}.th-crl i{flex:none;font-style:normal;font-weight:800;color:#ffd36b}.th-crl.mini{width:34px;height:34px;max-width:none;padding:0;border-radius:50%;justify-content:center;font-size:17px;background:rgba(0,0,0,.55)}@media (orientation:landscape){.th-crl{top:calc(max(8px,env(safe-area-inset-top)) + 164px);max-width:min(45vw,380px)}}body.th-pnl .kh-stuck,body.th-pnl #p3-rot,body.th-pnl #p3-set,body.th-pnl #game-music,body.th-pnl .th-crl,body.th-cardup .p3-tag.me>span,body.th-starting .p3-tag.me{visibility:hidden}
+.th-hud[hidden]{display:none}.th-crl{position:absolute;left:max(10px,env(safe-area-inset-left));top:calc(max(8px,env(safe-area-inset-top)) + 312px);z-index:6;pointer-events:auto;display:flex;align-items:center;gap:6px;max-width:min(72vw,340px);height:30px;box-sizing:border-box;border:1px solid rgba(212,175,55,.6);border-radius:15px;background:rgba(0,0,0,.62);color:#fff;font:700 12px/1 Inter,system-ui,sans-serif;padding:0 10px 0 8px;white-space:nowrap;text-shadow:0 1px 2px #000;transition:opacity .6s ease}.th-crl[hidden]{display:none}.th-crl.fo{opacity:0}.th-crl b{flex:none;font-weight:800}.th-crl .mk{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:600;opacity:.9}.th-crl i{flex:none;font-style:normal;font-weight:800;color:#ffd36b}.th-crl.mini{width:34px;height:34px;max-width:none;padding:0;border-radius:50%;justify-content:center;font-size:17px;background:rgba(0,0,0,.55)}@media (orientation:landscape){.th-crl{top:calc(max(8px,env(safe-area-inset-top)) + 164px);max-width:min(45vw,380px)}}body.th-pnl .kh-stuck,body.th-pnl #p3-rot,body.th-pnl #p3-set,body.th-pnl #game-music,body.th-pnl .th-crl,body.th-cardup .p3-tag.me>span,body.th-starting .p3-tag.me{visibility:hidden}body.th-film .p3-tag>span,body.th-film .p3-tag>.p3-safe,body.th-film .ks-tag{visibility:hidden}
 .th-cf{padding:8px 10px;margin:6px 0;border-radius:12px;background:rgba(255,255,255,.07);font-size:14px;line-height:1.4}.th-cf b{color:#fff6dc;font-size:16px}.th-cf p{margin:3px 0}.th-cf .th-k{color:#ffd36b;font-weight:800}.th-url{user-select:text;-webkit-user-select:text;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#fff;word-break:break-all;background:rgba(0,0,0,.3);padding:0 4px;border-radius:4px}.th-cbtn{width:100%;margin-top:6px}
 .th-hud button{min-height:40px;border-radius:999px;border:1px solid rgba(212,175,55,.7);background:rgba(60,4,18,.82);color:#fff6dc;font:800 13px Inter,system-ui,sans-serif;padding:0 12px}
 .th-card{background:#3a0712!important;border:2px solid #d4af37}.th-card h3{color:#ffd36b}.th-card h4{margin:12px 0 6px;color:#ffd36b}.th-sub{margin:0 0 8px;opacity:.85;font-size:13px}.th-w{font-weight:900;margin:4px 0 8px}
@@ -377,7 +377,7 @@ export function attachTheater(api, W, K, { far }) {
   }
   rebuildDecor('lo'); applyOutside(); { const [a, b] = marqText(); drawMarq(a, b); }
   // ---------------------------------------------------------------- per frame
-  let extT = 0, extLoaded = false, crT = 0; let bulbT = 0, bulbStep = 0, autoT = 0, fadeAt = 0, marqT = 0, bdT = 0, artT = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
+  let extT = 0, extLoaded = false, crT = 0, filmNames = false; let bulbT = 0, bulbStep = 0, autoT = 0, fadeAt = 0, marqT = 0, bdT = 0, artT = 0; const bc = new THREE.Color(), bd = new THREE.Color(); const hp = new THREE.Vector3();
   function update(dt, now) {
     const dx = P.x - (T.x0 + T.x1) / 2, dz = P.z - (T.z0 + T.z1) / 2, nearOut = !inside && dx * dx + dz * dz < 160 * 160;
     if (nearOut && (bulbT -= dt) <= 0) { bulbT = 0.28; bulbStep++; bc.set(sv('oMarq')).lerp(bd.set('#fff8dc'), 0.55); bd.set(sv('oMarq')).multiplyScalar(0.3); for (let i = 0; i < ex.bulbN; i++) ex.bulbs.setColorAt(i, (i + bulbStep) % 3 ? bc : bd); ex.bulbs.instanceColor.needsUpdate = true; }
@@ -389,12 +389,14 @@ export function attachTheater(api, W, K, { far }) {
       if (Math.abs(lvl - lvlT) > 0.002 || lvlT !== targetLevel()) { lvlT = targetLevel(); const tw = performance.now(), fdt = Math.min(0.5, Math.max(dt, (tw - (fadeAt || tw)) / 1000)); fadeAt = tw; lvl += (lvlT - lvl) * Math.min(1, fdt / 0.8); if (Math.abs(lvl - lvlT) < 0.003) lvl = lvlT; applyLights(); } else fadeAt = 0;
       drawScreen(now); if ((autoT -= dt) <= 0) { autoT = 0.5; syncAudio(); hush.tick(); }
       const sh = show(), aud = P.z - RZ <= 4.2; if (movie) movie.update(playing() ? null : sh, aud, dt);
+      const hideNames = aud && screenHidesNames(sh.phase, playing());
+      if (hideNames !== filmNames) { filmNames = hideNames; document.body.classList.toggle('th-film', hideNames); }
       if (!aud && (nsT -= dt) <= 0) { nsT = 1; drawNowShowing(ib.nsCv.getContext('2d'), ib.nsCv.width, ib.nsCv.height, sh); ib.nsTex.needsUpdate = true; } // lobby stand, once a second
       if (!aud && (bdT -= dt) <= 0) { bdT = 1; const L = list(); drawBoard(ib.bdCv.getContext('2d'), ib.bdCv.width, ib.bdCv.height, L, Date.now()); ib.bdTex.needsUpdate = true; drawPlates(L); } // showtimes board + poster plates
       if ((seatChk -= dt) <= 0) { seatChk = 0.2; const nb = P.sit ? null : findSeat(); if (nb !== seatNear) seatNear = nb; }
       // owner client advances the playlist when a song ends
       if (owner && st.pl.on && s && pos() > durNow(s) + 2.5 && Date.now() - st.pl.at > 4000) { if (songs().length > 1) transport('next'); else transport('stop'); }
-    } else if ((seatChk -= dt) <= 0) { seatChk = 0.3; seatNear = !P.sit && Math.hypot(P.x - OX, P.z - OZ) < 30 ? findSeat() : null; }
+    } else { if (filmNames) { filmNames = false; document.body.classList.remove('th-film'); } if ((seatChk -= dt) <= 0) { seatChk = 0.3; seatNear = !P.sit && Math.hypot(P.x - OX, P.z - OZ) < 30 ? findSeat() : null; } }
     if (held && heldSpr) { const me = api.me; if (me) { hp.set(P.x + Math.sin(P.yaw) * 0.38, P.y + 0.8, P.z + Math.cos(P.yaw) * 0.38); heldSpr.position.copy(hp); } if (Date.now() - (P.eAt || 0) > 5000) { P.e = held.e; P.eAt = Date.now(); api.markDirty && api.markDirty(); } }
     { const tc = performance.now(); if (tc - crT > 400) { crT = tc; paintCredit(); } } // wall clock: dt is capped at low fps
     npc.update(dt, now);
@@ -429,6 +431,6 @@ export function attachTheater(api, W, K, { far }) {
     prompt, action, update,
     destroy() { try { leave(true); } catch { /* */ } if (unsub) unsub(); clearTimeout(saveT); for (const f of cleanup) try { f(); } catch { /* */ }
       for (const c of ex.cols) { const i = api.cyl.indexOf(c); if (i >= 0) api.cyl.splice(i, 1); } for (const b of odBoxes) { const i = api.box.indexOf(b); if (i >= 0) api.box.splice(i, 1); }
-      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); crEl.remove(); document.body.classList.remove('th-pnl', 'th-cardup', 'th-starting'); hush.leave(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
+      extG.removeFromParent(); odG.removeFromParent(); inG && inG.removeFromParent(); heldSpr && heldSpr.removeFromParent(); hudEl.remove(); crEl.remove(); document.body.classList.remove('th-pnl', 'th-cardup', 'th-starting', 'th-film'); hush.leave(); if (audio) { audio.pause(); audio.src = ''; } if (movie) { movie.dispose(); movie = null; } if (far) far.visible = true; }
   };
 }

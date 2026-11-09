@@ -118,6 +118,10 @@ export function listings(nowMs, anchor = 0, off = false, kid = false, n = 3) {
   for (const e of out) { e.now = e.id === nowId; if (!e.now && (!up || e.times[0] < up.times[0])) up = e; }
   for (const e of out) e.next = e === up; return out;
 }
+// Name tags cover the screen during the countdown and the film. The end card and a paused program do not.
+export function screenHidesNames(phase, songOn) {
+  return !songOn && (phase === 'count' || phase === 'title' || phase === 'movie');
+}
 export const clockStr = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 export const mmss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 export const runtime = (f) => (f.dur >= 60 ? `${Math.round(f.dur / 60)} min` : `${Math.round(f.dur)} s`);
