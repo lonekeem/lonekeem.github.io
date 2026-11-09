@@ -32,6 +32,7 @@ import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; im
 import { presenceGapMs, presenceDeny, afterPresenceDeny, RECOVER_MS, presenceVelInt, extrapSec, keepRemotePal, inVehicle, lookKey, samplePose, takePose, HEARTBEAT_MS, STALE_PRESENCE_MS, RENDER_BEHIND_MS } from './presence-sync.js';
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
 import { attachRotate } from '../rotate.js';
+import { enterWorldLandscape, leaveWorldLandscape, bindWorldTurnHint, TURN_HINT } from '../world-orient.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
 const toW = (x, y) => [(x - CX) / PX, (y - CY) / PX]; const toP = (x, z) => [Math.round(x * PX + CX) || 0, Math.round(z * PX + CY) || 0];
@@ -65,8 +66,11 @@ const WATER_Y = { pond: 0, lake: 0 }; { WATER_Y.pond = ground(POND.x, POND.z) + 
 export function createPark3D(ctx) {
   const { S, db, main, esc, toast, friendlyError, requireAuth, openModal, closeModal } = ctx;
   let stop = null;
+  let unhint = () => {};
   async function page() {
-    if (!requireAuth()) return; if (stop) stop();
+    if (!requireAuth()) { leaveWorldLandscape(); return; }
+    enterWorldLandscape();
+    if (stop) stop();
     if (!document.getElementById('p3-css')) { const l = document.createElement('link'); l.id = 'p3-css'; l.rel = 'stylesheet'; l.href = new URL('../../css/park3d.css', import.meta.url).href; document.head.appendChild(l); }
     const Q = gfxPreset(); const ULTRA = Q.tier === 'ultra', LOW = Q.tier === 'low'; void gfxLevel; // shared Graphics setting (js/gfx.js)
     main.innerHTML = `<section class="p3"><div class="p3-view" id="p3-view">
@@ -75,8 +79,9 @@ export function createPark3D(ctx) {
       <div class="p3-log" id="p3-log" aria-live="polite"></div>
       <div class="p3-tags" id="p3-tags"></div>
       <form class="p3-chat" id="p3-chat"><input id="p3-t" maxlength="60" placeholder="Say something nice…" autocomplete="off" enterkeyhint="send" aria-label="Chat message"><button class="p3-send" aria-label="Send">➤</button><button type="button" class="p3-b" id="p3-quick" aria-label="Quick phrases">💬</button><button type="button" class="p3-b p3-type" id="p3-type" hidden aria-label="Type your own words. Add your birthday first">✏️</button></form>
-      <div class="p3-panel" id="park-panel" hidden></div><div class="p3-hint" id="p3-hint"></div><button type="button" class="p3-rotip" id="p3-rotip" hidden>📱 Tip: Turn your phone sideways for a bigger view, or tap 🔄 to rotate!</button><div class="p3-load" id="p3-load">Building the park…</div></div></section>`;
+      <div class="p3-panel" id="park-panel" hidden></div><div class="p3-hint" id="p3-hint"></div><button type="button" class="p3-rotip" id="p3-rotip" hidden>🔄 ${TURN_HINT}</button><div class="p3-load" id="p3-load">Building the park…</div></div></section>`;
     document.body.classList.add('p3-on');
+    unhint = bindWorldTurnHint(main.querySelector('#p3-rotip'));
     const view = main.querySelector('#p3-view'), cv = main.querySelector('#park-cv');
     const $ = (s) => main.querySelector(s);
     // ---------------------------------------------------------------- renderer
@@ -355,7 +360,7 @@ export function createPark3D(ctx) {
 
     // ---------------------------------------------------------------- my Pal
     const pal = await getActivePal(db, S.user.uid).catch(() => null);
-    if (!document.body.contains(cv)) { unhookSize(); R.dispose(); return; }
+    if (!document.body.contains(cv)) { unhint(); unhint = () => {}; unhookSize(); R.dispose(); leaveWorldLandscape(); return; }
     const snapOf = (p) => (p ? { species: p.species, name: p.name, colors: p.colors || {}, pattern: p.pattern || '', acc: p.acc || '', outfit: p.outfit || {}, level: p.level || 1, variant: p.variant || '' } : { species: 'kemy', name: 'Kemy', level: 1, outfit: {} });
     let palSnap = snapOf(pal);
     const HEIGHT = 1.45;
@@ -447,7 +452,7 @@ export function createPark3D(ctx) {
       return s.data().count;
     };
     for (let i = 1; i <= ROOMS; i++) { try { const n = await countRoom(i); if (n < MAX_ROOM) { room = 'r' + i; roomN = n; break; } } catch { break; } }
-    if (!document.body.contains(cv)) { unhookSize(); R.dispose(); return; }
+    if (!document.body.contains(cv)) { unhint(); unhint = () => {}; unhookSize(); R.dispose(); leaveWorldLandscape(); return; }
     $('#park-room').textContent = `Room ${room.slice(1)}`;
     const meRef = doc(db, 'parkRooms', room, 'p', S.user.uid); let extras = true, extrasBack = 0;
     const sync = { vel: null, plate: '' }; let plateOk = true, denyStreak = 0;
@@ -688,19 +693,6 @@ export function createPark3D(ctx) {
       document.getElementById('pr-f').onsubmit = async (e) => { e.preventDefault(); try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: o.uid, postId: '', reason: ('Pal Park: ' + document.getElementById('pr-r').value + '. ' + document.getElementById('pr-t').value).slice(0, 500), excerpt: String(o.say || '').slice(0, 300), createdAt: serverTimestamp() }); closeModal(); toast('Thanks. The report was sent.'); } catch (er) { toast(friendlyError(er)); } }; }
     const hintEl = $('#p3-hint'); function hint(t) { hintEl.textContent = t; hintEl.classList.add('on'); clearTimeout(hintEl._t); hintEl._t = setTimeout(() => hintEl.classList.remove('on'), 2200); }
     attachRotate($('#p3-rot'), hint);
-    function showRotTip() {
-      if (!document.body.contains(view)) return;
-      const KEY = 'kemy-rot-tip'; let n = 0;
-      try { n = parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch { return; }
-      if (n >= 3) return;
-      const el = $('#p3-rotip'); if (!el || window.innerWidth > window.innerHeight) return;
-      try { localStorage.setItem(KEY, String(n + 1)); } catch { /* still show it this time */ }
-      // portrait only, brief, and never parked over the middle of the view
-      if (window.innerWidth > window.innerHeight) return;
-      const hide = () => { el.hidden = true; window.removeEventListener('resize', onR); }; const onR = () => { if (window.innerWidth > window.innerHeight) hide(); };
-      el.hidden = false; el.onclick = hide; window.addEventListener('resize', onR); setTimeout(hide, 5000);
-    }
-    setTimeout(() => { const p = tc.tutorial(); if (p && p.then) p.then(showRotTip); else showRotTip(); }, 600);
 
     // ---------------------------------------------------------------- music: the theme playlist, softly, looping (🎵 player stays available)
     let gm = null; import('../gamemusic.js').then(async (m) => { gm = m; await m.mountGameMusic({ corner: 'top-right' }); if (!m.isPlaying() && document.body.contains(cv)) m.playStation('theme', { volume: 0.18 }); }).catch(() => {});
@@ -873,7 +865,7 @@ export function createPark3D(ctx) {
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
-    function cleanup() { if (!alive) return; alive = false; removeEventListener('kemy:pal-changed', onPal); try { unWorld(); } catch { /* */ } try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); unhookSize(); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
+    function cleanup() { if (!alive) return; alive = false; unhint(); unhint = () => {}; leaveWorldLandscape(); removeEventListener('kemy:pal-changed', onPal); try { unWorld(); } catch { /* */ } try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); unhookSize(); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
       document.body.classList.remove('p3-on', 'p3-drive'); tc?.destroy(); try { scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } delete window.__p3star; delete window.__p3play; }
     stop = cleanup;
   }
