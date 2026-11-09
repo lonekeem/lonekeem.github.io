@@ -1,6 +1,5 @@
 // Normal-account video save. Before: expression cap. After: one profile read, media rules only.
 // firebase emulators:exec --config firebase.emu.json --only firestore --project demo-postbudget "node tests/safety/post-budget.test.mjs"
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, setDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -8,8 +7,7 @@ import { deliveryUrls } from '../../js/media-config.js';
 import { searchFields } from '../../js/search-index.js';
 
 const afterRules = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
-const beforeRules = execSync('git show HEAD:firestore.rules', { encoding: 'utf8' });
-console.log('rules bytes before', Buffer.byteLength(beforeRules), 'after', Buffer.byteLength(afterRules));
+console.log('rules bytes', Buffer.byteLength(afterRules));
 const Y = new Date().getFullYear();
 const DAY = Math.floor(Date.now() / 864e5);
 const OLD = Timestamp.fromMillis(Date.now() - 40 * 864e5);
@@ -74,9 +72,6 @@ async function run(label, rules, cases) {
 const put = (id, label, kind, data, expect) => ({
   id, label, expect, build: (b, f) => b.set(doc(f, kind + (++seq)), data)
 });
-await run('before', beforeRules, [
-  put('tilly', 'original-audio empty', 'posts/b', video('tilly', '', false), 'EXPR')
-]);
 await run('after', afterRules, [
   put('tilly', 'original-audio empty', 'posts/p', video('tilly', '', false), 'PASS'),
   put('tilly', 'original-audio caption', 'posts/p', video('tilly', 'New music video', false), 'PASS'),
