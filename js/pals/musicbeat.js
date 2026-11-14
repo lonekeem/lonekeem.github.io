@@ -8,8 +8,8 @@ export const DEFAULT_BPM = 112;
 // audio file name -> lyrics / beat key (every song in theme.js TRACKS + the game radio stations)
 export const FILES = {
   'kemy-theme.m4a': 'kemy-on-the-screen', 'kemy-theme3.m4a': 'time', 'kemy-theme4.m4a': 'keep-me-alive', 'kemy-theme5.m4a': 'youre-the-one',
-  'another-week.mp3': 'another-week', 'walked-away.m4a': 'walked-away', 'keep-going.m4a': 'keep-going', 'not-a-common-person.m4a': 'not-a-common-person',
-  'day-dreaming.m4a': 'day-dreaming', 'empty-home.m4a': 'empty-home', 'stand-tall.m4a': 'stand-tall', 'stand-up-strong.m4a': 'stand-up-strong', 'stand-up.m4a': 'stand-up',
+  'another-week.mp3': 'another-week', 'keep-going.m4a': 'keep-going', 'not-a-common-person.m4a': 'not-a-common-person',
+  'day-dreaming.m4a': 'day-dreaming', 'stand-tall.m4a': 'stand-tall', 'stand-up-strong.m4a': 'stand-up-strong', 'stand-up.m4a': 'stand-up',
   'keep-building.mp3': 'keep-building', 'theme-song-2.mp3': 'kemy-song-2', 'theme-song-3.mp3': 'kemy-song-3'
 };
 const GAME = /^((chill|hype|lofi|adv)-[a-z0-9-]+)\.m4a$/; // game radio: key = file stem

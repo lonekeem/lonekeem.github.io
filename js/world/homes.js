@@ -560,8 +560,8 @@ body.kh-decorating .gm,body.kh-decorating .kh-radio{visibility:hidden!important;
       const note = document.createElement('small'); note.className = 'kh-note'; note.textContent = 'Tap ▶ to listen. Spotify and Apple embeds play 30 s previews unless you’re signed in there.'; body.appendChild(note);
       setRadioTitle(e.service === 'apple' ? 'Apple Music' : 'Spotify');
     } else {
-      const { TRACKS } = await import('../theme.js'); if (rad !== me0) return;
-      const t = TRACKS[Rd.t | 0] || TRACKS[0]; const au = new Audio(); au.preload = 'none'; au.loop = true; au.volume = 0.5; if (!t.lazy) au.src = t.src; me0.au = au;
+      const { trackAt } = await import('../theme.js'); if (rad !== me0) return;
+      const t = trackAt(Rd.t | 0); const au = new Audio(); au.preload = 'none'; au.loop = true; au.volume = 0.5; if (!t.lazy) au.src = t.src; me0.au = au;
       const sync = () => { try { au.currentTime = Math.max(0, ((Date.now() - (Rd.s || Date.now())) / 1000) % (t.dur || 120)); } catch { /* */ } };
       body.innerHTML = `<div class="kh-now">${t.cover ? `<img src="${esc(t.cover)}" alt="" width="44" height="44">` : ''}<div><b>🎵 ${esc(t.title)}</b><small>${esc(t.artist)}${t.credit ? ` · ${esc(t.credit)}` : ''}</small><small class="kh-note">Everyone inside hears the same spot.</small></div></div><button type="button" data-p hidden>Tap to listen 🎵</button>`;
       const tb = body.querySelector('[data-p]');

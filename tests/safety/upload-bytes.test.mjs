@@ -60,6 +60,6 @@ assert.match(works, /fileInMemory\(file, file\.name \|\| 'upload'\)/);
 assert.match(works, /chunkInMemory\(file, s, e\)/);
 assert.match(comments, /fileInMemory\(blob, 'comment\.jpg'\)/);
 assert.match(avatar, /fileInMemory\(file, file\.name \|\| 'avatar\.jpg'\)/);
-assert.match(text('sw.js'), /const CACHE = 'lks-v292'/);
+assert.match(text('sw.js'), /const CACHE = 'lks-v293'/);
 
 console.log('PASS upload bytes');

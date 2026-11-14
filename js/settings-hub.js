@@ -223,6 +223,8 @@ function html(ctx) {
         <p><b>Who can message or invite me</b><br>${esc(whoText())}</p>
         <a class="set-link" href="#/settings/parental">Parent info<span class="go" aria-hidden="true">›</span></a>
         <a class="set-link" href="kids-safety.html">Kids safety and parents<span class="go" aria-hidden="true">›</span></a>
+        <a class="set-link" href="privacy.html">Privacy Policy<span class="go" aria-hidden="true">›</span></a>
+        <a class="set-link" href="terms.html">Terms of Service<span class="go" aria-hidden="true">›</span></a>
         <a class="set-link" href="#/feedback">Message the Kemy team<span class="go" aria-hidden="true">›</span></a>
         <a class="set-link" href="#/settings/account">Delete my account and data<span class="go" aria-hidden="true">›</span></a>
         <h3 style="font-size:1rem;margin:12px 0 4px">For parents</h3>
@@ -246,6 +248,8 @@ function html(ctx) {
         <div class="set-links">
           <a class="set-link" href="#/updates">What’s New<span class="go" aria-hidden="true">›</span></a>
           <a class="set-link" href="kids-safety.html">Kids safety and parents<span class="go" aria-hidden="true">›</span></a>
+          <a class="set-link" href="privacy.html">Privacy Policy<span class="go" aria-hidden="true">›</span></a>
+          <a class="set-link" href="terms.html">Terms of Service<span class="go" aria-hidden="true">›</span></a>
           <a class="set-link" href="#/feedback">Message the Kemy team<span class="go" aria-hidden="true">›</span></a>
           <a class="set-link" href="#/settings/account">Delete my account and data<span class="go" aria-hidden="true">›</span></a>
           <button class="set-link" type="button" data-watch-intro>Watch intro<span class="go" aria-hidden="true">›</span></button>
