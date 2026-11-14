@@ -522,7 +522,7 @@ export function createPark3D(ctx) {
     }, (e) => { net.snapErr = e.code || String(e); link.fail(); console.error('[Kemy presence] listener failed (' + (wide ? 'wide' : 'cells') + '):', e); if (!wide) { wide = true; toast('⚠️ Nearby-player sync hiccup, switching to full-room sync'); } setTimeout(() => { if (document.body.contains(cv)) { try { unsubL && unsubL(); } catch { /* */ } unsubL = listen(); } }, 1500); }); };
     let unsubL = listen();
     const recenter = () => { const cx = (ctr.i + 0.5) * CELL, cz = (ctr.j + 0.5) * CELL; if (Math.abs(P.x - cx) < CELL / 2 + 30 && Math.abs(P.z - cz) < CELL / 2 + 30) return; ctr = { i: Math.floor(P.x / CELL), j: Math.floor(P.z / CELL) }; net.recenters = (net.recenters || 0) + 1; if (wide) return; if (unsubL) { unsubL(); unsubL = listen(); } };
-    setInterval(() => { if (document.body.contains(cv)) { recenter(); let n = 0; for (const o of others.values()) if (Math.hypot(o.x - P.x, o.z - P.z) < 150) n++; nearN = n; const rl = $('#park-room'); if (rl) { const t = `Room ${room.slice(1)} · 👥 ${others.size + 1}`; if (rl.textContent !== t) { rl.textContent = t; rl.title = `Up to ${MAX_ROOM} players per room; new rooms open automatically`; } } } }, 1000);
+    const roomTick = setInterval(() => { if (!alive || !document.body.contains(cv)) return; recenter(); let n = 0; for (const o of others.values()) if (Math.hypot(o.x - P.x, o.z - P.z) < 150) n++; nearN = n; const rl = $('#park-room'); if (rl) { const t = `Room ${room.slice(1)} · 👥 ${others.size + 1}`; if (rl.textContent !== t) { rl.textContent = t; rl.title = `Up to ${MAX_ROOM} players per room; new rooms open automatically`; } } }, 1000);
     let hideT = 0;
     const onVisHide = () => {
       if (unsubL) { unsubL(); unsubL = null; }
@@ -865,7 +865,7 @@ export function createPark3D(ctx) {
     requestAnimationFrame(frame); cv.focus({ preventScroll: true });
     const bye = () => { deleteDoc(meRef).catch(() => {}); };
     addEventListener('beforeunload', bye); addEventListener('pagehide', bye);
-    function cleanup() { if (!alive) return; alive = false; unhint(); unhint = () => {}; leaveWorldLandscape(); removeEventListener('kemy:pal-changed', onPal); try { unWorld(); } catch { /* */ } try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); unhookSize(); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
+    function cleanup() { if (!alive) return; alive = false; clearInterval(roomTick); unhint(); unhint = () => {}; leaveWorldLandscape(); removeEventListener('kemy:pal-changed', onPal); removeEventListener('kemy:chat-mode', applyPhrase); try { unWorld(); } catch { /* */ } try { W3.destroy(); } catch { /* */ } unsub(); bye(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); unhookSize(); removeEventListener('beforeunload', bye); removeEventListener('pagehide', bye);
       document.body.classList.remove('p3-on', 'p3-drive'); tc?.destroy(); try { scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); } catch { /* */ } delete window.__p3star; delete window.__p3play; }
     stop = cleanup;
   }

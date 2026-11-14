@@ -56,7 +56,7 @@ export function attachDrive(api, world) { const W_EXTRA = {};
   function dropCy() { const i = my ? api.cyl.indexOf(my.cy) : -1; if (i >= 0) api.cyl.splice(i, 1); }
   // input never stays latched: pedals, handbrake, joystick all cleared on enter/exit/blur
   function resetInput() { try { H.reset(); } catch { /* */ } held.gas = held.brake = 0; inp.thr = inp.brk = inp.steer = inp.hand = 0; try { api.tc.reset && api.tc.reset(); } catch { /* */ } document.querySelectorAll('.kd-b.on').forEach((b) => b.classList.remove('on')); if (my) { my.stuckT = 0; } }
-  addEventListener('blur', () => resetInput());
+  const onBlur = () => resetInput(); addEventListener('blur', onBlur);
   // unstick: try small moves out of whatever we are wedged in, else put the car upright on the nearest road
   function freeAt(x, z, yaw, c) { const s = Math.sin(yaw), co = Math.cos(yaw); for (const f of [c.L * 0.38, 0, -c.L * 0.38]) { const px = x + s * f, pz = z + co * f; const [nx, nz] = api.collide(px, pz, ground(px, pz)); if (Math.abs(nx - px) + Math.abs(nz - pz) > 1e-3) return false; } return true; }
   function resetCar(toRoad) { if (!my) return; const c = my.m.userData.def; let p = null;
@@ -313,6 +313,6 @@ async function sellCar(id) { const c = CAR[id]; if (!c || c.free || !owned.has(i
   W_EXTRA.savePref(); try { econ && econ.wallet && econ.wallet(true); econ && econ.inventory && econ.inventory(true); } catch { /* */ }
   dispatchEvent(new CustomEvent('kemy:wallet-changed')); say(`💰 Sold ${c.name} for ${c.p ? '⭐ ' + half : '💎 ' + half}.`); return half; }
   W_EXTRA.ownedCars = ownedCars; W_EXTRA.buyCar = buyCar; W_EXTRA.openSell = () => { if (SELL_CARS) openMyCars('sell'); }; W_EXTRA.sellOn = SELL_CARS; W_EXTRA.openKustoms = W_EXTRA.openKustoms || openKustoms; W_EXTRA.pref = pref; W_EXTRA.savePref = () => { savePrefNow(); carsChanged(); }; W_EXTRA.owned = owned;
-  return { ...W_EXTRA, update, destroy() { offPad(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); rcss.remove(); rbar.remove(); rpop.remove(); H.destroy(); FX.destroy(); }, spawnCar, mine, stash, place, removeCar, isOwned, resetCar, resetAt: (p) => { if (!my) return; my.V.place(p.x, p.z, p.yaw || 0); my.V.rev = false; my.V.gear = 1; my.stuckT = 0; api.markDirty(); } };
+  return { ...W_EXTRA, update, destroy() { offPad(); removeEventListener('blur', onBlur); removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeCar(); for (const R of remote.values()) scene.remove(R.m); css.remove(); rcss.remove(); rbar.remove(); rpop.remove(); H.destroy(); FX.destroy(); }, spawnCar, mine, stash, place, removeCar, isOwned, resetCar, resetAt: (p) => { if (!my) return; my.V.place(p.x, p.z, p.yaw || 0); my.V.rev = false; my.V.gear = 1; my.stuckT = 0; api.markDirty(); } };
 }
 void FLAT;

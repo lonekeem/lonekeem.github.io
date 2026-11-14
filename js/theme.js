@@ -165,7 +165,7 @@ export function initThemeMusic() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) { wasPlaying = isPlaying(); if (el) el.pause(); } else if (wasPlaying && getMode() === 'play' && calmNow()) play(); });
   addEventListener('pagehide', () => { if (el) el.pause(); });
   addEventListener('kemy:media-play', (e) => { if (e.detail?.source !== 'kemy-theme') stop(0.25); });
-  const route = () => { if (!calmNow() || LOUD.test(location.hash || '')) stop(0.6); paintFab(); if (calmNow() && getMode() === '') setTimeout(() => { if (calmNow()) ask(); }, 1200); };
+  const route = () => { if (!calmNow() || LOUD.test(location.hash || '')) stop(0.6); paintFab(); const askEl = document.getElementById('theme-ask'); if (!calmNow()) { if (askEl) askEl.remove(); return; } if (getMode() === '') setTimeout(() => { if (calmNow() && getMode() === '') ask(); }, 1200); };
   addEventListener('hashchange', route);
   new MutationObserver(() => paintFab()).observe(document.getElementById('modal-root') || document.body, { childList: true });
   // Browsers need a tap before sound: resume on the first tap on a calm screen when the choice is Play.
