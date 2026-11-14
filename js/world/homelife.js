@@ -97,7 +97,8 @@ export function attachHomeLife(api, H) { // H: { P, room(): {I, cx, cz}|null, in
     if (api.others) for (const o of api.others.values()) propsFor(o.obj, H.inside() && o.dn, T);
     if (crumbs > 0) { crumbs -= dt; if (!crumbS.length) for (let i = 0; i < 5; i++) { const c = sprite(THREE, '🟤', 0.05); api.scene.add(c); crumbS.push(c); } crumbS.forEach((c, i) => { const k = 1 - crumbs / 1.5; c.position.set(P.x + Math.sin(i * 2.3) * 0.25, P.y + 0.9 - k * 0.8 + i * 0.02, P.z + Math.cos(i * 2.3) * 0.25); c.visible = true; }); }
     else if (crumbS.length) { crumbS.forEach((c) => { api.scene.remove(c); c.material.dispose(); }); crumbS.length = 0; } }
-  function destroy() { if (showerOv && roomState.camOv === showerOv) roomState.camOv = null; showerOv = null; closeMenu(); css.remove(); dim(false); stopHiss(); flush(); for (const [o, e] of props) if (e.g) o.remove(e.g); props.clear(); }
-  addEventListener('pagehide', flush);
+  const onHideLife = () => flush();
+  function destroy() { removeEventListener('pagehide', onHideLife); if (showerOv && roomState.camOv === showerOv) roomState.camOv = null; showerOv = null; closeMenu(); css.remove(); dim(false); stopHiss(); flush(); for (const [o, e] of props) if (e.g) o.remove(e.g); props.clear(); }
+  addEventListener('pagehide', onHideLife);
   return { prompt, act, update, destroy, held: () => held, busy: () => busy && busy.k, flush };
 }

@@ -411,7 +411,7 @@ export function attachWorld(api) { const SEA = currentSeason(), HW = SEA.id === 
     if ((mapT += dt) > 0.25) { mapT = 0; drawMap(); }
     window.__kw = Object.assign(window.__kw || {}, { season: SEA.id, night: nk, bots: bots.length, cars: cars.length, houses: HOUSES.length, candy: candyTotal(), coinKnocks: kn.n, nearDoor: best }); }
   function spawnStreet() { P.x = GATE.x + (Math.random() - 0.5) * 3; P.z = GATE.z + 6 + Math.random() * 3; P.yaw = 0; P.lastYaw = P.yaw; P.y = ground(P.x, P.z); if (me.userData.m) me.userData.m.userData.snapHead = true; }
-  function destroy() { hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
+  function destroy() { removeEventListener('resize', placeAct); hud.remove(); pls.forEach((l) => scene.remove(l)); for (const k of ['top', 'hor', 'ground', 'sunCol']) SU[k].value.copy(DAY[k]); }
   window.__kwApi = { knock: (i) => knock(i), doors: () => doors.map((d) => ({ id: d.h.id, x: d.x, z: d.z })), paintHouse: (id, ext) => paintHouse(id, ext) };
   const W = { update: null, paintHouse, spawnStreet, destroy: null, doors, cars, bots, root, say, hud, setNight, lamps, loopAt, move: (m) => m, driving: () => false };
   const HALL = { x: 40, z: 248, door: [40, 255.2] };
