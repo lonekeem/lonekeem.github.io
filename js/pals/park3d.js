@@ -32,6 +32,7 @@ import { attachWorld, worldGround, worldClamp } from '../world/kemyworld.js'; im
 import { presenceGapMs, presenceDeny, afterPresenceDeny, RECOVER_MS, presenceVelInt, extrapSec, keepRemotePal, inVehicle, lookKey, samplePose, takePose, HEARTBEAT_MS, STALE_PRESENCE_MS, RENDER_BEHIND_MS } from './presence-sync.js';
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
 import { attachRotate } from '../rotate.js';
+import { benchSpot, swingPose, swingSpot, slideEnds, slideAt, picnicSeats, dailyStars, nearestSpot, STAR_COINS } from './park-play.js';
 import { enterWorldLandscape, leaveWorldLandscape, bindWorldTurnHint, TURN_HINT } from '../world-orient.js';
 
 const PX = 16, CX = 1600, CY = 1200;                 // 1 m = 16 park units; (1600,1200) = plaza centre (same as 2D park)
@@ -272,18 +273,24 @@ export function createPark3D(ctx) {
         const sc = 0.7 + R2() * 0.7; _q.setFromAxisAngle(Y, R2() * 6.28); _m.compose(_p.set(x, ground(x, z) - 0.1, z), _q, _s.set(sc, sc * (0.8 + R2() * 0.3), sc)); bu.setMatrixAt(k, _m); bu.setColorAt(k, _c.set(BC[k % BC.length]).lerp(_c2.set(FLW[k % 3]), R2() < 0.2 ? 0.25 : 0)); k++; }
       bu.count = k; scene.add(bu); }
 
-    // ---------------------------------------------------------------- benches, lamps (along the paths)
+    // ---------------------------------------------------------------- benches, lamps (along the paths). Seats are data only; the meshes can be merged.
+    const seats = [];
+    const addSeat = (s) => { s.id = s.id + ':' + seats.length; seats.push(s); return s; };
     const WT = proceduralTex('wood', Q, [1, 1]), STN = proceduralTex('rock', Q, [3, 1]); const wood = new THREE.MeshStandardMaterial({ color: '#b07a4b', map: WT.map, normalMap: WT.normalMap, roughness: 0.7 }), iron = new THREE.MeshStandardMaterial({ color: '#3b3550', roughness: 0.35, metalness: 0.6 }), stone = new THREE.MeshStandardMaterial({ color: '#e2d9c8', map: STN.map, normalMap: STN.normalMap, roughness: 0.85 });
     const lampHeads = [];
     function bench(x, z, ry) { const g = new THREE.Group(); const y = ground(x, z);
       for (let i = 0; i < 3; i++) { const sl = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.14), wood); sl.position.set(0, 0.48, -0.18 + i * 0.18); g.add(sl); const bk = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.12, 0.05), wood); bk.position.set(0, 0.68 + i * 0.16, -0.3); g.add(bk); }
       for (const sx of [-0.8, 0.8]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.5), iron); l.position.set(sx, 0.25, -0.05); g.add(l); }
-      g.traverse((o) => { if (o.isMesh) { o.castShadow = !LOW; o.receiveShadow = true; } }); g.position.set(x, y, z); g.rotation.y = ry; scene.add(g); addBox(x, z, 1.4, 1.4, y + 0.52); }
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = !LOW; o.receiveShadow = true; } }); g.position.set(x, y, z); g.rotation.y = ry; scene.add(g); addBox(x, z, 1.4, 1.4, y + 0.52); addSeat(benchSpot(x, z, ry, y)); }
     function lamp(x, z) { const g = new THREE.Group(); const y = ground(x, z); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 3.4, 8), iron); p.position.y = 1.7; g.add(p);
       const h = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), std('#fff6d8', { e: '#ffe7a8', ei: 0.6 })); h.position.y = 3.5; g.add(h); lampHeads.push(h); const c = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.25, 12), iron); c.position.y = 3.78; g.add(c);
       g.traverse((o) => { if (o.isMesh) o.castShadow = !LOW; }); g.position.set(x, y, z); scene.add(g); cyl.push({ x, z, r: 0.18, top: 99 }); }
     for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; lamp(Math.cos(a) * (PLAZA_R + 2.6), Math.sin(a) * (PLAZA_R + 2.6)); bench(Math.cos(a) * (PLAZA_R - 2), Math.sin(a) * (PLAZA_R - 2), -a - Math.PI / 2); }
     for (const d of [24, 40, 60, 80]) for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = sx * d, z = sz * d; if (Math.abs(z) > H - 8 || Math.abs(x) > W - 8) continue; if (!walkable(x, z, 4)) continue; lamp(x + (sz ? 2.6 : 0), z + (sx ? 2.6 : 0)); if (d % 40 === 0 && walkable(x - (sz ? 3.2 : 0), z - (sx ? 3.2 : 0), 4)) bench(x - (sz ? 3.4 : 0), z - (sx ? 3.4 : 0), sx ? 0 : Math.PI / 2); }
+    // picnic blankets: one shared plane, four seats each, no collider so friends can sit together
+    { const picG = new THREE.PlaneGeometry(2.4, 2.4); picG.rotateX(-Math.PI / 2); const picM = new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.95 }); const spots = [[22, 14], [-24, -12], [14, -20]].filter(([x, z]) => walkable(x, z, 3)); const pic = new THREE.InstancedMesh(picG, picM, Math.max(1, spots.length)); pic.name = 'picnic'; pic.count = spots.length; const cols = ['#e24b4b', '#3d8bfd', '#f2c14e'];
+      spots.forEach(([x, z], i) => { const gy = ground(x, z); _m.compose(_p.set(x, gy + 0.03, z), _q.identity(), _s.set(1, 1, 1)); pic.setMatrixAt(i, _m); pic.setColorAt(i, _c.set(cols[i])); picnicSeats(x, z, gy, 'pic' + i).forEach(addSeat); });
+      if (spots.length) { pic.receiveShadow = true; scene.add(pic); } }
 
     // ---------------------------------------------------------------- fountain (plaza centre): basin, tiers, animated spray
     const fountain = new THREE.Group(); scene.add(fountain); const fy = 2.4; fountain.position.set(0, fy, 0);
@@ -329,7 +336,8 @@ export function createPark3D(ctx) {
       for (let i = 0; i < 6; i++) addBox(PLAY.x + 1.9 + i * 0.62, PLAY.z, 0.62, 1.2, y0 + TH - (i + 0.5) * TH / 6);  // the slide surface (slope)
       const swings = new THREE.Group(); swings.position.set(-2, 0, -7); g.add(swings); const fr = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 5, 8), blue); fr.rotation.z = Math.PI / 2; fr.position.y = 3; swings.add(fr);
       for (const sx of [-2.4, 2.4]) for (const sz of [-0.8, 0.8]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.3, 8), blue); l.position.set(sx, 1.5, sz * 0.6); l.rotation.x = sz > 0 ? -0.35 : 0.35; swings.add(l); }
-      const seats = []; for (const sx of [-1, 1]) { const sw = new THREE.Group(); sw.position.set(sx, 3, 0); const r1 = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.4, 4), iron); r1.position.y = -1.2; const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.35), red); seat.position.y = -2.4; sw.add(r1, seat); swings.add(sw); seats.push(sw); } g.userData.seats = seats;
+      const swingSeats = []; for (const [i, sx] of [[0, -1], [1, 1]]) { const sw = new THREE.Group(); sw.position.set(sx, 3, 0); const r1 = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.4, 4), iron); r1.position.y = -1.2; const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.35), red); seat.position.y = -2.4; sw.add(r1, seat); swings.add(sw); swingSeats.push(sw); addSeat(swingSpot(PLAY, y0, sx, i, y0)); } g.userData.seats = swingSeats;
+      const chute = slideEnds(PLAY, y0); addSeat({ kind: 'slide', id: 'slide', x: chute.top.x, z: chute.top.z, y: chute.top.y, yaw: chute.top.yaw, ax: chute.use.x, az: chute.use.z, useY: chute.use.y, ends: chute });
       cyl.push({ x: PLAY.x - 4.4, z: PLAY.z - 7, r: 0.25, top: 99 }, { x: PLAY.x + 0.4, z: PLAY.z - 7, r: 0.25, top: 99 });
       const ss = new THREE.Group(); ss.position.set(4, 0, 6); g.add(ss); const piv = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.6, 12), blue); piv.position.y = 0.3; const plank = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.14, 0.45), yel); plank.position.y = 0.65; ss.add(piv, plank); g.userData.plank = plank;
       g.traverse((o) => { if (o.isMesh) { o.castShadow = !LOW; o.receiveShadow = true; } }); window.__p3play = g; }
@@ -355,6 +363,13 @@ export function createPark3D(ctx) {
     const tk = 'kemy-park-found-' + S.user.uid + '-' + Math.floor(Date.now() / 86400000); const found = new Set(JSON.parse(lsg(tk) || '[]'));
     const gemG = new THREE.OctahedronGeometry(0.35, 0), gemM = { pearl: '#f4f0ff', flower: '#ff6fae', candy: '#ffd447', shell: '#ffb38a' };
     const items = treasures().map((it) => { let [x, z] = toW(it.x, it.y); x *= 1.0; z *= 1.0; for (let n = 0; n < 12 && !freeSpotLoose(x, z); n++) { x *= 0.85; z *= 0.85; } const m = new THREE.Mesh(gemG, std(gemM[it.k] || '#fff', { e: gemM[it.k], ei: 0.5, r: 0.2 })); m.position.set(x, ground(x, z) + 1, z); m.visible = !found.has(it.id); scene.add(m); return { ...it, x, z, m }; });
+    // hidden stars: 6 a day, same places for everyone, once each. 5 coins uses the existing park earn (no new rules).
+    const starDay = Math.floor(Date.now() / 86400000); const starKey = 'kemy-park-stars-' + S.user.uid + '-' + starDay; let starsGot = new Set(); try { starsGot = new Set(JSON.parse(lsg(starKey) || '[]')); } catch { starsGot = new Set(); }
+    const starList = dailyStars(starDay).map((s) => { let x = s.x, z = s.z; for (let n = 0; n < 8 && !freeSpotLoose(x, z); n++) { x *= 0.86; z *= 0.86; } return { ...s, x, z, y: ground(x, z) + 0.55 }; });
+    const starGeo = new THREE.OctahedronGeometry(0.28, 0), starMat = new THREE.MeshStandardMaterial({ color: '#ffe56a', emissive: '#ffb800', emissiveIntensity: 0.65, roughness: 0.35 });
+    const starMesh = new THREE.InstancedMesh(starGeo, starMat, starList.length); starMesh.name = 'park-stars'; starMesh.frustumCulled = false;
+    starList.forEach((s, i) => { const on = !starsGot.has(s.id); _m.compose(_p.set(s.x, on ? s.y : -50, s.z), _q.identity(), _s.set(on ? 1 : 0, on ? 1 : 0, on ? 1 : 0)); starMesh.setMatrixAt(i, _m); });
+    scene.add(starMesh);
     function freeSpotLoose(x, z) { return walkable(x, z, 2) && !box.some((b) => x > b.x0 - 1 && x < b.x1 + 1 && z > b.z0 - 1 && z < b.z1 + 1) && !cyl.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + 0.8); }
     const foundEl = $('#park-found'); const paintFound = () => { foundEl.textContent = `✨ ${found.size}/${items.length}`; }; paintFound();
 
@@ -730,7 +745,19 @@ export function createPark3D(ctx) {
         geos.forEach((g) => g.dispose()); out.computeBoundingSphere(); const mm = new THREE.Mesh(out, b.m); [mm.castShadow, mm.receiveShadow] = b.shadow; mm.name = 'park-merged'; parkG.add(mm); mergedInfo.before += b.parts.length; mergedInfo.after++; dead.push(...b.parts); }
       for (const o of dead) o.parent && o.parent.remove(o); }
     const parkCull = () => { const dx = Math.max(0, Math.abs(P.x) - (W + 30)), dz = Math.max(0, Math.abs(P.z) - (H + 30)), d = Math.hypot(dx, dz); parkG.visible = d < Q.draw * 0.8; parkDet.visible = d < 50; };
-    const W3 = attachWorld({ THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, db, toast, sky, sun, hemi, ground, cam, palObj, others, gaitFor, posePal3D, beatNow: () => beatNow(), proceduralTex, terrainMat: terrainM, tc, collide, floorAt, markDirty: () => { dirty = true; }, send: (f) => send(f), sync, quietPark: () => { for (const id of [...others.keys()]) if (!(others.get(id) && others.get(id).house)) drop(id); }, dropPal: (id) => drop(id) });
+    const api = { THREE, scene, R, Q, LOW, ULTRA, box, cyl, P, me, view, hint, S, db, toast, sky, sun, hemi, ground, cam, palObj, others, gaitFor, posePal3D, beatNow: () => beatNow(), proceduralTex, terrainMat: terrainM, tc, collide, floorAt, markDirty: () => { dirty = true; }, send: (f) => send(f), sync, quietPark: () => { for (const id of [...others.keys()]) if (!(others.get(id) && others.get(id).house)) drop(id); }, dropPal: (id) => drop(id) };
+    const W3 = attachWorld(api);
+    // benches, swings, the slide and picnic blankets. Sitting reuses P.sit + dance 'sit' (already synced as dn).
+    const seatTaken = (s) => { for (const o of others.values()) if (o.dn === 'sit' && Math.hypot((o.x || 0) - s.x, (o.z || 0) - s.z) < 0.5) return true; return false; };
+    let seatPick = null, seatAt = 0;
+    function pickSeat() { const nowMs = performance.now(); if (nowMs - seatAt < 220) return seatPick; seatAt = nowMs; seatPick = (W3.driving && W3.driving()) ? null : nearestSpot(seats.filter((s) => !seatTaken(s)), P.x, P.z, P.y); return seatPick; }
+    function standPark() { const st = P.sit; if (!st || !st.park) return; P.sit = null; if (P.dance === 'sit') { P.dance = ''; P.danceUntil = 0; } P.x = st.back[0]; P.z = st.back[1]; P.y = st.back[2]; P.vy = 0; dirty = true; send(true); }
+    function sitSpot(s) { if (!s || seatTaken(s) || (W3.driving && W3.driving())) return; const gy = ground(s.ax, s.az); const back = s.kind === 'slide' ? [s.ends.bot.x, s.ends.bot.z, ground(s.ends.bot.x, s.ends.bot.z)] : [s.ax, s.az, gy];
+      P.sit = { x: s.x, z: s.z, y: s.y, yaw: s.yaw, ext: true, park: true, kind: s.kind, sx: s.sx, i: s.i, ends: s.ends, t0: performance.now(), dur: 2400, back, off: standPark };
+      P.x = s.x; P.z = s.z; P.y = s.y; P.yaw = s.yaw; P.vy = 0; P.dance = 'sit'; P.danceUntil = Date.now() + 864e5; dirty = true; send(true); }
+    function rideSit(nowMs) { const st = P.sit; if (!st || !st.park) return; if (st.kind === 'swing') { const p = swingPose(PLAY, 2.2, st.sx, st.i, nowMs / 1000, RM()); st.x = p.x; st.y = p.y; st.z = p.z; st.yaw = p.yaw; dirty = true; } else if (st.kind === 'slide' && st.ends) { const k = Math.min(1, (nowMs - st.t0) / st.dur); const p = slideAt(st.ends, k); st.x = p.x; st.y = p.y; st.z = p.z; st.yaw = p.yaw; dirty = true; if (k >= 1) st.off(); } }
+    const prevPrompt = api.prompt; api.prompt = () => { if (P.sit && P.sit.park) return { id: 'pk:stand', label: '🧍 Stand' }; const p0 = prevPrompt && prevPrompt(); if (p0) return p0; const s = pickSeat(); if (!s) return null; return { id: 'pk:' + s.kind, label: s.kind === 'swing' ? '🎢 Swing' : s.kind === 'slide' ? '🛝 Slide' : '🪑 Sit' }; };
+    const prevAct = api.onAction; api.onAction = (a) => { if (a === 'pk:stand') { if (P.sit && P.sit.off) P.sit.off(); return; } if (a && a.startsWith('pk:')) { sitSpot(pickSeat()); return; } if (prevAct) prevAct(a); };
     const unWorld = registerWorld({
       active: () => document.body.contains(cv),
       driving: () => !!(W3.driving && W3.driving()),
@@ -809,7 +836,7 @@ export function createPark3D(ctx) {
       P.vy -= GRAV * dt; P.y += P.vy * dt;
       if (P.y <= fl) { if (!P.onGround && P.vy < -2) dirty = true; P.y = fl; P.vy = 0; P.onGround = true; } else if (P.onGround && P.y - fl < 0.35 && P.vy <= 0) { P.y = fl; P.vy = 0; } else P.onGround = false;
       if (!P.onGround && P.y > fl + 0.35) P.onGround = false;
-      if (P.sit) { P.x = P.sit.x; P.z = P.sit.z; P.y = P.sit.y; P.yaw = P.sit.yaw; P.vy = 0; P.onGround = true; } // seated on a bed/chair/couch
+      if (P.sit && P.sit.park) rideSit(now); if (P.sit) { P.x = P.sit.x; P.z = P.sit.z; P.y = P.sit.y; P.yaw = P.sit.yaw; P.vy = 0; P.onGround = true; } // seated: bench, swing, slide, picnic, or a house seat
       if (!P.onGround) dirty = true; // stream the jump arc (send() still caps it at ~4/s)
       if (P.danceUntil && Date.now() > P.danceUntil && P.dance) { P.dance = ''; dirty = true; } // tell others the dance ended
       const aboard = !!(W3.driving && W3.driving()); if (!aboard) { me.position.set(P.x, P.y, P.z); me.rotation.y = P.yaw; }
@@ -845,6 +872,7 @@ export function createPark3D(ctx) {
         const said = clean(o.say || ''); const tp = seated ? o.obj.getWorldPosition(tagV) : null; placeTag(o, tp ? tp.x : o.x, tp ? tp.y + HEIGHT * 0.6 + 0.35 : o.y + HEIGHT + 0.35, tp ? tp.z : o.z, muted.has(o.uid) || isHidden(hideKey('park', o.uid, said)) ? '' : said, o.sayAt || 0, !o.obj.visible || dist > (roomState.inId ? 48 : 28)); }
       placeTag(meTag, P.x, P.y + HEIGHT + 0.35, P.z, P.say, P.sayAt, pov && Date.now() - P.sayAt > 7000);
       // treasures & portals
+      for (let si = 0; si < starList.length; si++) { const s = starList[si]; if (starsGot.has(s.id)) continue; if (Math.hypot(s.x - P.x, s.z - P.z) < 1.15 && Math.abs(P.y + 0.5 - s.y) < 2) { starsGot.add(s.id); _m.compose(_p.set(s.x, -80, s.z), _q.identity(), _s.set(0, 0, 0)); starMesh.setMatrixAt(si, _m); starMesh.instanceMatrix.needsUpdate = true; lss(starKey, JSON.stringify([...starsGot])); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: STAR_COINS, why: 'for a hidden star' } })); hint('⭐ Hidden star! +5 Star Coins'); } }
       for (const it of items) { if (found.has(it.id)) continue; it.m.rotation.y += dt * 2; it.m.position.y = ground(it.x, it.z) + 1 + Math.sin(now / 400 + it.x) * 0.15;
         if (Math.hypot(it.x - P.x, it.z - P.z) < 1.3 && Math.abs(P.y + 0.8 - it.m.position.y) < 1.6) { found.add(it.id); it.m.visible = false; lss(tk, JSON.stringify([...found])); paintFound(); dispatchEvent(new CustomEvent('kemy:coins', { detail: { src: 'park', n: 10, why: 'for a treasure' } })); hint('✨ Treasure found! +10 Star Coins'); } }
       if (portalCd > 0) portalCd -= dt; for (const pt of portals) { pt.disc.material.opacity = 0.45 + Math.sin(now / 300 + pt.x) * 0.15; if (portalCd <= 0 && Math.hypot(pt.x - P.x, pt.z - P.z) < 1.2) { portalCd = 4; if (confirm(`Play ${pt.name}?`)) { location.hash = pt.href; return; } } }
