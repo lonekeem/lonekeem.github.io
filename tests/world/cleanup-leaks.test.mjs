@@ -22,7 +22,7 @@ assert.match(drive, /removeEventListener\('blur', onBlur\)/);
 assert.match(life, /const onHideLife = \(\) => flush\(\)/);
 assert.match(life, /removeEventListener\('pagehide', onHideLife\)/);
 assert.match(text('js/theme.js'), /if \(!calmNow\(\)\) \{ if \(askEl\) askEl\.remove\(\); return; \}/);
-assert.match(text('sw.js'), /const CACHE = 'lks-v292'/);
+assert.match(text('sw.js'), /const CACHE = 'lks-v293'/);
 assert.doesNotMatch(text('js/world/drive.js'), /SELL_CARS\s*=\s*true/);
 
 console.log('cleanup leak tests passed');

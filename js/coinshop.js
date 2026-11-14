@@ -37,11 +37,12 @@ export async function openCoinShop(tab = 'get') {
   function spend() { body.innerHTML = `<div class="cs-links"><a href="${shopHref()}" data-x>🛍️ Pal Shop &amp; Store</a><a href="#/pals/shop" data-x>🍎 Food &amp; treats</a><a href="#/games" data-x>🎮 Play games to earn ⭐</a><a href="#/pals/park" data-x>🌳 Find treasures in Pal Park</a></div>`;
     body.querySelectorAll('[data-x]').forEach((a) => a.onclick = close); }
   function get() { const w = walletState();
-    const card = (p) => `<div class="cs-p">${p.tag ? `<span class="cs-tag">${p.tag}</span>` : ''}${st.ready ? '' : '<span class="cs-soon">Coming soon</span>'}<div class="em">${em(p.cur)}</div><b>${(p.amount + p.bonus).toLocaleString()}</b><small>${p.bonus ? `${p.amount.toLocaleString()} + ${p.bonus.toLocaleString()} bonus` : nm(p.cur)}</small><button class="cs-buy" data-id="${p.id}" ${st.ready ? '' : 'disabled'}>${priceOf(p)}</button></div>`;
-    body.innerHTML = `<div class="cs-bal">Your wallet: ⭐ ${w.admin ? '∞' : (w.c ?? 0).toLocaleString()} · 💎 ${w.admin ? '∞' : (w.d ?? 0).toLocaleString()}</div>
-      <h3 class="cs-sec">⭐ Star Coins</h3><div class="cs-grid">${PACKS.filter((p) => p.cur === 'star').map(card).join('')}</div>
+    const bal = `<div class="cs-bal">Your wallet: ⭐ ${w.admin ? '∞' : (w.c ?? 0).toLocaleString()} · 💎 ${w.admin ? '∞' : (w.d ?? 0).toLocaleString()}</div>`;
+    if (!st.ready) { body.innerHTML = `${bal}<div class="cs-note">Star Coins and Diamonds are free. Earn them by playing games, caring for your Pal, and finding treasures in Pal Park.</div><div class="cs-links"><a href="#/games" data-x>🎮 Play games to earn ⭐</a><a href="#/pals" data-x>🐾 Care for your Pal</a><a href="#/pals/park" data-x>🌳 Find treasures in Pal Park</a></div>`; body.querySelectorAll('[data-x]').forEach((a) => a.onclick = close); return; }
+    const card = (p) => `<div class="cs-p">${p.tag ? `<span class="cs-tag">${p.tag}</span>` : ''}<div class="em">${em(p.cur)}</div><b>${(p.amount + p.bonus).toLocaleString()}</b><small>${p.bonus ? `${p.amount.toLocaleString()} + ${p.bonus.toLocaleString()} bonus` : nm(p.cur)}</small><button class="cs-buy" data-id="${p.id}">${priceOf(p)}</button></div>`;
+    body.innerHTML = `${bal}<h3 class="cs-sec">⭐ Star Coins</h3><div class="cs-grid">${PACKS.filter((p) => p.cur === 'star').map(card).join('')}</div>
       <h3 class="cs-sec">💎 Diamonds</h3><div class="cs-grid">${PACKS.filter((p) => p.cur === 'diamond').map(card).join('')}</div>
-      <div class="cs-note">${st.ready ? '' : '🔒 Buying is coming soon. '}A grown-up must say yes before any purchase. You can always earn ⭐ for free by playing games and caring for your Pal.</div>`;
+      <div class="cs-note">A grown-up must say yes before any purchase. You can always earn ⭐ for free by playing games and caring for your Pal.</div>`;
     body.querySelectorAll('.cs-buy').forEach((b) => b.onclick = () => gate(PACKS.find((p) => p.id === b.dataset.id))); }
   function gate(p) {
     // Parental Controls (js/parental.js): when on, the parent PIN (or a block) replaces the math check.

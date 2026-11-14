@@ -32,11 +32,11 @@ export const TRACKS = [
   { title: THEME4_TITLE, artist: THEME4_ARTIST, src: new URL('../assets/audio/kemy-theme4.m4a?v=1', import.meta.url).href, dur: 186.8, credit: PRODUCED },
   { title: THEME5_TITLE, artist: THEME5_ARTIST, src: new URL('../assets/audio/kemy-theme5.m4a?v=1', import.meta.url).href, dur: 229.2, credit: PRODUCED },
   { title: 'Another Week', artist: 'Lone Keem', src: new URL('../assets/music/another-week.mp3', import.meta.url).href, cover: new URL('../assets/music/another-week-cover.jpg', import.meta.url).href, dur: 129.24, credit: 'Produced by Lone Keem · Made with Suno', lazy: true },
-  { title: 'Walked Away', artist: 'Keem', src: new URL('../assets/audio/walked-away.m4a?v=1', import.meta.url).href, dur: 159.6, credit: 'Produced by Lone Keem · Made with Suno' },
+  null, // 5 was Walked Away (removed). The empty slot keeps every later saved index on the same song.
   { title: 'Keep Going', artist: 'Keem', src: new URL('../assets/audio/keep-going.m4a?v=1', import.meta.url).href, dur: 117.2, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Not a Common Person', artist: 'Keem', src: new URL('../assets/audio/not-a-common-person.m4a?v=1', import.meta.url).href, dur: 134.4, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Day Dreaming', artist: 'Keem', src: new URL('../assets/audio/day-dreaming.m4a?v=1', import.meta.url).href, dur: 182.4, credit: 'Produced by Lone Keem · Made with Suno' },
-  { title: 'Empty Home', artist: 'Keem', src: new URL('../assets/audio/empty-home.m4a?v=1', import.meta.url).href, dur: 189.2, credit: 'Produced by Lone Keem · Made with Suno' },
+  null, // 9 was Empty Home (removed). Same reason: saved indexes must not slide.
   { title: 'Stand Tall', artist: 'Keem', src: new URL('../assets/audio/stand-tall.m4a?v=1', import.meta.url).href, dur: 129.6, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Stand Up Strong', artist: 'Keem', src: new URL('../assets/audio/stand-up-strong.m4a?v=1', import.meta.url).href, dur: 103.2, credit: 'Produced by Lone Keem · Made with Suno' },
   { title: 'Stand Up', artist: 'Keem', src: new URL('../assets/audio/stand-up.m4a?v=1', import.meta.url).href, dur: 100.4, credit: 'Produced by Lone Keem · Made with Suno' },
@@ -47,9 +47,11 @@ export const TRACKS = [
 // Play order (indexes into TRACKS; saved indexes and house radio picks stay valid): Keep Building first,
 // then Kemy on the Screen, theme song 2, theme song 3, then the rest in their usual order (loops back to Keep Building).
 // "All songs in order" and the welcome / hatch start follow it.
-export const KB_INDEX = TRACKS.findIndex((t) => t.src === KB_SRC);
-const S2 = TRACKS.findIndex((t) => t.id === 'song2'), S3 = TRACKS.findIndex((t) => t.id === 'song3');
-export const ORDER = [KB_INDEX, 0, S2, S3, ...TRACKS.map((_, i) => i).filter((i) => ![KB_INDEX, 0, S2, S3].includes(i))];
+export const KB_INDEX = TRACKS.findIndex((t) => t && t.src === KB_SRC);
+const S2 = TRACKS.findIndex((t) => t && t.id === 'song2'), S3 = TRACKS.findIndex((t) => t && t.id === 'song3');
+export const ORDER = [KB_INDEX, 0, S2, S3, ...TRACKS.map((_, i) => i).filter((i) => TRACKS[i] && ![KB_INDEX, 0, S2, S3].includes(i))];
+// A saved index that pointed at a removed song (or anything missing) plays the welcome track instead.
+export const trackAt = (i) => TRACKS[i] || TRACKS[FIRST] || TRACKS.find(Boolean);
 export const FIRST = ORDER[0];
 export const PLAYLIST_CREDIT = ORDER.map((i) => TRACKS[i]).map((t) => `${t.title} — ${t.credit}`).join('. ');
 const PICK = 'kemy-theme-track'; // 'all' (in order, loops) | 'shuffle' | '0', '1'… (one track, loops)
@@ -62,6 +64,8 @@ export const DEFAULT_VOL = 0.2, FADE = 1.5;
 const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } } };
 // One-time migration: track 2 was removed from TRACKS, so saved indices shift (1 -> reset, 2+ -> minus 1).
 (() => { try { if (localStorage.getItem('kemy-tracks-mig1')) return; for (const k of ['kemy-theme-track', 'kemy-radio-track']) { const v = localStorage.getItem(k); if (v == null || !/^\d+$/.test(v)) continue; const n = +v; if (n === 1) localStorage.removeItem(k); else if (n > 1) localStorage.setItem(k, String(n - 1)); } localStorage.setItem('kemy-tracks-mig1', '1'); } catch { /* */ } })();
+// Walked Away (5) and Empty Home (9) were removed. Drop a saved pick that pointed at either so play falls back.
+(() => { try { if (localStorage.getItem('kemy-tracks-mig2')) return; for (const k of ['kemy-theme-track', 'kemy-radio-track']) { const v = localStorage.getItem(k); if (v === '5' || v === '9') localStorage.removeItem(k); } localStorage.setItem('kemy-tracks-mig2', '1'); } catch { /* */ } })();
 // '' = not asked yet, 'play', 'mute' (paused, tap to resume), 'off' (never starts, button hidden)
 export function getMode() { const m = ls.get(MODE); if (m === 'play' || m === 'mute' || m === 'off') return m; if (ls.get(OLD) === '1') return 'play'; return ''; }
 export function getVolume() { const v = parseFloat(ls.get(VOLK)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : DEFAULT_VOL; }
@@ -125,10 +129,10 @@ export const silence = () => stop(0.25);
 // Welcome screen / egg hatch: play the full song from the start (asks first if never asked).
 export function playIntro() { const m = getMode(); if (m === '') { ask(); return Promise.resolve(false); } return m === 'play' ? play({ fromStart: true }) : Promise.resolve(false); }
 export const playShort = playIntro;
-function nextIndex() { const pk = getPick(); if (pk === 'shuffle') { if (TRACKS.length < 2) return 0; let n; do n = Math.floor(Math.random() * TRACKS.length); while (n === cur); return n; } if (pk !== 'all') return +pk; return ORDER[(ORDER.indexOf(cur) + 1) % ORDER.length]; }
+function nextIndex() { const pk = getPick(); const list = ORDER.filter((i) => TRACKS[i]); if (!list.length) return 0; if (pk === 'shuffle') { if (list.length < 2) return list[0]; let n; do n = list[Math.floor(Math.random() * list.length)]; while (n === cur); return n; } if (pk !== 'all' && TRACKS[+pk]) return +pk; const at = list.indexOf(cur); return list[(at + 1) % list.length]; }
 // Lazy tracks (the mp3) stay unfetched until playback. fetch:false only remembers the index.
 function loadTrack(i, { fetch } = {}) {
-  cur = i; const t = TRACKS[i]; const doFetch = fetch != null ? fetch : !t.lazy;
+  if (!TRACKS[i]) i = FIRST; cur = i; const t = TRACKS[i]; const doFetch = fetch != null ? fetch : !t.lazy;
   if (el && doFetch) {
     el.preload = t.lazy ? 'none' : 'auto';
     if (!el.getAttribute('src') || el.src !== t.src) { el.src = t.src; if (!t.lazy) el.load(); }
@@ -136,7 +140,7 @@ function loadTrack(i, { fetch } = {}) {
   emit();
 }
 // Settings: choose the playlist order or one track; starts it if the theme is on.
-export function setPick(v) { ls.set(PICK, v); const i = v === 'all' || v === 'shuffle' ? (v === 'shuffle' ? nextIndex() : FIRST) : +v; if (el) { const was = isPlaying(); loadTrack(i, { fetch: was }); if (was) { el.play().catch(() => {}); } } else cur = i; }
+export function setPick(v) { if (v !== 'all' && v !== 'shuffle' && !TRACKS[+v]) v = 'all'; ls.set(PICK, v); const i = v === 'all' || v === 'shuffle' ? (v === 'shuffle' ? nextIndex() : FIRST) : +v; if (el) { const was = isPlaying(); loadTrack(i, { fetch: was }); if (was) { el.play().catch(() => {}); } } else cur = i; }
 export function skip() { if (!el) return; const was = isPlaying(); loadTrack(nextIndex(), { fetch: was }); if (was) el.play().catch(() => {}); }
 export function gainInfo() { return { track: cur, title: TRACKS[cur].title, currentTime: el ? el.currentTime : null, webAudio: !!(actx && gain), gain: gain ? gain.gain.value : null, elVolume: el ? el.volume : null, playing: isPlaying(), state: actx ? actx.state : null, mode: getMode(), vol: getVolume(), duration: el ? el.duration : null, src: el ? el.currentSrc : null }; }
 
