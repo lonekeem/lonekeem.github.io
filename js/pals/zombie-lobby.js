@@ -4,6 +4,7 @@ import { createNet, palSnap, cleanCode, MAX_TEAM, ZTABS, zSayIdx, zText } from '
 import { renderQuickChat } from './emote-wheel.js';
 import { getActivePal } from './core.js';
 import { createEconomy } from './economy.js';
+import { enterWorldLandscape } from '../world-orient.js';
 const CSS = `.zl{max-width:620px;margin:0 auto;padding:14px;color:#fff}.zl-card{background:linear-gradient(160deg,#2b1d55,#1b1240);border-radius:22px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
 .zl h2{margin:0 0 4px;font-size:26px}.zl .sub{opacity:.8;margin:0 0 14px}.zl-btns{display:grid;gap:10px}.zl-b{min-height:64px;border:0;border-radius:18px;font-size:19px;font-weight:800;display:flex;align-items:center;gap:12px;padding:0 18px;cursor:pointer;color:#2b1d55;background:#ffd23f;text-align:left}
 .zl-b small{display:block;font-size:13px;font-weight:600;opacity:.75}.zl-b.alt{background:#7ee08a}.zl-b.alt2{background:#8fd8ff}.zl-b.ghost{background:rgba(255,255,255,.12);color:#fff}
@@ -32,7 +33,7 @@ export function createZombieLobby(ctx) {
       <a class="zl-b ghost" href="#/arcade/armory">🛡️ <span>Zombie Armory<small>Weapons, upgrades and armor</small></span></a></div><p class="zl-err" role="alert"></p><p class="credit">Written by Lone Keem</p></div></section>`;
     const err = (t) => (main.querySelector('.zl-err').textContent = t || '');
     const busy = async (fn) => { main.querySelectorAll('button').forEach((b) => (b.disabled = true)); try { await fn(); } catch (e) { err(e.code === 'permission-denied' ? 'Could not join that team.' : e.message || 'Something went wrong'); main.querySelectorAll('button').forEach((b) => (b.disabled = false)); } };
-    main.querySelector('[data-a=solo]').onclick = async () => (await game()).open({ pal: me.rawPal });
+    main.querySelector('[data-a=solo]').onclick = async () => { enterWorldLandscape(); (await game()).open({ pal: me.rawPal }); };
     main.querySelector('[data-a=shop]').onclick = () => openLobbyShop();
     main.querySelector('[data-a=create]').onclick = () => busy(async () => room(await net.create(me, false), me));
     main.querySelector('[data-a=quick]').onclick = () => busy(async () => room(await net.quick(me), me));
@@ -68,13 +69,13 @@ export function createZombieLobby(ctx) {
       st.innerHTML = allReady ? `▶ Start with ${list.length} players` : list.length < 2 ? '⏳ Need at least 2 players' : '⏳ Waiting for everyone to be ready';
       if (L.status === 'playing' && !starting && mine) go(); };
     const off0 = sess.on(render); const onH = () => { if (!/^#\/arcade\/zombie/.test(location.hash) && sess && !starting) { off(); const s0 = sess; sess = null; s0.leave(); } }; addEventListener('hashchange', onH); const off = () => { off0(); removeEventListener('hashchange', onH); };
-    const go = async () => { starting = true; off(); const g = await game(); const s0 = sess; sess = null; g.open({ pal: me.rawPal, net: s0, name: me.name }); };
+    const go = async () => { starting = true; enterWorldLandscape(); off(); const g = await game(); const s0 = sess; sess = null; g.open({ pal: me.rawPal, net: s0, name: me.name }); };
     $('[data-x=copy]').onclick = () => { navigator.clipboard?.writeText(code).then(() => toast('Code copied: ' + code), () => toast('Code: ' + code)); };
     $('[data-x=leave]').onclick = async () => { off(); const s0 = sess; sess = null; await s0.leave(); page({}); };
     // lobby quick chat: same phrases as in-game (speech bubble on your card, synced via em/emAt)
     let lastQ = 0; $('[data-x=qc]').onclick = () => { const b = $('.zl-qc'); b.hidden = !b.hidden; if (!b.hidden) renderQuickChat(b, (x) => { const i = zSayIdx(x); if (i < 0 || Date.now() - lastQ < 1200) return; lastQ = Date.now(); b.hidden = true; sess.send({ em: i, emAt: Date.now() }); setTimeout(render, 8100); }, ZTABS); };
     $('[data-x=ready]').onclick = () => { const m = sess.players[uid]; sess.send({ ready: !(m && m.ready) }); };
-    $('[data-x=start]').onclick = async () => { const n = Object.keys(sess.players).length; if (n < 2) return; $('[data-x=start]').disabled = true;
+    $('[data-x=start]').onclick = async () => { enterWorldLandscape(); const n = Object.keys(sess.players).length; if (n < 2) return; $('[data-x=start]').disabled = true;
       try { sess.sendState({ wave: 0, zs: [], score: 0, kills: {}, dia: {}, over: false, slam: [], seq: 0, n, ts: 0, brk: 2.5, bm: 0 }); await new Promise((r) => setTimeout(r, 400)); await sess.setLobby({ status: 'playing', n }); }
       catch (e) { $('.zl-err').textContent = 'Could not start: ' + (e.message || e.code); $('[data-x=start]').disabled = false; } };
     $('[data-x=invite]').onclick = () => { toast('Private messages are off. Share this code: ' + code); };

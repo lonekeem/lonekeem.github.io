@@ -1,4 +1,4 @@
-// Landscape lock is only for Pal Park and Kemy Street, and a failed lock never traps fullscreen.
+// Landscape lock is for Pal Park, Kemy Street, and Pal Zombie Survival. A failed lock never traps fullscreen.
 // Run: node tests/world/orient.test.mjs
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -83,6 +83,9 @@ const park = readFileSync(new URL('../../js/pals/park3d.js', import.meta.url), '
 assert.match(park, /enterWorldLandscape\(\)/);
 assert.match(park, /leaveWorldLandscape\(\)/);
 assert.match(park, /bindWorldTurnHint/);
+const zombie = readFileSync(new URL('../../js/pals/zombie.js', import.meta.url), 'utf8');
+assert.match(zombie, /enterWorldLandscape\(\)/);
+assert.match(zombie, /leaveWorldLandscape\(\)/);
 const rush = readFileSync(new URL('../../js/rush/game.js', import.meta.url), 'utf8');
 assert.equal(rush.includes('enterWorldLandscape'), false);
 const bingo = readFileSync(new URL('../../js/bingo/bingo.js', import.meta.url), 'utf8');

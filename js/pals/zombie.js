@@ -18,6 +18,7 @@ import { emoteMs } from './emotes.js';
 import { clipFor } from './dances3d.js';
 const EBEAT = () => performance.now() / 1000 * 116 / 60; // emotes dance at a steady 116 BPM in the game
 import { gfxPreset, makeRenderer, dprFor, makeSky, envFromSky, proceduralTex, mergeGeos, attachGfxSettings, showFps as gfxShowFps } from '../gfx.js';
+import { enterWorldLandscape, leaveWorldLandscape, bindWorldTurnHint, TURN_HINT } from '../world-orient.js';
 const TAU = Math.PI * 2, rnd = (a, b) => a + Math.random() * (b - a), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ZTYPES = ['walk', 'run', 'chonk', 'boss'];
 const ZT = { // zombie types
@@ -38,10 +39,10 @@ function snd(kind) { try { audioCtx = audioCtx || new (window.AudioContext || wi
   g.gain.setValueAtTime(P[4], t); g.gain.exponentialRampToValueAtTime(0.001, t + P[3]); o.start(t); o.stop(t + P[3] + 0.02); } catch { /* no audio */ } }
 function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
 const CSS = `.zg{position:fixed;inset:0;z-index:900;background:#140f2e;overflow:hidden;touch-action:none;font-family:system-ui,sans-serif;color:#fff}.zg canvas.zv{position:absolute;inset:0;width:100%;height:100%;display:block}
-.zg-hud{position:absolute;left:0;right:112px;top:0;padding:max(8px,env(safe-area-inset-top)) 10px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;pointer-events:none;z-index:6}
+.zg-hud{position:absolute;left:0;right:112px;top:0;padding:max(8px,env(safe-area-inset-top)) 10px 0 max(8px,env(safe-area-inset-left));display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;pointer-events:none;z-index:6}
 .zg-hp{width:min(46vw,200px);height:18px;border-radius:99px;background:rgba(0,0,0,.45);border:2px solid #fff;overflow:hidden}.zg-hp i{display:block;height:100%;background:linear-gradient(90deg,#ff6b9a,#ffb3c9);transition:width .15s}
 .zg-pill{background:rgba(0,0,0,.45);border-radius:99px;padding:3px 10px;font-weight:800;font-size:14px;white-space:nowrap}.zg-hud [data-h="wpn"]{max-width:min(54vw,240px);overflow:hidden;text-overflow:ellipsis}.zg-col{display:flex;flex-direction:column;gap:5px}
-.zg-tb{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 56px);right:8px;display:flex;flex-direction:column;gap:6px;z-index:7}.zg-tb button{width:48px;height:48px;border-radius:50%;border:0;background:rgba(0,0,0,.4);color:#fff;font-size:20px}
+.zg-tb{position:absolute;top:calc(max(8px,env(safe-area-inset-top)) + 56px);right:max(8px,env(safe-area-inset-right));display:flex;flex-direction:column;gap:6px;z-index:7}.zg-tb button{width:48px;height:48px;border-radius:50%;border:0;background:rgba(0,0,0,.4);color:#fff;font-size:20px;flex:none}
 .zg-msg{position:absolute;left:50%;top:28%;transform:translate(-50%,-50%);font-size:clamp(26px,7vw,48px);font-weight:900;text-shadow:0 4px 0 #2b1d55,0 0 18px #6dff5a;text-align:center;pointer-events:none;z-index:6;transition:opacity .4s}
 .zg-boss{position:absolute;left:50%;top:calc(max(8px,env(safe-area-inset-top)) + 118px);transform:translateX(-50%);width:min(70vw,380px);z-index:6;text-align:center;font-weight:800;pointer-events:none}.zg-boss div{height:12px;border-radius:99px;background:rgba(0,0,0,.5);overflow:hidden;border:2px solid #fff}.zg-boss i{display:block;height:100%;background:#b48cff}
 .zg-cross{position:absolute;left:50%;top:46%;width:26px;height:26px;margin:-13px;border:3px solid rgba(255,255,255,.85);border-radius:50%;pointer-events:none;z-index:6;transition:transform .1s}.zg-cross.lock{border-color:#ffd23f;transform:scale(.75)}
@@ -50,18 +51,42 @@ const CSS = `.zg{position:fixed;inset:0;z-index:900;background:#140f2e;overflow:
 .zg-card .ghost{background:rgba(255,255,255,.15);color:#fff}.zg-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.zg-stats div{background:rgba(255,255,255,.1);border-radius:12px;padding:8px}.zg-stats b{display:block;font-size:22px}
 .zg-slots{display:flex;gap:6px;flex-basis:100%;pointer-events:auto}.zg-slots button{min-width:48px;min-height:44px;padding:0 8px;border-radius:14px;border:2px solid rgba(255,255,255,.7);background:rgba(20,10,40,.78);color:#fff;font-size:20px;font-weight:800}.zg-slots button.on{border-color:#ffd23f;background:#4a2d86;box-shadow:0 0 0 2px rgba(255,210,63,.45)}
 .zg-team{position:absolute;left:10px;top:calc(max(8px,env(safe-area-inset-top)) + 150px);z-index:6;display:flex;flex-direction:column;gap:4px;pointer-events:none;font-size:13px;font-weight:800}.zg-team div{background:rgba(0,0,0,.45);border-radius:10px;padding:3px 8px;min-width:120px}.zg-team i{display:block;height:6px;border-radius:9px;background:#7ee08a;margin-top:2px}.zg-team .dn{color:#ffb3c9}
-.zg-emo{position:absolute;right:62px;top:calc(max(8px,env(safe-area-inset-top)) + 56px);z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:6px}.zg-emo button{min-height:48px;padding:0 12px;border-radius:14px;border:0;background:rgba(43,29,85,.92);color:#fff;font-weight:800;font-size:15px}.zg-emo{display:block;width:min(340px,80vw);background:rgba(27,18,51,.94);padding:8px;border-radius:16px}.zg-emo .qc-list button{min-height:42px;background:#fff;color:#2b1d55}
+.zg-emo{position:absolute;right:62px;top:calc(max(8px,env(safe-area-inset-top)) + 56px);z-index:8;display:grid;grid-template-columns:1fr 1fr;gap:6px}.zg-emo button{min-height:48px;padding:0 12px;border-radius:14px;border:0;background:rgba(43,29,85,.92);color:#fff;font-weight:800;font-size:15px}.zg-emo{display:block;width:min(340px,80vw);background:rgba(27,18,51,.94);padding:8px;border-radius:16px}.zg-emo .qc-list button{min-height:42px;background:#fff;color:#2b1d55}.zg-emo[hidden],.zg-team[hidden]{display:none!important}
 .zg-rev{position:absolute;left:50%;top:58%;width:160px;height:14px;margin-left:-80px;border-radius:99px;background:rgba(0,0,0,.5);border:2px solid #fff;z-index:6;overflow:hidden}.zg-rev i{display:block;height:100%;width:0;background:#7ee08a}
 .zg-dmg{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 80px rgba(255,80,160,.0);transition:box-shadow .2s;z-index:5}
-@media (orientation:landscape) and (max-height:500px){.zg-tb{top:max(6px,env(safe-area-inset-top));right:8px;flex-direction:row}.zg-tb button{width:42px;height:42px}.zg-hud{right:230px}.zg-team{top:calc(max(6px,env(safe-area-inset-top))+52px)}.zg .kc{--kc:52px!important}.zg .kc-btns{bottom:max(8px,env(safe-area-inset-bottom))}}`;
+.zg-turn{position:absolute;left:50%;top:34%;transform:translateX(-50%);z-index:8;max-width:min(280px,calc(100% - 24px));border:2px solid #ffd23f;border-radius:16px;background:rgba(43,29,85,.94);color:#fff;padding:7px 12px;font:800 12.5px/1.3 system-ui,sans-serif;text-align:center;cursor:pointer}
+.zg-turn[hidden]{display:none!important}
+.zg .kc:has(.kc-set),.zg .kc:has(.kc-tut){z-index:12}
+.zg-tb>.kc-gear{position:static;top:auto;right:auto;flex:none}
+html.zg-on .gm-radio,html.zg-on .gmr-toast{display:none!important}
+html.zg-on .gmp-card{left:-9999px!important;top:0!important;transform:none!important;opacity:0;pointer-events:none}
+html.zg-on .gm.top-right{top:max(6px,env(safe-area-inset-top))!important;right:max(8px,env(safe-area-inset-right))!important;z-index:950}
+@media (orientation:landscape) and (max-height:500px){
+.zg-tb{top:max(6px,env(safe-area-inset-top));right:calc(max(8px,env(safe-area-inset-right)) + 52px);flex-direction:row;flex-wrap:nowrap}
+.zg-tb button,.zg-tb .kc-gear{width:40px;height:40px}
+.zg-hud{padding-top:max(6px,env(safe-area-inset-top))}
+.zg-team{top:calc(max(6px,env(safe-area-inset-top)) + 88px);left:max(8px,env(safe-area-inset-left))}
+.zg .kc{--kc:52px!important}.zg .kc-btns{bottom:max(8px,env(safe-area-inset-bottom));right:max(8px,env(safe-area-inset-right))}
+.zg-emo{top:calc(max(6px,env(safe-area-inset-top)) + 50px);right:max(8px,env(safe-area-inset-right))}
+.zg-panel,.zg .kc-set,.zg .kc-tut{align-items:flex-start;justify-content:safe center;overflow:auto;box-sizing:border-box;padding:calc(max(6px,env(safe-area-inset-top)) + 50px) max(12px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.zg-card,.zg .kc-card,.zg .kc-set .kc-card,.zg .kc-tut .kc-card{width:min(520px,100%);max-height:none;overflow:visible;box-sizing:border-box;padding:12px 14px}
+.zg-card h2{font-size:22px}.zg-card .row{margin-top:8px;gap:8px}.zg-card button,.zg-card a{min-height:40px;font-size:15px;padding:0 12px}
+.zg-stats{gap:6px;margin-top:6px}.zg-stats div{padding:6px}.zg-stats b{font-size:18px}
+.zg .kc-card h3{font-size:18px;margin:0 0 6px}.zg .kc-card label{margin:6px 0}.zg .kc-card button,.zg .kc-all{min-height:40px}.zg .kc-card p{margin:4px 0;font-size:12px}
+}`;
 export function createZombieGame(ctx) {
   const { S, db, toast } = ctx;
-  let G = null;
+  let G = null, keepLand = 0;
+  const releaseLand = () => { document.documentElement.classList.remove('zg-on'); leaveWorldLandscape(); };
   async function open(o = {}) {
+    enterWorldLandscape();
+    document.documentElement.classList.add('zg-on');
+    keepLand++;
     if (G) G.quit(true);
+    keepLand--;
     if (!document.getElementById('zg-css')) { const s = document.createElement('style'); s.id = 'zg-css'; s.textContent = CSS; document.head.appendChild(s); }
     const uid = S.user.uid; let pal = o.pal || null; if (!pal) try { pal = await getActivePal(db, uid); } catch { /* */ }
-    if (!pal) { toast('Hatch a Pal first, then come back to play!'); location.hash = '#/pals'; return; }
+    if (!pal) { releaseLand(); toast('Hatch a Pal first, then come back to play!'); location.hash = '#/pals'; return; }
     let inv = o.inv || {}; if (db) try { inv = await createEconomy(db, uid).inventory(true); } catch { /* offline: free gear only */ }
     G = game({ pal, inv, uid, net: o.net || null, name: o.name || '' }); return G;
   }
@@ -83,7 +108,9 @@ export function createZombieGame(ctx) {
       <div class="zg-tb"><button type="button" data-t="pov" aria-label="Switch camera">👁️</button><button type="button" data-t="pause" aria-label="Pause">⏸️</button><button type="button" data-t="shop" aria-label="Weapon shop">🛒</button><button type="button" data-t="wheel" aria-label="Emote wheel">😊</button>${coop ? '<button type="button" data-t="chat" aria-label="Quick chat">💬</button>' : ''}</div>
       <div class="zg-team" ${coop ? '' : 'hidden'}></div><div class="zg-emo" hidden></div><div class="zg-rev" hidden><i></i></div>
       <div class="zg-boss" hidden><span>👑 Big Boss Zombie</span><div><i></i></div></div><div class="zg-msg"></div>`;
-    document.body.appendChild(el); document.documentElement.style.overflow = 'hidden';
+    document.body.appendChild(el); document.documentElement.style.overflow = 'hidden'; document.documentElement.classList.add('zg-on');
+    const turn = document.createElement('button'); turn.type = 'button'; turn.className = 'zg-turn'; turn.hidden = true; turn.textContent = '🔄 ' + TURN_HINT; el.appendChild(turn);
+    const hintOff = bindWorldTurnHint(turn);
     const $ = (s) => el.querySelector(s), H = (k) => el.querySelector(`[data-h="${k}"]`);
     const cv = $('canvas.zv');
     // ------------------------------------------------------------ renderer + scene
@@ -212,6 +239,18 @@ export function createZombieGame(ctx) {
     $('[data-t="pause"]').onclick = () => pause(true);
     $('[data-t="shop"]').onclick = () => openShop(false);
     C.on('settings:open', () => (paused = true)); C.on('settings:closed', () => (paused = false));
+    // Short landscape: one top row (rotate, camera, pause, shop, emote, settings) with the music button in the corner beside it.
+    const fitTop = () => {
+      const tb = $('.zg-tb'), hud = $('.zg-hud'), gear = el.querySelector('.kc-gear');
+      if (!tb || !hud) return;
+      const land = matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
+      if (gear) { if (land) { if (gear.parentElement !== tb) tb.appendChild(gear); } else if (gear.parentElement !== C.root) C.root.appendChild(gear); }
+      if (!land) { hud.style.right = ''; return; }
+      const right = parseFloat(getComputedStyle(tb).right) || 0;
+      hud.style.right = Math.ceil(right + tb.getBoundingClientRect().width + 10) + 'px';
+    };
+    const topRO = new ResizeObserver(fitTop); topRO.observe($('.zg-tb'));
+    addEventListener('resize', fitTop); addEventListener('orientationchange', fitTop); fitTop(); requestAnimationFrame(fitTop);
     attachGfxSettings(C, () => { const q = gfxPreset(); prMax = dprFor({ dpr: Math.min(q.dpr, 2) }); pr = prMax; R.setPixelRatio(pr); resize(); R.shadowMap.enabled = q.shadows; moon.castShadow = q.shadows && !!Q.shadows; fpsTag.hidden = !gfxShowFps(); }); // live: sharpness, shadows, FPS (grass/AA apply next game)
     const fpsTag = document.createElement('span'); fpsTag.className = 'zg-pill'; fpsTag.style.cssText = 'position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 8px);transform:translateX(-50%);font-variant-numeric:tabular-nums;z-index:5;pointer-events:none'; fpsTag.hidden = !gfxShowFps(); el.appendChild(fpsTag);
     const fwd = () => [Math.sin(me.yaw), Math.cos(me.yaw)];
@@ -464,13 +503,13 @@ export function createZombieGame(ctx) {
         <p class="small" data-dia style="opacity:.85;margin-top:10px">${dias ? 'Saving your Diamonds…' : ''}</p><div class="row"><button data-again>🔁 Play again</button><button class="ghost" data-shop>🛒 Weapon Shop</button><a class="ghost" href="#/arcade/armory">🛡️ Armory</a><a class="ghost" href="#/arcade">🎮 Arcade</a></div><p class="small" style="opacity:.75;margin-top:8px">Written by Lone Keem</p>`);
       if (coop && window.kemyFriends) { const fr = window.kemyFriends.row([...team.keys()], (u) => team.get(u) && team.get(u).name); if (fr) d.querySelector('.zg-card .row')?.before(fr); } // ➕ Add friend (js/friends.js)
       d.querySelector('[data-shop]').onclick = () => openShop(false);
-      d.querySelector('[data-again]').onclick = () => { destroy(); if (coop) { location.hash = '#/arcade/zombie'; dispatchEvent(new HashChangeEvent('hashchange')); } else open(); };
+      d.querySelector('[data-again]').onclick = () => { if (coop) { destroy(); location.hash = '#/arcade/zombie'; dispatchEvent(new HashChangeEvent('hashchange')); return; } keepLand++; destroy(); keepLand--; open(); };
       d.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => destroy()));
       if (dias && db && !window.__zombieNoSave) { try { const got = await createDiamonds(db, uid).earnRun(dias); const p = d.querySelector('[data-dia]'); if (p) p.textContent = got ? `💎 ${got} Diamonds saved!` : 'Daily Diamond limit reached. Come back tomorrow!'; } catch (e) { const p = d.querySelector('[data-dia]'); if (p) p.textContent = 'Could not save Diamonds right now.'; console.warn('diamonds', e.code || e.message); } }
       if (wave > 0 && db) import('../leaderboard.js').then((lb) => lb.recordScore('pals', { r: wave >= 5 ? 'w' : 'l', pts: Math.min(10000, score) }).then((rank) => { const c = d.querySelector('.zg-card'); if (rank && c) c.insertAdjacentHTML('beforeend', `<p style="margin-top:12px"><a href="#/scores/pals" style="background:none;color:#ffd23f;min-height:0;padding:0">🏆 You ranked #${rank} in Pal Games · Scoreboard</a></p>`); })).catch(() => {});
     }
-    function destroy() { if (net && !destroy.done) { destroy.done = 1; netOff && netOff(); net.leave(); } cancelAnimationFrame(raf); removeEventListener('resize', resize); removeEventListener('hashchange', onHash); removeEventListener('keydown', onNum); document.removeEventListener('visibilitychange', onVis); if (shopEl && shopEl._zwClose) shopEl._zwClose(); shopEl = null; C.destroy();
-      scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); el.remove(); document.documentElement.style.overflow = ''; const gmr = document.getElementById('game-music'); if (gmr) gmr.style.zIndex = ''; if (G === api) G = null; window.__zombie = null; }
+    function destroy() { if (net && !destroy.done) { destroy.done = 1; netOff && netOff(); net.leave(); } cancelAnimationFrame(raf); removeEventListener('resize', resize); removeEventListener('resize', fitTop); removeEventListener('orientationchange', fitTop); topRO.disconnect(); hintOff(); removeEventListener('hashchange', onHash); removeEventListener('keydown', onNum); document.removeEventListener('visibilitychange', onVis); if (shopEl && shopEl._zwClose) shopEl._zwClose(); shopEl = null; C.destroy();
+      scene.traverse((o) => { o.geometry?.dispose?.(); }); R.dispose(); R.forceContextLoss?.(); el.remove(); document.documentElement.style.overflow = ''; const gmr = document.getElementById('game-music'); if (gmr) gmr.style.zIndex = ''; if (!keepLand) releaseLand(); if (G === api) G = null; window.__zombie = null; }
     const onHash = () => { if (!/^#\/arcade\/zombie/.test(location.hash)) destroy(); }; addEventListener('hashchange', onHash);
     const onVis = () => { C.reset(); if (document.hidden && !over && !coop) pause(true); }; document.addEventListener('visibilitychange', onVis);
     const onNum = (e) => { if (shopEl || over) return; if (e.target && /input|textarea/i.test(e.target.tagName || '')) return; const n = Number(e.key); if (n >= 1 && n <= 3) { const id = bars()[n - 1]; if (id) equip(id); } };
