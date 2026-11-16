@@ -852,7 +852,14 @@ export function createPark3D(ctx) {
       posePal3D(me.userData.m, st);
       if (pov) { // arms forward + elbows bent so paws (and held items) are in view; walk/wave/dance motion rides on top
         for (const [n, sg] of [['Left', 1], ['Right', -1]]) { J[n + 'UpperArm'].rotation.x -= 55 * D2R; J[n + 'UpperArm'].rotation.z += sg * 32 * D2R; J[n + 'LowerArm'].rotation.x -= 70 * D2R; } }
-      if (pov !== me.userData.povVis) { me.userData.povVis = pov; for (const o of bodyParts) o.visible = !pov || armParts.has(o); } // only arms/paws/held items in first-person
+      // Re-apply every frame in first person: the blink turns the eye lids back on, and those lids
+      // sit on the camera as two huge white orbs. Paws stay. Flippers and wings have no separate hand.
+      if (pov || pov !== me.userData.povVis) {
+        me.userData.povVis = pov;
+        const paws = new Set();
+        if (pov) for (const n of ['LeftHand', 'RightHand']) { const h = J[n]; if (h) h.traverse((o) => { if (o.isMesh) paws.add(o); }); }
+        for (const o of bodyParts) o.visible = !pov || (paws.size ? paws.has(o) : armParts.has(o));
+      }
       // others: interpolate, LOD (full rig near, simple pose far, hidden very far)
       svTick(dt); if (Math.hypot(SV.vx, SV.vz) > 18) { recFast += dt; if (recFast >= 0.25) { recFast = 0; recenter(); } } else recFast = 0; const nowMs = Date.now(); if (!(fr % 15) || !drawSet) { const L = [...others.values()].map((o) => [Math.hypot(o.x - P.x, o.z - P.z), o.uid]).sort((a, b) => a[0] - b[0]); drawSet = new Set(L.slice(0, MAX_DRAWN).map((q) => q[1])); } fr++;
       for (const o of others3D()) {
