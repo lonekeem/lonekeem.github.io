@@ -63,6 +63,6 @@ assert.match(app, /kind: 'join'/);
 assert.match(app, /n\.type === 'play'/);
 assert.match(rules, /'playApp', 'playAppSeen', 'playTold', 'playJoined'/);
 assert.match(rules, /duration\.value\(3, 'h'\)/);
-assert.match(readFileSync(new URL('../sw.js', import.meta.url), 'utf8'), /const CACHE = 'lks-v295'/);
+assert.match(readFileSync(new URL('../sw.js', import.meta.url), 'utf8'), /const CACHE = 'lks-v296'/);
 
 console.log('play-app tests passed');
