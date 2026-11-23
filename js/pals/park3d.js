@@ -85,6 +85,15 @@ export function createPark3D(ctx) {
     unhint = bindWorldTurnHint(main.querySelector('#p3-rotip'));
     const view = main.querySelector('#p3-view'), cv = main.querySelector('#park-cv');
     const $ = (s) => main.querySelector(s);
+    // Bound before any await. Run, camera, and dance call hint() while the room list is still loading.
+    const hintEl = $('#p3-hint');
+    function hint(t) {
+      if (!hintEl) return;
+      hintEl.textContent = t;
+      hintEl.classList.add('on');
+      clearTimeout(hintEl._t);
+      hintEl._t = setTimeout(() => hintEl.classList.remove('on'), 2200);
+    }
     // ---------------------------------------------------------------- renderer
     const R = makeRenderer(cv, Q, { exposure: 1.0 });   // MSAA (not Low), ACES tone mapping, sRGB output, soft shadows
     const DPR = dprFor(Q); let dprK = 1;
@@ -706,7 +715,6 @@ export function createPark3D(ctx) {
     function report(o) {
       openModal(`<button class="icon-btn close" data-close aria-label="Close">✕</button><form class="park-card" id="pr-f"><h2>Report @${esc(o.uname)}</h2><select id="pr-r"><option>Mean or rude chat</option><option>Inappropriate name or Pal</option><option>Spam</option><option>Something else</option></select><textarea id="pr-t" maxlength="300" placeholder="What happened? (optional)"></textarea><button class="btn">Send report</button></form>`);
       document.getElementById('pr-f').onsubmit = async (e) => { e.preventDefault(); try { await addDoc(collection(db, 'reports'), { reporterId: S.user.uid, targetType: 'user', targetId: o.uid, postId: '', reason: ('Pal Park: ' + document.getElementById('pr-r').value + '. ' + document.getElementById('pr-t').value).slice(0, 500), excerpt: String(o.say || '').slice(0, 300), createdAt: serverTimestamp() }); closeModal(); toast('Thanks. The report was sent.'); } catch (er) { toast(friendlyError(er)); } }; }
-    const hintEl = $('#p3-hint'); function hint(t) { hintEl.textContent = t; hintEl.classList.add('on'); clearTimeout(hintEl._t); hintEl._t = setTimeout(() => hintEl.classList.remove('on'), 2200); }
     attachRotate($('#p3-rot'), hint);
 
     // ---------------------------------------------------------------- music: the theme playlist, softly, looping (🎵 player stays available)
